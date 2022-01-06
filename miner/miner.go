@@ -31,6 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/eth/downloader"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -39,6 +40,8 @@ import (
 type Backend interface {
 	BlockChain() *core.BlockChain
 	TxPool() *core.TxPool
+	WriteEvmTraces(hash common.Hash, evmTraces []*ethapi.ExecutionResult) error
+	DeleteEvmTraces(hash common.Hash) error
 }
 
 // Config is the configuration parameters of mining.

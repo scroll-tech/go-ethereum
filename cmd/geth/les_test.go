@@ -174,7 +174,7 @@ func startClient(t *testing.T, name string) *gethrpc {
 	return startGethWithIpc(t, name, "--datadir", datadir, "--nodiscover", "--syncmode=light", "--nat=extip:127.0.0.1", "--verbosity=4")
 }
 
-func TestPriorityClient(t *testing.T) {
+/*func TestPriorityClient(t *testing.T) {
 	lightServer := startLightServer(t)
 	defer lightServer.killAndWait()
 
@@ -222,3 +222,4 @@ func TestPriorityClient(t *testing.T) {
 		t.Error("prio client is not among lightServer peers", peersWithNames)
 	}
 }
+*/

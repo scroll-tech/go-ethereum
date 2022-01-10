@@ -95,6 +95,9 @@ type Ethereum struct {
 	p2pServer *p2p.Server
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+
+	// startHandler start downloader only when run test cases.
+	startHandler bool
 }
 
 // New creates a new Ethereum object (including the
@@ -153,6 +156,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		p2pServer:         stack.Server(),
+		startHandler:      stack.Config().Startup2p,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -530,15 +534,17 @@ func (s *Ethereum) Start() error {
 	s.startBloomHandlers(params.BloomBitsBlocks)
 
 	// Figure out a max peers count based on the server limits
-	//maxPeers := s.p2pServer.MaxPeers
-	//if s.config.LightServ > 0 {
-	//	if s.config.LightPeers >= s.p2pServer.MaxPeers {
-	//		return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, s.p2pServer.MaxPeers)
-	//	}
-	//	maxPeers -= s.config.LightPeers
-	//}
-	// Start the networking layer and the light server if requested
-	//s.handler.Start(maxPeers)
+	if s.startHandler {
+		maxPeers := s.p2pServer.MaxPeers
+		if s.config.LightServ > 0 {
+			if s.config.LightPeers >= s.p2pServer.MaxPeers {
+				return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, s.p2pServer.MaxPeers)
+			}
+			maxPeers -= s.config.LightPeers
+		}
+		// Start the networking layer and the light server if requested
+		s.handler.Start(maxPeers)
+	}
 	return nil
 }
 
@@ -548,7 +554,9 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	//s.handler.Stop()
+	if s.startHandler {
+		s.handler.Stop()
+	}
 
 	// Then stop everything else.
 	s.bloomIndexer.Close()

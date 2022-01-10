@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/prometheus/tsdb/fileutil"
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
@@ -33,7 +34,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/rpc"
-	"github.com/prometheus/tsdb/fileutil"
 )
 
 // Node is a container on which services can be registered.
@@ -261,15 +261,19 @@ func (n *Node) doClose(errs []error) error {
 // openEndpoints starts all network and RPC endpoints.
 func (n *Node) openEndpoints() error {
 	// start networking endpoints
-	/*n.log.Info("Starting peer-to-peer node", "instance", n.server.Name)
-	if err := n.server.Start(); err != nil {
-		return convertFileLockError(err)
-	}*/
+	if n.config.Startup2p {
+		n.log.Info("Starting peer-to-peer node", "instance", n.server.Name)
+		if err := n.server.Start(); err != nil {
+			return convertFileLockError(err)
+		}
+	}
 	// start RPC endpoints
 	err := n.startRPC()
 	if err != nil {
 		n.stopRPC()
-		//n.server.Stop()
+		if n.config.Startup2p {
+			n.server.Stop()
+		}
 	}
 	return err
 }
@@ -298,7 +302,9 @@ func (n *Node) stopServices(running []Lifecycle) error {
 	}
 
 	// Stop p2p networking.
-	//n.server.Stop()
+	if n.config.Startup2p {
+		n.server.Stop()
+	}
 
 	if len(failure.Services) > 0 {
 		return failure

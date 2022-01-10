@@ -546,7 +546,7 @@ func testAtFunctions(t *testing.T, client *rpc.Client) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if pending != 1 {
+	if pending != 0 {
 		t.Fatalf("unexpected pending, wanted 1 got: %v", pending)
 	}
 	// Query balance

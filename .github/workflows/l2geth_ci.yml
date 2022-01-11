@@ -12,9 +12,11 @@ jobs:
       uses: actions/checkout@v2
     - name: Lint
       run: |
+        rm -rf $HOME/.cache/golangci-lint 
         make lint
     - name: Test
       run: |
-        make test
+        go get ./...
+        go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
     - name: Upload coverage report
       run: bash <(curl -s https://codecov.io/bash)

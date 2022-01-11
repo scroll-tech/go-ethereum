@@ -107,6 +107,7 @@ func printHelp(out io.Writer, templ string, data interface{}) {
 // are the same for all commands.
 
 var (
+	// Stop2pFiag Stop p2p server.
 	Stop2pFiag = cli.BoolFlag{
 		Name:  "stop2p",
 		Usage: "Stop p2p server",

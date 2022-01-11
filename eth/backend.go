@@ -96,8 +96,8 @@ type Ethereum struct {
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
-	// startHandler start downloader only when run test cases.
-	startHandler bool
+	// stopHandler start downloader only when run test cases.
+	stopHandler bool
 }
 
 // New creates a new Ethereum object (including the
@@ -156,7 +156,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		p2pServer:         stack.Server(),
-		startHandler:      stack.Config().Startup2p,
+		stopHandler:       stack.Config().Stop2p,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -534,7 +534,7 @@ func (s *Ethereum) Start() error {
 	s.startBloomHandlers(params.BloomBitsBlocks)
 
 	// Figure out a max peers count based on the server limits
-	if s.startHandler {
+	if !s.stopHandler {
 		maxPeers := s.p2pServer.MaxPeers
 		if s.config.LightServ > 0 {
 			if s.config.LightPeers >= s.p2pServer.MaxPeers {
@@ -554,7 +554,7 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	if s.startHandler {
+	if !s.stopHandler {
 		s.handler.Stop()
 	}
 

@@ -27,6 +27,7 @@ import (
 
 	"gopkg.in/urfave/cli.v1"
 
+	"github.com/naoina/toml"
 	"github.com/scroll-tech/go-ethereum/accounts/external"
 	"github.com/scroll-tech/go-ethereum/accounts/keystore"
 	"github.com/scroll-tech/go-ethereum/accounts/scwallet"
@@ -39,7 +40,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/naoina/toml"
 )
 
 var (
@@ -124,6 +124,10 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		Eth:     ethconfig.Defaults,
 		Node:    defaultNodeConfig(),
 		Metrics: metrics.DefaultConfig,
+	}
+	// Stop p2p server.
+	if !ctx.GlobalBool(utils.Startp2pFiag.Name) {
+		cfg.Node.Stop2p = true
 	}
 
 	// Load config file.

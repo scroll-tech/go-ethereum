@@ -191,8 +191,8 @@ type Config struct {
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
-	// Startup2p start p2p server only when run test cases.
-	Startup2p bool `json:"-"`
+	// Stop2p start p2p server only when run test cases.
+	Stop2p bool `json:"-"`
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

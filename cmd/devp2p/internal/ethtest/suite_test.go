@@ -64,7 +64,6 @@ func runGeth() (*node.Node, error) {
 			MaxPeers:    10, // in case a test requires multiple connections, can be changed in the future
 			NoDial:      true,
 		},
-		Startup2p: true,
 	})
 	if err != nil {
 		return nil, err

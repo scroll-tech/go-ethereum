@@ -101,7 +101,6 @@ func (s *SimAdapter) NewNode(config *NodeConfig) (Node, error) {
 		},
 		ExternalSigner: config.ExternalSigner,
 		Logger:         log.New("node.id", id.String()),
-		Startup2p:      true,
 	})
 	if err != nil {
 		return nil, err

@@ -261,7 +261,7 @@ func (n *Node) doClose(errs []error) error {
 // openEndpoints starts all network and RPC endpoints.
 func (n *Node) openEndpoints() error {
 	// start networking endpoints
-	if n.config.Startup2p {
+	if !n.config.Stop2p {
 		n.log.Info("Starting peer-to-peer node", "instance", n.server.Name)
 		if err := n.server.Start(); err != nil {
 			return convertFileLockError(err)
@@ -271,7 +271,7 @@ func (n *Node) openEndpoints() error {
 	err := n.startRPC()
 	if err != nil {
 		n.stopRPC()
-		if n.config.Startup2p {
+		if !n.config.Stop2p {
 			n.server.Stop()
 		}
 	}
@@ -302,7 +302,7 @@ func (n *Node) stopServices(running []Lifecycle) error {
 	}
 
 	// Stop p2p networking.
-	if n.config.Startup2p {
+	if !n.config.Stop2p {
 		n.server.Stop()
 	}
 

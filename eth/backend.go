@@ -528,13 +528,12 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 // Start implements node.Lifecycle, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
 func (s *Ethereum) Start() error {
-	//eth.StartENRUpdater(s.blockchain, s.p2pServer.LocalNode())
-
 	// Start the bloom bits servicing goroutines
 	s.startBloomHandlers(params.BloomBitsBlocks)
 
 	// Figure out a max peers count based on the server limits
 	if !s.stopHandler {
+		eth.StartENRUpdater(s.blockchain, s.p2pServer.LocalNode())
 		maxPeers := s.p2pServer.MaxPeers
 		if s.config.LightServ > 0 {
 			if s.config.LightPeers >= s.p2pServer.MaxPeers {

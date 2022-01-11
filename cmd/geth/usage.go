@@ -34,7 +34,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		Name: "ETHEREUM",
 		Flags: []cli.Flag{
 			configFileFlag,
-			utils.Startp2pFiag,
+			utils.Stop2pFiag,
 			utils.DataDirFlag,
 			utils.AncientFlag,
 			utils.MinFreeDiskSpaceFlag,

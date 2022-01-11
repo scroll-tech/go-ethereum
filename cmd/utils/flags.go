@@ -107,9 +107,9 @@ func printHelp(out io.Writer, templ string, data interface{}) {
 // are the same for all commands.
 
 var (
-	Startp2pFiag = cli.BoolFlag{
-		Name:  "startp2p",
-		Usage: "Start p2p server",
+	Stop2pFiag = cli.BoolFlag{
+		Name:  "stop2p",
+		Usage: "Stop p2p server",
 	}
 	// General settings
 	DataDirFlag = DirectoryFlag{

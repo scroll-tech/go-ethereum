@@ -126,7 +126,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		Metrics: metrics.DefaultConfig,
 	}
 	// Stop p2p server.
-	if !ctx.GlobalBool(utils.Startp2pFiag.Name) {
+	if ctx.GlobalBool(utils.Stop2pFiag.Name) {
 		cfg.Node.Stop2p = true
 	}
 

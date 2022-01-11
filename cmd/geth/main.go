@@ -63,7 +63,7 @@ var (
 		utils.UnlockedAccountFlag,
 		utils.PasswordFileFlag,
 		utils.BootnodesFlag,
-		utils.Startp2pFiag,
+		utils.Stop2pFiag,
 		utils.DataDirFlag,
 		utils.AncientFlag,
 		utils.MinFreeDiskSpaceFlag,

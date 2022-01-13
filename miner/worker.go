@@ -786,10 +786,10 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	tracer := vm.StructLogger{}
+	tracer := vm.NewStructLogger(nil)
 	config := *w.chain.GetVMConfig()
 	config.Debug = true
-	config.Tracer = &tracer
+	config.Tracer = tracer
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, config)
 	if err != nil {

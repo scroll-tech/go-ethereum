@@ -96,10 +96,9 @@ type environment struct {
 	tcount    int            // tx count in cycle
 	gasPool   *core.GasPool  // available gas used to pack transactions
 
-	header   *types.Header
-	txs      []*types.Transaction
-	receipts []*types.Receipt
-
+	header           *types.Header
+	txs              []*types.Transaction
+	receipts         []*types.Receipt
 	executionResults []*ethapi.ExecutionResult
 }
 
@@ -792,6 +791,7 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
+	// Enables debugging and set tracer.
 	tracer := tracerPool.Get().(*vm.StructLogger)
 	defer func() {
 		tracer.Reset()

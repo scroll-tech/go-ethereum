@@ -39,6 +39,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
+var (
+	tracerPool = sync.Pool{
+		New: func() interface{} { return vm.NewStructLogger(&vm.LogConfig{EnableMemory: true}) },
+	}
+)
+
 const (
 	// resultQueueSize is the size of channel listening to sealing result.
 	resultQueueSize = 10
@@ -786,7 +792,11 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	tracer := vm.NewStructLogger(&vm.LogConfig{EnableMemory: true})
+	tracer := tracerPool.Get().(*vm.StructLogger)
+	defer func() {
+		tracer.Reset()
+		tracerPool.Put(tracer)
+	}()
 	config := *w.chain.GetVMConfig()
 	config.Debug = true
 	config.Tracer = tracer

@@ -16,7 +16,7 @@ func (s *Ethereum) ReadEvmTraces(hash common.Hash) []*ethapi.ExecutionResult {
 	}
 	var evmTraces []*ethapi.ExecutionResult
 	if err := rlp.DecodeBytes(data, &evmTraces); err != nil {
-		log.Error("")
+		log.Error("Failed to decode evmTraces", "err", err)
 	}
 	return evmTraces
 }

@@ -786,7 +786,7 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	tracer := vm.NewStructLogger(nil)
+	tracer := vm.NewStructLogger(&vm.LogConfig{EnableMemory: true})
 	config := *w.chain.GetVMConfig()
 	config.Debug = true
 	config.Tracer = tracer

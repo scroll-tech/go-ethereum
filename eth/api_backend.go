@@ -35,6 +35,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/eth/gasprice"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/miner"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -233,6 +234,10 @@ func (b *EthAPIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) e
 
 func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.eth.BlockChain().SubscribeLogsEvent(ch)
+}
+
+func (b EthAPIBackend) SubscribeEvmTracesEvent(ch chan<- []*ethapi.ExecutionResult) event.Subscription {
+	return b.eth.miner.SubscribeEvmTraces(ch)
 }
 
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {

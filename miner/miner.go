@@ -241,3 +241,8 @@ func (miner *Miner) DisablePreseal() {
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
 }
+
+// SubscribeEvmTraces starts delivering evmTraces when a new block is created.
+func (miner *Miner) SubscribeEvmTraces(ch chan<- []*ethapi.ExecutionResult) event.Subscription {
+	return miner.worker.evmTracesFeed.Subscribe(ch)
+}

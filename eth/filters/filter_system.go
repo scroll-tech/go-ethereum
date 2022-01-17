@@ -30,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -52,6 +53,8 @@ const (
 	PendingTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
+	// EvmTracesSubscription queries evmTrace list when new block created
+	EvmTracesSubscription
 	// LastSubscription keeps track of the last index
 	LastIndexSubscription
 )
@@ -76,6 +79,7 @@ type subscription struct {
 	logs      chan []*types.Log
 	hashes    chan []common.Hash
 	headers   chan *types.Header
+	evmTraces chan []*ethapi.ExecutionResult
 	installed chan struct{} // closed when the filter is installed
 	err       chan error    // closed when the filter is uninstalled
 }
@@ -93,15 +97,17 @@ type EventSystem struct {
 	rmLogsSub      event.Subscription // Subscription for removed log event
 	pendingLogsSub event.Subscription // Subscription for pending log event
 	chainSub       event.Subscription // Subscription for new chain event
+	evmTracesSub   event.Subscription // Subscription for new evmTraces event
 
 	// Channels
-	install       chan *subscription         // install filter for event notification
-	uninstall     chan *subscription         // remove filter for event notification
-	txsCh         chan core.NewTxsEvent      // Channel to receive new transactions event
-	logsCh        chan []*types.Log          // Channel to receive new log event
-	pendingLogsCh chan []*types.Log          // Channel to receive new log event
-	rmLogsCh      chan core.RemovedLogsEvent // Channel to receive removed log event
-	chainCh       chan core.ChainEvent       // Channel to receive new chain event
+	install       chan *subscription             // install filter for event notification
+	uninstall     chan *subscription             // remove filter for event notification
+	txsCh         chan core.NewTxsEvent          // Channel to receive new transactions event
+	logsCh        chan []*types.Log              // Channel to receive new log event
+	pendingLogsCh chan []*types.Log              // Channel to receive new log event
+	rmLogsCh      chan core.RemovedLogsEvent     // Channel to receive removed log event
+	chainCh       chan core.ChainEvent           // Channel to receive new chain event
+	evmTracesCh   chan []*ethapi.ExecutionResult // Channel to receive new evmTraces event
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -129,6 +135,7 @@ func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
 	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
 	m.pendingLogsSub = m.backend.SubscribePendingLogsEvent(m.pendingLogsCh)
+	m.evmTracesSub = m.backend.SubscribeEvmTracesEvent(m.evmTracesCh)
 
 	// Make sure none of the subscriptions are empty
 	if m.txsSub == nil || m.logsSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.pendingLogsSub == nil {
@@ -290,6 +297,19 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 	return es.subscribe(sub)
 }
 
+// SubscribeEvmTraces creates a subscription that writes the evmTraces when a new block is created.
+func (es *EventSystem) SubscribeEvmTraces(evmTraces chan []*ethapi.ExecutionResult) *Subscription {
+	sub := &subscription{
+		id:        rpc.NewID(),
+		typ:       EvmTracesSubscription,
+		created:   time.Now(),
+		evmTraces: evmTraces,
+		installed: make(chan struct{}),
+		err:       make(chan error),
+	}
+	return es.subscribe(sub)
+}
+
 // SubscribePendingTxs creates a subscription that writes transaction hashes for
 // transactions that enter the transaction pool.
 func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscription {
@@ -363,6 +383,12 @@ func (es *EventSystem) handleChainEvent(filters filterIndex, ev core.ChainEvent)
 				}
 			}
 		})
+	}
+}
+
+func (es *EventSystem) handleEvmTracesEvent(filters filterIndex, ev []*ethapi.ExecutionResult) {
+	for _, f := range filters[EvmTracesSubscription] {
+		f.evmTraces <- ev
 	}
 }
 
@@ -448,6 +474,7 @@ func (es *EventSystem) eventLoop() {
 		es.rmLogsSub.Unsubscribe()
 		es.pendingLogsSub.Unsubscribe()
 		es.chainSub.Unsubscribe()
+		es.evmTracesSub.Unsubscribe()
 	}()
 
 	index := make(filterIndex)
@@ -467,7 +494,8 @@ func (es *EventSystem) eventLoop() {
 			es.handlePendingLogs(index, ev)
 		case ev := <-es.chainCh:
 			es.handleChainEvent(index, ev)
-
+		case ev := <-es.evmTracesCh:
+			es.handleEvmTracesEvent(index, ev)
 		case f := <-es.install:
 			if f.typ == MinedAndPendingLogsSubscription {
 				// the type are logs and pending logs subscriptions

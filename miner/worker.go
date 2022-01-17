@@ -141,6 +141,7 @@ type worker struct {
 
 	// Feeds
 	pendingLogsFeed event.Feed
+	evmTracesFeed   event.Feed
 
 	// Subscriptions
 	mux          *event.TypeMux
@@ -678,6 +679,7 @@ func (w *worker) resultLoop() {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
 			}
+			w.evmTracesFeed.Send(evmTraces)
 			if err := w.eth.WriteEvmTraces(hash, evmTraces); err != nil {
 				log.Error("Failed writing evmTrace list to db", "err", err)
 			}

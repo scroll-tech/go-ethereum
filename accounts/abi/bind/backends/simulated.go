@@ -40,6 +40,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/eth/filters"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -873,6 +874,10 @@ func (fb *filterBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscr
 }
 
 func (fb *filterBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	return nullSubscription()
+}
+
+func (fb *filterBackend) SubscribeEvmTracesEvent(ch chan<- []*ethapi.ExecutionResult) event.Subscription {
 	return nullSubscription()
 }
 

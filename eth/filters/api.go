@@ -31,6 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -275,6 +276,35 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 		}
 	}()
 
+	return rpcSub, nil
+}
+
+// NewEvmTraces send evmTrace list when a new block is created.
+func (api *PublicFilterAPI) NewEvmTraces(ctx context.Context) (*rpc.Subscription, error) {
+	notifier, supported := rpc.NotifierFromContext(ctx)
+	if !supported {
+		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
+	}
+
+	rpcSub := notifier.CreateSubscription()
+
+	go func() {
+		evmTraces := make(chan []*ethapi.ExecutionResult)
+		evmTracesSub := api.events.SubscribeEvmTraces(evmTraces)
+
+		for {
+			select {
+			case traces := <-evmTraces:
+				notifier.Notify(rpcSub.ID, traces)
+			case <-rpcSub.Err():
+				evmTracesSub.Unsubscribe()
+				return
+			case <-notifier.Closed():
+				evmTracesSub.Unsubscribe()
+				return
+			}
+		}
+	}()
 	return rpcSub, nil
 }
 

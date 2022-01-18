@@ -618,7 +618,7 @@ func NewPublicTraceAPI(eth *Ethereum) *PublicTraceAPI {
 	return &PublicTraceAPI{eth}
 }
 
-// GetEvmTracesByHash returns the block's evmTrace list by blockHash.
-func (api *PublicTraceAPI) GetEvmTracesByHash(blockHash common.Hash) ([]*types.ExecutionResult, error) {
+// EvmTracesByHash returns the block's evmTrace list by blockHash.
+func (api *PublicTraceAPI) EvmTracesByHash(blockHash common.Hash) ([]*types.ExecutionResult, error) {
 	return rawdb.ReadEvmTraces(api.e.chainDb, blockHash), nil
 }

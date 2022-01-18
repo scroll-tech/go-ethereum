@@ -232,7 +232,7 @@ func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
 
-// EvmTracesKey = evmTracesPrefix + hash
-func EvmTracesKey(hash common.Hash) []byte {
+// evmTracesKey = evmTracesPrefix + hash
+func evmTracesKey(hash common.Hash) []byte {
 	return append(evmTracesPrefix, hash.Bytes()...)
 }

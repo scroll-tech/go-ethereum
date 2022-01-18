@@ -31,7 +31,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -289,7 +288,7 @@ func (api *PublicFilterAPI) NewEvmTraces(ctx context.Context) (*rpc.Subscription
 	rpcSub := notifier.CreateSubscription()
 
 	go func() {
-		evmTraces := make(chan []*ethapi.ExecutionResult)
+		evmTraces := make(chan []*types.ExecutionResult)
 		evmTracesSub := api.events.SubscribeEvmTraces(evmTraces)
 
 		for {

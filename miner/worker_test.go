@@ -35,7 +35,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
@@ -167,10 +166,6 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 
 func (b *testWorkerBackend) BlockChain() *core.BlockChain { return b.chain }
 func (b *testWorkerBackend) TxPool() *core.TxPool         { return b.txPool }
-func (b *testWorkerBackend) WriteEvmTraces(hash common.Hash, evmTraces []*ethapi.ExecutionResult) error {
-	return nil
-}
-func (b *testWorkerBackend) DeleteEvmTraces(hash common.Hash) error { return nil }
 
 func (b *testWorkerBackend) newRandomUncle() *types.Block {
 	var parent *types.Block

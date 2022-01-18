@@ -325,6 +325,11 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 	return ec.c.EthSubscribe(ctx, ch, "newHeads")
 }
 
+// SubscribeNewEvmTraces subscribe to evmTraces when new block created.
+func (ec *Client) SubscribeNewEvmTraces(ctx context.Context, ch chan<- *types.ExecutionResult) (ethereum.Subscription, error) {
+	return ec.c.EthSubscribe(ctx, ch, "newEvmTraces")
+}
+
 // State Access
 
 // NetworkID returns the network ID (also known as the chain ID) for this chain.

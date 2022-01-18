@@ -31,7 +31,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/eth/downloader"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -54,12 +53,6 @@ func (m *mockBackend) BlockChain() *core.BlockChain {
 func (m *mockBackend) TxPool() *core.TxPool {
 	return m.txPool
 }
-
-func (m *mockBackend) WriteEvmTraces(hash common.Hash, evmTraces []*ethapi.ExecutionResult) error {
-	return nil
-}
-
-func (m *mockBackend) DeleteEvmTraces(hash common.Hash) error { return nil }
 
 type testBlockChain struct {
 	statedb       *state.StateDB

@@ -33,16 +33,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/trie"
-)
-
-var (
-	tracerPool = sync.Pool{
-		New: func() interface{} { return vm.NewStructLogger(&vm.LogConfig{EnableMemory: true}) },
-	}
 )
 
 const (
@@ -99,13 +92,13 @@ type environment struct {
 	header           *types.Header
 	txs              []*types.Transaction
 	receipts         []*types.Receipt
-	executionResults []*ethapi.ExecutionResult
+	executionResults []*types.ExecutionResult
 }
 
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
 	receipts         []*types.Receipt
-	executionResults []*ethapi.ExecutionResult
+	executionResults []*types.ExecutionResult
 	state            *state.StateDB
 	block            *types.Block
 	createdAt        time.Time
@@ -141,7 +134,6 @@ type worker struct {
 
 	// Feeds
 	pendingLogsFeed event.Feed
-	evmTracesFeed   event.Feed
 
 	// Subscriptions
 	mux          *event.TypeMux
@@ -645,7 +637,7 @@ func (w *worker) resultLoop() {
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
 				receipts  = make([]*types.Receipt, len(task.receipts))
-				evmTraces = make([]*ethapi.ExecutionResult, len(task.executionResults))
+				evmTraces = make([]*types.ExecutionResult, len(task.executionResults))
 				logs      []*types.Log
 			)
 			for i, taskReceipt := range task.receipts {
@@ -653,7 +645,7 @@ func (w *worker) resultLoop() {
 				receipts[i] = receipt
 				*receipt = *taskReceipt
 
-				evmTrace := new(ethapi.ExecutionResult)
+				evmTrace := new(types.ExecutionResult)
 				evmTraces[i] = evmTrace
 				*evmTrace = *task.executionResults[i]
 
@@ -674,14 +666,10 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-			_, err := w.chain.WriteBlockWithState(block, receipts, logs, task.state, true)
+			_, err := w.chain.WriteBlockWithState(block, receipts, logs, evmTraces, task.state, true)
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
-			}
-			w.evmTracesFeed.Send(evmTraces)
-			if err := w.eth.WriteEvmTraces(hash, evmTraces); err != nil {
-				log.Error("Failed writing evmTrace list to db", "err", err)
 			}
 			w.chain.Genesis()
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
@@ -793,27 +781,21 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	// Enables debugging and set tracer.
-	tracer := tracerPool.Get().(*vm.StructLogger)
-	defer func() {
-		tracer.Reset()
-		tracerPool.Put(tracer)
-	}()
-	config := *w.chain.GetVMConfig()
-	config.Debug = true
-	config.Tracer = tracer
+	// reset tracer.
+	tracer := w.chain.GetVMConfig().Tracer.(*vm.StructLogger)
+	tracer.Reset()
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, config)
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
-	w.current.executionResults = append(w.current.executionResults, &ethapi.ExecutionResult{
+	w.current.executionResults = append(w.current.executionResults, &types.ExecutionResult{
 		Gas:        receipt.GasUsed,
 		Failed:     receipt.Status == types.ReceiptStatusSuccessful,
-		StructLogs: ethapi.FormatLogs(tracer.StructLogs()),
+		StructLogs: vm.FormatLogs(tracer.StructLogs()),
 	})
 
 	return receipt.Logs, nil
@@ -1107,8 +1089,8 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	return result
 }
 
-func copyExecutionResults(executionResults []*ethapi.ExecutionResult) []*ethapi.ExecutionResult {
-	result := make([]*ethapi.ExecutionResult, len(executionResults))
+func copyExecutionResults(executionResults []*types.ExecutionResult) []*types.ExecutionResult {
+	result := make([]*types.ExecutionResult, len(executionResults))
 	for i, l := range executionResults {
 		cpy := *l
 		result[i] = &cpy

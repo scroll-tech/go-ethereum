@@ -31,7 +31,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/eth/downloader"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -40,8 +39,6 @@ import (
 type Backend interface {
 	BlockChain() *core.BlockChain
 	TxPool() *core.TxPool
-	WriteEvmTraces(hash common.Hash, evmTraces []*ethapi.ExecutionResult) error
-	DeleteEvmTraces(hash common.Hash) error
 }
 
 // Config is the configuration parameters of mining.
@@ -240,9 +237,4 @@ func (miner *Miner) DisablePreseal() {
 // to the given channel.
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
-}
-
-// SubscribeEvmTraces starts delivering evmTraces when a new block is created.
-func (miner *Miner) SubscribeEvmTraces(ch chan<- []*ethapi.ExecutionResult) event.Subscription {
-	return miner.worker.evmTracesFeed.Subscribe(ch)
 }

@@ -328,7 +328,7 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 // EvmTracesByHash returns the evmTraces.
 func (ec *Client) EvmTracesByHash(ctx context.Context, blockHash common.Hash) ([]*types.ExecutionResult, error) {
 	var traces []*types.ExecutionResult
-	if err := ec.c.CallContext(ctx, &traces, "eth_evmTracesByHash"); err != nil {
+	if err := ec.c.CallContext(ctx, &traces, "eth_evmTracesByHash", blockHash); err != nil {
 		return nil, err
 	}
 	return traces, nil

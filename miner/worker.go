@@ -396,10 +396,10 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
-		/*case head := <-w.chainHeadCh:
-		clearPending(head.Block.NumberU64())
-		timestamp = time.Now().Unix()
-		commit(false, commitInterruptNewHead)*/
+		case head := <-w.chainHeadCh:
+			clearPending(head.Block.NumberU64())
+			timestamp = time.Now().Unix()
+		//commit(false, commitInterruptNewHead)
 
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
@@ -671,7 +671,6 @@ func (w *worker) resultLoop() {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
 			}
-			w.chain.Genesis()
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
 				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
 
@@ -1051,7 +1050,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time) error {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(w.current.receipts)
-	executionResults := copyExecutionResults(w.current.executionResults)
 	s := w.current.state.Copy()
 	block, err := w.engine.FinalizeAndAssemble(w.chain, w.current.header, s, w.current.txs, uncles, receipts)
 	if err != nil {
@@ -1062,7 +1060,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			interval()
 		}
 		select {
-		case w.taskCh <- &task{receipts: receipts, executionResults: executionResults, state: s, block: block, createdAt: time.Now()}:
+		case w.taskCh <- &task{receipts: receipts, executionResults: w.current.executionResults, state: s, block: block, createdAt: time.Now()}:
 			w.unconfirmed.Shift(block.NumberU64() - 1)
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"uncles", len(uncles), "txs", w.current.tcount,
@@ -1083,15 +1081,6 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	result := make([]*types.Receipt, len(receipts))
 	for i, l := range receipts {
-		cpy := *l
-		result[i] = &cpy
-	}
-	return result
-}
-
-func copyExecutionResults(executionResults []*types.ExecutionResult) []*types.ExecutionResult {
-	result := make([]*types.ExecutionResult, len(executionResults))
-	for i, l := range executionResults {
 		cpy := *l
 		result[i] = &cpy
 	}

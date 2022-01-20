@@ -98,7 +98,7 @@ type environment struct {
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
 	receipts         []*types.Receipt
-	executionResults []*types.ExecutionResult
+	blockResult *types.BlockResult
 	state            *state.StateDB
 	block            *types.Block
 	createdAt        time.Time

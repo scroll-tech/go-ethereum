@@ -1187,7 +1187,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		return NonStatTy, errInsertionInterrupted
 	}
 	defer bc.chainmu.Unlock()
-	//rawdb.WriteEvmTraces(bc.db, block.Hash(), evmTraces)
 	return bc.writeBlockWithState(block, receipts, logs, evmTraces, state, emitHeadEvent)
 }
 
@@ -1646,6 +1645,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
+		// EvmTraces is nil is safe because l2geth's p2p server is stoped and the code will not execute there.
 		status, err := bc.writeBlockWithState(block, receipts, logs, nil, statedb, false)
 		atomic.StoreUint32(&followupInterrupt, 1)
 		if err != nil {

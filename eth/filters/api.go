@@ -278,8 +278,8 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 	return rpcSub, nil
 }
 
-// NewEvmTraces sends the EVM trace list when a new block is created.
-func (api *PublicFilterAPI) NewEvmTraces(ctx context.Context) (*rpc.Subscription, error) {
+// NewBlockResult sends the EVM trace list when a new block is created.
+func (api *PublicFilterAPI) NewBlockResult(ctx context.Context) (*rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
@@ -288,8 +288,8 @@ func (api *PublicFilterAPI) NewEvmTraces(ctx context.Context) (*rpc.Subscription
 	rpcSub := notifier.CreateSubscription()
 
 	go func() {
-		evmTraces := make(chan []*types.ExecutionResult)
-		evmTracesSub := api.events.SubscribeEvmTraces(evmTraces)
+		evmTraces := make(chan *types.BlockResult)
+		evmTracesSub := api.events.SubscribeBlockResult(evmTraces)
 
 		for {
 			select {

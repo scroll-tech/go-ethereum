@@ -325,18 +325,18 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 	return ec.c.EthSubscribe(ctx, ch, "newHeads")
 }
 
-// EvmTracesByHash returns the evmTraces.
-func (ec *Client) EvmTracesByHash(ctx context.Context, blockHash common.Hash) ([]*types.ExecutionResult, error) {
+// BlockResultByHash returns the blockResult.
+func (ec *Client) BlockResultByHash(ctx context.Context, blockHash common.Hash) ([]*types.ExecutionResult, error) {
 	var traces []*types.ExecutionResult
-	if err := ec.c.CallContext(ctx, &traces, "eth_evmTracesByHash", blockHash); err != nil {
+	if err := ec.c.CallContext(ctx, &traces, "eth_blockResultByHash", blockHash); err != nil {
 		return nil, err
 	}
 	return traces, nil
 }
 
-// SubscribeNewEvmTraces subscribe to evmTraces when new block created.
-func (ec *Client) SubscribeNewEvmTraces(ctx context.Context, ch chan<- []*types.ExecutionResult) (ethereum.Subscription, error) {
-	return ec.c.EthSubscribe(ctx, ch, "newEvmTraces")
+// SubscribeNewBlockResult subscribe to blockResult when new block created.
+func (ec *Client) SubscribeNewBlockResult(ctx context.Context, ch chan<- *types.BlockResult) (ethereum.Subscription, error) {
+	return ec.c.EthSubscribe(ctx, ch, "newBlockResult")
 }
 
 // State Access

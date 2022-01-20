@@ -8,6 +8,30 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
+// BlockResult returns block execute result for rollers.
+type BlockResult struct {
+	ExecutionResult []*ExecutionResult `json:"executionResult"`
+}
+
+type rlpBlockResult struct {
+	ExecutionResult []*ExecutionResult `json:"executionResult"`
+}
+
+func (b *BlockResult) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, &rlpBlockResult{
+		ExecutionResult: b.ExecutionResult,
+	})
+}
+
+func (b *BlockResult) DecodeRLP(s *rlp.Stream) error {
+	var dec rlpBlockResult
+	err := s.Decode(&dec)
+	if err == nil {
+		b.ExecutionResult = dec.ExecutionResult
+	}
+	return err
+}
+
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value

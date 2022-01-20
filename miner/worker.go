@@ -98,7 +98,7 @@ type environment struct {
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
 	receipts         []*types.Receipt
-	blockResult *types.BlockResult
+	executionResults []*types.ExecutionResult
 	state            *state.StateDB
 	block            *types.Block
 	createdAt        time.Time
@@ -666,7 +666,7 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-			_, err := w.chain.WriteBlockWithState(block, receipts, logs, evmTraces, task.state, true)
+			_, err := w.chain.WriteBlockWithState(block, receipts, logs, &types.BlockResult{ExecutionResult: evmTraces}, task.state, true)
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue

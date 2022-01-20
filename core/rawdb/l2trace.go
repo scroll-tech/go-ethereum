@@ -8,32 +8,32 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-// ReadEvmTraces retrieves all the evmTraces belonging to a block.
-func ReadEvmTraces(db ethdb.Reader, hash common.Hash) []*types.ExecutionResult {
-	data, _ := db.Get(evmTracesKey(hash))
+// ReadBlockResult retrieves all data required by roller.
+func ReadBlockResult(db ethdb.Reader, hash common.Hash) *types.BlockResult {
+	data, _ := db.Get(blockResultKey(hash))
 	if len(data) == 0 {
 		return nil
 	}
-	var evmTraces []*types.ExecutionResult
-	if err := rlp.DecodeBytes(data, &evmTraces); err != nil {
+	var blockResult types.BlockResult
+	if err := rlp.DecodeBytes(data, &blockResult); err != nil {
 		log.Error("Failed to decode evmTraces", "err", err)
 		return nil
 	}
-	return evmTraces
+	return &blockResult
 }
 
-// WriteEvmTraces stores evmTrace list into leveldb.
-func WriteEvmTraces(db ethdb.KeyValueWriter, hash common.Hash, evmTraces []*types.ExecutionResult) {
-	bytes, err := rlp.EncodeToBytes(evmTraces)
+// WriteBlockResult stores blockResult into leveldb.
+func WriteBlockResult(db ethdb.KeyValueWriter, hash common.Hash, blockResult *types.BlockResult) {
+	bytes, err := rlp.EncodeToBytes(blockResult)
 	if err != nil {
 		log.Crit("Failed to RLP encode evmTraces", "err", err)
 	}
-	db.Put(evmTracesKey(hash), bytes)
+	db.Put(blockResultKey(hash), bytes)
 }
 
-// DeleteEvmTraces removes all evmTraces with a block hash.
-func DeleteEvmTraces(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Delete(evmTracesKey(hash)); err != nil {
+// DeleteBlockResult removes blockResult with a block hash.
+func DeleteBlockResult(db ethdb.KeyValueWriter, hash common.Hash) {
+	if err := db.Delete(blockResultKey(hash)); err != nil {
 		log.Crit("Failed to delete evmTraces", "err", err)
 	}
 }

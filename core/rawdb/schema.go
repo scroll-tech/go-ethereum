@@ -89,7 +89,7 @@ var (
 	SnapshotAccountPrefix = []byte("a") // SnapshotAccountPrefix + account hash -> account trie value
 	SnapshotStoragePrefix = []byte("o") // SnapshotStoragePrefix + account hash + storage hash -> storage trie value
 	CodePrefix            = []byte("c") // CodePrefix + code hash -> account code
-	evmTracesPrefix       = []byte("e") // evmTracesPrefix + hash -> evmTrace list
+	blockResultPrefix     = []byte("e") // blockResultPrefix + hash -> blockResult
 
 	PreimagePrefix = []byte("secure-key-")      // PreimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
@@ -232,7 +232,7 @@ func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
 
-// evmTracesKey = evmTracesPrefix + hash
-func evmTracesKey(hash common.Hash) []byte {
-	return append(evmTracesPrefix, hash.Bytes()...)
+// blockResultKey = blockResultPrefix + hash
+func blockResultKey(hash common.Hash) []byte {
+	return append(blockResultPrefix, hash.Bytes()...)
 }

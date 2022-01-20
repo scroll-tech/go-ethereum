@@ -12,35 +12,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-// TODO reference code
-/*func traceOps(db ethdb.Database, code []byte) (*types.ExecutionResult, error) {
-	newState, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize new state")
-	}
-	toAddress := common.Address{0xff}
-	newState.SetCode(toAddress, code)
-	config := &runtime.Config{
-		GasLimit: 1000000,
-		State:    newState,
-	}
-	tracer := vm.NewStructLogger(&vm.LogConfig{EnableMemory: true})
-	// Overwrite config with tracer
-	config.EVMConfig.Debug = true
-	config.EVMConfig.Tracer = tracer
-
-	res, _, err := runtime.Call(toAddress, nil, config)
-	if err != nil {
-		return nil, errors.Wrap(err, "transaction fails")
-	}
-	return &types.ExecutionResult{
-		Gas:         1,
-		Failed:      false,
-		ReturnValue: fmt.Sprintf("%x", res),
-		StructLogs:  vm.FormatLogs(tracer.StructLogs()),
-	}, nil
-}*/
-
 func TestBlockEvmTracesStorage(t *testing.T) {
 	db := NewMemoryDatabase()
 

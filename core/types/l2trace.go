@@ -10,16 +10,16 @@ import (
 
 // BlockResult returns block execute result for rollers.
 type BlockResult struct {
-	ExecutionResult []*ExecutionResult `json:"executionResult"`
+	ExecutionResults []*ExecutionResult `json:"executionResults"`
 }
 
 type rlpBlockResult struct {
-	ExecutionResult []*ExecutionResult `json:"executionResult"`
+	ExecutionResults []*ExecutionResult `json:"executionResults"`
 }
 
 func (b *BlockResult) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &rlpBlockResult{
-		ExecutionResult: b.ExecutionResult,
+		ExecutionResults: b.ExecutionResults,
 	})
 }
 
@@ -27,7 +27,7 @@ func (b *BlockResult) DecodeRLP(s *rlp.Stream) error {
 	var dec rlpBlockResult
 	err := s.Decode(&dec)
 	if err == nil {
-		b.ExecutionResult = dec.ExecutionResult
+		b.ExecutionResults = dec.ExecutionResults
 	}
 	return err
 }

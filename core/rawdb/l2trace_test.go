@@ -318,18 +318,18 @@ func TestBlockEvmTracesStorage(t *testing.T) {
 	evmTraces := []*types.ExecutionResult{evmTrace1, evmTrace2}
 	hash := common.BytesToHash([]byte{0x03, 0x04})
 	// Insert the blockResult into the database and check presence.
-	WriteBlockResult(db, hash, &types.BlockResult{ExecutionResult: evmTraces})
+	WriteBlockResult(db, hash, &types.BlockResult{ExecutionResults: evmTraces})
 	// Read blockResult from db.
-	if blockResult := ReadBlockResult(db, hash); len(blockResult.ExecutionResult) == 0 {
+	if blockResult := ReadBlockResult(db, hash); len(blockResult.ExecutionResults) == 0 {
 		t.Fatalf("No evmTraces returned")
 	} else {
-		if err := checkEvmTracesRLP(blockResult.ExecutionResult, evmTraces); err != nil {
+		if err := checkEvmTracesRLP(blockResult.ExecutionResults, evmTraces); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
 	// Delete blockResult by blockHash.
 	DeleteBlockResult(db, hash)
-	if blockResult := ReadBlockResult(db, hash); blockResult != nil && len(blockResult.ExecutionResult) != 0 {
+	if blockResult := ReadBlockResult(db, hash); blockResult != nil && len(blockResult.ExecutionResults) != 0 {
 		t.Fatalf("The evmTrace list should be empty.")
 	}
 }

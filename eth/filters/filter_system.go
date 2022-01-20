@@ -52,8 +52,8 @@ const (
 	PendingTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
-	// BlockResultSubscription queries evmTrace list when new block created
-	BlockResultSubscription
+	// BlockResultsSubscription queries evmTrace list when new block created
+	BlockResultsSubscription
 	// LastSubscription keeps track of the last index
 	LastIndexSubscription
 )
@@ -71,16 +71,16 @@ const (
 )
 
 type subscription struct {
-	id          rpc.ID
-	typ         Type
-	created     time.Time
-	logsCrit    ethereum.FilterQuery
-	logs        chan []*types.Log
-	hashes      chan []common.Hash
-	headers     chan *types.Header
-	blockResult chan *types.BlockResult
-	installed   chan struct{} // closed when the filter is installed
-	err         chan error    // closed when the filter is uninstalled
+	id           rpc.ID
+	typ          Type
+	created      time.Time
+	logsCrit     ethereum.FilterQuery
+	logs         chan []*types.Log
+	hashes       chan []common.Hash
+	headers      chan *types.Header
+	blockResults chan *types.BlockResult
+	installed    chan struct{} // closed when the filter is installed
+	err          chan error    // closed when the filter is uninstalled
 }
 
 // EventSystem creates subscriptions, processes events and broadcasts them to the
@@ -296,12 +296,12 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 // SubscribeBlockResult creates a subscription that writes the evmTraces when a new block is created.
 func (es *EventSystem) SubscribeBlockResult(blockResult chan *types.BlockResult) *Subscription {
 	sub := &subscription{
-		id:          rpc.NewID(),
-		typ:         BlockResultSubscription,
-		created:     time.Now(),
-		blockResult: blockResult,
-		installed:   make(chan struct{}),
-		err:         make(chan error),
+		id:           rpc.NewID(),
+		typ:          BlockResultsSubscription,
+		created:      time.Now(),
+		blockResults: blockResult,
+		installed:    make(chan struct{}),
+		err:          make(chan error),
 	}
 	return es.subscribe(sub)
 }
@@ -371,8 +371,8 @@ func (es *EventSystem) handleChainEvent(filters filterIndex, ev core.ChainEvent)
 	for _, f := range filters[BlocksSubscription] {
 		f.headers <- ev.Block.Header()
 	}
-	for _, f := range filters[BlockResultSubscription] {
-		f.blockResult <- ev.BlockResult
+	for _, f := range filters[BlockResultsSubscription] {
+		f.blockResults <- ev.BlockResult
 	}
 	if es.lightMode && len(filters[LogsSubscription]) > 0 {
 		es.lightFilterNewHead(ev.Block.Header(), func(header *types.Header, remove bool) {

@@ -16,7 +16,7 @@ func ReadBlockResult(db ethdb.Reader, hash common.Hash) *types.BlockResult {
 	}
 	var blockResult types.BlockResult
 	if err := rlp.DecodeBytes(data, &blockResult); err != nil {
-		log.Error("Failed to decode evmTraces", "err", err)
+		log.Error("Failed to decode BlockResult", "err", err)
 		return nil
 	}
 	return &blockResult

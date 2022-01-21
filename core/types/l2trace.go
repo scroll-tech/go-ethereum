@@ -8,7 +8,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-// BlockResult returns block execute result for rollers.
+// BlockResult contains block execution traces and results required for rollers.
 type BlockResult struct {
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
 }

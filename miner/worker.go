@@ -19,6 +19,7 @@ package miner
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -792,9 +793,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	w.current.executionResults = append(w.current.executionResults, &types.ExecutionResult{
-		Gas:        receipt.GasUsed,
-		Failed:     receipt.Status == types.ReceiptStatusSuccessful,
-		StructLogs: vm.FormatLogs(tracer.StructLogs()),
+		Gas:         receipt.GasUsed,
+		Failed:      receipt.Status == types.ReceiptStatusSuccessful,
+		ReturnValue: fmt.Sprintf("%x", receipt.ReturnValue),
+		StructLogs:  vm.FormatLogs(tracer.StructLogs()),
 	})
 
 	return receipt.Logs, nil

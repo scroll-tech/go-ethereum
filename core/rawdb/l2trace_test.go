@@ -226,7 +226,7 @@ func TestBlockEvmTracesStorage(t *testing.T) {
     }
   ]
 }`)
-	evmTrace1 := &types.ExecutionResult{}
+	evmTrace1 := &types.ExecutionResult{ReturnValue: "0xaaa"}
 	if err := json.Unmarshal(data1, evmTrace1); err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -310,7 +310,7 @@ func TestBlockEvmTracesStorage(t *testing.T) {
     }
   ]
 }`)
-	evmTrace2 := &types.ExecutionResult{}
+	evmTrace2 := &types.ExecutionResult{ReturnValue: "0xbbb"}
 	if err := json.Unmarshal(data2, evmTrace2); err != nil {
 		t.Fatalf(err.Error())
 	}

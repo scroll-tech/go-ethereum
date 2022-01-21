@@ -38,21 +38,23 @@ func (b *BlockResult) DecodeRLP(s *rlp.Stream) error {
 type ExecutionResult struct {
 	Gas         uint64         `json:"gas"`
 	Failed      bool           `json:"failed"`
-	ReturnValue string         `json:"returnValue"`
+	ReturnValue string         `json:"returnValue,omitempty"`
 	StructLogs  []StructLogRes `json:"structLogs"`
 }
 
 type rlpExecutionResult struct {
-	Gas        uint64
-	Failed     bool
-	StructLogs []StructLogRes
+	Gas         uint64
+	Failed      bool
+	ReturnValue string `json:"returnValue,omitempty"`
+	StructLogs  []StructLogRes
 }
 
 func (e *ExecutionResult) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, rlpExecutionResult{
-		Gas:        e.Gas,
-		Failed:     e.Failed,
-		StructLogs: e.StructLogs,
+		Gas:         e.Gas,
+		Failed:      e.Failed,
+		ReturnValue: e.ReturnValue,
+		StructLogs:  e.StructLogs,
 	})
 }
 
@@ -60,7 +62,7 @@ func (e *ExecutionResult) DecodeRLP(s *rlp.Stream) error {
 	var dec rlpExecutionResult
 	err := s.Decode(&dec)
 	if err == nil {
-		e.Gas, e.Failed, e.StructLogs = dec.Gas, dec.Failed, dec.StructLogs
+		e.Gas, e.Failed, e.ReturnValue, e.StructLogs = dec.Gas, dec.Failed, dec.ReturnValue, dec.StructLogs
 	}
 	return err
 }

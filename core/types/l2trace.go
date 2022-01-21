@@ -45,7 +45,7 @@ type ExecutionResult struct {
 type rlpExecutionResult struct {
 	Gas         uint64
 	Failed      bool
-	ReturnValue string `json:"returnValue,omitempty"`
+	ReturnValue string
 	StructLogs  []StructLogRes
 }
 

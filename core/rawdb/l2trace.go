@@ -34,6 +34,6 @@ func WriteBlockResult(db ethdb.KeyValueWriter, hash common.Hash, blockResult *ty
 // DeleteBlockResult removes blockResult with a block hash.
 func DeleteBlockResult(db ethdb.KeyValueWriter, hash common.Hash) {
 	if err := db.Delete(blockResultKey(hash)); err != nil {
-		log.Crit("Failed to delete evmTraces", "err", err)
+		log.Crit("Failed to delete BlockResult", "err", err)
 	}
 }

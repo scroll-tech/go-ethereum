@@ -26,7 +26,7 @@ func ReadBlockResult(db ethdb.Reader, hash common.Hash) *types.BlockResult {
 func WriteBlockResult(db ethdb.KeyValueWriter, hash common.Hash, blockResult *types.BlockResult) {
 	bytes, err := rlp.EncodeToBytes(blockResult)
 	if err != nil {
-		log.Crit("Failed to RLP encode evmTraces", "err", err)
+		log.Crit("Failed to RLP encode BlockResult", "err", err)
 	}
 	db.Put(blockResultKey(hash), bytes)
 }

@@ -14,7 +14,7 @@ type BlockResult struct {
 }
 
 type rlpBlockResult struct {
-	ExecutionResults []*ExecutionResult `json:"executionResults"`
+	ExecutionResults []*ExecutionResult
 }
 
 func (b *BlockResult) EncodeRLP(w io.Writer) error {

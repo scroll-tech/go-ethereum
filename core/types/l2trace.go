@@ -82,15 +82,15 @@ type StructLogRes struct {
 }
 
 type rlpStructLogRes struct {
-	Pc      uint64   `json:"pc"`
-	Op      string   `json:"op"`
-	Gas     uint64   `json:"gas"`
-	GasCost uint64   `json:"gasCost"`
-	Depth   uint     `json:"depth"`
-	Error   string   `json:"error,omitempty"`
-	Stack   []string `json:"stack,omitempty"`
-	Memory  []string `json:"memory,omitempty"`
-	Storage []string `json:"storage,omitempty"`
+	Pc      uint64
+	Op      string
+	Gas     uint64
+	GasCost uint64
+	Depth   uint
+	Error   string
+	Stack   []string
+	Memory  []string
+	Storage []string
 }
 
 // EncodeRLP implements rlp.Encoder.

@@ -278,8 +278,8 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 	return rpcSub, nil
 }
 
-// NewBlockResults sends the blockResult when a new block is created.
-func (api *PublicFilterAPI) NewBlockResults(ctx context.Context) (*rpc.Subscription, error) {
+// NewBlockResult sends the blockResult when a new block is created.
+func (api *PublicFilterAPI) NewBlockResult(ctx context.Context) (*rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
@@ -288,12 +288,12 @@ func (api *PublicFilterAPI) NewBlockResults(ctx context.Context) (*rpc.Subscript
 	rpcSub := notifier.CreateSubscription()
 
 	go func() {
-		blockResultsCh := make(chan *types.BlockResult)
-		blockResultsSub := api.events.SubscribeBlockResult(blockResultsCh)
+		blockResults := make(chan *types.BlockResult)
+		blockResultsSub := api.events.SubscribeBlockResult(blockResults)
 
 		for {
 			select {
-			case blockResult := <-blockResultsCh:
+			case blockResult := <-blockResults:
 				notifier.Notify(rpcSub.ID, blockResult)
 			case <-rpcSub.Err():
 				blockResultsSub.Unsubscribe()

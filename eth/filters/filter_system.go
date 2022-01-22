@@ -52,7 +52,7 @@ const (
 	PendingTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
-	// BlockResultsSubscription queries evmTrace list when new block created
+	// BlockResultsSubscription queries for block execution traces
 	BlockResultsSubscription
 	// LastSubscription keeps track of the last index
 	LastIndexSubscription

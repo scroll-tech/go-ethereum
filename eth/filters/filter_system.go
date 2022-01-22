@@ -293,7 +293,7 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 	return es.subscribe(sub)
 }
 
-// SubscribeBlockResult creates a subscription that writes the evmTraces when a new block is created.
+// SubscribeBlockResult creates a subscription that writes the block trace when a new block is created.
 func (es *EventSystem) SubscribeBlockResult(blockResult chan *types.BlockResult) *Subscription {
 	sub := &subscription{
 		id:           rpc.NewID(),

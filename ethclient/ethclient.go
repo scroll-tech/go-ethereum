@@ -334,7 +334,7 @@ func (ec *Client) BlockResultByHash(ctx context.Context, blockHash common.Hash) 
 	return &blockResult, nil
 }
 
-// SubscribeNewBlockResult subscribe to blockResult when new block created.
+// SubscribeNewBlockResult subscribes to block execution trace when a new block is created.
 func (ec *Client) SubscribeNewBlockResult(ctx context.Context, ch chan<- *types.BlockResult) (ethereum.Subscription, error) {
 	return ec.c.EthSubscribe(ctx, ch, "newBlockResult")
 }

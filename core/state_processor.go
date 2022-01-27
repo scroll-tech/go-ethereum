@@ -105,11 +105,12 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 
 	// Update the state with pending changes.
 	var root []byte
-	if config.IsByzantium(blockNumber) {
-		statedb.Finalise(true)
-	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
-	}
+	//  l2geth: to trace storage status we need PostState data (In fact what we need is the updated account trie)
+	//	if config.IsByzantium(blockNumber) {
+	//		statedb.Finalise(true)
+	//	} else {
+	root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
+	//	}
 	*usedGas += result.UsedGas
 
 	// If the result contains a revert reason, return it.

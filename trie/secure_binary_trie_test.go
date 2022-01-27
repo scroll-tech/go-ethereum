@@ -27,13 +27,13 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 
-func newEmptySecure() *SecureTrie {
+func newEmptySecure() *SecureBinaryTrie {
 	trie, _ := NewSecure(common.Hash{}, NewDatabase(memorydb.New()))
 	return trie
 }
 
 // makeTestSecureTrie creates a large enough secure trie for testing.
-func makeTestSecureTrie() (*Database, *SecureTrie, map[string][]byte) {
+func makeTestSecureTrie() (*Database, *SecureBinaryTrie, map[string][]byte) {
 	// Create an empty trie
 	triedb := NewDatabase(memorydb.New())
 	trie, _ := NewSecure(common.Hash{}, triedb)
@@ -110,7 +110,7 @@ func TestSecureTrieConcurrency(t *testing.T) {
 	_, trie, _ := makeTestSecureTrie()
 
 	threads := runtime.NumCPU()
-	tries := make([]*SecureTrie, threads)
+	tries := make([]*SecureBinaryTrie, threads)
 	for i := 0; i < threads; i++ {
 		cpy := *trie
 		tries[i] = &cpy

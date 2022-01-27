@@ -21,9 +21,31 @@ type ExecutionResult struct {
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
 	ByteCode string `json:"byteCode,omitempty"`
-	// The account's proof.
-	Proof      []string       `json:"proof,omitempty"`
+
+	// Deprecated: The account's proof.
+	// Proof      []string       `json:"proof,omitempty"`
+
+	// The base account's ([from, to]) proof
+	Proofs [2][][]byte `json:"-"`
+
+	Storage    *StorageRes    `json:"storage,omitempty"`
 	StructLogs []StructLogRes `json:"structLogs"`
+}
+
+// StorageRes stores data required in storage circuit
+type StorageRes struct {
+
+	// Root hash before execution:
+	RootBefore *common.Hash `json:"rootBefore,omitempty"`
+	// Root hash after execution, is nil if execution has failed
+	RootAfter *common.Hash `json:"rootAfter,omitempty"`
+
+	// The from account's proof BEFORE execution
+	ProofFrom []string `json:"proofFrom,omitempty"`
+	// The to account's proof BEFORE execution, these proof,
+	// along with account proof's inside structLogs, form the
+	// dataset required by tracing the updates of account trie
+	ProofTo []string `json:"proofTo,omitempty"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

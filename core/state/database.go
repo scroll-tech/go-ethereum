@@ -63,7 +63,7 @@ type Trie interface {
 	// GetKey returns the sha3 preimage of a hashed key that was previously used
 	// to store a value.
 	//
-	// TODO(fjl): remove this when SecureTrie is removed
+	// TODO(fjl): remove this when SecureBinaryTrie is removed
 	GetKey([]byte) []byte
 
 	// TryGet returns the value for key stored in the trie. The value bytes must
@@ -152,7 +152,7 @@ func (db *cachingDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
 // CopyTrie returns an independent copy of the given trie.
 func (db *cachingDB) CopyTrie(t Trie) Trie {
 	switch t := t.(type) {
-	case *trie.SecureTrie:
+	case *trie.SecureBinaryTrie:
 		return t.Copy()
 	default:
 		panic(fmt.Errorf("unknown trie type %T", t))

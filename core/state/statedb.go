@@ -18,7 +18,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -42,7 +41,7 @@ type revision struct {
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	emptyRoot = common.Hash{}
 )
 
 type proofList [][]byte
@@ -313,27 +312,31 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 	return common.Hash{}
 }
 
-// GetProof returns the Merkle proof for a given account.
-func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
-	return s.GetProofByHash(crypto.Keccak256Hash(addr.Bytes()))
+func (s *StateDB) GetRootHash() common.Hash {
+	return s.trie.Hash()
 }
 
-// GetProofByHash returns the Merkle proof for a given account.
-func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
+// GetProof returns the Merkle proof for a given account.
+func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
 	var proof proofList
-	err := s.trie.Prove(addrHash[:], 0, &proof)
+	err := s.trie.Prove(addr.Bytes(), 0, &proof)
 	return proof, err
 }
 
 // GetStorageProof returns the Merkle proof for given storage slot.
 func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
 	var proof proofList
-	trie := s.StorageTrie(a)
-	if trie == nil {
-		return proof, errors.New("storage trie for requested address does not exist")
-	}
-	err := trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
-	return proof, err
+	return proof, nil
+	/*
+		var proof proofList
+		trie := s.StorageTrie(a)
+		if trie == nil {
+			return proof, errors.New("storage trie for requested address does not exist")
+		}
+		err := trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
+		return proof, err
+	*/
+
 }
 
 // GetCommittedState retrieves a value from the given account's committed storage trie.
@@ -460,7 +463,7 @@ func (s *StateDB) updateStateObject(obj *stateObject) {
 	}
 	// Encode the account and update the account trie
 	addr := obj.Address()
-	if err := s.trie.TryUpdateAccount(addr[:], &obj.data); err != nil {
+	if err := s.trie.TryUpdateAccount(addr.Bytes32(), &obj.data); err != nil {
 		s.setError(fmt.Errorf("updateStateObject (%x) error: %v", addr[:], err))
 	}
 
@@ -538,7 +541,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 		if metrics.EnabledExpensive {
 			defer func(start time.Time) { s.AccountReads += time.Since(start) }(time.Now())
 		}
-		enc, err := s.trie.TryGet(addr.Bytes())
+		enc, err := s.trie.TryGet(addr.Bytes32())
 		if err != nil {
 			s.setError(fmt.Errorf("getDeleteStateObject (%x) error: %v", addr.Bytes(), err))
 			return nil
@@ -546,8 +549,8 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 		if len(enc) == 0 {
 			return nil
 		}
-		data = new(types.StateAccount)
-		if err := rlp.DecodeBytes(enc, data); err != nil {
+		data, err = types.UnmarshalStateAccount(enc)
+		if err != nil {
 			log.Error("Failed to decode state object", "addr", addr, "err", err)
 			return nil
 		}

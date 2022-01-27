@@ -20,12 +20,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
+
+	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
 )
 
 // Prove constructs a merkle proof for key. The result contains all encoded nodes
@@ -89,6 +93,80 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 	return nil
 }
 
+var magicHash []byte
+var magicSMTBytes []byte
+
+func init() {
+	magicSMTBytes = []byte("THIS IS SOME MAGIC BYTES FOR SMT m1rRXgP2xpDI")
+	hasher := newHasher(false)
+	defer returnHasherToPool(hasher)
+	magicHash = hasher.hashData(magicSMTBytes)
+}
+
+// Prove constructs a merkle proof for SMT, it respect the protocol used by the ethereum-trie
+// but save the node data with a compact form
+func (mt *MerkleTree) Prove(k *big.Int, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+
+	// verify that k is valid and fit inside the Finite Field.
+	if !cryptoUtils.CheckBigIntInField(k) {
+		return errors.New("key not inside the Finite Field")
+	}
+
+	kHash := smt.NewHashFromBigInt(k)
+	path := getPath(mt.maxLevels, kHash[:])
+	var nodes []*Node
+	tn := mt.rootKey
+	for i := 0; i < mt.maxLevels; i++ {
+		n, err := mt.GetNode(tn)
+		if err != nil {
+			return err
+		}
+
+		finished := true
+		switch n.Type {
+		case NodeTypeEmpty:
+		case NodeTypeLeaf:
+			// notice even we found a leaf whose entry didn't match the expected k,
+			// we still include it as the proof of absence
+		case NodeTypeMiddle:
+			finished = false
+			if path[i] {
+				tn = n.ChildR
+			} else {
+				tn = n.ChildL
+			}
+		default:
+			return ErrInvalidNodeFound
+		}
+
+		nodes = append(nodes, n)
+		if finished {
+			break
+		}
+	}
+
+	for _, n := range nodes {
+		if fromLevel > 0 {
+			fromLevel--
+			continue
+		}
+
+		// TODO: notice here we may have broken some implicit on the proofDb:
+		// the key is not kecca(value) and it even can not be derived from
+		// the value by any means without a actually decoding
+		key, err := n.Key()
+		if err != nil {
+			return err
+		}
+		proofDb.Put(key.Bytes(), n.Value())
+	}
+
+	// we put this special kv pair in db so we can distinguish the type and
+	// make suitable Proof
+	proofDb.Put(magicHash, magicSMTBytes)
+	return nil
+}
+
 // Prove constructs a merkle proof for key. The result contains all encoded nodes
 // on the path to the value at key. The value itself is also included in the last
 // node and can be retrieved by verifying the proof.
@@ -96,14 +174,102 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
-	return t.trie.Prove(key, fromLevel, proofDb)
+func (t *SecureBinaryTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+	word := smt.NewByte32FromBytesPaddingZero(key)
+	k, err := word.Hash()
+	if err != nil {
+		return err
+	}
+	return t.tree.Prove(k, fromLevel, proofDb)
+}
+
+func buildSMTProof(rootKey *smt.Hash, k *big.Int, lvl int, getNode func(key *smt.Hash) (*Node, error)) (*Proof,
+	*big.Int, error) {
+
+	p := &Proof{}
+	var siblingKey *smt.Hash
+
+	kHash := smt.NewHashFromBigInt(k)
+	path := getPath(lvl, kHash[:])
+
+	nextKey := rootKey
+	for p.depth = 0; p.depth < uint(lvl); p.depth++ {
+		n, err := getNode(nextKey)
+		if err != nil {
+			return nil, nil, err
+		}
+		switch n.Type {
+		case NodeTypeEmpty:
+			return p, big.NewInt(0), nil
+		case NodeTypeLeaf:
+			if bytes.Equal(kHash[:], n.Entry[0][:]) {
+				p.Existence = true
+				return p, n.Entry[1].BigInt(), nil
+			}
+			// We found a leaf whose entry didn't match hIndex
+			p.NodeAux = &NodeAux{Key: n.Entry[0], Value: n.Entry[1]}
+			return p, n.Entry[1].BigInt(), nil
+		case NodeTypeMiddle:
+			if path[p.depth] {
+				nextKey = n.ChildR
+				siblingKey = n.ChildL
+			} else {
+				nextKey = n.ChildL
+				siblingKey = n.ChildR
+			}
+		default:
+			return nil, nil, ErrInvalidNodeFound
+		}
+		if !bytes.Equal(siblingKey[:], smt.HashZero[:]) {
+			smt.SetBitBigEndian(p.notempties[:], p.depth)
+			p.Siblings = append(p.Siblings, siblingKey)
+		}
+	}
+	return nil, nil, ErrKeyNotFound
+
 }
 
 // VerifyProof checks merkle proofs. The given proof must contain the value for
 // key in a trie with the given root hash. VerifyProof returns an error if the
 // proof contains invalid trie nodes or the wrong value.
 func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
+
+	// test the type of proof (for trie or SMT)
+	if buf, _ := proofDb.Get(magicHash); buf != nil {
+		h, err := smt.NewHashFromBytes(rootHash.Bytes())
+		if err != nil {
+			return nil, err
+		}
+
+		word := smt.NewByte32FromBytesPaddingZero(key)
+		k, err := word.Hash()
+		if err != nil {
+			return nil, err
+		}
+
+		proof, v, err := buildSMTProof(h, k, len(key)*8, func(key *smt.Hash) (*Node, error) {
+			buf, _ := proofDb.Get(key.Bytes())
+			if buf == nil {
+				return nil, ErrKeyNotFound
+			}
+			n, err := NewNodeFromBytes(buf)
+			return n, err
+		})
+
+		if err != nil {
+			// do not contain the key
+			return nil, err
+		} else if !proof.Existence {
+			return nil, nil
+		}
+
+		if VerifyProofSMT(h, proof, k, v) {
+			return v.Bytes(), nil
+		} else {
+			return nil, fmt.Errorf("bad proof node %v", proof)
+		}
+	}
+
 	key = keybytesToHex(key)
 	wantHash := rootHash
 	for i := 0; ; i++ {

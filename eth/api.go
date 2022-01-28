@@ -618,9 +618,9 @@ func NewPublicTraceAPI(eth *Ethereum) *PublicTraceAPI {
 	return &PublicTraceAPI{eth}
 }
 
-// BlockResultByHash returns the blockResult by blockHash.
-func (api *PublicTraceAPI) BlockResultByHash(blockHash common.Hash) (*types.BlockResult, error) {
-	if blockResult := api.e.blockchain.BlockResultByHash(blockHash); blockResult != nil {
+// GetBlockResultByHash returns the blockResult by blockHash.
+func (api *PublicTraceAPI) GetBlockResultByHash(blockHash common.Hash) (*types.BlockResult, error) {
+	if blockResult := api.e.blockchain.GetBlockResultByHash(blockHash); blockResult != nil {
 		return blockResult, nil
 	}
 	return nil, fmt.Errorf("no block result found")

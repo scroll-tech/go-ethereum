@@ -254,7 +254,7 @@ func (l *StructLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint6
 		storage Storage
 		pprof   [][]byte
 	)
-	if !l.cfg.DisableStorage {
+	if !l.cfg.DisableStorage && stack.len() >= 2 {
 		// initialise new changed values storage container for this contract
 		// if not present.
 		if l.storage[contract.Address()] == nil {

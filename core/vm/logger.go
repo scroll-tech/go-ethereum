@@ -225,7 +225,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 
 // CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
 func (l *StructLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
-	if op != SSTORE {
+	if op != SSTORE && op != SLOAD {
 		return
 	}
 	memory := scope.Memory
@@ -235,52 +235,18 @@ func (l *StructLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint6
 	if l.cfg.Limit != 0 && l.cfg.Limit <= len(l.logs) {
 		return
 	}
-	// Copy a snapshot of the current memory state to a new buffer
-	var mem []byte
-	if l.cfg.EnableMemory {
-		mem = make([]byte, len(memory.Data()))
-		copy(mem, memory.Data())
-	}
-	// Copy a snapshot of the current stack state to a new buffer
-	var stck []uint256.Int
-	if !l.cfg.DisableStack {
-		stck = make([]uint256.Int, len(stack.Data()))
-		for i, item := range stack.Data() {
-			stck[i] = item
-		}
-	}
 	// Copy a snapshot of the current storage to a new container
-	var (
-		storage Storage
-		pprof   [][]byte
-	)
-	if !l.cfg.DisableStorage && stack.len() >= 2 {
-		// initialise new changed values storage container for this contract
-		// if not present.
-		if l.storage[contract.Address()] == nil {
-			l.storage[contract.Address()] = make(Storage)
-		}
-		// capture SLOAD opcodes and record the read entry in the local storage
-		// capture SSTORE opcodes and record the written entry in the local storage.
-		var (
-			value   = common.Hash(stack.data[stack.len()-2].Bytes32())
-			address = common.Hash(stack.data[stack.len()-1].Bytes32())
-		)
-		l.storage[contract.Address()][address] = value
-		storage = l.storage[contract.Address()].Copy()
-
+	var pprof [][]byte
+	if !l.cfg.DisableStorage && stack.len() >= 1 {
+		address := common.Hash(stack.data[stack.len()-1].Bytes32())
+		// Get storage proof.
 		pprof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
 		if err != nil {
 			log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
 		}
 	}
-	var rdata []byte
-	if l.cfg.EnableReturnData {
-		rdata = make([]byte, len(rData))
-		copy(rdata, rData)
-	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, pprof, storage, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, nil, memory.Len(), nil, nil, pprof, nil, depth, l.env.StateDB.GetRefund(), err}
 	l.logs = append(l.logs, log)
 }
 

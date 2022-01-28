@@ -10,10 +10,12 @@ import (
 
 // BlockResult contains block execution traces and results required for rollers.
 type BlockResult struct {
+	Block            *Block             `json:"block"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
 }
 
 type rlpBlockResult struct {
+	Block            *Block
 	ExecutionResults []*ExecutionResult
 }
 
@@ -36,16 +38,22 @@ func (b *BlockResult) DecodeRLP(s *rlp.Stream) error {
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
 type ExecutionResult struct {
-	Gas         uint64         `json:"gas"`
-	Failed      bool           `json:"failed"`
-	ReturnValue string         `json:"returnValue,omitempty"`
-	StructLogs  []StructLogRes `json:"structLogs"`
+	Gas         uint64 `json:"gas"`
+	Failed      bool   `json:"failed"`
+	ReturnValue string `json:"returnValue,omitempty"`
+	// If it is a contract call, the contract code is returned.
+	ByteCode string `json:"byteCode,omitempty"`
+	// The account's proof.
+	Proof      []string       `json:"proof,omitempty"`
+	StructLogs []StructLogRes `json:"structLogs"`
 }
 
 type rlpExecutionResult struct {
 	Gas         uint64
 	Failed      bool
 	ReturnValue string
+	ByteCode    string
+	Proof       []string
 	StructLogs  []StructLogRes
 }
 
@@ -54,6 +62,8 @@ func (e *ExecutionResult) EncodeRLP(w io.Writer) error {
 		Gas:         e.Gas,
 		Failed:      e.Failed,
 		ReturnValue: e.ReturnValue,
+		ByteCode:    e.ByteCode,
+		Proof:       e.Proof,
 		StructLogs:  e.StructLogs,
 	})
 }
@@ -62,7 +72,8 @@ func (e *ExecutionResult) DecodeRLP(s *rlp.Stream) error {
 	var dec rlpExecutionResult
 	err := s.Decode(&dec)
 	if err == nil {
-		e.Gas, e.Failed, e.ReturnValue, e.StructLogs = dec.Gas, dec.Failed, dec.ReturnValue, dec.StructLogs
+		e.Gas, e.Failed, e.StructLogs = dec.Gas, dec.Failed, dec.StructLogs
+		e.ReturnValue, e.ByteCode, e.Proof = dec.ReturnValue, dec.ByteCode, dec.Proof
 	}
 	return err
 }
@@ -70,27 +81,29 @@ func (e *ExecutionResult) DecodeRLP(s *rlp.Stream) error {
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc      uint64             `json:"pc"`
-	Op      string             `json:"op"`
-	Gas     uint64             `json:"gas"`
-	GasCost uint64             `json:"gasCost"`
-	Depth   int                `json:"depth"`
-	Error   string             `json:"error,omitempty"`
-	Stack   *[]string          `json:"stack,omitempty"`
-	Memory  *[]string          `json:"memory,omitempty"`
-	Storage *map[string]string `json:"storage,omitempty"`
+	Pc         uint64             `json:"pc"`
+	Op         string             `json:"op"`
+	Gas        uint64             `json:"gas"`
+	GasCost    uint64             `json:"gasCost"`
+	Depth      int                `json:"depth"`
+	Error      string             `json:"error,omitempty"`
+	Stack      *[]string          `json:"stack,omitempty"`
+	Memory     *[]string          `json:"memory,omitempty"`
+	Storage    *map[string]string `json:"storage,omitempty"`
+	ReturnData *[]string          `json:"returnData,omitempty"`
 }
 
 type rlpStructLogRes struct {
-	Pc      uint64
-	Op      string
-	Gas     uint64
-	GasCost uint64
-	Depth   uint
-	Error   string
-	Stack   []string
-	Memory  []string
-	Storage []string
+	Pc         uint64
+	Op         string
+	Gas        uint64
+	GasCost    uint64
+	Depth      uint
+	Error      string
+	Stack      []string
+	Memory     []string
+	Storage    []string
+	ReturnData []string
 }
 
 // EncodeRLP implements rlp.Encoder.
@@ -128,6 +141,12 @@ func (r *StructLogRes) EncodeRLP(w io.Writer) error {
 			data.Storage = append(data.Storage, []string{key, (*r.Storage)[key]}...)
 		}
 	}
+	if r.ReturnData != nil {
+		data.ReturnData = make([]string, len(*r.ReturnData))
+		for i, val := range *r.ReturnData {
+			data.ReturnData[i] = val
+		}
+	}
 	return rlp.Encode(w, data)
 }
 
@@ -160,6 +179,13 @@ func (r *StructLogRes) DecodeRLP(s *rlp.Stream) error {
 			storage[key] = val
 		}
 		r.Storage = &storage
+	}
+	if len(dec.ReturnData) != 0 {
+		returnData := make([]string, len(dec.ReturnData))
+		for i, val := range dec.ReturnData {
+			returnData[i] = val
+		}
+		r.ReturnData = &returnData
 	}
 	return nil
 }

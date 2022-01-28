@@ -620,5 +620,8 @@ func NewPublicTraceAPI(eth *Ethereum) *PublicTraceAPI {
 
 // BlockResultByHash returns the blockResult by blockHash.
 func (api *PublicTraceAPI) BlockResultByHash(blockHash common.Hash) (*types.BlockResult, error) {
-	return rawdb.ReadBlockResult(api.e.chainDb, blockHash), nil
+	if blockResult := api.e.blockchain.BlockResultByHash(blockHash); blockResult != nil {
+		return blockResult, nil
+	}
+	return nil, fmt.Errorf("no block result found")
 }

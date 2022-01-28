@@ -29,6 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
@@ -69,6 +70,7 @@ type StructLog struct {
 	MemorySize    int                         `json:"memSize"`
 	Stack         []uint256.Int               `json:"stack"`
 	ReturnData    []byte                      `json:"returnData"`
+	Proof         [][]byte                    `json:"proof,omitempty"`
 	Storage       map[common.Hash]common.Hash `json:"-"`
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
@@ -106,6 +108,7 @@ func (s *StructLog) ErrorString() string {
 type EVMLogger interface {
 	CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int)
 	CaptureState(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error)
+	CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error)
 	CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int)
 	CaptureExit(output []byte, gasUsed uint64, err error)
 	CaptureFault(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, depth int, err error)
@@ -177,7 +180,10 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		}
 	}
 	// Copy a snapshot of the current storage to a new container
-	var storage Storage
+	var (
+		storage Storage
+		proof   [][]byte
+	)
 	if !l.cfg.DisableStorage && (op == SLOAD || op == SSTORE) {
 		// initialise new changed values storage container for this contract
 		// if not present.
@@ -200,6 +206,11 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			)
 			l.storage[contract.Address()][address] = value
 			storage = l.storage[contract.Address()].Copy()
+
+			proof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
+			if err != nil {
+				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
+			}
 		}
 	}
 	var rdata []byte
@@ -208,7 +219,68 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, proof, storage, depth, l.env.StateDB.GetRefund(), err}
+	l.logs = append(l.logs, log)
+}
+
+// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
+func (l *StructLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+	if op != SSTORE {
+		return
+	}
+	memory := scope.Memory
+	stack := scope.Stack
+	contract := scope.Contract
+	// check if already accumulated the specified number of logs
+	if l.cfg.Limit != 0 && l.cfg.Limit <= len(l.logs) {
+		return
+	}
+	// Copy a snapshot of the current memory state to a new buffer
+	var mem []byte
+	if l.cfg.EnableMemory {
+		mem = make([]byte, len(memory.Data()))
+		copy(mem, memory.Data())
+	}
+	// Copy a snapshot of the current stack state to a new buffer
+	var stck []uint256.Int
+	if !l.cfg.DisableStack {
+		stck = make([]uint256.Int, len(stack.Data()))
+		for i, item := range stack.Data() {
+			stck[i] = item
+		}
+	}
+	// Copy a snapshot of the current storage to a new container
+	var (
+		storage Storage
+		pprof   [][]byte
+	)
+	if !l.cfg.DisableStorage {
+		// initialise new changed values storage container for this contract
+		// if not present.
+		if l.storage[contract.Address()] == nil {
+			l.storage[contract.Address()] = make(Storage)
+		}
+		// capture SLOAD opcodes and record the read entry in the local storage
+		// capture SSTORE opcodes and record the written entry in the local storage.
+		var (
+			value   = common.Hash(stack.data[stack.len()-2].Bytes32())
+			address = common.Hash(stack.data[stack.len()-1].Bytes32())
+		)
+		l.storage[contract.Address()][address] = value
+		storage = l.storage[contract.Address()].Copy()
+
+		pprof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
+		if err != nil {
+			log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
+		}
+	}
+	var rdata []byte
+	if l.cfg.EnableReturnData {
+		rdata = make([]byte, len(rData))
+		copy(rdata, rData)
+	}
+	// create a new snapshot of the EVM.
+	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, pprof, storage, depth, l.env.StateDB.GetRefund(), err}
 	l.logs = append(l.logs, log)
 }
 
@@ -345,6 +417,10 @@ func (t *mdLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scope *S
 	}
 }
 
+// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
+func (t *mdLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+}
+
 func (t *mdLogger) CaptureFault(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, depth int, err error) {
 	fmt.Fprintf(t.out, "\nError: at pc=%d, op=%v: %v\n", pc, op, err)
 }
@@ -391,6 +467,13 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
 			}
 			formatted[index].Storage = &storage
+		}
+		if trace.ReturnData != nil {
+			returnData := make([]string, 0, (len(trace.ReturnData)+31)/32)
+			for i := 0; i+32 <= len(trace.ReturnData); i += 32 {
+				returnData = append(returnData, fmt.Sprintf("%x", trace.ReturnData[i:i+32]))
+			}
+			formatted[index].ReturnData = &returnData
 		}
 	}
 	return formatted

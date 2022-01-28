@@ -91,6 +91,7 @@ type StructLogRes struct {
 	Memory     *[]string          `json:"memory,omitempty"`
 	Storage    *map[string]string `json:"storage,omitempty"`
 	ReturnData *[]string          `json:"returnData,omitempty"`
+	Proof      *[]string          `json:"proof,omitempty"`
 }
 
 type rlpStructLogRes struct {
@@ -104,6 +105,7 @@ type rlpStructLogRes struct {
 	Memory     []string
 	Storage    []string
 	ReturnData []string
+	Proof      []string
 }
 
 // EncodeRLP implements rlp.Encoder.
@@ -147,6 +149,12 @@ func (r *StructLogRes) EncodeRLP(w io.Writer) error {
 			data.ReturnData[i] = val
 		}
 	}
+	if r.Proof != nil {
+		data.Proof = make([]string, len(*r.Proof))
+		for i, val := range *r.Proof {
+			data.Proof[i] = val
+		}
+	}
 	return rlp.Encode(w, data)
 }
 
@@ -186,6 +194,13 @@ func (r *StructLogRes) DecodeRLP(s *rlp.Stream) error {
 			returnData[i] = val
 		}
 		r.ReturnData = &returnData
+	}
+	if len(dec.Proof) != 0 {
+		proof := make([]string, len(dec.Proof))
+		for i, val := range dec.Proof {
+			proof[i] = val
+		}
+		r.Proof = &proof
 	}
 	return nil
 }

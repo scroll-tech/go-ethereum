@@ -69,7 +69,7 @@ type StructLog struct {
 	Memory        []byte                      `json:"memory"`
 	MemorySize    int                         `json:"memSize"`
 	Stack         []uint256.Int               `json:"stack"`
-	ReturnData    []byte                      `json:"returnData"`
+	ReturnData    []byte                      `json:"returnData,omitempty"`
 	Proof         [][]byte                    `json:"proof,omitempty"`
 	Storage       map[common.Hash]common.Hash `json:"-"`
 	Depth         int                         `json:"depth"`
@@ -447,33 +447,40 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			Depth:   trace.Depth,
 			Error:   trace.ErrorString(),
 		}
-		if trace.Stack != nil {
+		if len(trace.Stack) != 0 {
 			stack := make([]string, len(trace.Stack))
 			for i, stackValue := range trace.Stack {
 				stack[i] = stackValue.Hex()
 			}
 			formatted[index].Stack = &stack
 		}
-		if trace.Memory != nil {
+		if len(trace.Memory) != 0 {
 			memory := make([]string, 0, (len(trace.Memory)+31)/32)
 			for i := 0; i+32 <= len(trace.Memory); i += 32 {
 				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
 			}
 			formatted[index].Memory = &memory
 		}
-		if trace.Storage != nil {
+		if len(trace.Storage) != 0 {
 			storage := make(map[string]string)
 			for i, storageValue := range trace.Storage {
 				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
 			}
 			formatted[index].Storage = &storage
 		}
-		if trace.ReturnData != nil {
+		if len(trace.ReturnData) != 0 {
 			returnData := make([]string, 0, (len(trace.ReturnData)+31)/32)
 			for i := 0; i+32 <= len(trace.ReturnData); i += 32 {
 				returnData = append(returnData, fmt.Sprintf("%x", trace.ReturnData[i:i+32]))
 			}
 			formatted[index].ReturnData = &returnData
+		}
+		if len(trace.Proof) != 0 {
+			proof := make([]string, len(trace.Proof))
+			for i, val := range trace.Proof {
+				proof[i] = hexutil.Encode(val)
+			}
+			formatted[index].Proof = &proof
 		}
 	}
 	return formatted

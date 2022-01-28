@@ -70,7 +70,7 @@ type StructLog struct {
 	MemorySize    int                         `json:"memSize"`
 	Stack         []uint256.Int               `json:"stack"`
 	ReturnData    []byte                      `json:"returnData,omitempty"`
-	Proof         [][]byte                    `json:"proof,omitempty"`
+	Proof         [][]byte                    `json:"storageProof,omitempty"`
 	Storage       map[common.Hash]common.Hash `json:"-"`
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
@@ -181,8 +181,8 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	}
 	// Copy a snapshot of the current storage to a new container
 	var (
-		storage Storage
-		proof   [][]byte
+		storage      Storage
+		storageProof [][]byte
 	)
 	if !l.cfg.DisableStorage && (op == SLOAD || op == SSTORE) {
 		// initialise new changed values storage container for this contract
@@ -207,7 +207,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			l.storage[contract.Address()][address] = value
 			storage = l.storage[contract.Address()].Copy()
 
-			proof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
+			storageProof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
 			if err != nil {
 				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
 			}
@@ -219,7 +219,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, proof, storage, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storageProof, storage, depth, l.env.StateDB.GetRefund(), err}
 	l.logs = append(l.logs, log)
 }
 
@@ -236,17 +236,17 @@ func (l *StructLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint6
 		return
 	}
 	// Copy a snapshot of the current storage to a new container
-	var pprof [][]byte
+	var storageProof [][]byte
 	if !l.cfg.DisableStorage && stack.len() >= 1 {
 		address := common.Hash(stack.data[stack.len()-1].Bytes32())
 		// Get storage proof.
-		pprof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
+		storageProof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
 		if err != nil {
 			log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
 		}
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, nil, memory.Len(), nil, nil, pprof, nil, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, nil, memory.Len(), nil, nil, storageProof, nil, depth, l.env.StateDB.GetRefund(), err}
 	l.logs = append(l.logs, log)
 }
 

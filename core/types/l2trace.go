@@ -91,7 +91,7 @@ type StructLogRes struct {
 	Memory     *[]string          `json:"memory,omitempty"`
 	Storage    *map[string]string `json:"storage,omitempty"`
 	ReturnData *[]string          `json:"returnData,omitempty"`
-	Proof      *[]string          `json:"proof,omitempty"`
+	Proof      *[]string          `json:"storageProof,omitempty"`
 }
 
 type rlpStructLogRes struct {

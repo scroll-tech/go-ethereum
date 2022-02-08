@@ -15,12 +15,13 @@ type BlockResult struct {
 }
 
 type rlpBlockResult struct {
-	Block            *Block
+	TraceBlock       *TraceBlock
 	ExecutionResults []*ExecutionResult
 }
 
 func (b *BlockResult) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &rlpBlockResult{
+		TraceBlock:       b.TraceBlock,
 		ExecutionResults: b.ExecutionResults,
 	})
 }
@@ -29,7 +30,7 @@ func (b *BlockResult) DecodeRLP(s *rlp.Stream) error {
 	var dec rlpBlockResult
 	err := s.Decode(&dec)
 	if err == nil {
-		b.ExecutionResults = dec.ExecutionResults
+		b.ExecutionResults, b.TraceBlock = dec.ExecutionResults, dec.TraceBlock
 	}
 	return err
 }

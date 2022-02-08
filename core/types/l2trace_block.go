@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
@@ -26,7 +27,7 @@ type TraceTransaction struct {
 	To       *common.Address `json:"to"`
 	ChainId  *big.Int        `json:"chainId"`
 	Value    *big.Int        `json:"value"`
-	Data     []byte          `json:"data"`
+	Data     string          `json:"data"`
 	IsCreate bool            `json:"isCreate"`
 	V        *big.Int        `json:"v"`
 	R        *big.Int        `json:"r"`
@@ -65,7 +66,7 @@ func newTraceTransaction(tx *Transaction, blockNumber uint64, config *params.Cha
 		GasPrice: tx.GasPrice(),
 		To:       tx.To(),
 		Value:    tx.Value(),
-		Data:     tx.Data(),
+		Data:     hexutil.Encode(tx.Data()),
 		IsCreate: tx.To() == nil,
 		V:        v,
 		R:        r,

@@ -1320,7 +1320,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 
 	// Fill blockResult content
 	if blockResult != nil {
-		bc.fillBlockResult(state, block, blockResult)
+		bc.writeBlockResult(state, block, blockResult)
 		bc.blockResultCache.Add(block.Hash(), blockResult)
 	}
 
@@ -1344,7 +1344,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 }
 
 // Fill blockResult content
-func (bc *BlockChain) fillBlockResult(state *state.StateDB, block *types.Block, blockResult *types.BlockResult) {
+func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, blockResult *types.BlockResult) {
 	blockResult.TraceBlock = types.NewTraceBlock(bc.chainConfig, block)
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]

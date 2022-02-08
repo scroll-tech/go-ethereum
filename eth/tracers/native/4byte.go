@@ -96,8 +96,8 @@ func (t *fourByteTracer) CaptureStart(env *vm.EVM, from common.Address, to commo
 func (t *fourByteTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
-// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
-func (t *fourByteTracer) CaptureStateSpecial(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (t *fourByteTracer) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
 // CaptureEnter is called when EVM enters a new scope (via call, create or selfdestruct).

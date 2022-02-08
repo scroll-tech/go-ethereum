@@ -108,7 +108,7 @@ func (s *StructLog) ErrorString() string {
 type EVMLogger interface {
 	CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int)
 	CaptureState(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error)
-	CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error)
+	CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error)
 	CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int)
 	CaptureExit(output []byte, gasUsed uint64, err error)
 	CaptureFault(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, depth int, err error)
@@ -223,8 +223,8 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	l.logs = append(l.logs, log)
 }
 
-// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
-func (l *StructLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
 	if op != SSTORE && op != SLOAD {
 		return
 	}
@@ -383,8 +383,8 @@ func (t *mdLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scope *S
 	}
 }
 
-// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
-func (t *mdLogger) CaptureStateSpecial(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (t *mdLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
 }
 
 func (t *mdLogger) CaptureFault(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, depth int, err error) {

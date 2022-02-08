@@ -266,7 +266,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 
 		if in.cfg.Debug {
-			in.cfg.Tracer.CaptureStateSpecial(pc, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
+			in.cfg.Tracer.CaptureStateAfter(pc, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
 		}
 
 		switch {

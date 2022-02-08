@@ -746,8 +746,8 @@ func (jst *jsTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, sco
 	}
 }
 
-// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
-func (jst *jsTracer) CaptureStateSpecial(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (jst *jsTracer) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
 // CaptureFault implements the Tracer interface to trace an execution fault

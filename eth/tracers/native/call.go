@@ -96,8 +96,8 @@ func (t *callTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Duration, 
 func (t *callTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
-// CaptureStateSpecial for special needs, tracks SSTORE ops and records the storage change.
-func (t *callTracer) CaptureStateSpecial(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (t *callTracer) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.

@@ -1319,7 +1319,10 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	bc.futureBlocks.Remove(block.Hash())
 
 	// Fill blockResult content
-	bc.fillBlockResult(state, block, blockResult)
+	if blockResult != nil {
+		bc.fillBlockResult(state, block, blockResult)
+		bc.blockResultCache.Add(block.Hash(), blockResult)
+	}
 
 	if status == CanonStatTy {
 		bc.chainFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs, BlockResult: blockResult})
@@ -1342,10 +1345,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 
 // Fill blockResult content
 func (bc *BlockChain) fillBlockResult(state *state.StateDB, block *types.Block, blockResult *types.BlockResult) {
-	if blockResult == nil {
-		return
-	}
-	blockResult.Block = block
+	blockResult.TraceBlock = types.NewTraceBlock(bc.chainConfig, block)
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
 		// Get the sender's address.
@@ -1367,7 +1367,6 @@ func (bc *BlockChain) fillBlockResult(state *state.StateDB, block *types.Block, 
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())
 		}
 	}
-	bc.blockResultCache.Add(block.Hash(), blockResult)
 }
 
 // addFutureBlock checks if the block is within the max allowed window to get

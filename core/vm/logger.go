@@ -434,13 +434,6 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			}
 			formatted[index].Storage = &storage
 		}
-		if len(trace.ReturnData) != 0 {
-			returnData := make([]string, 0, (len(trace.ReturnData)+31)/32)
-			for i := 0; i+32 <= len(trace.ReturnData); i += 32 {
-				returnData = append(returnData, fmt.Sprintf("%x", trace.ReturnData[i:i+32]))
-			}
-			formatted[index].ReturnData = &returnData
-		}
 		if len(trace.Proof) != 0 {
 			proof := make([]string, len(trace.Proof))
 			for i, val := range trace.Proof {

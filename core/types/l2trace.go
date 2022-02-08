@@ -81,31 +81,29 @@ func (e *ExecutionResult) DecodeRLP(s *rlp.Stream) error {
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc         uint64             `json:"pc"`
-	Op         string             `json:"op"`
-	Gas        uint64             `json:"gas"`
-	GasCost    uint64             `json:"gasCost"`
-	Depth      int                `json:"depth"`
-	Error      string             `json:"error,omitempty"`
-	Stack      *[]string          `json:"stack,omitempty"`
-	Memory     *[]string          `json:"memory,omitempty"`
-	Storage    *map[string]string `json:"storage,omitempty"`
-	ReturnData *[]string          `json:"returnData,omitempty"`
-	Proof      *[]string          `json:"storageProof,omitempty"`
+	Pc      uint64             `json:"pc"`
+	Op      string             `json:"op"`
+	Gas     uint64             `json:"gas"`
+	GasCost uint64             `json:"gasCost"`
+	Depth   int                `json:"depth"`
+	Error   string             `json:"error,omitempty"`
+	Stack   *[]string          `json:"stack,omitempty"`
+	Memory  *[]string          `json:"memory,omitempty"`
+	Storage *map[string]string `json:"storage,omitempty"`
+	Proof   *[]string          `json:"storageProof,omitempty"`
 }
 
 type rlpStructLogRes struct {
-	Pc         uint64
-	Op         string
-	Gas        uint64
-	GasCost    uint64
-	Depth      uint
-	Error      string
-	Stack      []string
-	Memory     []string
-	Storage    []string
-	ReturnData []string
-	Proof      []string
+	Pc      uint64
+	Op      string
+	Gas     uint64
+	GasCost uint64
+	Depth   uint
+	Error   string
+	Stack   []string
+	Memory  []string
+	Storage []string
+	Proof   []string
 }
 
 // EncodeRLP implements rlp.Encoder.
@@ -141,12 +139,6 @@ func (r *StructLogRes) EncodeRLP(w io.Writer) error {
 		data.Storage = make([]string, 0, len(*r.Storage)*2)
 		for _, key := range keys {
 			data.Storage = append(data.Storage, []string{key, (*r.Storage)[key]}...)
-		}
-	}
-	if r.ReturnData != nil {
-		data.ReturnData = make([]string, len(*r.ReturnData))
-		for i, val := range *r.ReturnData {
-			data.ReturnData[i] = val
 		}
 	}
 	if r.Proof != nil {
@@ -187,13 +179,6 @@ func (r *StructLogRes) DecodeRLP(s *rlp.Stream) error {
 			storage[key] = val
 		}
 		r.Storage = &storage
-	}
-	if len(dec.ReturnData) != 0 {
-		returnData := make([]string, len(dec.ReturnData))
-		for i, val := range dec.ReturnData {
-			returnData[i] = val
-		}
-		r.ReturnData = &returnData
 	}
 	if len(dec.Proof) != 0 {
 		proof := make([]string, len(dec.Proof))

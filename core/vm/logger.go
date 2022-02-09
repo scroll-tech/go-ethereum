@@ -70,7 +70,7 @@ type StructLog struct {
 	MemorySize    int                         `json:"memSize"`
 	Stack         []uint256.Int               `json:"stack"`
 	ReturnData    []byte                      `json:"returnData,omitempty"`
-	Proof         [][]byte                    `json:"storageProof,omitempty"`
+	StorageProof  [][]byte                    `json:"storageProof,omitempty"`
 	Storage       map[common.Hash]common.Hash `json:"-"`
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
@@ -434,12 +434,12 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			}
 			formatted[index].Storage = &storage
 		}
-		if len(trace.Proof) != 0 {
-			proof := make([]string, len(trace.Proof))
-			for i, val := range trace.Proof {
+		if len(trace.StorageProof) != 0 {
+			proof := make([]string, len(trace.StorageProof))
+			for i, val := range trace.StorageProof {
 				proof[i] = hexutil.Encode(val)
 			}
-			formatted[index].Proof = &proof
+			formatted[index].StorageProof = &proof
 		}
 	}
 	return formatted

@@ -82,16 +82,16 @@ func (e *ExecutionResult) DecodeRLP(s *rlp.Stream) error {
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc      uint64             `json:"pc"`
-	Op      string             `json:"op"`
-	Gas     uint64             `json:"gas"`
-	GasCost uint64             `json:"gasCost"`
-	Depth   int                `json:"depth"`
-	Error   string             `json:"error,omitempty"`
-	Stack   *[]string          `json:"stack,omitempty"`
-	Memory  *[]string          `json:"memory,omitempty"`
-	Storage *map[string]string `json:"storage,omitempty"`
-	Proof   *[]string          `json:"storageProof,omitempty"`
+	Pc           uint64             `json:"pc"`
+	Op           string             `json:"op"`
+	Gas          uint64             `json:"gas"`
+	GasCost      uint64             `json:"gasCost"`
+	Depth        int                `json:"depth"`
+	Error        string             `json:"error,omitempty"`
+	Stack        *[]string          `json:"stack,omitempty"`
+	Memory       *[]string          `json:"memory,omitempty"`
+	Storage      *map[string]string `json:"storage,omitempty"`
+	StorageProof *[]string          `json:"storageProof,omitempty"`
 }
 
 type rlpStructLogRes struct {
@@ -142,9 +142,9 @@ func (r *StructLogRes) EncodeRLP(w io.Writer) error {
 			data.Storage = append(data.Storage, []string{key, (*r.Storage)[key]}...)
 		}
 	}
-	if r.Proof != nil {
-		data.Proof = make([]string, len(*r.Proof))
-		for i, val := range *r.Proof {
+	if r.StorageProof != nil {
+		data.Proof = make([]string, len(*r.StorageProof))
+		for i, val := range *r.StorageProof {
 			data.Proof[i] = val
 		}
 	}
@@ -186,7 +186,7 @@ func (r *StructLogRes) DecodeRLP(s *rlp.Stream) error {
 		for i, val := range dec.Proof {
 			proof[i] = val
 		}
-		r.Proof = &proof
+		r.StorageProof = &proof
 	}
 	return nil
 }

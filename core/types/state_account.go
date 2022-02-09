@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/iden3/go-iden3-crypto/utils"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -73,7 +74,12 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 func (s *StateAccount) MarshalBytes() []byte {
 	bytes := make([]byte, 128)
 	binary.LittleEndian.PutUint64(bytes, s.Nonce)
+
+	if !utils.CheckBigIntInField(s.Balance) {
+		panic("balance overflow")
+	}
 	copy(bytes[32:64], s.Balance.Bytes())
+
 	copy(bytes[64:96], s.Root.Bytes())
 	copy(bytes[96:128], s.CodeHash)
 	return bytes

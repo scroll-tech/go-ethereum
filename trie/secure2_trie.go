@@ -69,9 +69,8 @@ func (t *Secure2Trie) Get(key []byte) []byte {
 // The value bytes must not be modified by the caller.
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *Secure2Trie) TryGet(key []byte) ([]byte, error) {
-	var word Byte32
-	copy(word[:], key[:32])
-	node, err := t.tree.GetLeafNodeByWord(&word)
+	word := NewByte32FromBytes(key)
+	node, err := t.tree.GetLeafNodeByWord(word)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +80,7 @@ func (t *Secure2Trie) TryGet(key []byte) ([]byte, error) {
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *Secure2Trie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
-	keyPreimage := new(Byte32)
-	copy(keyPreimage[:], key[:])
+	keyPreimage := NewByte32FromBytes(key)
 
 	vHash, err := acc.Hash()
 	if err != nil {
@@ -118,10 +116,9 @@ func (t *Secure2Trie) Update(key, value []byte) {
 //
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *Secure2Trie) TryUpdate(key, value []byte) error {
-	var kPreimage, vPreimage Byte32
-	copy(kPreimage[:], key[:32])
-	copy(vPreimage[:], value[:32])
-	_, err := t.tree.UpdateWord(&kPreimage, &vPreimage)
+	kPreimage := NewByte32FromBytes(key)
+	vPreimage := NewByte32FromBytes(value)
+	_, err := t.tree.UpdateWord(kPreimage, vPreimage)
 	if err != nil {
 		return err
 	}

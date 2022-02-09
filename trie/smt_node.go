@@ -14,6 +14,15 @@ type Byte32 [32]byte
 
 var byte32Zero Byte32
 
+func NewByte32FromBytes(b []byte) *Byte32 {
+	if len(b) != 32 {
+		panic("invalid byte length for byte32")
+	}
+	byte32 := new(Byte32)
+	copy(byte32[:], b[:32])
+	return byte32
+}
+
 func (b *Byte32) Hash() (*big.Int, error) {
 	first16 := new(big.Int).SetBytes(b[0:16])
 	last16 := new(big.Int).SetBytes(b[16:32])

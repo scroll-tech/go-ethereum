@@ -41,7 +41,7 @@ type StateAccount struct {
 //	  Root,
 //	  Hash(codeHashFirst16, codeHashLast16)
 //  ))
-func (s StateAccount) Hash() (*big.Int, error) {
+func (s *StateAccount) Hash() (*big.Int, error) {
 	nonce := new(big.Int).SetUint64(s.Nonce)
 	hash1, err := poseidon.Hash([]*big.Int{nonce, s.Balance})
 	if err != nil {
@@ -70,7 +70,7 @@ func (s StateAccount) Hash() (*big.Int, error) {
 // [32:64] Balance
 // [64:96] Root
 // [96:128] CodeHash
-func (s StateAccount) MarshalBytes() []byte {
+func (s *StateAccount) MarshalBytes() []byte {
 	bytes := make([]byte, 128)
 	binary.LittleEndian.PutUint64(bytes, s.Nonce)
 	copy(bytes[32:64], s.Balance.Bytes())

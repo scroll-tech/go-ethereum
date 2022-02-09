@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/trie/db"
 	"io"
 	"math/big"
 	"strings"
 	"sync"
 
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
-	"github.com/iden3/go-merkletree/db"
 )
 
 const (
@@ -345,7 +345,7 @@ func (mt *MerkleTree) AddAndGetCircomProof(k,
 	cp.Siblings = CircomSiblingsFromSiblings(siblings, mt.maxLevels)
 	//cp.Siblings = siblings
 
-	err = mt.Add(k, v, &byte32Zero, &byte32Zero)
+	err = mt.Add(k, v, &byte32Zero, byte32Zero[:])
 	if err != nil {
 		return nil, err
 	}

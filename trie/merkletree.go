@@ -750,6 +750,14 @@ func (mt *MerkleTree) Delete(k *big.Int) error {
 	return ErrKeyNotFound
 }
 
+func (mt *MerkleTree) DeleteWord(kPreimage *Byte32) error {
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return err
+	}
+	return mt.Delete(k)
+}
+
 // rmAndUpload removes the key, and goes up until the root updating all the
 // nodes with the new values.
 func (mt *MerkleTree) rmAndUpload(tx db.Tx, path []bool, kHash *Hash, siblings []*Hash) error {

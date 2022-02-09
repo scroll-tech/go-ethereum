@@ -69,11 +69,11 @@ type StructLog struct {
 	Memory        []byte                      `json:"memory"`
 	MemorySize    int                         `json:"memSize"`
 	Stack         []uint256.Int               `json:"stack"`
-	ReturnData    []byte                      `json:"returnData,omitempty"`
-	StorageProof  [][]byte                    `json:"storageProof,omitempty"`
+	ReturnData    []byte                      `json:"returnData"`
 	Storage       map[common.Hash]common.Hash `json:"-"`
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
+	ExtraData     *types.ExtraData            `json:"extraData"`
 	Err           error                       `json:"-"`
 }
 
@@ -181,8 +181,8 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	}
 	// Copy a snapshot of the current storage to a new container
 	var (
-		storage      Storage
-		storageProof [][]byte
+		storage   Storage
+		extraData *types.ExtraData
 	)
 	if !l.cfg.DisableStorage && (op == SLOAD || op == SSTORE) {
 		// initialise new changed values storage container for this contract
@@ -207,8 +207,8 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			l.storage[contract.Address()][address] = value
 			storage = l.storage[contract.Address()].Copy()
 
-			storageProof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
-			if err != nil {
+			extraData = types.NewExtraData()
+			if err := traceStorageProof(l, scope, extraData); err != nil {
 				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
 			}
 		}
@@ -218,35 +218,33 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		rdata = make([]byte, len(rData))
 		copy(rdata, rData)
 	}
+
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storageProof, storage, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), extraData, err}
 	l.logs = append(l.logs, log)
 }
 
 // CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
-	if op != SSTORE && op != SLOAD {
-		return
-	}
-	memory := scope.Memory
-	stack := scope.Stack
-	contract := scope.Contract
 	// check if already accumulated the specified number of logs
 	if l.cfg.Limit != 0 && l.cfg.Limit <= len(l.logs) {
 		return
 	}
-	// Copy a snapshot of the current storage to a new container
-	var storageProof [][]byte
-	if !l.cfg.DisableStorage && stack.len() >= 1 {
-		address := common.Hash(stack.data[stack.len()-1].Bytes32())
-		// Get storage proof.
-		storageProof, err = l.env.StateDB.GetStorageProof(contract.Address(), address)
-		if err != nil {
-			log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
+
+	execFuncList, ok := OpcodeExecs[op]
+	if !ok {
+		return
+	}
+	extraData := types.NewExtraData()
+	// execute trace func list.
+	for _, exec := range execFuncList {
+		if err = exec(l, scope, extraData); err != nil {
+			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
+			break
 		}
 	}
-	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, nil, memory.Len(), nil, nil, storageProof, nil, depth, l.env.StateDB.GetRefund(), err}
+
+	log := StructLog{pc, op, gas, cost, nil, scope.Memory.Len(), nil, nil, nil, depth, l.env.StateDB.GetRefund(), extraData, err}
 	l.logs = append(l.logs, log)
 }
 
@@ -434,12 +432,8 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			}
 			formatted[index].Storage = &storage
 		}
-		if len(trace.StorageProof) != 0 {
-			proof := make([]string, len(trace.StorageProof))
-			for i, val := range trace.StorageProof {
-				proof[i] = hexutil.Encode(val)
-			}
-			formatted[index].StorageProof = &proof
+		if trace.ExtraData != nil {
+			formatted[index].ExtraData = trace.ExtraData.CleanExtraData()
 		}
 	}
 	return formatted

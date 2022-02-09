@@ -1,38 +1,13 @@
 package types
 
 import (
-	"io"
-	"sort"
-	"strings"
-
-	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/common"
 )
 
 // BlockResult contains block execution traces and results required for rollers.
 type BlockResult struct {
 	TraceBlock       *TraceBlock        `json:"block"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
-}
-
-type rlpBlockResult struct {
-	TraceBlock       *TraceBlock
-	ExecutionResults []*ExecutionResult
-}
-
-func (b *BlockResult) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, &rlpBlockResult{
-		TraceBlock:       b.TraceBlock,
-		ExecutionResults: b.ExecutionResults,
-	})
-}
-
-func (b *BlockResult) DecodeRLP(s *rlp.Stream) error {
-	var dec rlpBlockResult
-	err := s.Decode(&dec)
-	if err == nil {
-		b.ExecutionResults, b.TraceBlock = dec.ExecutionResults, dec.TraceBlock
-	}
-	return err
 }
 
 // ExecutionResult groups all structured logs emitted by the EVM
@@ -49,144 +24,55 @@ type ExecutionResult struct {
 	StructLogs []StructLogRes `json:"structLogs"`
 }
 
-type rlpExecutionResult struct {
-	Gas         uint64
-	Failed      bool
-	ReturnValue string
-	ByteCode    string
-	Proof       []string
-	StructLogs  []StructLogRes
-}
-
-func (e *ExecutionResult) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, rlpExecutionResult{
-		Gas:         e.Gas,
-		Failed:      e.Failed,
-		ReturnValue: e.ReturnValue,
-		ByteCode:    e.ByteCode,
-		Proof:       e.Proof,
-		StructLogs:  e.StructLogs,
-	})
-}
-
-func (e *ExecutionResult) DecodeRLP(s *rlp.Stream) error {
-	var dec rlpExecutionResult
-	err := s.Decode(&dec)
-	if err == nil {
-		e.Gas, e.Failed, e.StructLogs = dec.Gas, dec.Failed, dec.StructLogs
-		e.ReturnValue, e.ByteCode, e.Proof = dec.ReturnValue, dec.ByteCode, dec.Proof
-	}
-	return err
-}
-
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc           uint64             `json:"pc"`
-	Op           string             `json:"op"`
-	Gas          uint64             `json:"gas"`
-	GasCost      uint64             `json:"gasCost"`
-	Depth        int                `json:"depth"`
-	Error        string             `json:"error,omitempty"`
-	Stack        *[]string          `json:"stack,omitempty"`
-	Memory       *[]string          `json:"memory,omitempty"`
-	Storage      *map[string]string `json:"storage,omitempty"`
-	StorageProof *[]string          `json:"storageProof,omitempty"`
+	Pc        uint64             `json:"pc"`
+	Op        string             `json:"op"`
+	Gas       uint64             `json:"gas"`
+	GasCost   uint64             `json:"gasCost"`
+	Depth     int                `json:"depth"`
+	Error     string             `json:"error,omitempty"`
+	Stack     *[]string          `json:"stack,omitempty"`
+	Memory    *[]string          `json:"memory,omitempty"`
+	Storage   *map[string]string `json:"storage,omitempty"`
+	ExtraData *ExtraData         `json:"extraData,omitempty"`
 }
 
-type rlpStructLogRes struct {
-	Pc      uint64
-	Op      string
-	Gas     uint64
-	GasCost uint64
-	Depth   uint
-	Error   string
-	Stack   []string
-	Memory  []string
-	Storage []string
-	Proof   []string
+type ExtraData struct {
+	// CREATE: sender address
+	From *common.Address `json:"from,omitempty"`
+	// CREATE: sender nonce
+	Nonce *uint64 `json:"nonce,omitempty"`
+	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code_hash, stack.nth_last(1) address’s code_hash]
+	CodeHashList []common.Hash `json:"codeHashList,omitempty"`
+	// SSTORE | SLOAD: [storageProof]
+	// SELFDESTRUCT: [contract address’s accountProof, stack.nth_last(0) address’s accountProof]
+	// SELFBALANCE: [contract address’s accountProof]
+	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
+	// CREATE | CREATE2: [created contract address’s accountProof]
+	// CALL | CALLCODE: [caller contract address’s accountProof, callee contract address’s accountProof, stack.nth_last(1) address’s accountProof]
+	ProofList [][]string `json:"proofList,omitempty"`
 }
 
-// EncodeRLP implements rlp.Encoder.
-func (r *StructLogRes) EncodeRLP(w io.Writer) error {
-	data := rlpStructLogRes{
-		Pc:      r.Pc,
-		Op:      r.Op,
-		Gas:     r.Gas,
-		GasCost: r.GasCost,
-		Depth:   uint(r.Depth),
-		Error:   r.Error,
+// NewExtraData create, init and return ExtraData
+func NewExtraData() *ExtraData {
+	return &ExtraData{
+		CodeHashList: make([]common.Hash, 0),
+		ProofList:    make([][]string, 0),
 	}
-	if r.Stack != nil {
-		data.Stack = make([]string, len(*r.Stack))
-		for i, val := range *r.Stack {
-			data.Stack[i] = val
-		}
-	}
-	if r.Memory != nil {
-		data.Memory = make([]string, len(*r.Memory))
-		for i, val := range *r.Memory {
-			data.Memory[i] = val
-		}
-	}
-	if r.Storage != nil {
-		keys := make([]string, 0, len(*r.Storage))
-		for key := range *r.Storage {
-			keys = append(keys, key)
-		}
-		sort.Slice(keys, func(i, j int) bool {
-			return strings.Compare(keys[i], keys[j]) >= 0
-		})
-		data.Storage = make([]string, 0, len(*r.Storage)*2)
-		for _, key := range keys {
-			data.Storage = append(data.Storage, []string{key, (*r.Storage)[key]}...)
-		}
-	}
-	if r.StorageProof != nil {
-		data.Proof = make([]string, len(*r.StorageProof))
-		for i, val := range *r.StorageProof {
-			data.Proof[i] = val
-		}
-	}
-	return rlp.Encode(w, data)
 }
 
-// DecodeRLP implements rlp.Decoder.
-func (r *StructLogRes) DecodeRLP(s *rlp.Stream) error {
-	var dec rlpStructLogRes
-	err := s.Decode(&dec)
-	if err != nil {
-		return err
+// CleanExtraData doesn't show empty fields.
+func (e *ExtraData) CleanExtraData() *ExtraData {
+	if len(e.CodeHashList) == 0 {
+		e.CodeHashList = nil
 	}
-	r.Pc, r.Op, r.Gas, r.GasCost, r.Depth, r.Error = dec.Pc, dec.Op, dec.Gas, dec.GasCost, int(dec.Depth), dec.Error
-	if len(dec.Stack) != 0 {
-		stack := make([]string, len(dec.Stack))
-		for i, val := range dec.Stack {
-			stack[i] = val
-		}
-		r.Stack = &stack
+	if len(e.ProofList) == 0 {
+		e.ProofList = nil
 	}
-	if len(dec.Memory) != 0 {
-		memory := make([]string, len(dec.Memory))
-		for i, val := range dec.Memory {
-			memory[i] = val
-		}
-		r.Memory = &memory
+	if e.From == nil && e.Nonce == nil && e.CodeHashList == nil && e.ProofList == nil {
+		return nil
 	}
-	if len(dec.Storage) != 0 {
-		storage := make(map[string]string, len(dec.Storage)*2)
-		for i := 0; i < len(dec.Storage); i += 2 {
-			key, val := dec.Storage[i], dec.Storage[i+1]
-			storage[key] = val
-		}
-		r.Storage = &storage
-	}
-	if len(dec.Proof) != 0 {
-		proof := make([]string, len(dec.Proof))
-		for i, val := range dec.Proof {
-			proof[i] = val
-		}
-		r.StorageProof = &proof
-	}
-	return nil
+	return e
 }

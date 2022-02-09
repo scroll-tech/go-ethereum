@@ -17,6 +17,7 @@
 package trie
 
 import (
+	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -137,9 +138,7 @@ func (t *Secure2Trie) Delete(key []byte) {
 // TryDelete removes any existing value for key from the trie.
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *Secure2Trie) TryDelete(key []byte) error {
-	var kPreimage Byte32
-	copy(kPreimage[:], key[:32])
-	return t.tree.DeleteWord(&kPreimage)
+	return errors.New("deletion is disabled")
 }
 
 // GetKey returns the preimage of a hashed key that was

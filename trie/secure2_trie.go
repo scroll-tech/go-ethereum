@@ -145,6 +145,7 @@ func (t *Secure2Trie) TryDelete(key []byte) error {
 // GetKey returns the preimage of a hashed key that was
 // previously used to store a value.
 func (t *Secure2Trie) GetKey(kHashBytes []byte) []byte {
+	// TODO: use a kv cache in memory
 	kHash, err := NewHashFromBytes(kHashBytes)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))

@@ -1,6 +1,7 @@
 package trie
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -49,14 +50,15 @@ type Node struct {
 	// Entry is the data stored in a leaf node.
 	Entry [2]*Hash
 	// key is a cache used to avoid recalculating key
-	key           *Hash
-	KeyPreimage   *Byte32
-	ValuePreimage *Byte32
+	key              *Hash
+	KeyPreimage      *Byte32
+	ValuePreimageLen uint32
+	ValuePreimage    []byte
 }
 
 // NewNodeLeaf creates a new leaf node.
-func NewNodeLeaf(k, v *Hash, keyPreimage, valuePreimage *Byte32) *Node {
-	return &Node{Type: NodeTypeLeaf, Entry: [2]*Hash{k, v}, KeyPreimage: keyPreimage, ValuePreimage: valuePreimage}
+func NewNodeLeaf(k, v *Hash, keyPreimage *Byte32, valuePreimage []byte) *Node {
+	return &Node{Type: NodeTypeLeaf, Entry: [2]*Hash{k, v}, KeyPreimage: keyPreimage, ValuePreimageLen: uint32(len(valuePreimage)), ValuePreimage: valuePreimage[:]}
 }
 
 // NewNodeMiddle creates a new middle node.
@@ -85,16 +87,17 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 		copy(n.ChildL[:], b[:ElemBytesLen])
 		copy(n.ChildR[:], b[ElemBytesLen:ElemBytesLen*2])
 	case NodeTypeLeaf:
-		if len(b) != 4*ElemBytesLen {
+		if len(b) < 4*ElemBytesLen+4 {
 			return nil, ErrNodeBytesBadSize
 		}
 		n.Entry = [2]*Hash{{}, {}}
 		copy(n.Entry[0][:], b[0:32])
 		copy(n.Entry[1][:], b[32:64])
 		n.KeyPreimage = &Byte32{}
-		n.ValuePreimage = &Byte32{}
+		n.ValuePreimage = []byte{}
 		copy(n.KeyPreimage[:], b[64:96])
-		copy(n.ValuePreimage[:], b[96:128])
+		n.ValuePreimageLen = binary.LittleEndian.Uint32(b[96:100])
+		copy(n.ValuePreimage[:], b[100:100+n.ValuePreimageLen])
 	case NodeTypeEmpty:
 		break
 	default:

@@ -252,7 +252,7 @@ func (mt *MerkleTree) Snapshot(rootKey *Hash) (*MerkleTree, error) {
 
 // Add adds a Key & Value into the MerkleTree. Where the `k` determines the
 // path from the Root to the Leaf.
-func (mt *MerkleTree) Add(k, v *big.Int, kPreimage, vPreimage *Byte32) error {
+func (mt *MerkleTree) Add(k, v *big.Int, kPreimage *Byte32, vPreimage []byte) error {
 	// verify that the MerkleTree is writable
 	if !mt.writable {
 		return ErrNotWritable
@@ -295,6 +295,8 @@ func (mt *MerkleTree) Add(k, v *big.Int, kPreimage, vPreimage *Byte32) error {
 	return nil
 }
 
+// AddWord
+// Add a Bytes32 kv to MerkleTree
 func (mt *MerkleTree) AddWord(kPreimage, vPreimage *Byte32) error {
 	k, err := kPreimage.Hash()
 	if err != nil {
@@ -304,7 +306,19 @@ func (mt *MerkleTree) AddWord(kPreimage, vPreimage *Byte32) error {
 	if err != nil {
 		return err
 	}
-	err = mt.Add(k, v, kPreimage, vPreimage)
+	err = mt.Add(k, v, kPreimage, vPreimage[:])
+	return err
+}
+
+// AddVarWord
+// Add a Bytes32 k and a var-length value to MerkleTree
+// User Must provide the hash of vPreimage since there is no define for vPreimage not Bytes32
+func (mt *MerkleTree) AddVarWord(kPreimage *Byte32, vHash *big.Int, vPreimage []byte) error {
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return err
+	}
+	err = mt.Add(k, vHash, kPreimage, vPreimage[:])
 	return err
 }
 
@@ -569,7 +583,7 @@ func (mt *MerkleTree) GetLeafNodeByWord(kPreimage *Byte32) (*Node, error) {
 // Update updates the value of a specified key in the MerkleTree, and updates
 // the path from the leaf to the Root with the new values. Returns the
 // CircomProcessorProof.
-func (mt *MerkleTree) Update(k, v *big.Int, kPreimage, vPreimage *Byte32) (*CircomProcessorProof, error) {
+func (mt *MerkleTree) Update(k, v *big.Int, kPreimage *Byte32, vPreimage []byte) (*CircomProcessorProof, error) {
 	// verify that the MerkleTree is writable
 	if !mt.writable {
 		return nil, ErrNotWritable
@@ -662,7 +676,15 @@ func (mt *MerkleTree) UpdateWord(kPreimage, vPreimage *Byte32) (*CircomProcessor
 	if err != nil {
 		return nil, err
 	}
-	return mt.Update(k, v, kPreimage, vPreimage)
+	return mt.Update(k, v, kPreimage, vPreimage[:])
+}
+
+func (mt *MerkleTree) UpdateVarWord(kPreimage *Byte32, vHash *big.Int, vPreimage []byte) (*CircomProcessorProof, error) {
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return nil, err
+	}
+	return mt.Update(k, vHash, kPreimage, vPreimage[:])
 }
 
 // Delete removes the specified Key from the MerkleTree and updates the path

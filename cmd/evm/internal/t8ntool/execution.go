@@ -18,6 +18,8 @@ package t8ntool
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/trie/db"
+	"github.com/ethereum/go-ethereum/trie/db/memory"
 	"math/big"
 	"os"
 
@@ -114,7 +116,7 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		return h
 	}
 	var (
-		statedb     = MakePreState(rawdb.NewMemoryDatabase(), pre.Pre)
+		statedb     = MakePreState(rawdb.NewMemoryDatabase(), memory.NewMemoryStorage(), pre.Pre)
 		signer      = types.MakeSigner(chainConfig, new(big.Int).SetUint64(pre.Env.Number))
 		gaspool     = new(core.GasPool)
 		blockHash   = common.Hash{0x13, 0x37}
@@ -261,8 +263,8 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 	return statedb, execRs, nil
 }
 
-func MakePreState(db ethdb.Database, accounts core.GenesisAlloc) *state.StateDB {
-	sdb := state.NewDatabase(db)
+func MakePreState(ethDb ethdb.Database, mtDb db.Storage, accounts core.GenesisAlloc) *state.StateDB {
+	sdb := state.NewDatabase(ethDb, mtDb)
 	statedb, _ := state.New(common.Hash{}, sdb, nil)
 	for addr, a := range accounts {
 		statedb.SetCode(addr, a.Code)

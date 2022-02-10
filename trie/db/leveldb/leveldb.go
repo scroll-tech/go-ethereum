@@ -1,7 +1,7 @@
 package leveldb
 
 import (
-	"github.com/iden3/go-merkletree/db"
+	"github.com/ethereum/go-ethereum/trie/db"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/opt"

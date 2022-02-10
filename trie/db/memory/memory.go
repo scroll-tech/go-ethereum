@@ -2,9 +2,8 @@ package memory
 
 import (
 	"bytes"
+	"github.com/ethereum/go-ethereum/trie/db"
 	"sort"
-
-	"github.com/iden3/go-merkletree/db"
 )
 
 // Storage implements the db.Storage interface

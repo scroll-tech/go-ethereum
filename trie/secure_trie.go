@@ -43,11 +43,15 @@ type SecureTrie struct {
 }
 
 // NewSecure creates a trie
-func NewSecure(db db.Storage, maxLevels int) (*SecureTrie, error) {
+func NewSecure(db db.Storage, root common.Hash, maxLevels int) (*SecureTrie, error) {
 	if db == nil {
 		panic("trie.NewSecure called without a database")
 	}
-	tree, err := NewMerkleTree(db, maxLevels)
+	rootHash, err := NewHashFromBytes(root.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	tree, err := NewMerkleTreeWithRoot(db, rootHash, maxLevels)
 	if err != nil {
 		return nil, err
 	}

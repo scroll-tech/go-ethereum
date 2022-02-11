@@ -16,7 +16,7 @@ type BlockTrace struct {
 	BaseFee     *big.Int            `json:"baseFee"`
 	Coinbase    common.Address      `json:"coinbase"`
 	Time        uint64              `json:"time"`
-	Transaction []*TraceTransaction `json:"transaction"`
+	Transaction []*TransactionTrace `json:"transaction"`
 }
 
 type TransactionTrace struct {
@@ -35,12 +35,12 @@ type TransactionTrace struct {
 }
 
 // NewTraceBlock supports necessary fields for roller.
-func NewTraceBlock(config *params.ChainConfig, block *Block) *TraceBlock {
-	txs := make([]*TraceTransaction, block.Transactions().Len())
+func NewTraceBlock(config *params.ChainConfig, block *Block) *BlockTrace {
+	txs := make([]*TransactionTrace, block.Transactions().Len())
 	for i, tx := range block.Transactions() {
 		txs[i] = newTraceTransaction(tx, block.NumberU64(), config)
 	}
-	return &TraceBlock{
+	return &BlockTrace{
 		Number:      block.Number(),
 		Hash:        block.Hash(),
 		GasLimit:    block.GasLimit(),
@@ -54,11 +54,11 @@ func NewTraceBlock(config *params.ChainConfig, block *Block) *TraceBlock {
 
 // newTraceTransaction returns a transaction that will serialize to the trace
 // representation, with the given location metadata set (if available).
-func newTraceTransaction(tx *Transaction, blockNumber uint64, config *params.ChainConfig) *TraceTransaction {
+func newTraceTransaction(tx *Transaction, blockNumber uint64, config *params.ChainConfig) *TransactionTrace {
 	signer := MakeSigner(config, big.NewInt(0).SetUint64(blockNumber))
 	from, _ := Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
-	result := &TraceTransaction{
+	result := &TransactionTrace{
 		Nonce:    tx.Nonce(),
 		ChainId:  tx.ChainId(),
 		From:     from,

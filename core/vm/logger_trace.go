@@ -12,7 +12,7 @@ var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
 		CALL:         {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceOriginProof, traceLastNAddressProof(1)},
-		CALLCODE：{ traceToAddressCodeHash，traceLastNAddressCodeHash（1），traceLastNAddressProof（0）}，traceOriginProof ，traceLastNAddressProof （1 ）}， 
+		CALLCODE:     {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceOriginProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCodeHash, traceLastNAddressCodeHash(1)},
 		STATICCALL:   {traceToAddressCodeHash, traceLastNAddressCodeHash(1)},
 		CREATE:       {traceSenderAddress, traceNonce},

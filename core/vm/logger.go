@@ -240,7 +240,6 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 	for _, exec := range execFuncList {
 		if err = exec(l, scope, extraData); err != nil {
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
-			break
 		}
 	}
 
@@ -433,7 +432,7 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			formatted[index].Storage = &storage
 		}
 		if trace.ExtraData != nil {
-			formatted[index].ExtraData = trace.ExtraData.CleanExtraData()
+			formatted[index].ExtraData = trace.ExtraData.SealExtraData()
 		}
 	}
 	return formatted

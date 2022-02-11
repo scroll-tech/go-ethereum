@@ -40,7 +40,7 @@ type StructLogRes struct {
 }
 
 type ExtraData struct {
-	// CREATE: sender address
+	// CREATE | CREATE2: sender address
 	From *common.Address `json:"from,omitempty"`
 	// CREATE: sender nonce
 	Nonce *uint64 `json:"nonce,omitempty"`
@@ -51,7 +51,7 @@ type ExtraData struct {
 	// SELFBALANCE: [contract address’s accountProof]
 	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
 	// CREATE | CREATE2: [created contract address’s accountProof]
-	// CALL | CALLCODE: [caller contract address’s accountProof, callee contract address’s accountProof, stack.nth_last(1) address’s accountProof]
+	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) address’s accountProof]
 	ProofList [][]string `json:"proofList,omitempty"`
 }
 
@@ -63,8 +63,8 @@ func NewExtraData() *ExtraData {
 	}
 }
 
-// CleanExtraData doesn't show empty fields.
-func (e *ExtraData) CleanExtraData() *ExtraData {
+// SealExtraData doesn't show empty fields.
+func (e *ExtraData) SealExtraData() *ExtraData {
 	if len(e.CodeHashList) == 0 {
 		e.CodeHashList = nil
 	}

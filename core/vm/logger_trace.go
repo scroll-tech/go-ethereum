@@ -73,7 +73,7 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 	// Get storage proof.
 	storageProof, err := l.env.StateDB.GetStorageProof(contract.Address(), address)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, transferProof(storageProof))
+		extraData.ProofList = append(extraData.ProofList, encodeProof(storageProof))
 	}
 	return err
 }
@@ -83,7 +83,7 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 	// Get account proof.
 	proof, err := l.env.StateDB.GetProof(scope.Contract.Address())
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, transferProof(proof))
+		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
 	}
 	return err
 }
@@ -99,7 +99,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
 		proof, err := l.env.StateDB.GetProof(address)
 		if err == nil {
-			extraData.ProofList = append(extraData.ProofList, transferProof(proof))
+			extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
 		}
 		return err
 	}
@@ -110,12 +110,12 @@ func traceOriginProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	address := l.env.Origin
 	proof, err := l.env.StateDB.GetProof(address)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, transferProof(proof))
+		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
 	}
 	return err
 }
 
-func transferProof(proof [][]byte) (res []string) {
+func encodeProof(proof [][]byte) (res []string) {
 	if len(proof) == 0 {
 		return nil
 	}

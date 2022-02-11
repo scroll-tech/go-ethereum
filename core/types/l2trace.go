@@ -40,7 +40,7 @@ type StructLogRes struct {
 }
 
 type ExtraData struct {
-	// CREATE: sender address
+	// CREATE | CREATE2: sender address
 	From *common.Address `json:"from,omitempty"`
 	// CREATE: sender nonce
 	Nonce *uint64 `json:"nonce,omitempty"`

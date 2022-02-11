@@ -6,7 +6,7 @@ import (
 
 // BlockResult contains block execution traces and results required for rollers.
 type BlockResult struct {
-	TraceBlock       *BlockTrace        `json:"block"`
+	BlockTrace       *BlockTrace        `json:"blockTrace"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
 }
 

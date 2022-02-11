@@ -1345,7 +1345,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 
 // Fill blockResult content
 func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, blockResult *types.BlockResult) {
-	blockResult.TraceBlock = types.NewTraceBlock(bc.chainConfig, block)
+	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block)
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
 		// Get the sender's address.

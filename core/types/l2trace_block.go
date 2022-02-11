@@ -8,7 +8,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
-type TraceBlock struct {
+type BlockTrace struct {
 	Number      *big.Int            `json:"number"`
 	Hash        common.Hash         `json:"hash"`
 	GasLimit    uint64              `json:"gasLimit"`
@@ -19,7 +19,7 @@ type TraceBlock struct {
 	Transaction []*TraceTransaction `json:"transaction"`
 }
 
-type TraceTransaction struct {
+type TransactionTrace struct {
 	Nonce    uint64          `json:"nonce"`
 	Gas      uint64          `json:"gas"`
 	GasPrice *big.Int        `json:"gasPrice"`

@@ -3,34 +3,22 @@ package trie
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/types/smt"
 	"math/big"
-
-	"github.com/iden3/go-iden3-crypto/poseidon"
 )
 
 // NodeType defines the type of node in the MT.
 type NodeType byte
-type Byte32 [32]byte
 
-var byte32Zero Byte32
+var byte32Zero smt.Byte32
 
-func NewByte32FromBytes(b []byte) *Byte32 {
+func NewByte32FromBytes(b []byte) *smt.Byte32 {
 	if len(b) != 32 {
 		panic("invalid byte length for byte32")
 	}
-	byte32 := new(Byte32)
+	byte32 := new(smt.Byte32)
 	copy(byte32[:], b[:32])
 	return byte32
-}
-
-func (b *Byte32) Hash() (*big.Int, error) {
-	first16 := new(big.Int).SetBytes(b[0:16])
-	last16 := new(big.Int).SetBytes(b[16:32])
-	hash, err := poseidon.Hash([]*big.Int{first16, last16})
-	if err != nil {
-		return nil, err
-	}
-	return hash, nil
 }
 
 const (
@@ -53,25 +41,25 @@ type Node struct {
 	// Type is the type of node in the tree.
 	Type NodeType
 	// ChildL is the left child of a middle node.
-	ChildL *Hash
+	ChildL *smt.Hash
 	// ChildR is the right child of a middle node.
-	ChildR *Hash
+	ChildR *smt.Hash
 	// Entry is the data stored in a leaf node.
-	Entry [2]*Hash
+	Entry [2]*smt.Hash
 	// key is a cache used to avoid recalculating key
-	key              *Hash
-	KeyPreimage      *Byte32
+	key              *smt.Hash
+	KeyPreimage      *smt.Byte32
 	ValuePreimageLen uint32
 	ValuePreimage    []byte
 }
 
 // NewNodeLeaf creates a new leaf node.
-func NewNodeLeaf(k, v *Hash, keyPreimage *Byte32, valuePreimage []byte) *Node {
-	return &Node{Type: NodeTypeLeaf, Entry: [2]*Hash{k, v}, KeyPreimage: keyPreimage, ValuePreimageLen: uint32(len(valuePreimage)), ValuePreimage: valuePreimage[:]}
+func NewNodeLeaf(k, v *smt.Hash, keyPreimage *smt.Byte32, valuePreimage []byte) *Node {
+	return &Node{Type: NodeTypeLeaf, Entry: [2]*smt.Hash{k, v}, KeyPreimage: keyPreimage, ValuePreimageLen: uint32(len(valuePreimage)), ValuePreimage: valuePreimage[:]}
 }
 
 // NewNodeMiddle creates a new middle node.
-func NewNodeMiddle(childL *Hash, childR *Hash) *Node {
+func NewNodeMiddle(childL *smt.Hash, childR *smt.Hash) *Node {
 	return &Node{Type: NodeTypeMiddle, ChildL: childL, ChildR: childR}
 }
 
@@ -89,20 +77,20 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 	b = b[1:]
 	switch n.Type {
 	case NodeTypeMiddle:
-		if len(b) != 2*ElemBytesLen {
+		if len(b) != 2*smt.ElemBytesLen {
 			return nil, ErrNodeBytesBadSize
 		}
-		n.ChildL, n.ChildR = &Hash{}, &Hash{}
-		copy(n.ChildL[:], b[:ElemBytesLen])
-		copy(n.ChildR[:], b[ElemBytesLen:ElemBytesLen*2])
+		n.ChildL, n.ChildR = &smt.Hash{}, &smt.Hash{}
+		copy(n.ChildL[:], b[:smt.ElemBytesLen])
+		copy(n.ChildR[:], b[smt.ElemBytesLen:smt.ElemBytesLen*2])
 	case NodeTypeLeaf:
-		if len(b) < 4*ElemBytesLen+4 {
+		if len(b) < 4*smt.ElemBytesLen+4 {
 			return nil, ErrNodeBytesBadSize
 		}
-		n.Entry = [2]*Hash{{}, {}}
+		n.Entry = [2]*smt.Hash{{}, {}}
 		copy(n.Entry[0][:], b[0:32])
 		copy(n.Entry[1][:], b[32:64])
-		n.KeyPreimage = &Byte32{}
+		n.KeyPreimage = &smt.Byte32{}
 		n.ValuePreimage = []byte{}
 		copy(n.KeyPreimage[:], b[64:96])
 		n.ValuePreimageLen = binary.LittleEndian.Uint32(b[96:100])
@@ -117,20 +105,20 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 
 // LeafKey computes the key of a leaf node given the hIndex and hValue of the
 // entry of the leaf.
-func LeafKey(k, v *Hash) (*Hash, error) {
-	return HashElemsKey(big.NewInt(1), k.BigInt(), v.BigInt())
+func LeafKey(k, v *smt.Hash) (*smt.Hash, error) {
+	return smt.HashElemsKey(big.NewInt(1), k.BigInt(), v.BigInt())
 }
 
 // Key computes the key of the node by hashing the content in a specific way
 // for each type of node.  This key is used as the hash of the merklee tree for
 // each node.
-func (n *Node) Key() (*Hash, error) {
+func (n *Node) Key() (*smt.Hash, error) {
 	if n.key == nil { // Cache the key to avoid repeated hash computations.
 		// NOTE: We are not using the type to calculate the hash!
 		switch n.Type {
 		case NodeTypeMiddle: // H(ChildL || ChildR)
 			var err error
-			n.key, err = HashElems(n.ChildL.BigInt(), n.ChildR.BigInt())
+			n.key, err = smt.HashElems(n.ChildL.BigInt(), n.ChildR.BigInt())
 			if err != nil {
 				return nil, err
 			}
@@ -141,9 +129,9 @@ func (n *Node) Key() (*Hash, error) {
 				return nil, err
 			}
 		case NodeTypeEmpty: // Zero
-			n.key = &HashZero
+			n.key = &smt.HashZero
 		default:
-			n.key = &HashZero
+			n.key = &smt.HashZero
 		}
 	}
 	return n.key, nil

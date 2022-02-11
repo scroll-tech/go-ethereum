@@ -24,6 +24,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"math/big"
 )
@@ -47,7 +50,7 @@ func NewSecure(db db.Storage, root common.Hash, maxLevels int) (*SecureTrie, err
 	if db == nil {
 		panic("trie.NewSecure called without a database")
 	}
-	rootHash, err := NewHashFromBytes(root.Bytes())
+	rootHash, err := smt.NewHashFromBytes(root.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +150,7 @@ func (t *SecureTrie) TryDelete(key []byte) error {
 // previously used to store a value.
 func (t *SecureTrie) GetKey(kHashBytes []byte) []byte {
 	// TODO: use a kv cache in memory
-	kHash, err := NewHashFromBytes(kHashBytes)
+	kHash, err := smt.NewHashFromBytes(kHashBytes)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}

@@ -18,7 +18,7 @@ package types
 
 import (
 	"encoding/binary"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/core/types/smt"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-iden3-crypto/utils"
 	"math/big"
@@ -53,7 +53,7 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 	codeHashLast16 := new(big.Int).SetBytes(s.CodeHash[16:32])
 	hash2, err := poseidon.Hash([]*big.Int{codeHashFirst16, codeHashLast16})
 
-	rootHash, err := trie.NewHashFromBytes(s.Root.Bytes())
+	rootHash, err := smt.NewHashFromBytes(s.Root.Bytes())
 	if err != nil {
 		return nil, err
 	}

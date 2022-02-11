@@ -2,6 +2,7 @@ package trie
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/types/smt"
 	"math/big"
 	"os"
 	"testing"
@@ -17,16 +18,16 @@ const HashLeafExtFinal = 4
 
 type Row struct {
 	IsFirst bool
-	Sib     *Hash
+	Sib     *smt.Hash
 	Path    string // for debug, switch to bigint later
 	//PathAcc     *big.Int
 	OldHashType int
-	OldHash     *Hash
-	OldValue    *Hash
+	OldHash     *smt.Hash
+	OldValue    *smt.Hash
 	NewHashType int
-	NewHash     *Hash
-	NewValue    *Hash
-	Key         *Hash
+	NewHash     *smt.Hash
+	NewValue    *smt.Hash
+	Key         *smt.Hash
 }
 
 // TODO: check root between operations
@@ -127,11 +128,11 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 			Path:        formatPathFromBool(fullPath[i]),
 			Key:         p.NewKey,
 			OldHashType: HashMid,
-			OldHash:     &HashZero, // place holder
-			OldValue:    &HashZero, // place holder
+			OldHash:     &smt.HashZero, // place holder
+			OldValue:    &smt.HashZero, // place holder
 			NewHashType: HashMid,
-			NewHash:     &HashZero, // place holder
-			NewValue:    &HashZero, // place holder
+			NewHash:     &smt.HashZero, // place holder
+			NewValue:    &smt.HashZero, // place holder
 		}
 		rows = append(rows, row)
 	}
@@ -154,15 +155,15 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 			// make leafExt
 			row := Row{
 				IsFirst:     false,
-				Sib:         &HashZero,
+				Sib:         &smt.HashZero,
 				Path:        formatPathFromBool(fullPath[i]),
 				Key:         p.NewKey,
 				OldHashType: HashLeafExt,
 				OldHash:     leafSib,
 				OldValue:    leafSib,
 				NewHashType: HashMid,
-				NewHash:     &HashZero, // place holder
-				NewValue:    &HashZero, // place holder
+				NewHash:     &smt.HashZero, // place holder
+				NewValue:    &smt.HashZero, // place holder
 			}
 			rows = append(rows, row)
 		}
@@ -173,10 +174,10 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 			Path:        formatPathFromBool(fullPath[leafHeight]),
 			Key:         p.NewKey,
 			OldHashType: HashLeafExtFinal,
-			OldHash:     leafSib,   // place holder
-			OldValue:    &HashZero, // place holder
+			OldHash:     leafSib,       // place holder
+			OldValue:    &smt.HashZero, // place holder
 			NewHashType: HashMid,
-			NewHash:     &HashZero,
+			NewHash:     &smt.HashZero,
 			NewValue:    newLeafKey,
 		}
 		if fullPath[leafHeight] {
@@ -195,12 +196,12 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 		rows = append(rows, row)
 		row = Row{
 			IsFirst:     false,
-			Sib:         &HashZero,
+			Sib:         &smt.HashZero,
 			Path:        formatPathFromBools(fullPath[leafHeight:]),
 			Key:         p.NewKey,
 			OldHashType: HashEmpty,
-			OldHash:     &HashZero, // place holder
-			OldValue:    &HashZero, // place holder
+			OldHash:     &smt.HashZero, // place holder
+			OldValue:    &smt.HashZero, // place holder
 			NewHashType: HashLeaf,
 			NewHash:     newLeafKey,
 			NewValue:    p.NewValue,
@@ -210,12 +211,12 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 		// the leaf
 		row := Row{
 			IsFirst:     false,
-			Sib:         &HashZero,
+			Sib:         &smt.HashZero,
 			Path:        formatPathFromBools(fullPath[midNum:]),
 			Key:         p.NewKey,
 			OldHashType: HashEmpty,
-			OldHash:     &HashZero, // place holder
-			OldValue:    &HashZero, // place holder
+			OldHash:     &smt.HashZero, // place holder
+			OldValue:    &smt.HashZero, // place holder
 			NewHashType: HashLeaf,
 			NewHash:     newLeafKey,
 			NewValue:    p.NewValue,

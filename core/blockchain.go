@@ -1363,6 +1363,9 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		// Contract is called
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(state.GetCode(*tx.To()))
+			// Get tx.to address's code hash.
+			codeHash := state.GetCodeHash(*tx.To())
+			evmTrace.CodeHash = &codeHash
 		} else if tx.To() == nil { // Contract is created.
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())
 		}

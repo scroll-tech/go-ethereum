@@ -17,6 +17,8 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
+	// It's exist only when tx is a contract call.
+	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
 	ByteCode string `json:"byteCode,omitempty"`
 	// The account's proof.

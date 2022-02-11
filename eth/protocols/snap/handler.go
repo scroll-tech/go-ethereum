@@ -341,7 +341,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 				for _, blob := range proof.NodeList() {
 					proofs = append(proofs, blob)
 				}
-				// StorageProof terminates the reply as proofs are only added if a node
+				// Proof terminates the reply as proofs are only added if a node
 				// refuses to serve more data (exception when a contract fetch is
 				// finishing, but that's that).
 				break

@@ -19,7 +19,7 @@ type TraceBlock struct {
 	Transaction []*TraceTransaction `json:"transaction"`
 }
 
-type TraceTransaction struct {
+type TransactionTrace struct {
 	Nonce    uint64          `json:"nonce"`
 	Gas      uint64          `json:"gas"`
 	GasPrice *big.Int        `json:"gasPrice"`

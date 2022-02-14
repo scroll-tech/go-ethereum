@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/trie/db/leveldb"
 	"os"
 	"runtime"
 	"strconv"
@@ -453,11 +452,7 @@ func dump(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	mtDb, err := leveldb.NewLevelDbStorage(stack.ResolvePath("treedata"), false)
-	if err != nil {
-		return err
-	}
-	state, err := state.New(root, state.NewDatabase(db, mtDb), nil)
+	state, err := state.New(root, state.NewDatabase(db), nil)
 	if err != nil {
 		return err
 	}

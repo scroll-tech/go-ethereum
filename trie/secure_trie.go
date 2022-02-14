@@ -91,6 +91,12 @@ func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
 	return node.ValuePreimage[:], nil
 }
 
+// TryGetNode attempts to retrieve a trie node by compact-encoded path. It is not
+// possible to use keybyte-encoding as the path might contain odd nibbles.
+func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
+	panic("unimplemented")
+}
+
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {

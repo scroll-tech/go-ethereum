@@ -58,6 +58,9 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 		return nil, err
 	}
 	hash3, err := poseidon.Hash([]*big.Int{rootHash.BigInt(), hash2})
+	if err != nil {
+		return nil, err
+	}
 
 	hash4, err := poseidon.Hash([]*big.Int{hash1, hash3})
 	if err != nil {

@@ -511,27 +511,28 @@ func (db *Database) reference(child common.Hash, parent common.Hash) {
 
 // Dereference removes an existing reference from a root node.
 func (db *Database) Dereference(root common.Hash) {
-	// Sanity check to ensure that the meta-root is not removed
-	if root == (common.Hash{}) {
-		log.Error("Attempted to dereference the trie cache meta root")
-		return
-	}
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
-	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
-	db.dereference(root, common.Hash{})
-
-	db.gcnodes += uint64(nodes - len(db.dirties))
-	db.gcsize += storage - db.dirtiesSize
-	db.gctime += time.Since(start)
-
-	memcacheGCTimeTimer.Update(time.Since(start))
-	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
-
-	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
-		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
+	//// Sanity check to ensure that the meta-root is not removed
+	//if root == (common.Hash{}) {
+	//	log.Error("Attempted to dereference the trie cache meta root")
+	//	return
+	//}
+	//db.lock.Lock()
+	//defer db.lock.Unlock()
+	//
+	//nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
+	//db.dereference(root, common.Hash{})
+	//
+	//db.gcnodes += uint64(nodes - len(db.dirties))
+	//db.gcsize += storage - db.dirtiesSize
+	//db.gctime += time.Since(start)
+	//
+	//memcacheGCTimeTimer.Update(time.Since(start))
+	//memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	//memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
+	//
+	//log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
+	//	"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
+	log.Warn("gc should be implemented later")
 }
 
 // dereference is the private locked version of Dereference.

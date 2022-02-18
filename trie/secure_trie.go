@@ -83,7 +83,7 @@ func (t *SecureTrie) Get(key []byte) []byte {
 // The value bytes must not be modified by the caller.
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
-	word := NewByte32FromBytes(key)
+	word := NewByte32FromBytesPaddingZero(key)
 	node, err := t.tree.GetLeafNodeByWord(word)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
-	keyPreimage := NewByte32FromBytes(key)
+	keyPreimage := NewByte32FromBytesPaddingZero(key)
 
 	vHash, err := acc.Hash()
 	if err != nil {
@@ -136,8 +136,8 @@ func (t *SecureTrie) Update(key, value []byte) {
 //
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureTrie) TryUpdate(key, value []byte) error {
-	kPreimage := NewByte32FromBytes(key)
-	vPreimage := NewByte32FromBytes(value)
+	kPreimage := NewByte32FromBytesPaddingZero(key)
+	vPreimage := NewByte32FromBytesPaddingZero(value)
 	_, err := t.tree.UpdateWord(kPreimage, vPreimage)
 	if err != nil {
 		return err

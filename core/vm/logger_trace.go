@@ -78,7 +78,7 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 	return err
 }
 
-// traceContractProof gets the account address's proof
+// traceContractProof gets the contract's account proof
 func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	// Get account proof.
 	proof, err := l.env.StateDB.GetProof(scope.Contract.Address())

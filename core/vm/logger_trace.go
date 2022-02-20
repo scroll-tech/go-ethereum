@@ -11,8 +11,8 @@ type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.Extra
 var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
-		CALL:         {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceOriginProof, traceLastNAddressProof(1)},
-		CALLCODE:     {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceOriginProof, traceLastNAddressProof(1)},
+		CALL:         {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceCallerProof, traceLastNAddressProof(1)},
+		CALLCODE:     {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceCallerProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCodeHash, traceLastNAddressCodeHash(1)},
 		STATICCALL:   {traceToAddressCodeHash, traceLastNAddressCodeHash(1)},
 		CREATE:       {traceSenderAddress, traceNonce},
@@ -105,9 +105,9 @@ func traceLastNAddressProof(n int) traceFunc {
 	}
 }
 
-// traceOriginProof gets caller address's proof.
-func traceOriginProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
-	address := l.env.Origin
+// traceCallerProof gets caller address's proof.
+func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+	address := scope.Contract.CallerAddress
 	proof, err := l.env.StateDB.GetProof(address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))

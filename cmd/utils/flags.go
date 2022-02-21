@@ -1836,7 +1836,8 @@ func MakeChainDatabase(ctx *cli.Context, stack *node.Node, readonly bool) ethdb.
 		chainDb, err = stack.OpenDatabaseWithFreezer(name, cache, handles, ctx.GlobalString(AncientFlag.Name), "", readonly)
 	}
 	if err != nil {
-		Fatalf("Could not open database: %v", err)
+		//Fatalf("Could not open database: %v", err)
+		panic(fmt.Sprintf("Could not open database: %v", err))
 	}
 	return chainDb
 }

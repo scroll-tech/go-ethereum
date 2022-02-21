@@ -53,7 +53,7 @@ func NewSecure(root common.Hash, _ *Database) (*SecureTrie, error) {
 	//	panic("trie.NewSecure called without a database")
 	//}
 	mtDbOnce.Do(func() {
-		newDb, _ := leveldb.NewLevelDbStorage("/tmp/treedata", false)
+		newDb, _ := leveldb.NewLevelDbStorage("tmp/treedata", false)
 		mtDb = &*newDb
 	})
 	rootHash, err := smt.NewHashFromBytes(root.Bytes())

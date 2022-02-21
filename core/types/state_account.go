@@ -52,6 +52,9 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 	codeHashFirst16 := new(big.Int).SetBytes(s.CodeHash[0:16])
 	codeHashLast16 := new(big.Int).SetBytes(s.CodeHash[16:32])
 	hash2, err := poseidon.Hash([]*big.Int{codeHashFirst16, codeHashLast16})
+	if err != nil {
+		return nil, err
+	}
 
 	rootHash, err := smt.NewHashFromBytes(s.Root.Bytes())
 	if err != nil {

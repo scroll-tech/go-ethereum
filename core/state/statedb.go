@@ -42,7 +42,7 @@ type revision struct {
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = new(common.Hash)
+	emptyRoot = common.Hash{}
 )
 
 type proofList [][]byte

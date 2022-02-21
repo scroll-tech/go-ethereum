@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"errors"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -15,8 +16,8 @@ var (
 		CALLCODE:     {traceToAddressCodeHash, traceLastNAddressCodeHash(1), traceCallerProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCodeHash, traceLastNAddressCodeHash(1)},
 		STATICCALL:   {traceToAddressCodeHash, traceLastNAddressCodeHash(1)},
-		CREATE:       {traceSenderAddress, traceNonce},
-		CREATE2:      {traceSenderAddress},
+		CREATE:       {traceSenderAddress, traceCreatedContractProof, traceNonce},
+		CREATE2:      {traceSenderAddress, traceCreatedContractProof},
 		SSTORE:       {traceStorageProof},
 		SLOAD:        {traceStorageProof},
 		SELFDESTRUCT: {traceContractProof, traceLastNAddressProof(0)},
@@ -82,6 +83,24 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	// Get account proof.
 	proof, err := l.env.StateDB.GetProof(scope.Contract.Address())
+	if err == nil {
+		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+	}
+	return err
+}
+
+/// traceCreatedContractProof get created contract address’s accountProof
+func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+	stack := scope.Stack
+	if stack.len() < 1 {
+		return nil
+	}
+	stackvalue := stack.peek()
+	if stackvalue.IsZero() {
+		return errors.New("can't get created contract address from stack")
+	}
+	address := common.BytesToAddress(stackvalue.Bytes())
+	proof, err := l.env.StateDB.GetProof(address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
 	}

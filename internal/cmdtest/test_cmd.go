@@ -209,7 +209,6 @@ func (tt *TestCmd) ExpectExit() {
 		tt.Cleanup()
 	}
 	if len(output) > 0 {
-		fmt.Println(string(output))
 		tt.Errorf("Unmatched stdout text:\n%s", output)
 	}
 }

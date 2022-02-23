@@ -108,7 +108,7 @@ func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error
 	}
 	value := acc.MarshalBytes()
 
-	err = t.tree.UpdateVarWord(keyPreimage, vHash, value)
+	_, err = t.tree.UpdateVarWord(keyPreimage, vHash, value)
 	if err != nil {
 		return err
 	}

@@ -100,9 +100,9 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 		copy(n.Entry[0][:], b[0:32])
 		copy(n.Entry[1][:], b[32:64])
 		n.KeyPreimage = &smt.Byte32{}
-		n.ValuePreimage = []byte{}
 		copy(n.KeyPreimage[:], b[64:96])
 		n.ValuePreimageLen = binary.LittleEndian.Uint32(b[96:100])
+		n.ValuePreimage = make([]byte, n.ValuePreimageLen)
 		copy(n.ValuePreimage[:], b[100:100+n.ValuePreimageLen])
 	case NodeTypeEmpty:
 		break
@@ -160,6 +160,9 @@ func (n *Node) Value() []byte {
 		bytes = append(bytes, n.Entry[0][:]...)
 		bytes = append(bytes, n.Entry[1][:]...)
 		bytes = append(bytes, n.KeyPreimage[:]...)
+		tmp := make([]byte, 4)
+		binary.LittleEndian.PutUint32(tmp, n.ValuePreimageLen)
+		bytes = append(bytes, tmp...)
 		bytes = append(bytes, n.ValuePreimage[:]...)
 		return bytes
 	case NodeTypeEmpty: // {}

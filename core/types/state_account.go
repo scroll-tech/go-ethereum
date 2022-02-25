@@ -18,12 +18,18 @@ package types
 
 import (
 	"encoding/binary"
-	"github.com/ethereum/go-ethereum/core/types/smt"
-	"github.com/iden3/go-iden3-crypto/poseidon"
-	"github.com/iden3/go-iden3-crypto/utils"
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
+	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/iden3/go-iden3-crypto/utils"
+)
+
+var (
+	ErrInvalidLength = errors.New("StateAccount: invalid input length")
 )
 
 // StateAccount is the Ethereum consensus representation of accounts.
@@ -84,9 +90,23 @@ func (s *StateAccount) MarshalBytes() []byte {
 	if !utils.CheckBigIntInField(s.Balance) {
 		panic("balance overflow")
 	}
-	copy(bytes[32:64], s.Balance.Bytes())
+	s.Balance.FillBytes(bytes[32:64])
 
 	copy(bytes[64:96], s.Root.Bytes())
 	copy(bytes[96:128], s.CodeHash)
 	return bytes
+}
+
+func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
+	if len(bytes) != 128 {
+		return nil, ErrInvalidLength
+	}
+	acc := new(StateAccount)
+	acc.Nonce = binary.LittleEndian.Uint64(bytes[:8])
+	acc.Balance = new(big.Int).SetBytes(bytes[32:64])
+	acc.Root = common.Hash{}
+	acc.Root.SetBytes(bytes[64:96])
+	acc.CodeHash = make([]byte, 32)
+	copy(acc.CodeHash, bytes[96:128])
+	return acc, nil
 }

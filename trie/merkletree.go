@@ -161,7 +161,12 @@ func (mt *MerkleTree) Add(k, v *big.Int, kPreimage *smt.Byte32, vPreimage []byte
 	path := getPath(mt.maxLevels, kHash[:])
 
 	newRootKey, err := mt.addLeaf(tx, newNodeLeaf, mt.rootKey, 0, path)
-	if err != nil {
+	if err == ErrEntryIndexAlreadyExists {
+		newRootKey, err = mt.updateNode(tx, newNodeLeaf)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
 	mt.rootKey = newRootKey
@@ -298,14 +303,32 @@ func (mt *MerkleTree) addLeaf(tx db.Tx, newLeaf *Node, key *smt.Hash,
 	switch n.Type {
 	case NodeTypeEmpty:
 		// We can add newLeaf now
-		return mt.addNode(tx, newLeaf)
+		{
+			r, e := mt.addNode(tx, newLeaf)
+			if e != nil {
+				fmt.Println("err on NodeTypeEmpty mt.addNode ")
+			}
+			return r, e
+		}
 	case NodeTypeLeaf:
 		nKey := n.Entry[0]
 		// Check if leaf node found contains the leaf node we are
 		// trying to add
 		newLeafKey := newLeaf.Entry[0]
 		if bytes.Equal(nKey[:], newLeafKey[:]) {
-			return nil, ErrEntryIndexAlreadyExists
+			if bytes.Equal(n.Entry[1][:], newLeaf.Entry[1][:]) {
+				// do nothing, duplicate entry
+				// FIXME more optimization may needed here
+				k, err := n.Key()
+				if err != nil {
+					panic("wtf")
+				}
+				return k, nil
+			} else {
+				fmt.Printf("ErrEntryIndexAlreadyExists nKey %v newLeafKey %v n.Entry[1] %v newLeaf.Entry[1] %v\n",
+					nKey, newLeafKey, n.Entry[1], newLeaf.Entry[1])
+				return nil, ErrEntryIndexAlreadyExists
+			}
 		}
 		pathOldLeaf := getPath(mt.maxLevels, nKey[:])
 		// We need to push newLeaf down until its path diverges from
@@ -348,8 +371,11 @@ func (mt *MerkleTree) addNode(tx db.Tx, n *Node) (*smt.Hash, error) {
 	}
 	v := n.Value()
 	// Check that the node key doesn't already exist
-	if _, err := tx.Get(k[:]); err == nil {
-		return nil, ErrNodeKeyAlreadyExists
+	oldV, err := tx.Get(k[:])
+	if err == nil {
+		if !bytes.Equal(oldV, v) {
+			return nil, ErrNodeKeyAlreadyExists
+		}
 	}
 	err = tx.Put(k[:], v)
 	return k, err

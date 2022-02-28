@@ -584,7 +584,12 @@ func (mt *MerkleTree) UpdateWord(kPreimage, vPreimage *smt.Byte32) (*CircomProce
 	if err != nil {
 		return nil, err
 	}
-	return mt.Update(k, v, kPreimage, vPreimage[:])
+	proof, err := mt.Update(k, v, kPreimage, vPreimage[:])
+	if err == ErrKeyNotFound {
+		err = mt.Add(k, v, kPreimage, vPreimage[:])
+		return nil, err
+	}
+	return proof, err
 }
 
 func (mt *MerkleTree) UpdateVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPreimage []byte) (*CircomProcessorProof, error) {
@@ -592,7 +597,12 @@ func (mt *MerkleTree) UpdateVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPrei
 	if err != nil {
 		return nil, err
 	}
-	return mt.Update(k, vHash, kPreimage, vPreimage[:])
+	proof, err := mt.Update(k, vHash, kPreimage, vPreimage[:])
+	if err == ErrKeyNotFound {
+		err = mt.Add(k, vHash, kPreimage, vPreimage[:])
+		return nil, err
+	}
+	return proof, err
 }
 
 // Delete removes the specified Key from the MerkleTree and updates the path

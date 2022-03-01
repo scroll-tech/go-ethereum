@@ -19,7 +19,6 @@ package types
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"

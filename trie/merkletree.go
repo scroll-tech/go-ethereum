@@ -36,8 +36,8 @@ var (
 	// ErrInvalidProofBytes is used when a serialized proof is invalid.
 	ErrInvalidProofBytes = errors.New("the serialized proof is invalid")
 	// ErrInvalidDBValue is used when a value in the key value DB is
-	// invalid (for example, it doen't contain a byte header and a []byte
-	// body of at least len=1.
+	// invalid (for example, it doesn't contain a byte header and a []byte
+	// body of at least len=1).
 	ErrInvalidDBValue = errors.New("the value in the DB is invalid")
 	// ErrEntryIndexAlreadyExists is used when the entry index already
 	// exists in the tree.
@@ -63,7 +63,7 @@ func NewMerkleTree(storage db.Storage, maxLevels int) (*MerkleTree, error) {
 	return NewMerkleTreeWithRoot(storage, &smt.HashZero, maxLevels)
 }
 
-// NewMerkleTreeWithRoot loads a new Merkletree. If in the sotrage already exists one
+// NewMerkleTreeWithRoot loads a new Merkletree. If in the storage already exists one
 // will open that one, if not, will create a new one.
 func NewMerkleTreeWithRoot(storage db.Storage, root *smt.Hash, maxLevels int) (*MerkleTree, error) {
 	mt := MerkleTree{db: storage, maxLevels: maxLevels, writable: true}
@@ -140,7 +140,7 @@ func (mt *MerkleTree) Add(k, v *big.Int, kPreimage *smt.Byte32, vPreimage []byte
 		return ErrNotWritable
 	}
 
-	// verfy that k & v are valid and fit inside the Finite Field.
+	// verify that k & v are valid and fit inside the Finite Field.
 	if !cryptoUtils.CheckBigIntInField(k) {
 		return errors.New("Key not inside the Finite Field")
 	}
@@ -209,7 +209,7 @@ func (mt *MerkleTree) AddVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPreimag
 	return err
 }
 
-// this function has no sense now.. just used for testing...
+// This function has no sense now.. just used for testing...
 // AddAndGetCircomProof does an Add, and returns a CircomProcessorProof
 func (mt *MerkleTree) AddAndGetCircomProof(k,
 	v *big.Int) (*CircomProcessorProof, error) {
@@ -402,7 +402,7 @@ func (mt *MerkleTree) updateNode(tx db.Tx, n *Node) (*smt.Hash, error) {
 
 // Get returns the value of the leaf for the given key
 func (mt *MerkleTree) Get(k *big.Int) (*big.Int, *big.Int, []*smt.Hash, error) {
-	// verfy that k is valid and fit inside the Finite Field.
+	// verify that k is valid and fit inside the Finite Field.
 	if !cryptoUtils.CheckBigIntInField(k) {
 		return nil, nil, nil, errors.New("Key not inside the Finite Field")
 	}
@@ -442,7 +442,7 @@ func (mt *MerkleTree) Get(k *big.Int) (*big.Int, *big.Int, []*smt.Hash, error) {
 }
 
 func (mt *MerkleTree) GetLeafNode(k *big.Int) (*Node, error) {
-	// verfy that k is valid and fit inside the Finite Field.
+	// verify that k is valid and fit inside the Finite Field.
 	if !cryptoUtils.CheckBigIntInField(k) {
 		return nil, errors.New("key not inside the Finite Field")
 	}
@@ -488,8 +488,8 @@ func (mt *MerkleTree) GetLeafNodeByWord(kPreimage *smt.Byte32) (*Node, error) {
 	return mt.GetLeafNode(k)
 }
 
-// Update updates the value of a specified key in the MerkleTree, and updates
-// the path from the leaf to the Root with the new values. Returns the
+// Update function updates the value of a specified key in the MerkleTree, and updates
+// the path from the leaf to the Root with the new values,and returns the
 // CircomProcessorProof.
 func (mt *MerkleTree) Update(k, v *big.Int, kPreimage *smt.Byte32, vPreimage []byte) (*CircomProcessorProof, error) {
 	// verify that the MerkleTree is writable
@@ -497,7 +497,7 @@ func (mt *MerkleTree) Update(k, v *big.Int, kPreimage *smt.Byte32, vPreimage []b
 		return nil, ErrNotWritable
 	}
 
-	// verfy that k & are valid and fit inside the Finite Field.
+	// verify that k & are valid and fit inside the Finite Field.
 	if !cryptoUtils.CheckBigIntInField(k) {
 		return nil, errors.New("Key not inside the Finite Field")
 	}
@@ -613,7 +613,7 @@ func (mt *MerkleTree) UpdateVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPrei
 // to remove the key-values from the database that are not under the current
 // Root, an option could be to dump all the leafs (using mt.DumpLeafs) and
 // import them in a new MerkleTree in a new database (using
-// mt.ImportDumpedLeafs), but this will loose all the Root history of the
+// mt.ImportDumpedLeafs), but this will lose all the Root history of the
 // MerkleTree
 func (mt *MerkleTree) Delete(k *big.Int) error {
 	// verify that the MerkleTree is writable
@@ -621,7 +621,7 @@ func (mt *MerkleTree) Delete(k *big.Int) error {
 		return ErrNotWritable
 	}
 
-	// verfy that k is valid and fit inside the Finite Field.
+	// verify that k is valid and fit inside the Finite Field.
 	if !cryptoUtils.CheckBigIntInField(k) {
 		return errors.New("Key not inside the Finite Field")
 	}
@@ -920,7 +920,7 @@ type CircomProcessorProof struct {
 	Fnc int `json:"fnc"`
 }
 
-// String returns a human readable string representation of the
+// String function returns a human-readable string representation of the
 // CircomProcessorProof
 func (p CircomProcessorProof) String() string {
 	buf := bytes.NewBufferString("{")
@@ -970,8 +970,8 @@ func (mt *MerkleTree) GenerateCircomVerifierProof(k *big.Int,
 
 // GenerateSCVerifierProof returns the CircomVerifierProof for a certain key in
 // the MerkleTree with the Siblings without the extra 0 needed at the circom
-// circuits, which makes it straight forward to verifiy inside a Smart
-// Contract.  If the rootKey is nil, the current merkletree root is used.
+// circuits, which makes it straight forward to verify inside a Smart
+// Contract. If the rootKey is nil, the current merkletree root is used.
 func (mt *MerkleTree) GenerateSCVerifierProof(k *big.Int,
 	rootKey *smt.Hash) (*CircomVerifierProof, error) {
 	if rootKey == nil {

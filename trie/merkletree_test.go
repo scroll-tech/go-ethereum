@@ -1,7 +1,7 @@
 package trie
 
 import (
-	"github.com/ethereum/go-ethereum/core/types/smt"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"math/big"
 	"testing"
 

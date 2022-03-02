@@ -19,13 +19,14 @@ package trie
 import (
 	"errors"
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/trie/db/leveldb"
 
+	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/trie/db"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"math/big"
 	"sync"
 )

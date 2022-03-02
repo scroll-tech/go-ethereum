@@ -2,7 +2,7 @@ package pebble
 
 import (
 	"github.com/cockroachdb/pebble"
-	"github.com/ethereum/go-ethereum/trie/db"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 // Storage implements the db.Storage interface

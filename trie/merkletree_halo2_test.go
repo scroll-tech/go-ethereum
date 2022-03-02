@@ -2,7 +2,7 @@ package trie
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types/smt"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"math/big"
 	"os"
 	"testing"

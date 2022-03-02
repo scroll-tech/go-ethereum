@@ -2,7 +2,7 @@ package memory
 
 import (
 	"bytes"
-	"github.com/ethereum/go-ethereum/trie/db"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 	"sort"
 )
 

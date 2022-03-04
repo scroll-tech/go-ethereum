@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/iden3/go-iden3-crypto/utils"
+	"github.com/scroll-tech/go-ethereum/common"
 	"math/big"
-	"strings"
 )
 
 const numCharPrint = 8
@@ -13,8 +13,7 @@ const numCharPrint = 8
 // ElemBytesLen is the length of the Hash byte array
 const ElemBytesLen = 32
 
-var HashZero = Hash{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var HashZero = Hash{}
 
 // Hash is the generic type stored in the MerkleTree
 type Hash [32]byte
@@ -46,16 +45,16 @@ func (h Hash) Hex() string {
 	// alternatively equivalent, but with too extra steps:
 	// bRaw := h.BigInt().Bytes()
 	// b := [32]byte{}
-	// copy(b[:], SwapEndianness(bRaw[:]))
+	// copy(b[:], ReverseByteOrder(bRaw[:]))
 	// return hex.EncodeToString(b[:])
 }
 
 // BigInt returns the *big.Int representation of the *Hash
 func (h *Hash) BigInt() *big.Int {
-	if new(big.Int).SetBytes(SwapEndianness(h[:])) == nil {
+	if new(big.Int).SetBytes(ReverseByteOrder(h[:])) == nil {
 		return big.NewInt(0)
 	}
-	return new(big.Int).SetBytes(SwapEndianness(h[:]))
+	return new(big.Int).SetBytes(ReverseByteOrder(h[:]))
 }
 
 // Bytes returns the []byte representation of the *Hash, which always is 32
@@ -63,7 +62,7 @@ func (h *Hash) BigInt() *big.Int {
 func (h *Hash) Bytes() []byte {
 	bi := new(big.Int).SetBytes(h[:]).Bytes()
 	b := [32]byte{}
-	copy(b[:], SwapEndianness(bi[:]))
+	copy(b[:], ReverseByteOrder(bi[:]))
 	return b[:]
 }
 
@@ -91,7 +90,7 @@ func NewBigIntFromHashBytes(b []byte) (*big.Int, error) {
 // NewHashFromBigInt returns a *Hash representation of the given *big.Int
 func NewHashFromBigInt(b *big.Int) *Hash {
 	r := &Hash{}
-	copy(r[:], SwapEndianness(b.Bytes()))
+	copy(r[:], ReverseByteOrder(b.Bytes()))
 	//copy(r[:], b.Bytes())
 	return r
 }
@@ -104,18 +103,13 @@ func NewHashFromBytes(b []byte) (*Hash, error) {
 		return nil, fmt.Errorf("Expected 32 bytes, found %d bytes", len(b))
 	}
 	var h Hash
-	copy(h[:], SwapEndianness(b))
+	copy(h[:], ReverseByteOrder(b))
 	return &h, nil
 }
 
 // NewHashFromHex returns a *Hash representation of the given hex string
 func NewHashFromHex(h string) (*Hash, error) {
-	h = strings.TrimPrefix(h, "0x")
-	b, err := hex.DecodeString(h)
-	if err != nil {
-		return nil, err
-	}
-	return NewHashFromBytes(SwapEndianness(b[:]))
+	return NewHashFromBytes(ReverseByteOrder(common.FromHex(h)))
 }
 
 // NewHashFromString returns a *Hash representation of the given decimal string
@@ -127,8 +121,8 @@ func NewHashFromString(s string) (*Hash, error) {
 	return NewHashFromBigInt(bi), nil
 }
 
-// SwapEndianness swaps the order of the bytes in the slice.
-func SwapEndianness(b []byte) []byte {
+// ReverseByteOrder swaps the order of the bytes in the slice.
+func ReverseByteOrder(b []byte) []byte {
 	o := make([]byte, len(b))
 	for i := range b {
 		o[len(b)-1-i] = b[i]

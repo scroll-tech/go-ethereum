@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/iden3/go-merkletree/db/memory"
+	"github.com/scroll-tech/go-ethereum/trie/db/memory"
 )
 
 const HashEmpty = 0
@@ -105,11 +105,11 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 	fullOldPath := getPath(numLevels, p.OldKey[:])
 
 	// just mock for test...
-	newLeafKey, err := NewNodeLeaf(p.NewKey, p.NewValue, &byte32Zero, &byte32Zero).Key()
+	newLeafKey, err := NewNodeLeaf(p.NewKey, p.NewValue, &byte32Zero, byte32Zero[:]).Key()
 	if err != nil {
 		return nil, err
 	}
-	oldLeafKey, err := NewNodeLeaf(p.OldKey, p.OldKey, &byte32Zero, &byte32Zero).Key()
+	oldLeafKey, err := NewNodeLeaf(p.OldKey, p.OldKey, &byte32Zero, byte32Zero[:]).Key()
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +323,7 @@ func generateTestData() error {
 		return err
 	}
 	fmt.Printf("p3 %+v\n", p3)
-	p4, err := tree.Update(littleEndianIntBitsToBigInt(1, 0, 1, 0), big.NewInt(23), &byte32Zero, &byte32Zero)
+	p4, err := tree.Update(littleEndianIntBitsToBigInt(1, 0, 1, 0), big.NewInt(23), &byte32Zero, byte32Zero[:])
 	if err != nil {
 		return err
 	}

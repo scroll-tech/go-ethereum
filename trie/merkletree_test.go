@@ -7,7 +7,7 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/constants"
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
-	"github.com/iden3/go-merkletree/db/memory"
+	"github.com/scroll-tech/go-ethereum/trie/db/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

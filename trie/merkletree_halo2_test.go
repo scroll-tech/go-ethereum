@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/trie/db/memory"
@@ -61,19 +60,6 @@ func littleEndianIntBitsToBigInt(bools ...int64) *big.Int {
 	var base int64 = 1
 	for _, b := range bools {
 		result.Add(result, big.NewInt(b*base))
-		base *= 2
-	}
-	return result
-}
-
-func littleEndianBoolBitsToBigInt(bools ...bool) *big.Int {
-	// little endian
-	result := big.NewInt(0)
-	var base int64 = 1
-	for _, b := range bools {
-		if b {
-			result.Add(result, big.NewInt(base))
-		}
 		base *= 2
 	}
 	return result
@@ -272,28 +258,6 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 	return rows, nil
 }
 
-func dbg(tree *MerkleTree) {
-	//fmt.Printf("debug\n")
-	tree.Walk(tree.rootKey, func(n *Node) {
-		k, _ := n.Key()
-		fmt.Printf("%v hash:%v\n", n, k.BigInt())
-	})
-	//fmt.Printf("debug done\n")
-}
-
-func drawTree(tree *MerkleTree) error {
-	f, err := os.OpenFile("/tmp/tree.dot", os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	err = tree.GraphViz(f, tree.rootKey)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // notes: swap endians(little endian bits) to make the tree full utilized
 func generateTestData() error {
 	tree, err := NewMerkleTree(memory.NewMemoryStorage(), numLevels)
@@ -366,7 +330,7 @@ func generateTestData() error {
 	if err != nil {
 		return err
 	}
-	rows = append(rows, proofRows...)
+	// rows = append(rows, proofRows...)
 
 	// TODO: check all the constraints of rows
 	return nil

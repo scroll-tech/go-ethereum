@@ -35,10 +35,6 @@ var (
 	ErrInvalidNodeFound = errors.New("found an invalid node in the DB")
 	// ErrInvalidProofBytes is used when a serialized proof is invalid.
 	ErrInvalidProofBytes = errors.New("the serialized proof is invalid")
-	// ErrInvalidDBValue is used when a value in the key value DB is
-	// invalid (for example, it doesn't contain a byte header and a []byte
-	// body of at least len=1).
-	ErrInvalidDBValue = errors.New("the value in the DB is invalid")
 	// ErrEntryIndexAlreadyExists is used when the entry index already
 	// exists in the tree.
 	ErrEntryIndexAlreadyExists = errors.New("the entry index already exists in the tree")
@@ -67,44 +63,9 @@ func NewMerkleTree(storage db.Storage, maxLevels int) (*MerkleTree, error) {
 // will open that one, if not, will create a new one.
 func NewMerkleTreeWithRoot(storage db.Storage, root *smt.Hash, maxLevels int) (*MerkleTree, error) {
 	mt := MerkleTree{db: storage, maxLevels: maxLevels, writable: true}
-	/*
-		root, err := mt.dbGetRoot()
-		if err == db.ErrNotFound {
-			tx, err := mt.db.NewTx()
-			if err != nil {
-				return nil, err
-			}
-			mt.rootKey = &HashZero
-			err = tx.Put(dbKeyRootNode, mt.rootKey[:])
-			if err != nil {
-				return nil, err
-			}
-			err = tx.Commit()
-			if err != nil {
-				return nil, err
-			}
-			return &mt, nil
-		} else if err != nil {
-			return nil, err
-		}
-	*/
 	mt.rootKey = root
 	return &mt, nil
 }
-
-// we give the root from external, like state root in block header
-/*
-func (mt *MerkleTree) dbGetRoot() (*Hash, error) {
-	v, err := mt.db.Get(dbKeyRootNode)
-	if err != nil {
-		return nil, err
-	}
-	var root Hash
-	// Skip first byte which contains the NodeType
-	copy(root[:], v[1:])
-	return &root, nil
-}
-*/
 
 // DB returns the MerkleTree.DB()
 func (mt *MerkleTree) DB() db.Storage {
@@ -209,7 +170,7 @@ func (mt *MerkleTree) AddVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPreimag
 	return err
 }
 
-// This function has no sense now.. just used for testing...
+// AddAndGetCircomProof has no sense now.. just used for testing...
 // AddAndGetCircomProof does an Add, and returns a CircomProcessorProof
 func (mt *MerkleTree) AddAndGetCircomProof(k,
 	v *big.Int) (*CircomProcessorProof, error) {
@@ -1044,7 +1005,7 @@ func (mt *MerkleTree) GenerateProof(k *big.Int, rootKey *smt.Hash) (*Proof,
 			return nil, nil, ErrInvalidNodeFound
 		}
 		if !bytes.Equal(siblingKey[:], smt.HashZero[:]) {
-			smt.SetBitBigEndian(p.notempties[:], uint(p.depth))
+			smt.SetBitBigEndian(p.notempties[:], p.depth)
 			p.Siblings = append(p.Siblings, siblingKey)
 		}
 	}

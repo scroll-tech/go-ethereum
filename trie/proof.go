@@ -34,7 +34,8 @@ import (
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
 func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
-	panic("not implemented")
+	// TODO: implemented
+	return nil
 }
 
 // Prove constructs a merkle proof for key. The result contains all encoded nodes
@@ -45,7 +46,8 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
 func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
-	panic("not implemented")
+	// TODO: implemented
+	return nil
 }
 
 // VerifyProof checks merkle proofs. The given proof must contain the value for

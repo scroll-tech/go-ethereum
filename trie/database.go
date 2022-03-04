@@ -511,27 +511,7 @@ func (db *Database) reference(child common.Hash, parent common.Hash) {
 
 // Dereference removes an existing reference from a root node.
 func (db *Database) Dereference(root common.Hash) {
-	//// Sanity check to ensure that the meta-root is not removed
-	//if root == (common.Hash{}) {
-	//	log.Error("Attempted to dereference the trie cache meta root")
-	//	return
-	//}
-	//db.lock.Lock()
-	//defer db.lock.Unlock()
-	//
-	//nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
-	//db.dereference(root, common.Hash{})
-	//
-	//db.gcnodes += uint64(nodes - len(db.dirties))
-	//db.gcsize += storage - db.dirtiesSize
-	//db.gctime += time.Since(start)
-	//
-	//memcacheGCTimeTimer.Update(time.Since(start))
-	//memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	//memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
-	//
-	//log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
-	//	"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
+	// TODO: implement
 	log.Warn("gc should be implemented later")
 }
 
@@ -694,62 +674,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 // Note, this method is a non-synchronized mutator. It is unsafe to call this
 // concurrently with other mutators.
 func (db *Database) Commit(node common.Hash, report bool, callback func(common.Hash)) error {
-	// Create a database batch to flush persistent data out. It is important that
-	// outside code doesn't see an inconsistent state (referenced data removed from
-	// memory cache during commit but not yet in persistent storage). This is ensured
-	// by only uncaching existing data when the database write finalizes.
-	//start := time.Now()
-	//batch := db.diskdb.NewBatch()
-	//
-	//// Move all of the accumulated preimages into a write batch
-	//if db.preimages != nil {
-	//	rawdb.WritePreimages(batch, db.preimages)
-	//	// Since we're going to replay trie node writes into the clean cache, flush out
-	//	// any batched pre-images before continuing.
-	//	if err := batch.Write(); err != nil {
-	//		return err
-	//	}
-	//	batch.Reset()
-	//}
-	//// Move the trie itself into the batch, flushing if enough data is accumulated
-	//nodes, storage := len(db.dirties), db.dirtiesSize
-	//
-	//uncacher := &cleaner{db}
-	//if err := db.commit(node, batch, uncacher, callback); err != nil {
-	//	log.Error("Failed to commit trie from trie database", "err", err)
-	//	return err
-	//}
-	//// Trie mostly committed to disk, flush any batch leftovers
-	//if err := batch.Write(); err != nil {
-	//	log.Error("Failed to write trie to disk", "err", err)
-	//	return err
-	//}
-	//// Uncache any leftovers in the last batch
-	//db.lock.Lock()
-	//defer db.lock.Unlock()
-	//
-	//batch.Replay(uncacher)
-	//batch.Reset()
-	//
-	//// Reset the storage counters and bumped metrics
-	//if db.preimages != nil {
-	//	db.preimages, db.preimagesSize = make(map[common.Hash][]byte), 0
-	//}
-	//memcacheCommitTimeTimer.Update(time.Since(start))
-	//memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	//memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
-	//
-	//logger := log.Info
-	//if !report {
-	//	logger = log.Debug
-	//}
-	//logger("Persisted trie from memory database", "nodes", nodes-len(db.dirties)+int(db.flushnodes), "size", storage-db.dirtiesSize+db.flushsize, "time", time.Since(start)+db.flushtime,
-	//	"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
-	//
-	//// Reset the garbage collection statistics
-	//db.gcnodes, db.gcsize, db.gctime = 0, 0, 0
-	//db.flushnodes, db.flushsize, db.flushtime = 0, 0, 0
-
+	// iden3 merkletree do not need this
 	return nil
 }
 

@@ -12,24 +12,6 @@ type NodeType byte
 
 var byte32Zero smt.Byte32
 
-func NewByte32FromBytesPaddingZero(b []byte) *smt.Byte32 {
-	if len(b) > 32 {
-		panic("bytes length larger than 32")
-	}
-	byte32 := new(smt.Byte32)
-	copy(byte32[:], b)
-	return byte32
-}
-
-func NewByte32FromBytes(b []byte) *smt.Byte32 {
-	if len(b) != 32 {
-		panic("invalid byte length for byte32")
-	}
-	byte32 := new(smt.Byte32)
-	copy(byte32[:], b[:32])
-	return byte32
-}
-
 const (
 	// NodeTypeMiddle indicates the type of middle Node that has children.
 	NodeTypeMiddle NodeType = 0

@@ -16,3 +16,12 @@ func (b *Byte32) Hash() (*big.Int, error) {
 	}
 	return hash, nil
 }
+
+func NewByte32FromBytesPaddingZero(b []byte) *Byte32 {
+	if len(b) > 32 {
+		panic("bytes length larger than 32")
+	}
+	byte32 := new(Byte32)
+	copy(byte32[:], b)
+	return byte32
+}

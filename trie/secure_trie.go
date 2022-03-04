@@ -53,6 +53,7 @@ func NewSecure(root common.Hash, _ *Database) (*SecureTrie, error) {
 	//if db == nil {
 	//	panic("trie.NewSecure called without a database")
 	//}
+	// FIXME: using same level
 	mtDbOnce.Do(func() {
 		newDb, _ := leveldb.NewLevelDbStorage("tmp/treedata", false)
 		mtDb = &*newDb
@@ -87,6 +88,7 @@ func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
 	word := NewByte32FromBytesPaddingZero(key)
 	node, err := t.tree.GetLeafNodeByWord(word)
 	if err != nil {
+		// FIXME: should we passing NOT_FOUND to upper layers?
 		return nil, err
 	}
 	return node.ValuePreimage[:], nil
@@ -136,6 +138,8 @@ func (t *SecureTrie) Update(key, value []byte) {
 // stored in the trie.
 //
 // If a node was not found in the database, a MissingNodeError is returned.
+//
+// NOTE: value is restricted to length of bytes32.
 func (t *SecureTrie) TryUpdate(key, value []byte) error {
 	kPreimage := NewByte32FromBytesPaddingZero(key)
 	vPreimage := NewByte32FromBytesPaddingZero(value)

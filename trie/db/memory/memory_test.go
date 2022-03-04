@@ -3,8 +3,8 @@ package memory
 import (
 	"testing"
 
-	"github.com/iden3/go-merkletree/db"
-	"github.com/iden3/go-merkletree/db/test"
+	"github.com/scroll-tech/go-ethereum/trie/db"
+	"github.com/scroll-tech/go-ethereum/trie/db/test"
 	"github.com/stretchr/testify/require"
 )
 

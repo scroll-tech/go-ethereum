@@ -4,7 +4,7 @@ package test
 import (
 	"testing"
 
-	"github.com/iden3/go-merkletree/db"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 	"github.com/stretchr/testify/assert"
 )
 

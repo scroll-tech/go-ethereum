@@ -45,7 +45,7 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+func (t *SecureBinaryTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
 	// TODO: implemented
 	return nil
 }

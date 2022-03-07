@@ -173,7 +173,7 @@ func checkSnapRoot(t *testing.T, snap *diskLayer, trieRoot common.Hash) {
 type testHelper struct {
 	diskdb  *memorydb.Database
 	triedb  *trie.Database
-	accTrie *trie.SecureTrie
+	accTrie *trie.SecureBinaryTrie
 }
 
 func newHelper() *testHelper {
@@ -534,7 +534,7 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	<-stop
 }
 
-func getStorageTrie(n int, triedb *trie.Database) *trie.SecureTrie {
+func getStorageTrie(n int, triedb *trie.Database) *trie.SecureBinaryTrie {
 	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	for i := 0; i < n; i++ {
 		k := fmt.Sprintf("key-%d", i)

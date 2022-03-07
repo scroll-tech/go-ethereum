@@ -33,17 +33,17 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
-// SecureTrie wraps a trie with key hashing. In a secure trie, all
+// SecureBinaryTrie wraps a trie with key hashing. In a secure trie, all
 // access operations hash the key using keccak256. This prevents
 // calling code from creating long chains of nodes that
 // increase the access time.
 //
-// Contrary to a regular trie, a SecureTrie can only be created with
+// Contrary to a regular trie, a SecureBinaryTrie can only be created with
 // New and must have an attached database. The database also stores
 // the preimage of each key.
 //
-// SecureTrie is not safe for concurrent use.
-type SecureTrie struct {
+// SecureBinaryTrie is not safe for concurrent use.
+type SecureBinaryTrie struct {
 	tree *MerkleTree
 }
 
@@ -51,7 +51,7 @@ var mtDbOnce sync.Once
 var mtDb db.Storage
 
 // NewSecure creates a trie
-func NewSecure(root common.Hash, _ *Database) (*SecureTrie, error) {
+func NewSecure(root common.Hash, _ *Database) (*SecureBinaryTrie, error) {
 	//if db == nil {
 	//	panic("trie.NewSecure called without a database")
 	//}
@@ -68,14 +68,14 @@ func NewSecure(root common.Hash, _ *Database) (*SecureTrie, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SecureTrie{
+	return &SecureBinaryTrie{
 		tree: tree,
 	}, nil
 }
 
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
-func (t *SecureTrie) Get(key []byte) []byte {
+func (t *SecureBinaryTrie) Get(key []byte) []byte {
 	res, err := t.TryGet(key)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
@@ -86,7 +86,7 @@ func (t *SecureTrie) Get(key []byte) []byte {
 // TryGet returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 // If a node was not found in the database, a MissingNodeError is returned.
-func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
+func (t *SecureBinaryTrie) TryGet(key []byte) ([]byte, error) {
 	word := smt.NewByte32FromBytesPaddingZero(key)
 	node, err := t.tree.GetLeafNodeByWord(word)
 	if err == ErrKeyNotFound {
@@ -101,13 +101,13 @@ func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
 
 // TryGetNode attempts to retrieve a trie node by compact-encoded path. It is not
 // possible to use keybyte-encoding as the path might contain odd nibbles.
-func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
+func (t *SecureBinaryTrie) TryGetNode(path []byte) ([]byte, int, error) {
 	panic("unimplemented")
 }
 
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
-func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
+func (t *SecureBinaryTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
 	keyPreimage := smt.NewByte32FromBytesPaddingZero(key)
 
 	vHash, err := acc.Hash()
@@ -129,7 +129,7 @@ func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error
 //
 // The value bytes must not be modified by the caller while they are
 // stored in the trie.
-func (t *SecureTrie) Update(key, value []byte) {
+func (t *SecureBinaryTrie) Update(key, value []byte) {
 	if err := t.TryUpdate(key, value); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
@@ -145,7 +145,7 @@ func (t *SecureTrie) Update(key, value []byte) {
 // If a node was not found in the database, a MissingNodeError is returned.
 //
 // NOTE: value is restricted to length of bytes32.
-func (t *SecureTrie) TryUpdate(key, value []byte) error {
+func (t *SecureBinaryTrie) TryUpdate(key, value []byte) error {
 	kPreimage := smt.NewByte32FromBytesPaddingZero(key)
 	vPreimage := smt.NewByte32FromBytesPaddingZero(value)
 	_, err := t.tree.UpdateWord(kPreimage, vPreimage)
@@ -156,7 +156,7 @@ func (t *SecureTrie) TryUpdate(key, value []byte) error {
 }
 
 // Delete removes any existing value for key from the trie.
-func (t *SecureTrie) Delete(key []byte) {
+func (t *SecureBinaryTrie) Delete(key []byte) {
 	if err := t.TryDelete(key); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
@@ -164,13 +164,13 @@ func (t *SecureTrie) Delete(key []byte) {
 
 // TryDelete removes any existing value for key from the trie.
 // If a node was not found in the database, a MissingNodeError is returned.
-func (t *SecureTrie) TryDelete(key []byte) error {
+func (t *SecureBinaryTrie) TryDelete(key []byte) error {
 	return errors.New("deletion is disabled")
 }
 
 // GetKey returns the preimage of a hashed key that was
 // previously used to store a value.
-func (t *SecureTrie) GetKey(kHashBytes []byte) []byte {
+func (t *SecureBinaryTrie) GetKey(kHashBytes []byte) []byte {
 	// TODO: use a kv cache in memory
 	kHash, err := smt.NewHashFromBytes(kHashBytes)
 	if err != nil {
@@ -188,28 +188,28 @@ func (t *SecureTrie) GetKey(kHashBytes []byte) []byte {
 //
 // Committing flushes nodes from memory. Subsequent Get calls will load nodes
 // from the database.
-func (t *SecureTrie) Commit(LeafCallback) (common.Hash, int, error) {
+func (t *SecureBinaryTrie) Commit(LeafCallback) (common.Hash, int, error) {
 	// FIXME
 	return t.Hash(), 0, nil
 }
 
-// Hash returns the root hash of SecureTrie. It does not write to the
+// Hash returns the root hash of SecureBinaryTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
-func (t *SecureTrie) Hash() common.Hash {
+func (t *SecureBinaryTrie) Hash() common.Hash {
 	var hash common.Hash
 	hash.SetBytes(t.tree.rootKey.Bytes())
 	return hash
 }
 
-// Copy returns a copy of SecureTrie.
-func (t *SecureTrie) Copy() *SecureTrie {
+// Copy returns a copy of SecureBinaryTrie.
+func (t *SecureBinaryTrie) Copy() *SecureBinaryTrie {
 	cpy := *t
 	return &cpy
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
 // starts at the key after the given start key.
-func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
+func (t *SecureBinaryTrie) NodeIterator(start []byte) NodeIterator {
 	/// FIXME
 	panic("not implemented")
 }
@@ -217,7 +217,7 @@ func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
 // hashKey returns the hash of key as an ephemeral buffer.
 // The caller must not hold onto the return value because it will become
 // invalid on the next call to hashKey or secKey.
-func (t *SecureTrie) hashKey(key []byte) []byte {
+func (t *SecureBinaryTrie) hashKey(key []byte) []byte {
 	if len(key) != 32 {
 		panic("non byte32 input to hashKey")
 	}

@@ -19,7 +19,11 @@ package trie
 import (
 	"errors"
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/trie/db/leveldb"
+
+	"math/big"
+	"sync"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -27,8 +31,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/trie/db"
-	"math/big"
-	"sync"
 )
 
 // SecureTrie wraps a trie with key hashing. In a secure trie, all
@@ -87,8 +89,11 @@ func (t *SecureTrie) Get(key []byte) []byte {
 func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
 	word := smt.NewByte32FromBytesPaddingZero(key)
 	node, err := t.tree.GetLeafNodeByWord(word)
+	if err == ErrKeyNotFound {
+		// according to https://github.com/ethereum/go-ethereum/blob/37f9d25ba027356457953eab5f181c98b46e9988/trie/trie.go#L135
+		return nil, nil
+	}
 	if err != nil {
-		// FIXME: should we passing NOT_FOUND to upper layers?
 		return nil, err
 	}
 	return node.ValuePreimage[:], nil

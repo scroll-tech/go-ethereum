@@ -3,9 +3,10 @@ package smt
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+
 	"github.com/iden3/go-iden3-crypto/utils"
 	"github.com/scroll-tech/go-ethereum/common"
-	"math/big"
 )
 
 const numCharPrint = 8

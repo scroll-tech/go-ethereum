@@ -1,8 +1,9 @@
 package smt
 
 import (
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"math/big"
+
+	"github.com/iden3/go-iden3-crypto/poseidon"
 )
 
 // HashElems performs a poseidon hash over the array of ElemBytes, currently we

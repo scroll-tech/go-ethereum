@@ -343,14 +343,12 @@ func (s *stateObject) updateTrie(db Database) Trie {
 		}
 		s.originStorage[key] = value
 
-		var v []byte
 		if (value == common.Hash{}) {
 			s.setError(tr.TryDelete(key[:]))
 			s.db.StorageDeleted += 1
 		} else {
 			// Encoding []byte cannot fail, ok to ignore the error.
-			v, _ = rlp.EncodeToBytes(common.TrimLeftZeroes(value[:]))
-			s.setError(tr.TryUpdate(key[:], v))
+			s.setError(tr.TryUpdate(key[:], value[:]))
 			s.db.StorageUpdated += 1
 		}
 		// If state snapshotting is active, cache the data til commit
@@ -362,7 +360,11 @@ func (s *stateObject) updateTrie(db Database) Trie {
 					s.db.snapStorage[s.addrHash] = storage
 				}
 			}
-			storage[crypto.HashData(hasher, key[:])] = v // v will be nil if it's deleted
+			if (value == common.Hash{}) {
+				storage[crypto.HashData(hasher, key[:])] = nil // v will be nil if it's deleted
+			} else {
+				storage[crypto.HashData(hasher, key[:])] = value[:]
+			}
 		}
 		usedStorage = append(usedStorage, common.CopyBytes(key[:])) // Copy needed for closure
 	}

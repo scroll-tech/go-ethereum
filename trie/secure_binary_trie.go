@@ -19,18 +19,15 @@ package trie
 import (
 	"errors"
 	"fmt"
-
-	"github.com/scroll-tech/go-ethereum/trie/db/leveldb"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 
 	"math/big"
-	"sync"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 // SecureBinaryTrie wraps a trie with key hashing. In a secure trie, all
@@ -47,24 +44,13 @@ type SecureBinaryTrie struct {
 	tree *MerkleTree
 }
 
-var mtDbOnce sync.Once
-var mtDb db.Storage
-
 // NewSecure creates a trie
-func NewSecure(root common.Hash, _ *Database) (*SecureBinaryTrie, error) {
-	//if db == nil {
-	//	panic("trie.NewSecure called without a database")
-	//}
-	// FIXME: using same leveldb
-	mtDbOnce.Do(func() {
-		newDb, _ := leveldb.NewLevelDbStorage("tmp/treedata", false)
-		mtDb = &*newDb
-	})
+func NewSecure(root common.Hash, ethdb *Database) (*SecureBinaryTrie, error) {
 	rootHash, err := smt.NewHashFromBytes(root.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	tree, err := NewMerkleTreeWithRoot(mtDb, rootHash, 256)
+	tree, err := NewMerkleTreeWithRoot(db.NewEthKVStorage(ethdb.diskdb), rootHash, 256)
 	if err != nil {
 		return nil, err
 	}

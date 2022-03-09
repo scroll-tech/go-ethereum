@@ -241,11 +241,6 @@ func (db *Database) Path() string {
 	return db.fn
 }
 
-// Raw returns the raw leveldb.
-func (db *Database) Raw() *leveldb.DB {
-	return db.db
-}
-
 // meter periodically retrieves internal leveldb counters and reports them to
 // the metrics subsystem.
 //
@@ -447,10 +442,6 @@ func (db *Database) meter(refresh time.Duration) {
 		errc = <-db.quitChan
 	}
 	errc <- merr
-}
-
-func (db *Database) UnwrapDb() interface{} {
-	return db.db
 }
 
 // batch is a write-only leveldb batch that commits changes to its host database

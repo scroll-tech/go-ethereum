@@ -17,9 +17,7 @@
 // Package ethdb defines the interfaces for an Ethereum data store.
 package ethdb
 
-import (
-	"io"
-)
+import "io"
 
 // KeyValueReader wraps the Has and Get method of a backing data store.
 type KeyValueReader interface {
@@ -66,7 +64,6 @@ type KeyValueStore interface {
 	Iteratee
 	Stater
 	Compacter
-	UnwrapRawDb
 	io.Closer
 }
 
@@ -125,10 +122,6 @@ type AncientWriteOp interface {
 	AppendRaw(kind string, number uint64, item []byte) error
 }
 
-type UnwrapRawDb interface {
-	UnwrapDb() interface{}
-}
-
 // Reader contains the methods required to read data from both key-value as well as
 // immutable ancient data.
 type Reader interface {
@@ -160,6 +153,5 @@ type Database interface {
 	Iteratee
 	Stater
 	Compacter
-	UnwrapRawDb
 	io.Closer
 }

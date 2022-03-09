@@ -74,6 +74,10 @@ func (frdb *freezerdb) Freeze(threshold uint64) error {
 	return nil
 }
 
+func (frdb *freezerdb) UnwrapDb() interface{} {
+	return frdb.KeyValueStore.UnwrapDb()
+}
+
 // nofreezedb is a database wrapper that disables freezer data retrievals.
 type nofreezedb struct {
 	ethdb.KeyValueStore
@@ -133,6 +137,10 @@ func (db *nofreezedb) ReadAncients(fn func(reader ethdb.AncientReader) error) (e
 	// have to explicitly check for that, having an extra clause to do the
 	// non-ancient operations.
 	return fn(db)
+}
+
+func (db *nofreezedb) UnwrapDb() interface{} {
+	return db.KeyValueStore.UnwrapDb()
 }
 
 // NewDatabase creates a high level database on top of a given key-value data

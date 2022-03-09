@@ -165,6 +165,10 @@ func (t *table) Compact(start []byte, limit []byte) error {
 	return t.db.Compact(start, limit)
 }
 
+func (t *table) UnwrapDb() interface{} {
+	return t.db.UnwrapDb()
+}
+
 // NewBatch creates a write-only database that buffers changes to its host db
 // until a final write is called, each operation prefixing all keys with the
 // pre-configured string.

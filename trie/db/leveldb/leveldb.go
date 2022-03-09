@@ -32,6 +32,10 @@ func NewLevelDbStorage(path string, errorIfMissing bool) (*Storage, error) {
 	return &Storage{ldb, []byte{}}, nil
 }
 
+func NewStorage(ldb *leveldb.DB) *Storage {
+	return &Storage{ldb, []byte{}}
+}
+
 // WithPrefix implements the method WithPrefix of the interface db.Storage
 func (l *Storage) WithPrefix(prefix []byte) db.Storage {
 	return &Storage{l.ldb, db.Concat(l.prefix, prefix)}

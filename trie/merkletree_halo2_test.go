@@ -70,13 +70,6 @@ func littleEndianIntBitsToBigInt(bools ...int64) *big.Int {
 func isZero(b *big.Int) bool {
 	return b.Cmp(big.NewInt(0)) == 0
 }
-func boolToBigInt(b bool) *big.Int {
-	if b {
-		return big.NewInt(1)
-	} else {
-		return big.NewInt(0)
-	}
-}
 
 // there are 3 types of insertion
 // case1: overwrite 0 (include genesis: insert into empty root)
@@ -332,8 +325,8 @@ func generateTestData() error {
 	if err != nil {
 		return err
 	}
-	// rows = append(rows, proofRows...)
-
+	rows = append(rows, proofRows...)
+	eatValue(rows)
 	// TODO: check all the constraints of rows
 	return nil
 }
@@ -344,3 +337,5 @@ func TestHalo2Rows(t *testing.T) {
 		panic(err)
 	}
 }
+
+func eatValue(_ interface{}) {}

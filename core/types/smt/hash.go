@@ -69,7 +69,7 @@ func (h *Hash) Bytes() []byte {
 
 func (h *Hash) Bytes2() []byte {
 	b := [32]byte{}
-	copy(b[:], (h[:]))
+	copy(b[:], h[:])
 	return b[:]
 }
 

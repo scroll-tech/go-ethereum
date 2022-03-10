@@ -325,8 +325,8 @@ func generateTestData() error {
 	if err != nil {
 		return err
 	}
-	// rows = append(rows, proofRows...)
-
+	rows = append(rows, proofRows...)
+	eatValue(rows)
 	// TODO: check all the constraints of rows
 	return nil
 }
@@ -337,3 +337,5 @@ func TestHalo2Rows(t *testing.T) {
 		panic(err)
 	}
 }
+
+func eatValue(_ interface{}) {}

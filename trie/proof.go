@@ -260,7 +260,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 			// do not contain the key
 			return nil, err
 		} else if !proof.Existence {
-			return nil, ErrKeyNotFound
+			return nil, nil
 		}
 
 		if VerifyProofSMT(h, proof, k, v) {

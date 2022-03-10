@@ -24,6 +24,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/trie/db"
 )
@@ -51,6 +52,35 @@ func makeSMTProvers(mt *MerkleTree) []func(key []byte) *memorydb.Database {
 	return provers
 }
 
+func verifyValue(vHash []byte, vPreimage []byte) bool {
+	hv, err := smt.NewByte32FromBytesPaddingZero(vPreimage).Hash()
+	if err != nil {
+		panic(err)
+	}
+	return bytes.Equal(vHash, hv.Bytes())
+}
+
+func TestSMTOneElementProof(t *testing.T) {
+	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
+	mt.UpdateWord(smt.NewByte32FromBytesPaddingZero([]byte("k")), smt.NewByte32FromBytesPaddingZero([]byte("v")))
+	for i, prover := range makeSMTProvers(mt) {
+		proof := prover([]byte("k"))
+		if proof == nil {
+			t.Fatalf("prover %d: nil proof", i)
+		}
+		if proof.Len() != 2 {
+			t.Errorf("prover %d: proof should have 1+1 element (including the magic kv)", i)
+		}
+		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), []byte("k"), proof)
+		if err != nil {
+			t.Fatalf("prover %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
+		}
+		if !verifyValue(val, []byte("v")) {
+			t.Fatalf("prover %d: verified value mismatch: want 'k'", i)
+		}
+	}
+}
+
 func TestSMTProof(t *testing.T) {
 	mt, vals := randomSMT(500)
 	root := mt.Root()
@@ -64,13 +94,61 @@ func TestSMTProof(t *testing.T) {
 			if err != nil {
 				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x\n", i, kv.k, err, proof)
 			}
-			hv, err := smt.NewByte32FromBytesPaddingZero(kv.v).Hash()
-			if err != nil {
-				panic(err)
+			if !verifyValue(val, kv.v) {
+				t.Fatalf("prover %d: verified value mismatch for key %x, want %x", i, kv.k, kv.v)
 			}
-			if !bytes.Equal(val, hv.Bytes()) {
-				t.Fatalf("prover %d: verified value mismatch for key %x: have %x, want %x", i, kv.k, val, hv.Bytes())
+		}
+	}
+}
+
+func TestSMTBadProof(t *testing.T) {
+	mt, vals := randomSMT(500)
+	root := mt.Root()
+	for i, prover := range makeSMTProvers(mt) {
+		for _, kv := range vals {
+			proof := prover(kv.k)
+			if proof == nil {
+				t.Fatalf("prover %d: nil proof", i)
 			}
+			it := proof.NewIterator(nil, nil)
+			for i, d := 0, mrand.Intn(proof.Len()); i <= d; i++ {
+				it.Next()
+			}
+			key := it.Key()
+			val, _ := proof.Get(key)
+			proof.Delete(key)
+			it.Release()
+
+			mutateByte(val)
+			proof.Put(crypto.Keccak256(val), val)
+
+			if _, err := VerifyProof(common.BytesToHash(root.Bytes()), kv.k, proof); err == nil {
+				t.Fatalf("prover %d: expected proof to fail for key %x", i, kv.k)
+			}
+		}
+	}
+}
+
+// Tests that missing keys can also be proven. The test explicitly uses a single
+// entry trie and checks for missing keys both before and after the single entry.
+func TestSMTMissingKeyProof(t *testing.T) {
+	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
+	mt.UpdateWord(smt.NewByte32FromBytesPaddingZero([]byte("k")), smt.NewByte32FromBytesPaddingZero([]byte("v")))
+
+	prover := makeSMTProvers(mt)[0]
+
+	for i, key := range []string{"a", "j", "l", "z"} {
+		proof := prover([]byte(key))
+
+		if proof.Len() != 2 {
+			t.Errorf("test %d: proof should have 2 element (with magic kv)", i)
+		}
+		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), []byte(key), proof)
+		if err != nil {
+			t.Fatalf("test %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
+		}
+		if val != nil {
+			t.Fatalf("test %d: verified value mismatch: have %x, want nil", i, val)
 		}
 	}
 }
@@ -98,24 +176,4 @@ func randomSMT(n int) (*MerkleTree, map[string]*kv) {
 	}
 
 	return mt, vals
-}
-
-func TestKeyHash(t *testing.T) {
-
-	vals := make(map[string]int)
-	for i := 0; i < 110; i++ {
-
-		k := common.LeftPadBytes([]byte{byte(i)}, 32)
-		h, err := smt.NewByte32FromBytesPaddingZero(k).Hash()
-		if err != nil {
-			t.Fatal(err)
-		}
-		kHash := smt.NewHashFromBigInt(h)
-		ks := kHash.Hex()[60:]
-		if v, existed := vals[ks]; existed {
-			t.Fatalf("duplicated of hash %s (%v with %v)", ks, v, i)
-		}
-		vals[ks] = i
-	}
-	t.Fatalf("always fail %v", vals)
 }

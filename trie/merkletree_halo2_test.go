@@ -2,11 +2,13 @@ package trie
 
 import (
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"math/big"
 	"testing"
 
-	"github.com/scroll-tech/go-ethereum/trie/db/memory"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
+
+	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 const HashEmpty = 0
@@ -260,7 +262,7 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 
 // notes: swap endians(little endian bits) to make the tree full utilized
 func generateTestData() error {
-	tree, err := NewMerkleTree(memory.NewMemoryStorage(), numLevels)
+	tree, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), numLevels)
 	if err != nil {
 		return err
 	}

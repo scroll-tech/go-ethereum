@@ -18,7 +18,6 @@ package trie
 
 import (
 	"bytes"
-	"fmt"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -26,7 +25,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/trie/db/memory"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 func init() {
@@ -63,7 +62,7 @@ func TestSMTProof(t *testing.T) {
 			}
 			val, err := VerifyProof(common.BytesToHash(root.Bytes()), kv.k, proof)
 			if err != nil {
-				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x", i, kv.k, err, proof)
+				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x\n", i, kv.k, err, proof)
 			}
 			hv, err := smt.NewByte32FromBytesPaddingZero(kv.v).Hash()
 			if err != nil {
@@ -72,13 +71,12 @@ func TestSMTProof(t *testing.T) {
 			if !bytes.Equal(val, hv.Bytes()) {
 				t.Fatalf("prover %d: verified value mismatch for key %x: have %x, want %x", i, kv.k, val, hv.Bytes())
 			}
-			fmt.Println("pass", kv.k, hv)
 		}
 	}
 }
 
 func randomSMT(n int) (*MerkleTree, map[string]*kv) {
-	mt, err := NewMerkleTree(memory.NewMemoryStorage(), 10)
+	mt, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
 	if err != nil {
 		panic(err)
 	}
@@ -98,5 +96,26 @@ func randomSMT(n int) (*MerkleTree, map[string]*kv) {
 		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value.k), smt.NewByte32FromBytesPaddingZero(value.v))
 		vals[string(value.k)] = value
 	}
+
 	return mt, vals
+}
+
+func TestKeyHash(t *testing.T) {
+
+	vals := make(map[string]int)
+	for i := 0; i < 110; i++ {
+
+		k := common.LeftPadBytes([]byte{byte(i)}, 32)
+		h, err := smt.NewByte32FromBytesPaddingZero(k).Hash()
+		if err != nil {
+			t.Fatal(err)
+		}
+		kHash := smt.NewHashFromBigInt(h)
+		ks := kHash.Hex()[60:]
+		if v, existed := vals[ks]; existed {
+			t.Fatalf("duplicated of hash %s (%v with %v)", ks, v, i)
+		}
+		vals[ks] = i
+	}
+	t.Fatalf("always fail %v", vals)
 }

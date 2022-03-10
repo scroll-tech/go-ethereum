@@ -1,13 +1,15 @@
 package trie
 
 import (
-	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"math/big"
 	"testing"
 
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
+
 	"github.com/iden3/go-iden3-crypto/constants"
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
-	"github.com/scroll-tech/go-ethereum/trie/db/memory"
+	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +19,7 @@ type Fatalable interface {
 }
 
 func newTestingMerkle(f Fatalable, numLevels int) *MerkleTree {
-	mt, err := NewMerkleTree(memory.NewMemoryStorage(), numLevels)
+	mt, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), numLevels)
 	if err != nil {
 		f.Fatal(err)
 		return nil

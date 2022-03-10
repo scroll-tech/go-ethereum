@@ -247,7 +247,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 			return nil, err
 		}
 
-		proof, v, err := buildSMTProof(h, k, len(key), func(key *smt.Hash) (*Node, error) {
+		proof, v, err := buildSMTProof(h, k, len(key)*8, func(key *smt.Hash) (*Node, error) {
 			buf, _ := proofDb.Get(key.Bytes())
 			if buf == nil {
 				return nil, ErrKeyNotFound
@@ -259,6 +259,8 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 		if err != nil {
 			// do not contain the key
 			return nil, err
+		} else if !proof.Existence {
+			return nil, ErrKeyNotFound
 		}
 
 		if VerifyProofSMT(h, proof, k, v) {

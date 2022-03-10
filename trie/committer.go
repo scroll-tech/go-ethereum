@@ -19,11 +19,8 @@ package trie
 import (
 	"errors"
 	"fmt"
-	"sync"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
-	"golang.org/x/crypto/sha3"
 )
 
 // leaf represents a trie leaf value
@@ -45,16 +42,6 @@ type committer struct {
 
 	onleaf LeafCallback
 	leafCh chan *leaf
-}
-
-// committers live in a global sync.Pool
-var committerPool = sync.Pool{
-	New: func() interface{} {
-		return &committer{
-			tmp: make(sliceBuffer, 0, 550), // cap is as large as a full fullNode.
-			sha: sha3.NewLegacyKeccak256().(crypto.KeccakState),
-		}
-	},
 }
 
 // Commit collapses a node down into a hash node and inserts it into the database

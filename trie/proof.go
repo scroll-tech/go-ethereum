@@ -151,7 +151,7 @@ func (mt *MerkleTree) Prove(k *big.Int, fromLevel uint, proofDb ethdb.KeyValueWr
 			continue
 		}
 
-		// TODO: notice here we may have broken some implicity on the proofDb:
+		// TODO: notice here we may have broken some implicit on the proofDb:
 		// the key is not kecca(value) and it even can not be derived from
 		// the value by any means without a actually decoding
 		key, err := n.Key()

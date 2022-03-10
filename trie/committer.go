@@ -19,6 +19,7 @@ package trie
 import (
 	"errors"
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
 )

@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/core/types/smt"
-	"github.com/scroll-tech/go-ethereum/trie/db"
 	"io"
 	"math/big"
 	"sync"
 
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
+
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
+	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 const (

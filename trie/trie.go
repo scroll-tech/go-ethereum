@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"

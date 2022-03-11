@@ -19,6 +19,7 @@ package trie
 import (
 	"errors"
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/trie/db"
 
 	"math/big"

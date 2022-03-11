@@ -3,8 +3,9 @@ package trie
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"math/big"
+
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
 )
 
 // NodeType defines the type of node in the MT.

@@ -356,7 +356,8 @@ func (s *stateObject) updateTrie(db Database) Trie {
 			if (value == common.Hash{}) {
 				storage[crypto.HashData(hasher, key[:])] = nil // v will be nil if it's deleted
 			} else {
-				storage[crypto.HashData(hasher, key[:])] = value[:]
+				storage[crypto.HashData(hasher, key[:])] = append(make([]byte, 0, len(value[:])), value[:]...)
+				//storage[crypto.HashData(hasher, key[:])] = value[:]
 			}
 		}
 		usedStorage = append(usedStorage, common.CopyBytes(key[:])) // Copy needed for closure

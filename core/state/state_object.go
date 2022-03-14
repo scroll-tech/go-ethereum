@@ -244,14 +244,7 @@ func (s *stateObject) GetCommittedState(db Database, key common.Hash) common.Has
 			return common.Hash{}
 		}
 	}
-	var value common.Hash
-	if len(enc) > 0 {
-		_, content, _, err := rlp.Split(enc)
-		if err != nil {
-			s.setError(err)
-		}
-		value.SetBytes(content)
-	}
+	value := common.BytesToHash(enc)
 	s.originStorage[key] = value
 	return value
 }

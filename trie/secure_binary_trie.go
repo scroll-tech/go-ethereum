@@ -17,7 +17,6 @@
 package trie
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/scroll-tech/go-ethereum/trie/db"
@@ -152,7 +151,7 @@ func (t *SecureBinaryTrie) Delete(key []byte) {
 // TryDelete removes any existing value for key from the trie.
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureBinaryTrie) TryDelete(key []byte) error {
-	return errors.New("deletion is disabled")
+	return t.TryUpdate(key, []byte{})
 }
 
 // GetKey returns the preimage of a hashed key that was

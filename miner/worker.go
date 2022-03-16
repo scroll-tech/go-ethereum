@@ -792,11 +792,18 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+	proofFrom, proofTo := tracer.BaseProofs()
+	finalRoot := common.BytesToHash(receipt.PostState)
 	w.current.executionResults = append(w.current.executionResults, &types.ExecutionResult{
 		Gas:         receipt.GasUsed,
 		Failed:      receipt.Status != types.ReceiptStatusSuccessful,
 		ReturnValue: fmt.Sprintf("%x", receipt.ReturnValue),
 		StructLogs:  vm.FormatLogs(tracer.StructLogs()),
+		Proofs:      [2][][]byte{proofFrom, proofTo},
+		Storage: &types.StorageRes{
+			RootBefore: tracer.StateRootBefore(),
+			RootAfter:  &finalRoot,
+		},
 	})
 
 	return receipt.Logs, nil

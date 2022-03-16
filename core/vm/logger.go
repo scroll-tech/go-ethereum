@@ -124,10 +124,14 @@ type StructLogger struct {
 	cfg LogConfig
 	env *EVM
 
-	storage map[common.Address]Storage
-	logs    []StructLog
-	output  []byte
-	err     error
+	storage      map[common.Address]Storage
+	accFromProof [][]byte
+	accToProof   [][]byte
+	stateRoot    *common.Hash
+
+	logs   []StructLog
+	output []byte
+	err    error
 }
 
 // NewStructLogger returns a new logger
@@ -147,11 +151,29 @@ func (l *StructLogger) Reset() {
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.err = nil
+	l.stateRoot = nil
+	l.accFromProof = nil
+	l.accToProof = nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
+
+	log.Info("capture address", "from", from, "to", to)
+	pf, err := env.StateDB.GetProof(from)
+	if err != nil {
+		log.Warn("Failed to get base proof", "from", from.String(), " err", err)
+	}
+	l.accFromProof = pf
+
+	l.accToProof, err = env.StateDB.GetProof(to)
+	if err != nil {
+		log.Warn("Failed to get base proof", "to", to.String(), " err", err)
+	}
+
+	root := env.StateDB.GetRootHash()
+	l.stateRoot = &root
 }
 
 // CaptureState logs a new structured log message and pushes it out to the environment
@@ -207,6 +229,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			l.storage[contract.Address()][address] = value
 			storage = l.storage[contract.Address()].Copy()
 
+			log.Info("SSTORE", "contract", contract.Address())
 			extraData = types.NewExtraData()
 			if err := traceStorageProof(l, scope, extraData); err != nil {
 				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
@@ -268,6 +291,12 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 }
 
 func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
+
+// BaseProofs returns the account proof of 2 accounts which must being mutated in tx (from and to)
+func (l *StructLogger) BaseProofs() ([][]byte, [][]byte) { return l.accFromProof, l.accToProof }
+
+// StateRootBefore returns the root of state before execution begins
+func (l *StructLogger) StateRootBefore() *common.Hash { return l.stateRoot }
 
 // StructLogs returns the captured log entries.
 func (l *StructLogger) StructLogs() []StructLog { return l.logs }

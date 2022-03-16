@@ -60,8 +60,8 @@ type ExtraData struct {
 // NewExtraData create, init and return ExtraData
 func NewExtraData() *ExtraData {
 	return &ExtraData{
-		CodeList: make([][]byte, 0),
-		ProofList:    make([][]string, 0),
+		CodeList:  make([][]byte, 0),
+		ProofList: make([][]string, 0),
 	}
 }
 

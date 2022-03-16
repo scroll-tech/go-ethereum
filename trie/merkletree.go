@@ -24,7 +24,7 @@ var (
 	// ErrNodeKeyAlreadyExists is used when a node key already exists.
 	ErrNodeKeyAlreadyExists = errors.New("key already exists")
 	// ErrKeyNotFound is used when a key is not found in the MerkleTree.
-	ErrKeyNotFound = errors.New("Key not found in the MerkleTree")
+	ErrKeyNotFound = errors.New("key not found")
 	// ErrNodeBytesBadSize is used when the data of a node has an incorrect
 	// size and can't be parsed.
 	ErrNodeBytesBadSize = errors.New("node data has incorrect size in the DB")

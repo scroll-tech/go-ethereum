@@ -313,6 +313,15 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 	return common.Hash{}
 }
 
+func (s *StateDB) GetStateData(addr common.Address) *types.StateAccount {
+	obj, ok := s.stateObjects[addr]
+	if !ok {
+		return nil
+	}
+
+	return &obj.data
+}
+
 func (s *StateDB) GetRootHash() common.Hash {
 	return s.trie.Hash()
 }

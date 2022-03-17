@@ -25,9 +25,6 @@ type ExecutionResult struct {
 	// Deprecated: The account's proof.
 	// Proof      []string       `json:"proof,omitempty"`
 
-	// The base account's ([from, to]) proof
-	Proofs [2][][]byte `json:"-"`
-
 	Storage    *StorageRes    `json:"storage,omitempty"`
 	StructLogs []StructLogRes `json:"structLogs"`
 }
@@ -39,6 +36,8 @@ type StorageRes struct {
 	RootBefore *common.Hash `json:"rootBefore,omitempty"`
 	// Root hash after execution, is nil if execution has failed
 	RootAfter *common.Hash `json:"rootAfter,omitempty"`
+	// AccountsAfter recode and encoded all accounts
+	AccountsAfter map[string]string `json:"accountAfter"`
 
 	// The from account's proof BEFORE execution
 	ProofFrom []string `json:"proofFrom,omitempty"`

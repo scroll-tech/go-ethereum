@@ -86,6 +86,7 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 	proof, err := l.env.StateDB.GetProof(scope.Contract.Address())
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }
@@ -104,6 +105,7 @@ func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *
 	proof, err := l.env.StateDB.GetProof(address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }
@@ -120,6 +122,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		proof, err := l.env.StateDB.GetProof(address)
 		if err == nil {
 			extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+			l.states[scope.Contract.Address()] = struct{}{}
 		}
 		return err
 	}
@@ -131,6 +134,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	proof, err := l.env.StateDB.GetProof(address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }

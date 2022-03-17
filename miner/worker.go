@@ -27,6 +27,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -793,16 +794,32 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	proofFrom, proofTo := tracer.BaseProofs()
+	proofFromEnc := make([]string, len(proofFrom))
+	for i := range proofFrom {
+		proofFromEnc[i] = hexutil.Encode(proofFrom[i])
+	}
+	proofToEnc := make([]string, len(proofTo))
+	for i := range proofTo {
+		proofToEnc[i] = hexutil.Encode(proofTo[i])
+	}
+	accs := tracer.UpdatedAccounts()
+	accsEnc := make(map[string]string)
+	for addr, data := range accs {
+		accsEnc[addr.String()] = hexutil.Encode(data.MarshalBytes())
+	}
+
 	finalRoot := common.BytesToHash(receipt.PostState)
 	w.current.executionResults = append(w.current.executionResults, &types.ExecutionResult{
 		Gas:         receipt.GasUsed,
 		Failed:      receipt.Status != types.ReceiptStatusSuccessful,
 		ReturnValue: fmt.Sprintf("%x", receipt.ReturnValue),
 		StructLogs:  vm.FormatLogs(tracer.StructLogs()),
-		Proofs:      [2][][]byte{proofFrom, proofTo},
 		Storage: &types.StorageRes{
-			RootBefore: tracer.StateRootBefore(),
-			RootAfter:  &finalRoot,
+			RootBefore:    tracer.StateRootBefore(),
+			RootAfter:     &finalRoot,
+			ProofFrom:     proofFromEnc,
+			ProofTo:       proofToEnc,
+			AccountsAfter: accsEnc,
 		},
 	})
 

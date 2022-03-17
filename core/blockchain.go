@@ -1351,18 +1351,6 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		// Get the sender's address.
 		// from, _ := types.Sender(types.MakeSigner(bc.chainConfig, block.Number()), tx)
 
-		proofs := evmTrace.Proofs[0]
-		evmTrace.Storage.ProofFrom = make([]string, len(proofs))
-		for i := range proofs {
-			evmTrace.Storage.ProofFrom[i] = hexutil.Encode(proofs[i])
-		}
-
-		proofs = evmTrace.Proofs[1]
-		evmTrace.Storage.ProofTo = make([]string, len(proofs))
-		for i := range proofs {
-			evmTrace.Storage.ProofTo[i] = hexutil.Encode(proofs[i])
-		}
-
 		// Contract is called
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(state.GetCode(*tx.To()))

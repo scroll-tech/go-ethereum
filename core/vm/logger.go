@@ -124,6 +124,7 @@ type StructLogger struct {
 	cfg LogConfig
 	env *EVM
 
+	states       map[common.Address]struct{}
 	storage      map[common.Address]Storage
 	accFromProof [][]byte
 	accToProof   [][]byte
@@ -138,6 +139,7 @@ type StructLogger struct {
 func NewStructLogger(cfg *LogConfig) *StructLogger {
 	logger := &StructLogger{
 		storage: make(map[common.Address]Storage),
+		states:  make(map[common.Address]struct{}),
 	}
 	if cfg != nil {
 		logger.cfg = *cfg
@@ -148,6 +150,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 // Reset clears the data held by the logger.
 func (l *StructLogger) Reset() {
 	l.storage = make(map[common.Address]Storage)
+	l.states = make(map[common.Address]struct{})
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.err = nil
@@ -171,6 +174,9 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 	if err != nil {
 		log.Warn("Failed to get base proof", "to", to.String(), " err", err)
 	}
+
+	l.states[from] = struct{}{}
+	l.states[to] = struct{}{}
 
 	root := env.StateDB.GetRootHash()
 	l.stateRoot = &root
@@ -291,6 +297,29 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 }
 
 func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
+
+// CaptureFinal is used to collect all "touched" accounts just after all modification to state has finished
+func (l *StructLogger) UpdatedAccounts() (output map[common.Address]*types.StateAccount) {
+	output = make(map[common.Address]*types.StateAccount)
+
+	for addr := range l.states {
+
+		acc := l.env.StateDB.GetStateData(addr)
+		if acc == nil {
+			log.Error("Failed to query data", "account addr", addr)
+		} else {
+			//deep copy is required, except for codehash (it should not change)
+			output[addr] = &types.StateAccount{
+				Nonce:    acc.Nonce,
+				Balance:  big.NewInt(0).Set(acc.Balance),
+				Root:     acc.Root,
+				CodeHash: acc.CodeHash,
+			}
+		}
+	}
+
+	return
+}
 
 // BaseProofs returns the account proof of 2 accounts which must being mutated in tx (from and to)
 func (l *StructLogger) BaseProofs() ([][]byte, [][]byte) { return l.accFromProof, l.accToProof }

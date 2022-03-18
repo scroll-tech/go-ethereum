@@ -123,7 +123,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.AccountProofWrapper, error) {
 	proof, err := l.env.StateDB.GetProof(address)
 	if err != nil {
-		return &types.AccountProofWrapper{}, err
+		return nil, err
 	}
 
 	return &types.AccountProofWrapper{
@@ -138,12 +138,12 @@ func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.Acc
 func getWrappedProofForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountProofWrapper, error) {
 	proof, err := l.env.StateDB.GetProof(address)
 	if err != nil {
-		return &types.AccountProofWrapper{}, err
+		return nil, err
 	}
 
 	storageProof, err := l.env.StateDB.GetStorageProof(address, key)
 	if err != nil {
-		return &types.AccountProofWrapper{}, err
+		return nil, err
 	}
 
 	return &types.AccountProofWrapper{

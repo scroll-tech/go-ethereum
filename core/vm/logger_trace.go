@@ -120,6 +120,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	return err
 }
 
+// StorageProofWrapper will be empty
 func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.AccountProofWrapper, error) {
 	proof, err := l.env.StateDB.GetProof(address)
 	if err != nil {
@@ -131,7 +132,6 @@ func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.Acc
 		Nonce:   l.env.StateDB.GetNonce(address),
 		Balance: l.env.StateDB.GetBalance(address),
 		Proof:   encodeProof(proof),
-		Storage: &types.StorageProofWrapper{},
 	}, nil
 }
 

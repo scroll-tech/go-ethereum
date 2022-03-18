@@ -29,6 +29,50 @@ type ExecutionResult struct {
 	StructLogs []StructLogRes `json:"structLogs"`
 }
 
+// SMTPathNode represent a node in the SMT Path
+type SMTPathNode struct {
+	Value    string `json:"value"`
+	Silbling string `json:"silbiling"`
+}
+
+// SMTPath is the whole path of SMT
+type SMTPath struct {
+	Root string        `json:"root"`
+	Path []SMTPathNode `json:"path"` //from top to leaf
+}
+
+// StateAccountL2 is the represent of StateAccount in L2 circuit
+// Notice in L2 we have different hash scheme against StateAccount.MarshalByte
+type StateAccountL2 struct {
+	Address  string `json:"address"`
+	Nonce    int    `json:"nonce"`
+	Balance  string `json:"balance"` //just the common hex expression of integer (big-endian)
+	CodeHash string `json:"codeHash,omitempty"`
+}
+
+// StateStorageL2 is the represent of a stored key-value pair for specified account
+type StateStorageL2 struct {
+	Key   string `json:"key"` //notice this is the preimage of storage key
+	Value string `json:"value"`
+}
+
+// StateTrace record the updating on state trie and (if changed) account trie
+// represent by the [before, after] updating of SMTPath amont tries and Account
+type StateTrace struct {
+	// which log the trace is responded for, -1 indicate not caused
+	// by opcode (like gasRefund, coinbase, setNonce, etc)
+	Index            int                `json:"index"`
+	AccountKey       string             `json:"accountKey"`
+	AccountPath      [2]*SMTPath        `json:"accountPath"`
+	AccountUpdate    [2]*StateAccountL2 `json:"accountUpdate"`
+	StateKey         string             `json:"stateKey,omitempty"`
+	CommonStateRoot  string             `json:"commonStateRoot,omitempty"`
+	StatePath        [2]*SMTPath        `json:"statePath,omitempty"`
+	StateUpdate      [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
+	AccountKeyBefore string             `json:"accountKeyBefore,omitempty"`
+	StateKeyBefore   string             `json:"stateKeyBefore,omitempty"`
+}
+
 // StorageRes stores data required in storage circuit
 type StorageRes struct {
 

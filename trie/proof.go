@@ -229,6 +229,32 @@ func buildSMTProof(rootKey *smt.Hash, k *big.Int, lvl int, getNode func(key *smt
 
 }
 
+// DecodeProof try to decode a node bytes and rewrite it into a db
+func DecodeSMTProof(data []byte,
+	db ethdb.KeyValueWriter,
+	onNode func(*Node)) error {
+
+	if bytes.Equal(magicSMTBytes, data) {
+		//skip magic bytes node
+		return nil
+	}
+
+	n, err := NewNodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	if onNode != nil {
+		onNode(n)
+	}
+
+	k, err := n.Key()
+	if err != nil {
+		return err
+	}
+
+	return db.Put(k.Bytes(), data)
+}
+
 // VerifyProof checks merkle proofs. The given proof must contain the value for
 // key in a trie with the given root hash. VerifyProof returns an error if the
 // proof contains invalid trie nodes or the wrong value.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/log"
 	"io"
 	"math/big"
 	"reflect"
@@ -573,22 +574,19 @@ func (mt *MerkleTree) UpdateWord(kPreimage, vPreimage *smt.Byte32) (*CircomProce
 }
 
 func (mt *MerkleTree) UpdateVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPreimage []byte) (*CircomProcessorProof, error) {
-	fmt.Printf("UpdateVarWord root %v\n", mt.Root())
 	k, err := kPreimage.Hash()
 	if err != nil {
 		return nil, err
 	}
 	proof, err := mt.Update(k, vHash, kPreimage, vPreimage[:])
 	if err == ErrKeyNotFound {
-		fmt.Printf("UpdateVarWord, key not found, so insert: kPreimage %v, len(vPreimage) %v root %v \n", kPreimage, len(vPreimage), mt.rootKey)
-		fmt.Printf("root %v", mt.Root())
 		err = mt.Add(k, vHash, kPreimage, vPreimage[:])
 		if err != nil {
-			fmt.Printf("UpdateVarWord, inset still failed %v root %v", err, mt.rootKey)
+			log.Error("UpdateVarWord, inset still failed %v root %v", err, mt.rootKey)
 		}
 		return nil, err
 	} else if err != nil {
-		fmt.Printf("UpdateVarWord err %v %v", err, reflect.TypeOf(err))
+		log.Error("UpdateVarWord err %v %v", err, reflect.TypeOf(err))
 	}
 	return proof, err
 }

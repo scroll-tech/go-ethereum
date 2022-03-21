@@ -1348,13 +1348,17 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block)
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
-		// Get the sender's address.
-		// from, _ := types.Sender(types.MakeSigner(bc.chainConfig, block.Number()), tx)
 
-		proofs := evmTrace.Proofs[0]
-		evmTrace.Storage.ProofFrom = make([]string, len(proofs))
-		for i := range proofs {
-			evmTrace.Storage.ProofFrom[i] = hexutil.Encode(proofs[i])
+		// Get sender's address.
+
+		evmTrace.Sender = &types.AccountProofWrapper{
+			Address: from,
+			Nonce:   state.GetNonce(from),
+			Balance: state.GetBalance(from),
+		}
+		// Get sender's account proof.
+			evmTrace.Sender.Proof = make([]string, len(proof))
+				evmTrace.Sender.Proof[i] = hexutil.Encode(proof[i])
 		}
 
 		proofs = evmTrace.Proofs[1]

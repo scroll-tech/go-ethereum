@@ -28,7 +28,7 @@ import (
 )
 
 func newEmptySecure() *SecureBinaryTrie {
-	trie, _ := NewSecure(common.Hash{}, NewDatabase(memorydb.New()))
+	trie, _ := NewSecureBinaryTrie(common.Hash{}, NewDatabase(memorydb.New()))
 	return trie
 }
 
@@ -36,7 +36,7 @@ func newEmptySecure() *SecureBinaryTrie {
 func makeTestSecureTrie() (*Database, *SecureBinaryTrie, map[string][]byte) {
 	// Create an empty trie
 	triedb := NewDatabase(memorydb.New())
-	trie, _ := NewSecure(common.Hash{}, triedb)
+	trie, _ := NewSecureBinaryTrie(common.Hash{}, triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)

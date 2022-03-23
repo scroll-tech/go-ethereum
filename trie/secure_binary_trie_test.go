@@ -18,12 +18,13 @@ package trie
 
 import (
 	"bytes"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
+	"github.com/stretchr/testify/assert"
 	"runtime"
 	"sync"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 
@@ -91,16 +92,18 @@ func TestSecureDelete(t *testing.T) {
 
 func TestSecureGetKey(t *testing.T) {
 	trie := newEmptySecure()
-	trie.Update([]byte("foo"), []byte("bar"))
+	key := []byte("0a1b2c3d4e5f6g7h8i9j")
+	value := []byte("9j8i7h6g5f4e3d2c1b0a")
+	trie.Update(key, value)
 
-	key := []byte("foo")
-	value := []byte("bar")
-	seckey := crypto.Keccak256(key)
+	kPreimage := smt.NewByte32FromBytesPadding(key)
+	kHash, err := kPreimage.Hash()
+	assert.Nil(t, err)
 
 	if !bytes.Equal(trie.Get(key), value) {
 		t.Errorf("Get did not return bar")
 	}
-	if k := trie.GetKey(seckey); !bytes.Equal(k, key) {
+	if k := trie.GetKey(kHash.Bytes()); !bytes.Equal(k, key) {
 		t.Errorf("GetKey returned %q, want %q", k, key)
 	}
 }

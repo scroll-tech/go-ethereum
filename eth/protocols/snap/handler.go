@@ -430,7 +430,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 		// Make sure we have the state associated with the request
 		triedb := backend.Chain().StateCache().TrieDB()
 
-		accTrie, err := trie.NewSecure(req.Root, triedb)
+		accTrie, err := trie.NewSecureBinaryTrie(req.Root, triedb)
 		if err != nil {
 			// We don't have the requested state available, bail out
 			return p2p.Send(peer.rw, TrieNodesMsg, &TrieNodesPacket{ID: req.ID})
@@ -472,7 +472,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 				if err != nil || account == nil {
 					break
 				}
-				stTrie, err := trie.NewSecure(common.BytesToHash(account.Root), triedb)
+				stTrie, err := trie.NewSecureBinaryTrie(common.BytesToHash(account.Root), triedb)
 				loads++ // always account database reads, even for failures
 				if err != nil {
 					break

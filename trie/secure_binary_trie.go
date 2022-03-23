@@ -44,8 +44,8 @@ type SecureBinaryTrie struct {
 	tree *MerkleTree
 }
 
-// NewSecure creates a trie
-func NewSecure(root common.Hash, ethdb *Database) (*SecureBinaryTrie, error) {
+// NewSecureBinaryTrie creates a trie
+func NewSecureBinaryTrie(root common.Hash, ethdb *Database) (*SecureBinaryTrie, error) {
 	rootHash, err := smt.NewHashFromBytes(root.Bytes())
 	if err != nil {
 		return nil, err

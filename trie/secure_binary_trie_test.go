@@ -44,17 +44,17 @@ func makeTestSecureTrie() (*Database, *SecureBinaryTrie, map[string][]byte) {
 	content := make(map[string][]byte)
 	for i := byte(0); i < 255; i++ {
 		// Map the same data under multiple keys
-		key, val := common.LeftPadBytes([]byte{1, i}, 32), []byte{i}
+		key, val := common.LeftPadBytes([]byte{1, i}, 32), bytes.Repeat([]byte{i}, 32)
 		content[string(key)] = val
 		trie.Update(key, val)
 
-		key, val = common.LeftPadBytes([]byte{2, i}, 32), []byte{i}
+		key, val = common.LeftPadBytes([]byte{2, i}, 32), bytes.Repeat([]byte{i}, 32)
 		content[string(key)] = val
 		trie.Update(key, val)
 
 		// Add some other data to inflate the trie
 		for j := byte(3); j < 13; j++ {
-			key, val = common.LeftPadBytes([]byte{j, i}, 32), []byte{j, i}
+			key, val = common.LeftPadBytes([]byte{j, i}, 32), bytes.Repeat([]byte{j, i}, 16)
 			content[string(key)] = val
 			trie.Update(key, val)
 		}
@@ -131,15 +131,15 @@ func TestSecureTrieConcurrency(t *testing.T) {
 
 			for j := byte(0); j < 255; j++ {
 				// Map the same data under multiple keys
-				key, val := common.LeftPadBytes([]byte{byte(index), 1, j}, 32), []byte{j}
+				key, val := common.LeftPadBytes([]byte{byte(index), 1, j}, 32), bytes.Repeat([]byte{j}, 32)
 				tries[index].Update(key, val)
 
-				key, val = common.LeftPadBytes([]byte{byte(index), 2, j}, 32), []byte{j}
+				key, val = common.LeftPadBytes([]byte{byte(index), 2, j}, 32), bytes.Repeat([]byte{j}, 32)
 				tries[index].Update(key, val)
 
 				// Add some other data to inflate the trie
 				for k := byte(3); k < 13; k++ {
-					key, val = common.LeftPadBytes([]byte{byte(index), k, j}, 32), []byte{k, j}
+					key, val = common.LeftPadBytes([]byte{byte(index), k, j}, 32), bytes.Repeat([]byte{k, j}, 16)
 					tries[index].Update(key, val)
 				}
 			}

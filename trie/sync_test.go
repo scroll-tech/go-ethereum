@@ -35,17 +35,17 @@ func makeTestTrie() (*Database, *SecureBinaryTrie, map[string][]byte) {
 	content := make(map[string][]byte)
 	for i := byte(0); i < 255; i++ {
 		// Map the same data under multiple keys
-		key, val := common.LeftPadBytes([]byte{1, i}, 32), []byte{i}
+		key, val := common.LeftPadBytes([]byte{1, i}, 32), bytes.Repeat([]byte{i}, 32)
 		content[string(key)] = val
 		trie.Update(key, val)
 
-		key, val = common.LeftPadBytes([]byte{2, i}, 32), []byte{i}
+		key, val = common.LeftPadBytes([]byte{2, i}, 32), bytes.Repeat([]byte{i}, 32)
 		content[string(key)] = val
 		trie.Update(key, val)
 
 		// Add some other data to inflate the trie
 		for j := byte(3); j < 13; j++ {
-			key, val = common.LeftPadBytes([]byte{j, i}, 32), []byte{j, i}
+			key, val = common.LeftPadBytes([]byte{j, i}, 32), bytes.Repeat([]byte{j, i}, 16)
 			content[string(key)] = val
 			trie.Update(key, val)
 		}

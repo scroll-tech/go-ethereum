@@ -35,9 +35,7 @@ var (
 )
 
 func TestEthSuite(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("regenerate halfchain.rlp and chain.rlp to enable this test")
 	geth, err := runGeth()
 	if err != nil {
 		t.Fatalf("could not run geth: %v", err)

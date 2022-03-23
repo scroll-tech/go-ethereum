@@ -504,7 +504,7 @@ func (db *Database) reference(child common.Hash, parent common.Hash) {
 // Dereference removes an existing reference from a root node.
 func (db *Database) Dereference(root common.Hash) {
 	// TODO: implement
-	log.Warn("gc should be implemented later")
+	log.Debug("gc should be implemented later")
 }
 
 // dereference is the private locked version of Dereference.

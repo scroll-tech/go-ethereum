@@ -175,9 +175,7 @@ func startClient(t *testing.T, name string) *gethrpc {
 }
 
 func TestPriorityClient(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("light client not supported by layer2")
 	lightServer := startLightServer(t)
 	defer lightServer.killAndWait()
 

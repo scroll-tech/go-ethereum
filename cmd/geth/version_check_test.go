@@ -29,9 +29,6 @@ import (
 )
 
 func TestVerification(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
 	// Signatures generated with `minisign`
 	t.Run("minisig", func(t *testing.T) {
 		// For this test, the pubkey is in testdata/minisign.pub

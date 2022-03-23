@@ -36,6 +36,7 @@ var (
 
 	// emptyState is the known hash of an empty state trie entry.
 	emptyState = crypto.Keccak256Hash(nil)
+	zeroHash   = common.Hash{}
 )
 
 // LeafCallback is a callback type invoked when a trie operation reaches a leaf

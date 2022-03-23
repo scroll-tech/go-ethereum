@@ -42,7 +42,7 @@ type SecureTrie struct {
 	secKeyCacheOwner *SecureTrie // Pointer to self, replace the key cache on mismatch
 }
 
-// NewSecureBinaryTrie creates a trie with an existing root node from a backing database
+// NewSecure creates a trie with an existing root node from a backing database
 // and optional intermediate in-memory node pool.
 //
 // If root is the zero hash or the sha3 hash of an empty string, the
@@ -55,7 +55,7 @@ type SecureTrie struct {
 // cachelimit sets the number of past cache generations to keep.
 func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
-		panic("trie.NewSecureBinaryTrie called without a database")
+		panic("trie.NewSecure called without a database")
 	}
 	trie, err := New(root, db)
 	if err != nil {

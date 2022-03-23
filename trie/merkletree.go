@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/log"
 	"io"
 	"math/big"
 	"reflect"
 	"sync"
+
+	"github.com/scroll-tech/go-ethereum/log"
 
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
 

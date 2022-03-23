@@ -45,6 +45,8 @@ type SecureBinaryTrie struct {
 }
 
 // NewSecureBinaryTrie creates a trie
+// SecureBinaryTrie bypasses all the buffer mechanism in *Database, it directly uses the
+// underlying diskdb
 func NewSecureBinaryTrie(root common.Hash, ethdb *Database) (*SecureBinaryTrie, error) {
 	rootHash, err := smt.NewHashFromBytes(root.Bytes())
 	if err != nil {

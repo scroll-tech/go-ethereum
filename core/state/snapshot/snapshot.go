@@ -184,6 +184,7 @@ type Tree struct {
 // - otherwise, the entire snapshot is considered invalid and will be recreated on
 //   a background thread.
 func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash, async bool, rebuild bool, recovery bool) (*Tree, error) {
+	panic("snapshot disabled")
 	// Create a new, empty snapshot tree
 	snap := &Tree{
 		diskdb: diskdb,

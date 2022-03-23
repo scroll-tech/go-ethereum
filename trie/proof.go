@@ -229,30 +229,15 @@ func buildSMTProof(rootKey *smt.Hash, k *big.Int, lvl int, getNode func(key *smt
 
 }
 
-// DecodeProof try to decode a node bytes and rewrite it into a db
-func DecodeSMTProof(data []byte,
-	db ethdb.KeyValueWriter,
-	onNode func(*Node)) error {
+// DecodeProof try to decode a node bytes, return can be nil for any non-node data (magic code)
+func DecodeSMTProof(data []byte) (*Node, error) {
 
 	if bytes.Equal(magicSMTBytes, data) {
 		//skip magic bytes node
-		return nil
+		return nil, nil
 	}
 
-	n, err := NewNodeFromBytes(data)
-	if err != nil {
-		return err
-	}
-	if onNode != nil {
-		onNode(n)
-	}
-
-	k, err := n.Key()
-	if err != nil {
-		return err
-	}
-
-	return db.Put(k.Bytes(), data)
+	return NewNodeFromBytes(data)
 }
 
 // VerifyProof checks merkle proofs. The given proof must contain the value for

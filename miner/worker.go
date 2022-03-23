@@ -794,18 +794,18 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	proofFrom, proofTo := tracer.BaseProofs()
-	proofFromEnc := make([]string, len(proofFrom))
+	proofFromEnc := make([]hexutil.Bytes, len(proofFrom))
 	for i := range proofFrom {
-		proofFromEnc[i] = hexutil.Encode(proofFrom[i])
+		proofFromEnc[i] = proofFrom[i]
 	}
-	proofToEnc := make([]string, len(proofTo))
+	proofToEnc := make([]hexutil.Bytes, len(proofTo))
 	for i := range proofTo {
-		proofToEnc[i] = hexutil.Encode(proofTo[i])
+		proofToEnc[i] = proofTo[i]
 	}
 	accs := tracer.UpdatedAccounts()
-	accsEnc := make(map[string]string)
+	accsEnc := make(map[string]hexutil.Bytes)
 	for addr, data := range accs {
-		accsEnc[addr.String()] = hexutil.Encode(data.MarshalBytes())
+		accsEnc[addr.String()] = data.MarshalBytes()
 	}
 
 	finalRoot := common.BytesToHash(receipt.PostState)

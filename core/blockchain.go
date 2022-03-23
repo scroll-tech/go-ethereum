@@ -1360,6 +1360,12 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		} else if tx.To() == nil { // Contract is created.
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())
 		}
+
+		if smtWriter, err := newSMTProofWriter(evmTrace.Storage); err != nil {
+			log.Error("build smt writer fail", "error", err)
+		} else if err = smtWriter.handleLogs(evmTrace.StructLogs); err != nil {
+			log.Error("handle logs for SMT fail", "error", err)
+		}
 	}
 }
 

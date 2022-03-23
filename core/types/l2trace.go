@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
 // BlockResult contains block execution traces and results required for rollers.
@@ -31,29 +32,29 @@ type ExecutionResult struct {
 
 // SMTPathNode represent a node in the SMT Path
 type SMTPathNode struct {
-	Value    string `json:"value"`
-	Silbling string `json:"silbiling"`
+	Value    hexutil.Bytes `json:"value"`
+	Silbling hexutil.Bytes `json:"silbiling"`
 }
 
 // SMTPath is the whole path of SMT
 type SMTPath struct {
-	Root string        `json:"root"`
+	Root hexutil.Bytes `json:"root"`
 	Path []SMTPathNode `json:"path"` //from top to leaf
 }
 
 // StateAccountL2 is the represent of StateAccount in L2 circuit
 // Notice in L2 we have different hash scheme against StateAccount.MarshalByte
 type StateAccountL2 struct {
-	Address  string `json:"address"`
-	Nonce    int    `json:"nonce"`
-	Balance  string `json:"balance"` //just the common hex expression of integer (big-endian)
-	CodeHash string `json:"codeHash,omitempty"`
+	Address  hexutil.Bytes `json:"address"`
+	Nonce    int           `json:"nonce"`
+	Balance  hexutil.Bytes `json:"balance"` //just the common hex expression of integer (big-endian)
+	CodeHash hexutil.Bytes `json:"codeHash,omitempty"`
 }
 
 // StateStorageL2 is the represent of a stored key-value pair for specified account
 type StateStorageL2 struct {
-	Key   string `json:"key"` //notice this is the preimage of storage key
-	Value string `json:"value"`
+	Key   hexutil.Bytes `json:"key"` //notice this is the preimage of storage key
+	Value hexutil.Bytes `json:"value"`
 }
 
 // StateTrace record the updating on state trie and (if changed) account trie
@@ -62,15 +63,15 @@ type StateTrace struct {
 	// which log the trace is responded for, -1 indicate not caused
 	// by opcode (like gasRefund, coinbase, setNonce, etc)
 	Index            int                `json:"index"`
-	AccountKey       string             `json:"accountKey"`
+	AccountKey       hexutil.Bytes      `json:"accountKey"`
 	AccountPath      [2]*SMTPath        `json:"accountPath"`
 	AccountUpdate    [2]*StateAccountL2 `json:"accountUpdate"`
-	StateKey         string             `json:"stateKey,omitempty"`
-	CommonStateRoot  string             `json:"commonStateRoot,omitempty"`
+	StateKey         hexutil.Bytes      `json:"stateKey,omitempty"`
+	CommonStateRoot  hexutil.Bytes      `json:"commonStateRoot,omitempty"` //CommonStateRoot is used if there is no state update
 	StatePath        [2]*SMTPath        `json:"statePath,omitempty"`
 	StateUpdate      [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
-	AccountKeyBefore string             `json:"accountKeyBefore,omitempty"`
-	StateKeyBefore   string             `json:"stateKeyBefore,omitempty"`
+	AccountKeyBefore hexutil.Bytes      `json:"accountKeyBefore,omitempty"`
+	StateKeyBefore   hexutil.Bytes      `json:"stateKeyBefore,omitempty"`
 }
 
 // StorageRes stores data required in storage circuit
@@ -81,14 +82,14 @@ type StorageRes struct {
 	// Root hash after execution, is nil if execution has failed
 	RootAfter *common.Hash `json:"rootAfter,omitempty"`
 	// AccountsAfter recode and encoded all accounts
-	AccountsAfter map[string]string `json:"accountAfter"`
+	AccountsAfter map[string]hexutil.Bytes `json:"accountAfter"`
 
 	// The from account's proof BEFORE execution
-	ProofFrom []string `json:"proofFrom,omitempty"`
+	ProofFrom []hexutil.Bytes `json:"proofFrom,omitempty"`
 	// The to account's proof BEFORE execution, these proof,
 	// along with account proof's inside structLogs, form the
 	// dataset required by tracing the updates of account trie
-	ProofTo []string `json:"proofTo,omitempty"`
+	ProofTo []hexutil.Bytes `json:"proofTo,omitempty"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

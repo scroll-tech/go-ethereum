@@ -64,23 +64,24 @@ func verifyValue(vHash []byte, vPreimage []byte) bool {
 func TestSMTOneElementProof(t *testing.T) {
 	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
 	_, err := mt.UpdateWord(
-		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("k"), 20)),
-		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("v"), 20)),
+		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("k"), 32)),
+		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("v"), 32)),
 	)
 	assert.Nil(t, err)
 	for i, prover := range makeSMTProvers(mt) {
-		proof := prover([]byte("k"))
+		keyBytes := bytes.Repeat([]byte("k"), 32)
+		proof := prover(keyBytes)
 		if proof == nil {
 			t.Fatalf("prover %d: nil proof", i)
 		}
 		if proof.Len() != 2 {
 			t.Errorf("prover %d: proof should have 1+1 element (including the magic kv)", i)
 		}
-		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), []byte("k"), proof)
+		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), keyBytes, proof)
 		if err != nil {
 			t.Fatalf("prover %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
 		}
-		if !verifyValue(val, []byte("v")) {
+		if !verifyValue(val, bytes.Repeat([]byte("v"), 32)) {
 			t.Fatalf("prover %d: verified value mismatch: want 'k'", i)
 		}
 	}

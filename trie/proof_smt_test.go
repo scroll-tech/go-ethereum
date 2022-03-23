@@ -40,7 +40,7 @@ func makeSMTProvers(mt *MerkleTree) []func(key []byte) *memorydb.Database {
 
 	// Create a direct trie based Merkle prover
 	provers = append(provers, func(key []byte) *memorydb.Database {
-		word := smt.NewByte32FromBytesPaddingZero(key)
+		word := smt.NewByte32FromBytesPadding(key)
 		k, err := word.Hash()
 		if err != nil {
 			panic(err)
@@ -53,7 +53,7 @@ func makeSMTProvers(mt *MerkleTree) []func(key []byte) *memorydb.Database {
 }
 
 func verifyValue(vHash []byte, vPreimage []byte) bool {
-	hv, err := smt.NewByte32FromBytesPaddingZero(vPreimage).Hash()
+	hv, err := smt.NewByte32FromBytesPadding(vPreimage).Hash()
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +62,7 @@ func verifyValue(vHash []byte, vPreimage []byte) bool {
 
 func TestSMTOneElementProof(t *testing.T) {
 	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
-	mt.UpdateWord(smt.NewByte32FromBytesPaddingZero([]byte("k")), smt.NewByte32FromBytesPaddingZero([]byte("v")))
+	mt.UpdateWord(smt.NewByte32FromBytesPadding([]byte("k")), smt.NewByte32FromBytesPadding([]byte("v")))
 	for i, prover := range makeSMTProvers(mt) {
 		proof := prover([]byte("k"))
 		if proof == nil {
@@ -133,7 +133,7 @@ func TestSMTBadProof(t *testing.T) {
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
 	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
-	mt.UpdateWord(smt.NewByte32FromBytesPaddingZero([]byte("k")), smt.NewByte32FromBytesPaddingZero([]byte("v")))
+	mt.UpdateWord(smt.NewByte32FromBytesPadding([]byte("k")), smt.NewByte32FromBytesPadding([]byte("v")))
 
 	prover := makeSMTProvers(mt)[0]
 
@@ -164,14 +164,14 @@ func randomSMT(n int) (*MerkleTree, map[string]*kv) {
 		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
 		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), []byte{i}, false}
 
-		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value.k), smt.NewByte32FromBytesPaddingZero(value.v))
-		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value2.k), smt.NewByte32FromBytesPaddingZero(value2.v))
+		mt.UpdateWord(smt.NewByte32FromBytesPadding(value.k), smt.NewByte32FromBytesPadding(value.v))
+		mt.UpdateWord(smt.NewByte32FromBytesPadding(value2.k), smt.NewByte32FromBytesPadding(value2.v))
 		vals[string(value.k)] = value
 		vals[string(value2.k)] = value2
 	}
 	for i := 0; i < n; i++ {
 		value := &kv{randBytes(32), randBytes(20), false}
-		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value.k), smt.NewByte32FromBytesPaddingZero(value.v))
+		mt.UpdateWord(smt.NewByte32FromBytesPadding(value.k), smt.NewByte32FromBytesPadding(value.v))
 		vals[string(value.k)] = value
 	}
 

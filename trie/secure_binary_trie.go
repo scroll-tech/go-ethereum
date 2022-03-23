@@ -73,7 +73,7 @@ func (t *SecureBinaryTrie) Get(key []byte) []byte {
 // The value bytes must not be modified by the caller.
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureBinaryTrie) TryGet(key []byte) ([]byte, error) {
-	word := smt.NewByte32FromBytesPaddingZero(key)
+	word := smt.NewByte32FromBytesPadding(key)
 	node, err := t.tree.GetLeafNodeByWord(word)
 	if err == ErrKeyNotFound {
 		// according to https://github.com/ethereum/go-ethereum/blob/37f9d25ba027356457953eab5f181c98b46e9988/trie/trie.go#L135
@@ -81,6 +81,9 @@ func (t *SecureBinaryTrie) TryGet(key []byte) ([]byte, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if node.ValuePreimageLen == 32 {
+		return smt.UnPadBytes32(node.ValuePreimage), nil
 	}
 	return node.ValuePreimage[:], nil
 }
@@ -94,7 +97,7 @@ func (t *SecureBinaryTrie) TryGetNode(path []byte) ([]byte, int, error) {
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *SecureBinaryTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
-	keyPreimage := smt.NewByte32FromBytesPaddingZero(key)
+	keyPreimage := smt.NewByte32FromBytesPadding(key)
 
 	vHash, err := acc.Hash()
 	if err != nil {
@@ -132,8 +135,8 @@ func (t *SecureBinaryTrie) Update(key, value []byte) {
 //
 // NOTE: value is restricted to length of bytes32.
 func (t *SecureBinaryTrie) TryUpdate(key, value []byte) error {
-	kPreimage := smt.NewByte32FromBytesPaddingZero(key)
-	vPreimage := smt.NewByte32FromBytesPaddingZero(value)
+	kPreimage := smt.NewByte32FromBytesPadding(key)
+	vPreimage := smt.NewByte32FromBytesPadding(value)
 	_, err := t.tree.UpdateWord(kPreimage, vPreimage)
 	if err != nil {
 		return err
@@ -158,15 +161,18 @@ func (t *SecureBinaryTrie) TryDelete(key []byte) error {
 // previously used to store a value.
 func (t *SecureBinaryTrie) GetKey(kHashBytes []byte) []byte {
 	// TODO: use a kv cache in memory
-	kHash, err := smt.NewHashFromBytes(kHashBytes)
+	kHash, err := smt.NewBigIntFromHashBytes(kHashBytes)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
-	node, err := t.tree.GetNode(kHash)
+	node, err := t.tree.GetLeafNode(kHash)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
-	return node.KeyPreimage[:]
+	if node == nil {
+		return nil
+	}
+	return smt.UnPadBytes32(node.KeyPreimage[:])
 }
 
 // Commit writes all nodes and the secure hash pre-images to the trie's database.

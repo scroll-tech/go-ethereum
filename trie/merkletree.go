@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"reflect"
 	"sync"
+
+	"github.com/scroll-tech/go-ethereum/log"
 
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"github.com/scroll-tech/go-ethereum/trie/db"
 )
@@ -24,7 +28,7 @@ var (
 	// ErrNodeKeyAlreadyExists is used when a node key already exists.
 	ErrNodeKeyAlreadyExists = errors.New("key already exists")
 	// ErrKeyNotFound is used when a key is not found in the MerkleTree.
-	ErrKeyNotFound = errors.New("key not found")
+	ErrKeyNotFound = errors.New("key not found in merkletree")
 	// ErrNodeBytesBadSize is used when the data of a node has an incorrect
 	// size and can't be parsed.
 	ErrNodeBytesBadSize = errors.New("node data has incorrect size in the DB")
@@ -50,8 +54,9 @@ var (
 // MerkleTree is the struct with the main elements of the MerkleTree
 type MerkleTree struct {
 	sync.RWMutex
-	db        db.Storage
-	rootKey   *smt.Hash
+	db      db.Storage
+	rootKey *smt.Hash
+	//rootNode  *Node
 	writable  bool
 	maxLevels int
 }
@@ -75,6 +80,13 @@ func (mt *MerkleTree) DB() db.Storage {
 
 // Root returns the MerkleRoot
 func (mt *MerkleTree) Root() *smt.Hash {
+	// FIXME
+	_, err := mt.GetNode(mt.rootKey)
+	if err != nil {
+		var hash common.Hash
+		hash.SetBytes(mt.rootKey.Bytes())
+		panic(fmt.Errorf("load trie root failed hash %v", hash))
+	}
 	return mt.rootKey
 }
 
@@ -260,6 +272,8 @@ func (mt *MerkleTree) addLeaf(tx db.Tx, newLeaf *Node, key *smt.Hash,
 	}
 	n, err := mt.GetNode(key)
 	if err != nil {
+		fmt.Printf("addLeaf:GetNode err %v key %v root %v level %v\n", err, key, mt.rootKey, lvl)
+		fmt.Printf("root %v\n", mt.Root())
 		return nil, err
 	}
 	switch n.Type {
@@ -268,7 +282,7 @@ func (mt *MerkleTree) addLeaf(tx db.Tx, newLeaf *Node, key *smt.Hash,
 		{
 			r, e := mt.addNode(tx, newLeaf)
 			if e != nil {
-				fmt.Println("err on NodeTypeEmpty mt.addNode ")
+				fmt.Println("err on NodeTypeEmpty mt.addNode ", e)
 			}
 			return r, e
 		}
@@ -308,6 +322,7 @@ func (mt *MerkleTree) addLeaf(tx db.Tx, newLeaf *Node, key *smt.Hash,
 			newNodeMiddle = NewNodeMiddle(nextKey, n.ChildR)
 		}
 		if err != nil {
+			fmt.Printf("addLeaf:GetNode err %v level %v\n", err, lvl)
 			return nil, err
 		}
 		// Update the node to reflect the modified child
@@ -338,6 +353,9 @@ func (mt *MerkleTree) addNode(tx db.Tx, n *Node) (*smt.Hash, error) {
 		if !bytes.Equal(oldV, v) {
 			return nil, ErrNodeKeyAlreadyExists
 		}
+	} else if err == db.ErrNotFound {
+		// expected, do nothing
+		//return nil, ErrKeyNotFound
 	}
 	err = tx.Put(k[:], v)
 	return k, err
@@ -550,6 +568,8 @@ func (mt *MerkleTree) UpdateWord(kPreimage, vPreimage *smt.Byte32) (*CircomProce
 	if err == ErrKeyNotFound {
 		err = mt.Add(k, v, kPreimage, vPreimage[:])
 		return nil, err
+	} else if err != nil {
+		fmt.Printf("UpdateWord err %v", err)
 	}
 	return proof, err
 }
@@ -562,7 +582,12 @@ func (mt *MerkleTree) UpdateVarWord(kPreimage *smt.Byte32, vHash *big.Int, vPrei
 	proof, err := mt.Update(k, vHash, kPreimage, vPreimage[:])
 	if err == ErrKeyNotFound {
 		err = mt.Add(k, vHash, kPreimage, vPreimage[:])
+		if err != nil {
+			log.Error("UpdateVarWord, inset still failed %v root %v", err, mt.rootKey)
+		}
 		return nil, err
+	} else if err != nil {
+		log.Error("UpdateVarWord err %v %v", err, reflect.TypeOf(err))
 	}
 	return proof, err
 }
@@ -735,12 +760,16 @@ func (mt *MerkleTree) dbInsert(tx db.Tx, k []byte, t NodeType, data []byte) erro
 
 // GetNode gets a node by key from the MT.  Empty nodes are not stored in the
 // tree; they are all the same and assumed to always exist.
+// <del>for non exist key, return (NewNodeEmpty(), nil)</del>
 func (mt *MerkleTree) GetNode(key *smt.Hash) (*Node, error) {
 	if bytes.Equal(key[:], smt.HashZero[:]) {
 		return NewNodeEmpty(), nil
 	}
 	nBytes, err := mt.db.Get(key[:])
-	if err != nil {
+	if err == db.ErrNotFound {
+		//return NewNodeEmpty(), nil
+		return nil, ErrKeyNotFound
+	} else if err != nil {
 		return nil, err
 	}
 	return NewNodeFromBytes(nBytes)

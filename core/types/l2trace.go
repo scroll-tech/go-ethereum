@@ -1,6 +1,8 @@
 package types
 
 import (
+	"math/big"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
@@ -18,6 +20,8 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
+	// Sender's account proof.
+	Sender *AccountProofWrapper `json:"sender,omitempty"`
 	// It's exist only when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
@@ -108,38 +112,50 @@ type StructLogRes struct {
 }
 
 type ExtraData struct {
-	// CREATE | CREATE2: sender address
-	From *common.Address `json:"from,omitempty"`
-	// CREATE: sender nonce
-	Nonce *uint64 `json:"nonce,omitempty"`
-	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code_hash, stack.nth_last(1) address’s code_hash]
-	CodeHashList []common.Hash `json:"codeHashList,omitempty"`
+	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code, stack.nth_last(1) address’s code]
+	CodeList [][]byte `json:"codeList,omitempty"`
 	// SSTORE | SLOAD: [storageProof]
 	// SELFDESTRUCT: [contract address’s accountProof, stack.nth_last(0) address’s accountProof]
 	// SELFBALANCE: [contract address’s accountProof]
 	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
-	// CREATE | CREATE2: [created contract address’s accountProof]
+	// CREATE | CREATE2: [sender's accountProof, created contract address’s accountProof]
 	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) address’s accountProof]
-	ProofList [][]string `json:"proofList,omitempty"`
+	ProofList []*AccountProofWrapper `json:"proofList,omitempty"`
+}
+
+type AccountProofWrapper struct {
+	Address common.Address       `json:"address,omitempty"`
+	Nonce   uint64               `json:"nonce,omitempty"`
+	Balance *big.Int             `json:"balance,omitempty"`
+	Proof   []string             `json:"proof,omitempty"`
+	Storage *StorageProofWrapper `json:"storage,omitempty"` // StorageProofWrapper can be empty if irrelated to storage operation
+}
+
+// while key & value can also be retrieved from StructLogRes.Storage,
+// we still stored in here for roller's processing convenience.
+type StorageProofWrapper struct {
+	Key   string   `json:"key,omitempty"`
+	Value string   `json:"value,omitempty"`
+	Proof []string `json:"proof,omitempty"`
 }
 
 // NewExtraData create, init and return ExtraData
 func NewExtraData() *ExtraData {
 	return &ExtraData{
-		CodeHashList: make([]common.Hash, 0),
-		ProofList:    make([][]string, 0),
+		CodeList:  make([][]byte, 0),
+		ProofList: make([]*AccountProofWrapper, 0),
 	}
 }
 
 // SealExtraData doesn't show empty fields.
 func (e *ExtraData) SealExtraData() *ExtraData {
-	if len(e.CodeHashList) == 0 {
-		e.CodeHashList = nil
+	if len(e.CodeList) == 0 {
+		e.CodeList = nil
 	}
 	if len(e.ProofList) == 0 {
 		e.ProofList = nil
 	}
-	if e.From == nil && e.Nonce == nil && e.CodeHashList == nil && e.ProofList == nil {
+	if e.CodeList == nil && e.ProofList == nil {
 		return nil
 	}
 	return e

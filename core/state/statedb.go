@@ -18,7 +18,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -338,7 +337,7 @@ func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, 
 	var proof proofList
 	trie := s.StorageTrie(a)
 	if trie == nil {
-		return proof, errors.New("storage trie for requested address does not exist")
+		return proof, fmt.Errorf("storage trie for requested address does not exist")
 	}
 	err := trie.Prove(key.Bytes(), 0, &proof)
 	return proof, err

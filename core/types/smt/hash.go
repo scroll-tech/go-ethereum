@@ -58,11 +58,15 @@ func (h *Hash) BigInt() *big.Int {
 	return new(big.Int).SetBytes(ReverseByteOrder(h[:]))
 }
 
-// Bytes returns the []byte representation of the *Hash, which always is 32
+// Bytes returns the little endian []byte representation of the *Hash, which always is 32
 // bytes length.
 func (h *Hash) Bytes() []byte {
-	bi := new(big.Int).SetBytes(h[:]).Bytes()
-	return ReverseByteOrder(bi[:])
+	buf := make([]byte, 32)
+	bi := new(big.Int).SetBytes(h[:])
+	bi.FillBytes(buf)
+	result := ReverseByteOrder(buf[:])
+
+	return result
 }
 
 func (h *Hash) Bytes2() []byte {

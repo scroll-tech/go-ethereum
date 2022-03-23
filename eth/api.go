@@ -525,11 +525,11 @@ func (api *PrivateDebugAPI) getModifiedAccounts(startBlock, endBlock *types.Bloc
 	}
 	triedb := api.eth.BlockChain().StateCache().TrieDB()
 
-	oldTrie, err := trie.NewSecure(startBlock.Root(), triedb)
+	oldTrie, err := trie.NewSecureBinaryTrie(startBlock.Root(), triedb)
 	if err != nil {
 		return nil, err
 	}
-	newTrie, err := trie.NewSecure(endBlock.Root(), triedb)
+	newTrie, err := trie.NewSecureBinaryTrie(endBlock.Root(), triedb)
 	if err != nil {
 		return nil, err
 	}

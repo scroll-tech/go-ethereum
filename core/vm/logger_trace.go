@@ -70,7 +70,7 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 	// Get account proof.
 	proof, err := getWrappedProofForAddr(l, scope.Contract.Address())
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+		extraData.ProofList = append(extraData.ProofList, proof)
 		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
@@ -89,7 +89,7 @@ func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *
 	address := common.BytesToAddress(stackvalue.Bytes())
 	proof, err := getWrappedProofForAddr(l, address)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+		extraData.ProofList = append(extraData.ProofList, proof)
 		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
@@ -106,7 +106,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
 		proof, err := getWrappedProofForAddr(l, address)
 		if err == nil {
-			extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+			extraData.ProofList = append(extraData.ProofList, proof)
 			l.states[scope.Contract.Address()] = struct{}{}
 		}
 		return err
@@ -118,7 +118,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	address := scope.Contract.CallerAddress
 	proof, err := getWrappedProofForAddr(l, address)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, encodeProof(proof))
+		extraData.ProofList = append(extraData.ProofList, proof)
 		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err

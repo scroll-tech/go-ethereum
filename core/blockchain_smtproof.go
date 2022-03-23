@@ -142,7 +142,7 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 
 	underlayerDb := memorydb.New()
 
-	smt, err := trie.NewSecure(
+	smt, err := trie.NewSecureBinaryTrie(
 		*storage.RootBefore,
 		trie.NewDatabase(underlayerDb),
 	)
@@ -164,6 +164,35 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 	}, nil
 }
 
+func getAccountProof(l *types.StructLogRes) *types.AccountProofWrapper {
+	if exData := l.ExtraData; exData == nil {
+		return nil
+	} else if len(exData.ProofList) == 0 {
+		return nil
+	} else {
+		return exData.ProofList[0]
+	}
+}
+
+func getStorageProof(l *types.StructLogRes) []string {
+	if acc := getAccountProof(l); acc == nil {
+		return nil
+	} else if stg := acc.Storage; stg == nil {
+		return nil
+	} else {
+		return stg.Proof
+	}
+}
+
+func mustGetStorageProof(l *types.StructLogRes) []string {
+	ret := getStorageProof(l)
+	if ret == nil {
+		panic("No storage proof in log")
+	}
+
+	return ret
+}
+
 func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTrace, err error) {
 
 	out = new(types.StateTrace)
@@ -174,7 +203,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 	out.AccountUpdate = [2]*types.StateAccountL2{}
 
 	var storageBeforeProof, storageAfterProof proofList
-	if storageBeforeProof, err = proofListFromString(w.sstoreBefore.ExtraData.ProofList[0]); err != nil {
+	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(w.sstoreBefore)); err != nil {
 		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 
@@ -193,7 +222,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 		out.StateKeyBefore = k[:]
 	}
 
-	if storageAfterProof, err = proofListFromString(l.ExtraData.ProofList[0]); err != nil {
+	if storageAfterProof, err = proofListFromString(mustGetStorageProof(l)); err != nil {
 		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 

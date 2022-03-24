@@ -1367,6 +1367,10 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 			log.Error("build smt writer fail", "error", err)
 		} else if err = smtWriter.handleLogs(evmTrace.StructLogs); err != nil {
 			log.Error("handle logs for SMT fail", "error", err)
+		} else if err = smtWriter.handlePostTx(evmTrace.Storage.AccountsAfter); err != nil {
+			log.Error("handle post tx account state for SMT fail", "error", err)
+		} else if err = smtWriter.txFinal(evmTrace.Storage.RootAfter); err != nil {
+			log.Error("final tx verify fail", "error", err)
 		} else {
 			log.Info("write SMTTrace", "records", len(smtWriter.outTrace))
 			evmTrace.Storage.SMTTrace = smtWriter.outTrace

@@ -284,11 +284,13 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 
 	//update account
 	acc.Root = common.BytesToHash(out.StatePath[1].Root)
-	w.tracingSMT.TryUpdateAccount(w.currentContract.Bytes32(), acc)
+	if err = w.tracingSMT.TryUpdateAccount(w.currentContract.Bytes32(), acc); err != nil {
+		return nil, fmt.Errorf("update smt account state for SSTORE fail: %s", err)
+	}
 
 	err = w.tracingSMT.Prove(w.currentContract.Bytes(), 0, &proof)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("prove current address's AFTER state <%s> fail: %s", w.currentContract, err)
 	}
 
 	nAfter := decodeProofForMPTPath(proof, out.AccountPath[1])
@@ -344,5 +346,105 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 		}
 	}
 
+	return nil
+}
+
+//finally update account status which is not traced in logs (Nonce added, gasBuy, gasRefund etc)
+func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
+
+	for acc, buf := range accs {
+
+		accDataBefore, existed := w.tracingAccounts[acc]
+		if !existed {
+			return fmt.Errorf("account %s has not been traced in Log", acc)
+		}
+
+		addrBytes, _ := hexutil.Decode(acc)
+
+		accData, err := types.UnmarshalStateAccount(buf)
+		if err != nil {
+			return fmt.Errorf("unmarshall acc fail: %s", err)
+		}
+
+		if !bytes.Equal(accData.Root[:], accDataBefore.Root[:]) {
+			panic(fmt.Errorf("accout %s is not cleaned for state", acc))
+		}
+
+		if accData.Balance.Cmp(accDataBefore.Balance) == 0 &&
+			accData.Nonce == accDataBefore.Nonce {
+
+			log.Debug("no update for traced account", "account", acc)
+			continue
+		}
+
+		out := new(types.StateTrace)
+		//account trie
+		out.Address = addrBytes
+		out.AccountPath = [2]*types.SMTPath{{}, {}}
+		out.CommonStateRoot = accData.Root.Bytes()
+		out.AccountUpdate = [2]*types.StateAccountL2{
+			{
+				Nonce:    int(accDataBefore.Nonce),
+				Balance:  accDataBefore.Balance.Bytes(),
+				CodeHash: accDataBefore.CodeHash,
+			},
+			{
+				Nonce:    int(accData.Nonce),
+				Balance:  accData.Balance.Bytes(),
+				CodeHash: accData.CodeHash,
+			},
+		}
+
+		var proof proofList
+		if err := w.tracingSMT.Prove(addrBytes, 0, &proof); err != nil {
+			return fmt.Errorf("prove <%s>'s BEFORE state fail: %s", acc, err)
+		}
+
+		nBefore := decodeProofForMPTPath(proof, out.AccountPath[0])
+		// SSTORE must has account existed
+		if nBefore.Type != trie.NodeTypeLeaf {
+			return fmt.Errorf("state has no valid %s account", acc)
+		}
+
+		if err := w.tracingSMT.Prove(addrBytes, 0, &proof); err != nil {
+			return fmt.Errorf("prove <%s>'s AFTER state fail: %s", acc, err)
+		}
+
+		if err := w.tracingSMT.TryUpdateAccount(common.BytesToAddress(addrBytes).Bytes32(), accData); err != nil {
+			return fmt.Errorf("update smt account state fail: %s", err)
+		}
+
+		nAfter := decodeProofForMPTPath(proof, out.AccountPath[1])
+		// SSTORE must has account existed
+		if nAfter.Type != trie.NodeTypeLeaf {
+			return fmt.Errorf("state has no valid %s account", acc)
+		}
+
+		if !bytes.Equal(nAfter.KeyPreimage[:], nBefore.KeyPreimage[:]) {
+			panic(fmt.Errorf("not expected address of before state from trie proof: %x vs %x", nBefore.KeyPreimage[:], nAfter.KeyPreimage[:]))
+		} else if !bytes.Equal(nAfter.KeyPreimage[:common.AddressLength], addrBytes) {
+			panic(fmt.Errorf("not expected address from trie proof: %x vs %x", addrBytes, nAfter.KeyPreimage[:]))
+		}
+
+		if k, err := nAfter.Key(); err != nil {
+			return fmt.Errorf("invalid account node key: %s", err)
+		} else {
+			out.AccountKey = k[:]
+		}
+
+		w.tracingAccounts[acc] = accData
+		w.outTrace = append(w.outTrace, out)
+	}
+
+	return nil
+}
+
+func (w *smtProofWriter) txFinal(rootAfter *common.Hash) error {
+
+	root := w.tracingSMT.Hash()
+
+	if !bytes.Equal(rootAfter[:], root[:]) {
+		return fmt.Errorf("unmatched root: expected %x but we have %x", rootAfter[:], root)
+	}
 	return nil
 }

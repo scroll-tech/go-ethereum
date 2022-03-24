@@ -54,6 +54,7 @@ func traceLastNAddressCode(n int) traceFunc {
 
 // traceStorageProof get contract's storage proof at storage_address
 func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+
 	if scope.Stack.len() == 0 {
 		return nil
 	}

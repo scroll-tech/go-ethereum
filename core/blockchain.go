@@ -1361,10 +1361,15 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())
 		}
 
-		if smtWriter, err := newSMTProofWriter(evmTrace.Storage); err != nil {
+		if evmTrace.Storage == nil {
+			log.Info("no storage in trace")
+		} else if smtWriter, err := newSMTProofWriter(evmTrace.Storage); err != nil {
 			log.Error("build smt writer fail", "error", err)
 		} else if err = smtWriter.handleLogs(evmTrace.StructLogs); err != nil {
 			log.Error("handle logs for SMT fail", "error", err)
+		} else {
+			log.Info("write SMTTrace", "records", len(smtWriter.outTrace))
+			evmTrace.Storage.SMTTrace = smtWriter.outTrace
 		}
 	}
 }

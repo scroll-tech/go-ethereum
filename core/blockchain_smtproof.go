@@ -54,11 +54,12 @@ func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map
 			if err != nil {
 				log.Warn("node has no valid key", "error", err)
 			} else {
-				bt := k.Bytes()
+				//notice: must consistent with trie/merkletree.go
+				bt := k[:]
 				db.Put(bt, buf)
 				if n.Type == trie.NodeTypeLeaf {
 					if acc, err := types.UnmarshalStateAccount(n.ValuePreimage); err == nil {
-						addr := common.BytesToAddress(n.KeyPreimage[:])
+						addr := common.BytesToAddress(n.KeyPreimage[:common.AddressLength])
 						addrs := addr.String()
 						if _, exist := accounts[addrs]; !exist {
 							//update an address, even the proof just point to another one (proof of unexist)
@@ -111,7 +112,8 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 				return n
 			}
 			if lastNode == nil {
-				path.Root = k[:]
+				//use the copy of REVERSEORDER of k[:]
+				path.Root = k.Bytes()
 			}
 			if n.Type == trie.NodeTypeMiddle {
 				if lastNode != nil {
@@ -193,7 +195,9 @@ func mustGetStorageProof(l *types.StructLogRes) []string {
 	return ret
 }
 
-func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTrace, err error) {
+func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.StructLogRes) (out *types.StateTrace, err error) {
+
+	log.Debug("handle SSTORE", "pc", l.Pc)
 
 	out = new(types.StateTrace)
 	//account trie
@@ -203,7 +207,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 	out.AccountUpdate = [2]*types.StateAccountL2{}
 
 	var storageBeforeProof, storageAfterProof proofList
-	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(w.sstoreBefore)); err != nil {
+	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(lBefore)); err != nil {
 		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 
@@ -226,7 +230,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 
-	sAfter := decodeProofForMPTPath(storageAfterProof, out.StatePath[0])
+	sAfter := decodeProofForMPTPath(storageAfterProof, out.StatePath[1])
 	if sAfter.Type == trie.NodeTypeLeaf {
 		out.StateUpdate[1] = &types.StateStorageL2{
 			Key:   sAfter.KeyPreimage[:],
@@ -244,7 +248,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 	var proof proofList
 	err = w.tracingSMT.Prove(w.currentContract.Bytes(), 0, &proof)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("prove current address's BEFORE state <%s> fail: %s", w.currentContract, err)
 	}
 
 	nBefore := decodeProofForMPTPath(proof, out.AccountPath[0])
@@ -263,19 +267,14 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 		panic(fmt.Errorf("unexpected storage root before: [%s] vs [%s]", acc.Root, out.StatePath[0].Root))
 	}
 
+	//notice in SSTORE Account has no other update
 	out.AccountUpdate[0] = &types.StateAccountL2{
-		Address:  w.currentContract.Bytes(),
 		Nonce:    int(acc.Nonce),
 		Balance:  acc.Balance.Bytes(),
 		CodeHash: acc.CodeHash,
 	}
 
-	out.AccountUpdate[1] = &types.StateAccountL2{
-		Address:  w.currentContract.Bytes(),
-		Nonce:    int(acc.Nonce),
-		Balance:  acc.Balance.Bytes(),
-		CodeHash: acc.CodeHash,
-	}
+	out.AccountUpdate[1] = out.AccountUpdate[0]
 
 	if k, err := nBefore.Key(); err != nil {
 		return nil, fmt.Errorf("invalid accountBefore node key: %s", err)
@@ -285,7 +284,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 
 	//update account
 	acc.Root = common.BytesToHash(out.StatePath[1].Root)
-	w.tracingSMT.Update(w.currentContract.Bytes(), acc.MarshalBytes())
+	w.tracingSMT.TryUpdateAccount(w.currentContract.Bytes32(), acc)
 
 	err = w.tracingSMT.Prove(w.currentContract.Bytes(), 0, &proof)
 	if err != nil {
@@ -296,8 +295,10 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 
 	if nAfter.Type != trie.NodeTypeLeaf {
 		panic(fmt.Errorf("contract has no valid %s account AFTER SSTORE", w.currentContract))
-	} else if !bytes.Equal(nAfter.KeyPreimage[:], w.currentContract.Bytes()) {
+	} else if !bytes.Equal(nAfter.KeyPreimage[:common.AddressLength], w.currentContract.Bytes()) {
 		panic(fmt.Errorf("not expected address AFTER SSTORE: %s vs %x", w.currentContract, nAfter.KeyPreimage[:]))
+	} else {
+		out.Address = w.currentContract.Bytes()
 	}
 
 	if k, err := nAfter.Key(); err != nil {
@@ -313,23 +314,30 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (out *types.StateTr
 func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 	// now trace every OP which could cause changes on state:
 	for i, sLog := range logs {
-
 		switch sLog.Op {
 		case "SSTORE":
 			if sLog.Storage != nil {
+				if w.sstoreBefore != nil {
+					log.Warn("wrong layout in SSTORE", "pc", w.sstoreBefore.Pc)
+				}
 				//the before state
 				logCpy := sLog
 				w.sstoreBefore = &logCpy
 			} else {
 				//the after state, can handle (but check before)
-				if w.sstoreBefore == nil || w.sstoreBefore.Pc != sLog.Pc {
+				lBefore := w.sstoreBefore
+				w.sstoreBefore = nil
+				if lBefore == nil || lBefore.Pc != sLog.Pc {
 					return fmt.Errorf("unmatch SSTORE log found [%d]", sLog.Pc)
 				}
 
-				if t, err := w.handleSStore(&sLog); err == nil {
+				if t, err := w.handleSStore(lBefore, &sLog); err == nil {
 					t.Index = i
 					w.outTrace = append(w.outTrace, t)
+				} else {
+					return fmt.Errorf("handle SSTORE log fail: %s", err)
 				}
+
 			}
 
 		default:

@@ -49,7 +49,6 @@ type SMTPath struct {
 // StateAccountL2 is the represent of StateAccount in L2 circuit
 // Notice in L2 we have different hash scheme against StateAccount.MarshalByte
 type StateAccountL2 struct {
-	Address  hexutil.Bytes `json:"address"`
 	Nonce    int           `json:"nonce"`
 	Balance  hexutil.Bytes `json:"balance"` //just the common hex expression of integer (big-endian)
 	CodeHash hexutil.Bytes `json:"codeHash,omitempty"`
@@ -67,6 +66,7 @@ type StateTrace struct {
 	// which log the trace is responded for, -1 indicate not caused
 	// by opcode (like gasRefund, coinbase, setNonce, etc)
 	Index            int                `json:"index"`
+	Address          hexutil.Bytes      `json:"address"`
 	AccountKey       hexutil.Bytes      `json:"accountKey"`
 	AccountPath      [2]*SMTPath        `json:"accountPath"`
 	AccountUpdate    [2]*StateAccountL2 `json:"accountUpdate"`
@@ -94,6 +94,8 @@ type StorageRes struct {
 	// along with account proof's inside structLogs, form the
 	// dataset required by tracing the updates of account trie
 	ProofTo []hexutil.Bytes `json:"proofTo,omitempty"`
+
+	SMTTrace []*StateTrace `json:"smtTrace,omitempty"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

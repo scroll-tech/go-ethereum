@@ -163,7 +163,6 @@ func (l *StructLogger) Reset() {
 func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
 
-	log.Info("capture address", "from", from, "to", to)
 	pf, err := env.StateDB.GetProof(from)
 	if err != nil {
 		log.Warn("Failed to get base proof", "from", from.String(), " err", err)
@@ -241,7 +240,6 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			l.storage[contract.Address()][address] = value
 			storage = l.storage[contract.Address()].Copy()
 
-			log.Info("SSTORE", "contract", contract.Address())
 			extraData = types.NewExtraData()
 			if err := traceStorageProof(l, scope, extraData); err != nil {
 				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)

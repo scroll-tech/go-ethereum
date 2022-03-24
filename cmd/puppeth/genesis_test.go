@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,9 +69,6 @@ func TestAlethSturebyConverter(t *testing.T) {
 
 // Tests the go-ethereum to Parity chainspec conversion for the Stureby testnet.
 func TestParitySturebyConverter(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
 	blob, err := ioutil.ReadFile("testdata/stureby_geth.json")
 	if err != nil {
 		t.Fatalf("could not read file: %v", err)

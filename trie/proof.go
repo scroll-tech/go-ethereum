@@ -175,7 +175,7 @@ func (mt *MerkleTree) Prove(k *big.Int, fromLevel uint, proofDb ethdb.KeyValueWr
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
 func (t *SecureBinaryTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
-	word := smt.NewByte32FromBytesPaddingZero(key)
+	word := smt.NewByte32FromBytesPadding(key)
 	k, err := word.Hash()
 	if err != nil {
 		return err
@@ -252,7 +252,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 			return nil, err
 		}
 
-		word := smt.NewByte32FromBytesPaddingZero(key)
+		word := smt.NewByte32FromBytesPadding(key)
 		k, err := word.Hash()
 		if err != nil {
 			return nil, err

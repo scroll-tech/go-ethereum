@@ -18,6 +18,7 @@ package trie
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func makeSMTProvers(mt *MerkleTree) []func(key []byte) *memorydb.Database {
 
 	// Create a direct trie based Merkle prover
 	provers = append(provers, func(key []byte) *memorydb.Database {
-		word := smt.NewByte32FromBytesPaddingZero(key)
+		word := smt.NewByte32FromBytesPadding(key)
 		k, err := word.Hash()
 		if err != nil {
 			panic(err)
@@ -53,7 +54,7 @@ func makeSMTProvers(mt *MerkleTree) []func(key []byte) *memorydb.Database {
 }
 
 func verifyValue(vHash []byte, vPreimage []byte) bool {
-	hv, err := smt.NewByte32FromBytesPaddingZero(vPreimage).Hash()
+	hv, err := smt.NewByte32FromBytesPadding(vPreimage).Hash()
 	if err != nil {
 		panic(err)
 	}
@@ -62,27 +63,32 @@ func verifyValue(vHash []byte, vPreimage []byte) bool {
 
 func TestSMTOneElementProof(t *testing.T) {
 	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
-	mt.UpdateWord(smt.NewByte32FromBytesPaddingZero([]byte("k")), smt.NewByte32FromBytesPaddingZero([]byte("v")))
+	_, err := mt.UpdateWord(
+		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("k"), 32)),
+		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("v"), 32)),
+	)
+	assert.Nil(t, err)
 	for i, prover := range makeSMTProvers(mt) {
-		proof := prover([]byte("k"))
+		keyBytes := bytes.Repeat([]byte("k"), 32)
+		proof := prover(keyBytes)
 		if proof == nil {
 			t.Fatalf("prover %d: nil proof", i)
 		}
 		if proof.Len() != 2 {
 			t.Errorf("prover %d: proof should have 1+1 element (including the magic kv)", i)
 		}
-		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), []byte("k"), proof)
+		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), keyBytes, proof)
 		if err != nil {
 			t.Fatalf("prover %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
 		}
-		if !verifyValue(val, []byte("v")) {
+		if !verifyValue(val, bytes.Repeat([]byte("v"), 32)) {
 			t.Fatalf("prover %d: verified value mismatch: want 'k'", i)
 		}
 	}
 }
 
 func TestSMTProof(t *testing.T) {
-	mt, vals := randomSMT(500)
+	mt, vals := randomSMT(t, 500)
 	root := mt.Root()
 	for i, prover := range makeSMTProvers(mt) {
 		for _, kv := range vals {
@@ -102,7 +108,7 @@ func TestSMTProof(t *testing.T) {
 }
 
 func TestSMTBadProof(t *testing.T) {
-	mt, vals := randomSMT(500)
+	mt, vals := randomSMT(t, 500)
 	root := mt.Root()
 	for i, prover := range makeSMTProvers(mt) {
 		for _, kv := range vals {
@@ -133,17 +139,22 @@ func TestSMTBadProof(t *testing.T) {
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
 	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
-	mt.UpdateWord(smt.NewByte32FromBytesPaddingZero([]byte("k")), smt.NewByte32FromBytesPaddingZero([]byte("v")))
+	_, err := mt.UpdateWord(
+		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("k"), 20)),
+		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("v"), 20)),
+	)
+	assert.Nil(t, err)
 
 	prover := makeSMTProvers(mt)[0]
 
 	for i, key := range []string{"a", "j", "l", "z"} {
-		proof := prover([]byte(key))
+		keyBytes := bytes.Repeat([]byte(key), 32)
+		proof := prover(keyBytes)
 
 		if proof.Len() != 2 {
 			t.Errorf("test %d: proof should have 2 element (with magic kv)", i)
 		}
-		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), []byte(key), proof)
+		val, err := VerifyProof(common.BytesToHash(mt.Root().Bytes()), keyBytes, proof)
 		if err != nil {
 			t.Fatalf("test %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
 		}
@@ -153,7 +164,7 @@ func TestSMTMissingKeyProof(t *testing.T) {
 	}
 }
 
-func randomSMT(n int) (*MerkleTree, map[string]*kv) {
+func randomSMT(t *testing.T, n int) (*MerkleTree, map[string]*kv) {
 	mt, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
 	if err != nil {
 		panic(err)
@@ -161,17 +172,20 @@ func randomSMT(n int) (*MerkleTree, map[string]*kv) {
 	vals := make(map[string]*kv)
 	for i := byte(0); i < 100; i++ {
 
-		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
-		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), []byte{i}, false}
+		value := &kv{common.LeftPadBytes([]byte{i}, 32), bytes.Repeat([]byte{i}, 32), false}
+		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), bytes.Repeat([]byte{i}, 32), false}
 
-		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value.k), smt.NewByte32FromBytesPaddingZero(value.v))
-		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value2.k), smt.NewByte32FromBytesPaddingZero(value2.v))
+		_, err = mt.UpdateWord(smt.NewByte32FromBytesPadding(value.k), smt.NewByte32FromBytesPadding(value.v))
+		assert.Nil(t, err)
+		_, err = mt.UpdateWord(smt.NewByte32FromBytesPadding(value2.k), smt.NewByte32FromBytesPadding(value2.v))
+		assert.Nil(t, err)
 		vals[string(value.k)] = value
 		vals[string(value2.k)] = value2
 	}
 	for i := 0; i < n; i++ {
 		value := &kv{randBytes(32), randBytes(20), false}
-		mt.UpdateWord(smt.NewByte32FromBytesPaddingZero(value.k), smt.NewByte32FromBytesPaddingZero(value.v))
+		_, err = mt.UpdateWord(smt.NewByte32FromBytesPadding(value.k), smt.NewByte32FromBytesPadding(value.v))
+		assert.Nil(t, err)
 		vals[string(value.k)] = value
 	}
 

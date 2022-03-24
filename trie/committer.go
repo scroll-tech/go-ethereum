@@ -19,10 +19,16 @@ package trie
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"golang.org/x/crypto/sha3"
 )
+
+// leafChanSize is the size of the leafCh. It's a pretty arbitrary number, to allow
+// some parallelism but not incur too much memory overhead.
+const leafChanSize = 200
 
 // leaf represents a trie leaf value
 type leaf struct {
@@ -43,6 +49,27 @@ type committer struct {
 
 	onleaf LeafCallback
 	leafCh chan *leaf
+}
+
+// committers live in a global sync.Pool
+var committerPool = sync.Pool{
+	New: func() interface{} {
+		return &committer{
+			tmp: make(sliceBuffer, 0, 550), // cap is as large as a full fullNode.
+			sha: sha3.NewLegacyKeccak256().(crypto.KeccakState),
+		}
+	},
+}
+
+// newCommitter creates a new committer or picks one from the pool.
+func newCommitter() *committer {
+	return committerPool.Get().(*committer)
+}
+
+func returnCommitterToPool(h *committer) {
+	h.onleaf = nil
+	h.leafCh = nil
+	committerPool.Put(h)
 }
 
 // Commit collapses a node down into a hash node and inserts it into the database

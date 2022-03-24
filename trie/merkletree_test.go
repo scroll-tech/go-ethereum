@@ -98,13 +98,13 @@ func TestMerkleTree_AddUpdateGetWord(t *testing.T) {
 
 	node, err := mt.GetLeafNodeByWord(&smt.Byte32{1})
 	assert.Nil(t, err)
-	assert.Equal(t, &smt.Byte32{2}, node.ValuePreimage)
+	assert.Equal(t, (&smt.Byte32{2})[:], node.ValuePreimage)
 	node, err = mt.GetLeafNodeByWord(&smt.Byte32{3})
 	assert.Nil(t, err)
-	assert.Equal(t, &smt.Byte32{4}, node.ValuePreimage)
+	assert.Equal(t, (&smt.Byte32{4})[:], node.ValuePreimage)
 	node, err = mt.GetLeafNodeByWord(&smt.Byte32{5})
 	assert.Nil(t, err)
-	assert.Equal(t, &smt.Byte32{6}, node.ValuePreimage)
+	assert.Equal(t, (&smt.Byte32{6})[:], node.ValuePreimage)
 
 	_, err = mt.UpdateWord(&smt.Byte32{1}, &smt.Byte32{7})
 	assert.Nil(t, err)
@@ -115,11 +115,11 @@ func TestMerkleTree_AddUpdateGetWord(t *testing.T) {
 
 	node, err = mt.GetLeafNodeByWord(&smt.Byte32{1})
 	assert.Nil(t, err)
-	assert.Equal(t, &smt.Byte32{7}, node.ValuePreimage)
+	assert.Equal(t, (&smt.Byte32{7})[:], node.ValuePreimage)
 	node, err = mt.GetLeafNodeByWord(&smt.Byte32{3})
 	assert.Nil(t, err)
-	assert.Equal(t, &smt.Byte32{8}, node.ValuePreimage)
+	assert.Equal(t, (&smt.Byte32{8})[:], node.ValuePreimage)
 	node, err = mt.GetLeafNodeByWord(&smt.Byte32{5})
 	assert.Nil(t, err)
-	assert.Equal(t, &smt.Byte32{9}, node.ValuePreimage)
+	assert.Equal(t, (&smt.Byte32{9})[:], node.ValuePreimage)
 }

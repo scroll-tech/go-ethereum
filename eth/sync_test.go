@@ -33,6 +33,7 @@ func TestFastSyncDisabling66(t *testing.T) { testFastSyncDisabling(t, eth.ETH66)
 // Tests that fast sync gets disabled as soon as a real block is successfully
 // imported into the blockchain.
 func testFastSyncDisabling(t *testing.T, protocol uint) {
+	t.Skip("sync not needed for layer2")
 	t.Parallel()
 
 	// Create an empty handler and ensure it's in fast sync mode

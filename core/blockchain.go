@@ -142,8 +142,9 @@ var defaultCacheConfig = &CacheConfig{
 	TrieCleanLimit: 256,
 	TrieDirtyLimit: 256,
 	TrieTimeLimit:  5 * time.Minute,
-	SnapshotLimit:  256,
-	SnapshotWait:   true,
+	// snapshot is disabled now, because it needs Trie.Prove, which is not implemented yet
+	SnapshotLimit: 0,
+	SnapshotWait:  true,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis

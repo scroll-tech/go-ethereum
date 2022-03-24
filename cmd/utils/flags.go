@@ -33,8 +33,8 @@ import (
 	"text/template"
 	"time"
 
-	gopsutil "github.com/shirou/gopsutil/mem"
 	pcsclite "github.com/gballet/go-libpcsclite"
+	gopsutil "github.com/shirou/gopsutil/mem"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/scroll-tech/go-ethereum/accounts"

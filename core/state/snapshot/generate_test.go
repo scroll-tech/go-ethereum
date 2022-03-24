@@ -35,9 +35,7 @@ import (
 
 // Tests that snapshot generation from an empty database.
 func TestGeneration(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("var-len kv not supported")
 	// We can't use statedb to make a test trie (circular dependency), so make
 	// a fake one manually. We're going with a small account trie of 3 accounts,
 	// two of which also has the same 3-slot storage trie attached.
@@ -95,9 +93,7 @@ func hashData(input []byte) common.Hash {
 
 // Tests that snapshot generation with existent flat state.
 func TestGenerateExistentState(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("var-len kv not supported")
 	// We can't use statedb to make a test trie (circular dependency), so make
 	// a fake one manually. We're going with a small account trie of 3 accounts,
 	// two of which also has the same 3-slot storage trie attached.
@@ -249,9 +245,7 @@ func (t *testHelper) Generate() (common.Hash, *diskLayer) {
 //   - extra slots in the middle
 //   - extra slots in the end
 func TestGenerateExistentStateWithWrongStorage(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("var-len kv not supported")
 	helper := newHelper()
 	stRoot := helper.makeStorageTrie([]string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
 

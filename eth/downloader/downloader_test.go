@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -722,9 +721,7 @@ func TestBoundedHeavyForkedSync66Full(t *testing.T) {
 	testBoundedHeavyForkedSync(t, eth.ETH66, FullSync)
 }
 func TestBoundedHeavyForkedSync66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testBoundedHeavyForkedSync(t, eth.ETH66, FastSync)
 }
 func TestBoundedHeavyForkedSync66Light(t *testing.T) {
@@ -866,9 +863,7 @@ func testMultiProtoSync(t *testing.T, protocol uint, mode SyncMode) {
 // made, and instead the header should be assembled into a whole block in itself.
 func TestEmptyShortCircuit66Full(t *testing.T) { testEmptyShortCircuit(t, eth.ETH66, FullSync) }
 func TestEmptyShortCircuit66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testEmptyShortCircuit(t, eth.ETH66, FastSync)
 }
 func TestEmptyShortCircuit66Light(t *testing.T) { testEmptyShortCircuit(t, eth.ETH66, LightSync) }
@@ -949,9 +944,7 @@ func testMissingHeaderAttack(t *testing.T, protocol uint, mode SyncMode) {
 // detects the invalid numbering.
 func TestShiftedHeaderAttack66Full(t *testing.T) { testShiftedHeaderAttack(t, eth.ETH66, FullSync) }
 func TestShiftedHeaderAttack66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testShiftedHeaderAttack(t, eth.ETH66, FastSync)
 }
 func TestShiftedHeaderAttack66Light(t *testing.T) { testShiftedHeaderAttack(t, eth.ETH66, LightSync) }

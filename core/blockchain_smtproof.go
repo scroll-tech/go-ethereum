@@ -353,6 +353,19 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 	return nil
 }
 
+/*
+func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
+	accData, err := types.UnmarshalStateAccount(buf)
+	if err != nil {
+		return fmt.Errorf("unmarshall created acc fail: %s", err)
+	}
+
+
+
+	return nil
+}
+*/
+
 //finally update account status which is not traced in logs (Nonce added, gasBuy, gasRefund etc)
 func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
 

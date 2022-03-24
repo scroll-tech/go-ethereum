@@ -95,6 +95,10 @@ type StorageRes struct {
 	// dataset required by tracing the updates of account trie
 	ProofTo []hexutil.Bytes `json:"proofTo,omitempty"`
 
+	// AccountCreated record the account in case tx is create
+	// (for creating inside contracts we handle CREATE op)
+	AccountCreated hexutil.Bytes `json:"accountCreated,omitempty"`
+
 	SMTTrace []*StateTrace `json:"smtTrace,omitempty"`
 }
 

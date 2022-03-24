@@ -124,11 +124,12 @@ type StructLogger struct {
 	cfg LogConfig
 	env *EVM
 
-	states       map[common.Address]struct{}
-	storage      map[common.Address]Storage
-	accFromProof [][]byte
-	accToProof   [][]byte
-	stateRoot    *common.Hash
+	states         map[common.Address]struct{}
+	storage        map[common.Address]Storage
+	accFromProof   [][]byte
+	accToProof     [][]byte
+	createdAccount *types.StateAccount
+	stateRoot      *common.Hash
 
 	logs   []StructLog
 	output []byte
@@ -157,11 +158,21 @@ func (l *StructLogger) Reset() {
 	l.stateRoot = nil
 	l.accFromProof = nil
 	l.accToProof = nil
+	l.createdAccount = nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
+
+	if create {
+		//Notice codeHash is set AFTER CreateTx has exited, so heree codeHash is still empty
+		l.createdAccount = &types.StateAccount{
+			//Nonce is 1 after EIP158, so we query it from stateDb
+			Nonce:   env.StateDB.GetNonce(to),
+			Balance: value,
+		}
+	}
 
 	pf, err := env.StateDB.GetProof(from)
 	if err != nil {
@@ -327,6 +338,8 @@ func (l *StructLogger) UpdatedAccounts() (output map[common.Address]*types.State
 
 // BaseProofs returns the account proof of 2 accounts which must being mutated in tx (from and to)
 func (l *StructLogger) BaseProofs() ([][]byte, [][]byte) { return l.accFromProof, l.accToProof }
+
+func (l *StructLogger) CreatedAccount() *types.StateAccount { return l.createdAccount }
 
 // StateRootBefore returns the root of state before execution begins
 func (l *StructLogger) StateRootBefore() *common.Hash { return l.stateRoot }

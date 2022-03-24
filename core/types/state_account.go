@@ -49,6 +49,9 @@ type StateAccount struct {
 //  ))
 func (s *StateAccount) Hash() (*big.Int, error) {
 	nonce := new(big.Int).SetUint64(s.Nonce)
+	if s.Balance == nil {
+		s.Balance = new(big.Int)
+	}
 	hash1, err := poseidon.Hash([]*big.Int{nonce, s.Balance})
 	if err != nil {
 		return nil, err

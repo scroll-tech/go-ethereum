@@ -121,6 +121,10 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 				}
 				lastNode = n
 			} else {
+				path.Path = append(path.Path, types.SMTPathNode{
+					Value:    k[:],
+					Silbling: make([]byte, common.HashLength),
+				})
 				return n
 			}
 		}

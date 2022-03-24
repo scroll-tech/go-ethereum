@@ -163,11 +163,11 @@ func (t *SecureBinaryTrie) TryDelete(key []byte) error {
 // previously used to store a value.
 func (t *SecureBinaryTrie) GetKey(kHashBytes []byte) []byte {
 	// TODO: use a kv cache in memory
-	kHash, err := smt.NewHashFromBytes(kHashBytes)
+	kHash, err := smt.NewBigIntFromHashBytes(kHashBytes)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
-	node, err := t.tree.GetNode(kHash)
+	node, err := t.tree.GetLeafNode(kHash)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}

@@ -18,7 +18,6 @@ package trie
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -105,20 +104,10 @@ func TestEmptySync(t *testing.T) {
 
 // Tests that given a root hash, a trie can sync iteratively on a single thread,
 // requesting retrieval tasks and returning all of them in one go.
-func TestIterativeSyncIndividual(t *testing.T) { testIterativeSync(t, 1, false) }
-func TestIterativeSyncBatched(t *testing.T)    { testIterativeSync(t, 100, false) }
-func TestIterativeSyncIndividualByPath(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
-	testIterativeSync(t, 1, true)
-}
-func TestIterativeSyncBatchedByPath(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
-	testIterativeSync(t, 100, true)
-}
+func TestIterativeSyncIndividual(t *testing.T)       { testIterativeSync(t, 1, false) }
+func TestIterativeSyncBatched(t *testing.T)          { testIterativeSync(t, 100, false) }
+func TestIterativeSyncIndividualByPath(t *testing.T) { testIterativeSync(t, 1, true) }
+func TestIterativeSyncBatchedByPath(t *testing.T)    { testIterativeSync(t, 100, true) }
 
 func testIterativeSync(t *testing.T, count int, bypath bool) {
 	t.Skip("sync disabled for layer2")

@@ -1393,6 +1393,7 @@ func TestEIP155Transition(t *testing.T) {
 }
 
 func TestEIP161AccountRemoval(t *testing.T) {
+	t.Skip("skipping EIP161 account removal test")
 	// Configure and generate a sample block chain
 	var (
 		db      = rawdb.NewMemoryDatabase()
@@ -2800,6 +2801,7 @@ func TestDeleteRecreateAccount(t *testing.T) {
 // Expected outcome is that _all_ slots are cleared from A, due to the selfdestruct,
 // and then the new slots exist
 func TestDeleteRecreateSlotsAcrossManyBlocks(t *testing.T) {
+	t.Skip("skip TestDeleteRecreateSlotsAcrossManyBlocks")
 	var (
 		// Generate a canonical chain to act as the main dataset
 		engine = ethash.NewFaker()

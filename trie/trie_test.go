@@ -81,13 +81,10 @@ func TestMissingRoot(t *testing.T) {
 	}
 }
 
-func TestMissingNodeDisk(t *testing.T) { testMissingNode(t, false) }
-func TestMissingNodeMemonly(t *testing.T) {
-	testMissingNode(t, true)
-}
+func TestMissingNodeDisk(t *testing.T)    { testMissingNode(t, false) }
+func TestMissingNodeMemonly(t *testing.T) { testMissingNode(t, true) }
 
 func testMissingNode(t *testing.T, memonly bool) {
-	//t.Skip("disable this test now due to trie.Commit removed")
 	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 

@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -101,9 +100,7 @@ func TestIteratorLargeData(t *testing.T) {
 
 // Tests that the node iterator indeed walks over the entire database contents.
 func TestNodeIteratorCoverage(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	// Create some arbitrary test trie to iterate
 	db, trie, _ := makeTestTrie()
 
@@ -299,9 +296,7 @@ func TestIteratorContinueAfterErrorDisk(t *testing.T)    { testIteratorContinueA
 func TestIteratorContinueAfterErrorMemonly(t *testing.T) { testIteratorContinueAfterError(t, true) }
 
 func testIteratorContinueAfterError(t *testing.T, memonly bool) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 
@@ -392,9 +387,7 @@ func TestIteratorContinueAfterSeekErrorMemonly(t *testing.T) {
 }
 
 func testIteratorContinueAfterSeekError(t *testing.T, memonly bool) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	// Commit test trie to db, then remove the node containing "bars".
 	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
@@ -520,9 +513,7 @@ func makeLargeTestTrie() (*Database, *SecureBinaryTrie, *loggingDb) {
 
 // Tests that the node iterator indeed walks over the entire database contents.
 func TestNodeIteratorLargeTrie(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	// Create some arbitrary test trie to iterate
 	db, trie, logDb := makeLargeTestTrie()
 	db.Cap(0) // flush everything

@@ -379,6 +379,7 @@ func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
 
 		out := new(types.StateTrace)
 		//account trie
+		out.Index = -1
 		out.Address = addrBytes
 		out.AccountPath = [2]*types.SMTPath{{}, {}}
 		out.CommonStateRoot = accData.Root.Bytes()

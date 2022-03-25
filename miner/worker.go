@@ -820,6 +820,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		StructLogs:  vm.FormatLogs(tracer.StructLogs()),
 		Storage: &types.StorageRes{
 			RootBefore:     tracer.StateRootBefore(),
+			ToAddress:      tracer.ToAddress(),
 			RootAfter:      &finalRoot,
 			AccountCreated: createdAcc,
 			ProofFrom:      proofFromEnc,

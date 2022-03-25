@@ -22,6 +22,7 @@ type ExecutionResult struct {
 	ReturnValue string `json:"returnValue,omitempty"`
 	// Sender's account proof.
 	Sender *AccountProofWrapper `json:"sender,omitempty"`
+
 	// It's exist only when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
@@ -95,6 +96,8 @@ type StorageRes struct {
 	// dataset required by tracing the updates of account trie
 	ProofTo []hexutil.Bytes `json:"proofTo,omitempty"`
 
+	// The To Address, would be valid even when tx is creation
+	ToAddress common.Address `json:"to"`
 	// AccountCreated record the account in case tx is create
 	// (for creating inside contracts we handle CREATE op)
 	AccountCreated hexutil.Bytes `json:"accountCreated,omitempty"`

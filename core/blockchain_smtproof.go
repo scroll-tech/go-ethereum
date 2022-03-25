@@ -111,18 +111,25 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 			if lastNode == nil {
 				//use the copy of REVERSEORDER of k[:]
 				path.Root = k.Bytes()
-			}
-			if n.Type == trie.NodeTypeMiddle {
-				if lastNode != nil {
-					appendSMTPath(lastNode, k[:], path)
-				}
-				lastNode = n
 			} else {
-				path.Path = append(path.Path, types.SMTPathNode{
-					Value:    k[:],
-					Silbling: make([]byte, common.HashLength),
-				})
+				appendSMTPath(lastNode, k[:], path)
+			}
+			switch n.Type {
+			case trie.NodeTypeMiddle:
+				lastNode = n
+			case trie.NodeTypeLeaf:
+				path.Leaf = &types.SMTPathNode{
+					//TODO: not sure here should be Bytes (reverse order) or Bytes2
+					Value:    n.Entry[1].Bytes(),
+					Silbling: n.Entry[0][:],
+				}
 				return n
+			case trie.NodeTypeEmpty:
+				//we omit the empty node because it can be derived from the
+				//0 hash in parent
+				return n
+			default:
+				panic(fmt.Errorf("unknown node type %d", n.Type))
 			}
 		}
 	}
@@ -249,11 +256,8 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 		if err := verifyAccountNode(addr, nBefore); err != nil {
 			return nil, fmt.Errorf("state BEFORE has no valid account: %s", err)
 		}
-	}
-	if k, err := nBefore.Key(); err != nil {
-		return nil, fmt.Errorf("invalid account node before key: %s", err)
-	} else {
-		out.AccountKeyBefore = k[:]
+		// we have ensured the nBefore has a key corresponding to the query one
+		out.AccountKey = nBefore.Entry[0].Bytes2()
 	}
 
 	if accData != nil {
@@ -278,12 +282,10 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 		if err := verifyAccountNode(addr, nAfter); err != nil {
 			return nil, fmt.Errorf("state AFTER has no valid account: %s", err)
 		}
-	}
-
-	if k, err := nAfter.Key(); err != nil {
-		return nil, fmt.Errorf("invalid account node key: %s", err)
-	} else {
-		out.AccountKey = k[:]
+		if out.AccountKey == nil {
+			out.AccountKey = nAfter.Entry[0].Bytes2()
+		}
+		//now accountKey must has been filled
 	}
 
 	return out, nil

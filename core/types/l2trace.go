@@ -44,7 +44,8 @@ type SMTPathNode struct {
 // SMTPath is the whole path of SMT
 type SMTPath struct {
 	Root hexutil.Bytes `json:"root"`
-	Path []SMTPathNode `json:"path"` //from top to leaf
+	Path []SMTPathNode `json:"path"`           //path start from top
+	Leaf *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf
 }
 
 // StateAccountL2 is the represent of StateAccount in L2 circuit
@@ -66,17 +67,15 @@ type StateStorageL2 struct {
 type StateTrace struct {
 	// which log the trace is responded for, -1 indicate not caused
 	// by opcode (like gasRefund, coinbase, setNonce, etc)
-	Index            int                `json:"index"`
-	Address          hexutil.Bytes      `json:"address"`
-	AccountKey       hexutil.Bytes      `json:"accountKey"`
-	AccountPath      [2]*SMTPath        `json:"accountPath"`
-	AccountUpdate    [2]*StateAccountL2 `json:"accountUpdate"`
-	StateKey         hexutil.Bytes      `json:"stateKey,omitempty"`
-	CommonStateRoot  hexutil.Bytes      `json:"commonStateRoot,omitempty"` //CommonStateRoot is used if there is no state update
-	StatePath        [2]*SMTPath        `json:"statePath,omitempty"`
-	StateUpdate      [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
-	AccountKeyBefore hexutil.Bytes      `json:"accountKeyBefore,omitempty"`
-	StateKeyBefore   hexutil.Bytes      `json:"stateKeyBefore,omitempty"`
+	Index           int                `json:"index"`
+	Address         hexutil.Bytes      `json:"address"`
+	AccountKey      hexutil.Bytes      `json:"accountKey"`
+	AccountPath     [2]*SMTPath        `json:"accountPath"`
+	AccountUpdate   [2]*StateAccountL2 `json:"accountUpdate"`
+	StateKey        hexutil.Bytes      `json:"stateKey,omitempty"`
+	CommonStateRoot hexutil.Bytes      `json:"commonStateRoot,omitempty"` //CommonStateRoot is used if there is no state update
+	StatePath       [2]*SMTPath        `json:"statePath,omitempty"`
+	StateUpdate     [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
 }
 
 // StorageRes stores data required in storage circuit

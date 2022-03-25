@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -659,9 +658,7 @@ func testForkedSync(t *testing.T, protocol uint, mode SyncMode) {
 // corrently and is not dropped.
 func TestHeavyForkedSync66Full(t *testing.T) { testHeavyForkedSync(t, eth.ETH66, FullSync) }
 func TestHeavyForkedSync66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testHeavyForkedSync(t, eth.ETH66, FastSync)
 }
 func TestHeavyForkedSync66Light(t *testing.T) { testHeavyForkedSync(t, eth.ETH66, LightSync) }
@@ -695,9 +692,7 @@ func testHeavyForkedSync(t *testing.T, protocol uint, mode SyncMode) {
 // long dead chains.
 func TestBoundedForkedSync66Full(t *testing.T) { testBoundedForkedSync(t, eth.ETH66, FullSync) }
 func TestBoundedForkedSync66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testBoundedForkedSync(t, eth.ETH66, FastSync)
 }
 func TestBoundedForkedSync66Light(t *testing.T) { testBoundedForkedSync(t, eth.ETH66, LightSync) }
@@ -732,9 +727,7 @@ func TestBoundedHeavyForkedSync66Full(t *testing.T) {
 	testBoundedHeavyForkedSync(t, eth.ETH66, FullSync)
 }
 func TestBoundedHeavyForkedSync66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testBoundedHeavyForkedSync(t, eth.ETH66, FastSync)
 }
 func TestBoundedHeavyForkedSync66Light(t *testing.T) {
@@ -787,9 +780,7 @@ func TestInactiveDownloader63(t *testing.T) {
 // Tests that a canceled download wipes all previously accumulated state.
 func TestCancel66Full(t *testing.T) { testCancel(t, eth.ETH66, FullSync) }
 func TestCancel66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testCancel(t, eth.ETH66, FastSync)
 }
 func TestCancel66Light(t *testing.T) { testCancel(t, eth.ETH66, LightSync) }
@@ -847,9 +838,7 @@ func testMultiSynchronisation(t *testing.T, protocol uint, mode SyncMode) {
 // and not wreak havoc on other nodes in the network.
 func TestMultiProtoSynchronisation66Full(t *testing.T) { testMultiProtoSync(t, eth.ETH66, FullSync) }
 func TestMultiProtoSynchronisation66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testMultiProtoSync(t, eth.ETH66, FastSync)
 }
 func TestMultiProtoSynchronisation66Light(t *testing.T) { testMultiProtoSync(t, eth.ETH66, LightSync) }
@@ -886,9 +875,7 @@ func testMultiProtoSync(t *testing.T, protocol uint, mode SyncMode) {
 // made, and instead the header should be assembled into a whole block in itself.
 func TestEmptyShortCircuit66Full(t *testing.T) { testEmptyShortCircuit(t, eth.ETH66, FullSync) }
 func TestEmptyShortCircuit66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testEmptyShortCircuit(t, eth.ETH66, FastSync)
 }
 func TestEmptyShortCircuit66Light(t *testing.T) { testEmptyShortCircuit(t, eth.ETH66, LightSync) }
@@ -941,9 +928,7 @@ func testEmptyShortCircuit(t *testing.T, protocol uint, mode SyncMode) {
 // stalling the downloader by feeding gapped header chains.
 func TestMissingHeaderAttack66Full(t *testing.T) { testMissingHeaderAttack(t, eth.ETH66, FullSync) }
 func TestMissingHeaderAttack66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testMissingHeaderAttack(t, eth.ETH66, FastSync)
 }
 func TestMissingHeaderAttack66Light(t *testing.T) { testMissingHeaderAttack(t, eth.ETH66, LightSync) }
@@ -974,9 +959,7 @@ func testMissingHeaderAttack(t *testing.T, protocol uint, mode SyncMode) {
 // detects the invalid numbering.
 func TestShiftedHeaderAttack66Full(t *testing.T) { testShiftedHeaderAttack(t, eth.ETH66, FullSync) }
 func TestShiftedHeaderAttack66Fast(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("sync not needed for layer2")
 	testShiftedHeaderAttack(t, eth.ETH66, FastSync)
 }
 func TestShiftedHeaderAttack66Light(t *testing.T) { testShiftedHeaderAttack(t, eth.ETH66, LightSync) }

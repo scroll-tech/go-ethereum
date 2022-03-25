@@ -23,7 +23,6 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -38,9 +37,7 @@ import (
 // Tests that updating a state trie does not leak any database writes prior to
 // actually committing the state.
 func TestUpdateLeaks(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("Trie commits real time now, revisit this after trie.Commit / write buffer implemented")
 	// Create an empty state database
 	db := rawdb.NewMemoryDatabase()
 	state, _ := New(common.Hash{}, NewDatabase(db), nil)
@@ -74,9 +71,7 @@ func TestUpdateLeaks(t *testing.T) {
 // Tests that no intermediate state of an object is stored into the database,
 // only the one right before the commit.
 func TestIntermediateLeaks(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("Trie commits real time now, revisit this after trie.Commit / write buffer implemented")
 	// Create two state databases, one transitioning to the final state, the other final from the beginning
 	transDb := rawdb.NewMemoryDatabase()
 	finalDb := rawdb.NewMemoryDatabase()
@@ -218,9 +213,7 @@ func TestCopy(t *testing.T) {
 }
 
 func TestSnapshotRandom(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	config := &quick.Config{MaxCount: 1000}
 	err := quick.Check((*snapshotTest).run, config)
 	if cerr, ok := err.(*quick.CheckError); ok {

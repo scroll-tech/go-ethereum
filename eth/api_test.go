@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -64,9 +63,7 @@ func (h resultHash) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 func (h resultHash) Less(i, j int) bool { return bytes.Compare(h[i].Bytes(), h[j].Bytes()) < 0 }
 
 func TestAccountRange(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	t.Parallel()
 
 	var (
@@ -138,9 +135,7 @@ func TestAccountRange(t *testing.T) {
 }
 
 func TestEmptyAccountRange(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	t.Parallel()
 
 	var (
@@ -164,9 +159,7 @@ func TestEmptyAccountRange(t *testing.T) {
 }
 
 func TestStorageRangeAt(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
+	t.Skip("node iterator not implemented")
 	t.Parallel()
 
 	// Create a state where account 0x010000... has a few storage entries.

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -451,9 +450,6 @@ func testTransactionPropagation(t *testing.T, protocol uint) {
 // challenge to validate each other's chains. Hash mismatches, or missing ones
 // during a fast sync should lead to the peer getting dropped.
 func TestCheckpointChallenge(t *testing.T) {
-	if os.Getenv("FULL_TEST") == "" {
-		t.Skip("Skipping failed test temporarily")
-	}
 	tests := []struct {
 		syncmode   downloader.SyncMode
 		checkpoint bool

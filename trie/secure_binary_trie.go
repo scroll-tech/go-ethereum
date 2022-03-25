@@ -157,6 +157,8 @@ func (t *SecureBinaryTrie) Delete(key []byte) {
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureBinaryTrie) TryDelete(key []byte) error {
 	return t.TryUpdate(key, []byte{})
+	//kPreimage := smt.NewByte32FromBytesPadding(key)
+	//return t.tree.DeleteWord(kPreimage)
 }
 
 // GetKey returns the preimage of a hashed key that was

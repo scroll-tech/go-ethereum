@@ -103,14 +103,18 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 		return nil, err
 	}
 
+	// l2geth: to trace storage, we need updated account trie root
 	// Update the state with pending changes.
+	statedb.IntermediateRoot(config.IsEIP158(blockNumber))
+
 	var root []byte
-	//  l2geth: to trace storage status we need PostState data (In fact what we need is the updated account trie)
-	//	if config.IsByzantium(blockNumber) {
-	//		statedb.Finalise(true)
-	//	} else {
-	root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
-	//	}
+	if config.IsByzantium(blockNumber) {
+		// no nothing
+		// so PostState in Receipt will be empty
+	} else {
+		root = statedb.GetRootHash().Bytes()
+	}
+
 	*usedGas += result.UsedGas
 
 	// If the result contains a revert reason, return it.
@@ -121,6 +125,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	// Create a new receipt for the transaction, storing the intermediate root and gas used
 	// by the tx.
 	receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas, ReturnValue: returnVal}
+
 	if result.Failed() {
 		receipt.Status = types.ReceiptStatusFailed
 	} else {

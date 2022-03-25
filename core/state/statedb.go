@@ -328,7 +328,7 @@ func (s *StateDB) GetRootHash() common.Hash {
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
 	var proof proofList
-	err := s.trie.Prove(addr.Bytes(), 0, &proof)
+	err := s.trie.Prove(addr.Bytes32(), 0, &proof)
 	return proof, err
 }
 

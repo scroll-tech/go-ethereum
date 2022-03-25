@@ -43,7 +43,7 @@ func proofListFromHex(proofs []hexutil.Bytes) proofList {
 	return out
 }
 
-func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map[string]*types.StateAccount) common.Address {
+func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map[string]*types.StateAccount) {
 	for _, buf := range proof {
 
 		n, err := trie.DecodeSMTProof(buf)
@@ -59,14 +59,13 @@ func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map
 				db.Put(bt, buf)
 				if n.Type == trie.NodeTypeLeaf {
 					if acc, err := types.UnmarshalStateAccount(n.ValuePreimage); err == nil {
-						addr := common.BytesToAddress(n.KeyPreimage[:common.AddressLength])
-						addrs := addr.String()
+						addrs := common.BytesToAddress(n.KeyPreimage[:common.AddressLength]).String()
 						if _, exist := accounts[addrs]; !exist {
 							//update an address, even the proof just point to another one (proof of unexist)
 							accounts[addrs] = acc
 						}
 
-						return addr
+						return
 					} else {
 						log.Warn("decode account bytes fail", "error", err)
 					}
@@ -75,8 +74,6 @@ func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map
 		}
 
 	}
-
-	return common.Address{}
 }
 
 func appendSMTPath(lastNode *trie.Node, k []byte, path *types.SMTPath) {
@@ -160,13 +157,13 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 
 	// start with from/to's data
 	decodeProofForAccounts(proofListFromHex(storage.ProofFrom), underlayerDb, accounts)
-	contractAddr := decodeProofForAccounts(proofListFromHex(storage.ProofTo), underlayerDb, accounts)
+	decodeProofForAccounts(proofListFromHex(storage.ProofTo), underlayerDb, accounts)
 
 	return &smtProofWriter{
 		underlayerDb:    underlayerDb,
 		tracingSMT:      smt,
 		tracingAccounts: accounts,
-		currentContract: contractAddr,
+		currentContract: storage.ToAddress,
 	}, nil
 }
 
@@ -199,121 +196,173 @@ func mustGetStorageProof(l *types.StructLogRes) []string {
 	return ret
 }
 
-func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.StructLogRes) (out *types.StateTrace, err error) {
+func verifyAccountNode(addr *common.Address, n *trie.Node) error {
 
-	log.Debug("handle SSTORE", "pc", l.Pc)
+	if n.Type != trie.NodeTypeLeaf {
+		return fmt.Errorf("not leaf type")
+	} else if !bytes.Equal(n.KeyPreimage[:common.AddressLength], addr.Bytes()) {
+		return fmt.Errorf("unexpected address: %s vs %x", addr, n.KeyPreimage[:])
+	}
 
-	out = new(types.StateTrace)
+	return nil
+}
+
+// update account state, and return the corresponding trace object which
+// is still opened for more infos
+func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore, accData *types.StateAccount) (*types.StateTrace, error) {
+
+	out := new(types.StateTrace)
 	//account trie
+	out.Address = addr.Bytes()
 	out.AccountPath = [2]*types.SMTPath{{}, {}}
-	out.StatePath = [2]*types.SMTPath{{}, {}}
-	out.StateUpdate = [2]*types.StateStorageL2{}
-	out.AccountUpdate = [2]*types.StateAccountL2{}
-
-	var storageBeforeProof, storageAfterProof proofList
-	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(lBefore)); err != nil {
-		return nil, fmt.Errorf("invalid hex string: %s", err)
+	//fill dummy
+	out.AccountUpdate = [2]*types.StateAccountL2{
+		{
+			Balance: []byte{0},
+		},
+		{
+			Balance: []byte{0},
+		},
 	}
-
-	sBefore := decodeProofForMPTPath(storageBeforeProof, out.StatePath[0])
-	if sBefore.Type == trie.NodeTypeLeaf {
-		out.StateUpdate[0] = &types.StateStorageL2{
-			Key:   sBefore.KeyPreimage[:],
-			Value: sBefore.ValuePreimage[:],
+	if accData != nil {
+		out.AccountUpdate[1] = &types.StateAccountL2{
+			Nonce:    int(accData.Nonce),
+			Balance:  accData.Balance.Bytes(),
+			CodeHash: accData.CodeHash,
 		}
-	} else {
-		out.StateUpdate[0] = &types.StateStorageL2{}
 	}
-	if k, err := sBefore.Key(); err != nil {
-		return nil, fmt.Errorf("invalid stateBefore node key: %s", err)
-	} else {
-		out.StateKeyBefore = k[:]
-	}
-
-	if storageAfterProof, err = proofListFromString(mustGetStorageProof(l)); err != nil {
-		return nil, fmt.Errorf("invalid hex string: %s", err)
-	}
-
-	sAfter := decodeProofForMPTPath(storageAfterProof, out.StatePath[1])
-	if sAfter.Type == trie.NodeTypeLeaf {
-		out.StateUpdate[1] = &types.StateStorageL2{
-			Key:   sAfter.KeyPreimage[:],
-			Value: sAfter.ValuePreimage[:],
+	if accDataBefore != nil {
+		out.AccountUpdate[0] = &types.StateAccountL2{
+			Nonce:    int(accDataBefore.Nonce),
+			Balance:  accDataBefore.Balance.Bytes(),
+			CodeHash: accDataBefore.CodeHash,
 		}
-	} else {
-		return nil, fmt.Errorf("no valid leaf node after SSTORE")
-	}
-	if k, err := sAfter.Key(); err != nil {
-		return nil, fmt.Errorf("invalid stateAfter node key: %s", err)
-	} else {
-		out.StateKey = k[:]
 	}
 
 	var proof proofList
-	err = w.tracingSMT.Prove(w.currentContract.Bytes(), 0, &proof)
-	if err != nil {
-		return nil, fmt.Errorf("prove current address's BEFORE state <%s> fail: %s", w.currentContract, err)
+	if err := w.tracingSMT.Prove(addr.Bytes32(), 0, &proof); err != nil {
+		return nil, fmt.Errorf("prove BEFORE state fail: %s", err)
 	}
 
 	nBefore := decodeProofForMPTPath(proof, out.AccountPath[0])
-	// SSTORE must has account existed
-	if nBefore.Type != trie.NodeTypeLeaf {
-		return nil, fmt.Errorf("contract has no valid %s account for SSTORE", w.currentContract)
+	if accDataBefore != nil {
+		if err := verifyAccountNode(addr, nBefore); err != nil {
+			return nil, fmt.Errorf("state BEFORE has no valid account: %s", err)
+		}
 	}
+	if k, err := nBefore.Key(); err != nil {
+		return nil, fmt.Errorf("invalid account node before key: %s", err)
+	} else {
+		out.AccountKeyBefore = k[:]
+	}
+
+	if accData != nil {
+		if err := w.tracingSMT.TryUpdateAccount(addr.Bytes32(), accData); err != nil {
+			return nil, fmt.Errorf("update smt account state fail: %s", err)
+		}
+		w.tracingAccounts[addr.String()] = accData
+	} else {
+		if err := w.tracingSMT.TryDelete(addr.Bytes32()); err != nil {
+			return nil, fmt.Errorf("delete smt account state fail: %s", err)
+		}
+		delete(w.tracingAccounts, addr.String())
+	}
+
+	proof = proofList{}
+	if err := w.tracingSMT.Prove(addr.Bytes32(), 0, &proof); err != nil {
+		return nil, fmt.Errorf("prove AFTER state fail: %s", err)
+	}
+
+	nAfter := decodeProofForMPTPath(proof, out.AccountPath[1])
+	if accData != nil {
+		if err := verifyAccountNode(addr, nAfter); err != nil {
+			return nil, fmt.Errorf("state AFTER has no valid account: %s", err)
+		}
+	}
+
+	if k, err := nAfter.Key(); err != nil {
+		return nil, fmt.Errorf("invalid account node key: %s", err)
+	} else {
+		out.AccountKey = k[:]
+	}
+
+	return out, nil
+}
+
+func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.StructLogRes) (*types.StateTrace, error) {
+
+	log.Debug("handle SSTORE", "pc", l.Pc)
 
 	acc, existed := w.tracingAccounts[w.currentContract.String()]
 	if !existed {
 		return nil, fmt.Errorf("contract has no %s account for trace", w.currentContract)
 	}
 
-	//check
-	if !bytes.Equal(acc.Root[:], out.StatePath[0].Root) {
-		panic(fmt.Errorf("unexpected storage root before: [%s] vs [%s]", acc.Root, out.StatePath[0].Root))
+	statePath := [2]*types.SMTPath{{}, {}}
+	stateUpdate := [2]*types.StateStorageL2{}
+
+	var storageBeforeProof, storageAfterProof proofList
+	var err error
+	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(lBefore)); err != nil {
+		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 
-	//notice in SSTORE Account has no other update
-	out.AccountUpdate[0] = &types.StateAccountL2{
-		Nonce:    int(acc.Nonce),
-		Balance:  acc.Balance.Bytes(),
+	sBefore := decodeProofForMPTPath(storageBeforeProof, statePath[0])
+	if sBefore.Type == trie.NodeTypeLeaf {
+		stateUpdate[0] = &types.StateStorageL2{
+			Key:   sBefore.KeyPreimage[:],
+			Value: sBefore.ValuePreimage[:],
+		}
+	} else {
+		stateUpdate[0] = &types.StateStorageL2{}
+	}
+
+	//sanity check
+	if !bytes.Equal(acc.Root[:], statePath[0].Root) {
+		panic(fmt.Errorf("unexpected storage root before: [%s] vs [%s]", acc.Root, statePath[0].Root))
+	}
+
+	if storageAfterProof, err = proofListFromString(mustGetStorageProof(l)); err != nil {
+		return nil, fmt.Errorf("invalid hex string: %s", err)
+	}
+
+	sAfter := decodeProofForMPTPath(storageAfterProof, statePath[1])
+	if sAfter.Type == trie.NodeTypeLeaf {
+		stateUpdate[1] = &types.StateStorageL2{
+			Key:   sAfter.KeyPreimage[:],
+			Value: sAfter.ValuePreimage[:],
+		}
+	} else {
+		stateUpdate[1] = &types.StateStorageL2{}
+	}
+
+	accAfter := &types.StateAccount{
+		Nonce:    acc.Nonce,
+		Balance:  acc.Balance,
 		CodeHash: acc.CodeHash,
+		Root:     common.BytesToHash(statePath[1].Root),
 	}
 
-	out.AccountUpdate[1] = out.AccountUpdate[0]
-
-	if k, err := nBefore.Key(); err != nil {
-		return nil, fmt.Errorf("invalid accountBefore node key: %s", err)
-	} else {
-		out.AccountKeyBefore = k[:]
-	}
-
-	//update account
-	acc.Root = common.BytesToHash(out.StatePath[1].Root)
-	if err = w.tracingSMT.TryUpdateAccount(w.currentContract.Bytes32(), acc); err != nil {
-		return nil, fmt.Errorf("update smt account state for SSTORE fail: %s", err)
-	}
-
-	err = w.tracingSMT.Prove(w.currentContract.Bytes(), 0, &proof)
+	out, err := w.traceAccountUpdate(&w.currentContract, acc, accAfter)
 	if err != nil {
-		return nil, fmt.Errorf("prove current address's AFTER state <%s> fail: %s", w.currentContract, err)
+		return nil, fmt.Errorf("update account %s in SSTORE fail: %s", w.currentContract, err)
 	}
 
-	nAfter := decodeProofForMPTPath(proof, out.AccountPath[1])
-
-	if nAfter.Type != trie.NodeTypeLeaf {
-		panic(fmt.Errorf("contract has no valid %s account AFTER SSTORE", w.currentContract))
-	} else if !bytes.Equal(nAfter.KeyPreimage[:common.AddressLength], w.currentContract.Bytes()) {
-		panic(fmt.Errorf("not expected address AFTER SSTORE: %s vs %x", w.currentContract, nAfter.KeyPreimage[:]))
+	if k, err := sBefore.Key(); err != nil {
+		return nil, fmt.Errorf("invalid stateBefore node key: %s", err)
 	} else {
-		out.Address = w.currentContract.Bytes()
+		out.StateKeyBefore = k[:]
 	}
 
-	if k, err := nAfter.Key(); err != nil {
-		return nil, fmt.Errorf("invalid accountBefore node key: %s", err)
+	if k, err := sAfter.Key(); err != nil {
+		return nil, fmt.Errorf("invalid stateAfter node key: %s", err)
 	} else {
-		out.AccountKey = k[:]
+		out.StateKey = k[:]
 	}
 
-	return
+	out.StatePath = statePath
+	out.StateUpdate = stateUpdate
+	return out, nil
 }
 
 // Fill smtproof field for execResult
@@ -353,104 +402,55 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 	return nil
 }
 
-/*
 func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
+	if buf == nil {
+		return nil
+	}
+
 	accData, err := types.UnmarshalStateAccount(buf)
 	if err != nil {
 		return fmt.Errorf("unmarshall created acc fail: %s", err)
 	}
 
+	out, err := w.traceAccountUpdate(&w.currentContract, nil, accData)
+	if err != nil {
+		return fmt.Errorf("update account %s for creation fail: %s", w.currentContract, err)
+	}
 
+	out.CommonStateRoot = accData.Root[:]
+	w.outTrace = append(w.outTrace, out)
 
 	return nil
 }
-*/
 
 //finally update account status which is not traced in logs (Nonce added, gasBuy, gasRefund etc)
 func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
 
 	for acc, buf := range accs {
 
-		accDataBefore, existed := w.tracingAccounts[acc]
-		if !existed {
-			return fmt.Errorf("account %s has not been traced in Log", acc)
-		}
-
-		addrBytes, _ := hexutil.Decode(acc)
-
 		accData, err := types.UnmarshalStateAccount(buf)
 		if err != nil {
 			return fmt.Errorf("unmarshall acc fail: %s", err)
 		}
 
-		if !bytes.Equal(accData.Root[:], accDataBefore.Root[:]) {
+		accDataBefore, existed := w.tracingAccounts[acc]
+		// sanity check
+		if !existed {
+			panic(fmt.Errorf("account %s has not been traced in Log", acc))
+		} else if !bytes.Equal(accData.Root[:], accDataBefore.Root[:]) {
 			panic(fmt.Errorf("accout %s is not cleaned for state", acc))
 		}
 
-		if accData.Balance.Cmp(accDataBefore.Balance) == 0 &&
-			accData.Nonce == accDataBefore.Nonce {
+		addrBytes, _ := hexutil.Decode(acc)
+		addr := common.BytesToAddress(addrBytes)
 
-			log.Debug("no update for traced account", "account", acc)
-			continue
+		out, err := w.traceAccountUpdate(&addr, accDataBefore, accData)
+		if err != nil {
+			return fmt.Errorf("update account %s fail: %s", addr, err)
 		}
 
-		out := new(types.StateTrace)
-		//account trie
 		out.Index = -1
-		out.Address = addrBytes
-		out.AccountPath = [2]*types.SMTPath{{}, {}}
-		out.CommonStateRoot = accData.Root.Bytes()
-		out.AccountUpdate = [2]*types.StateAccountL2{
-			{
-				Nonce:    int(accDataBefore.Nonce),
-				Balance:  accDataBefore.Balance.Bytes(),
-				CodeHash: accDataBefore.CodeHash,
-			},
-			{
-				Nonce:    int(accData.Nonce),
-				Balance:  accData.Balance.Bytes(),
-				CodeHash: accData.CodeHash,
-			},
-		}
-
-		var proof proofList
-		if err := w.tracingSMT.Prove(addrBytes, 0, &proof); err != nil {
-			return fmt.Errorf("prove <%s>'s BEFORE state fail: %s", acc, err)
-		}
-
-		nBefore := decodeProofForMPTPath(proof, out.AccountPath[0])
-		// SSTORE must has account existed
-		if nBefore.Type != trie.NodeTypeLeaf {
-			return fmt.Errorf("state has no valid %s account", acc)
-		}
-
-		if err := w.tracingSMT.Prove(addrBytes, 0, &proof); err != nil {
-			return fmt.Errorf("prove <%s>'s AFTER state fail: %s", acc, err)
-		}
-
-		if err := w.tracingSMT.TryUpdateAccount(common.BytesToAddress(addrBytes).Bytes32(), accData); err != nil {
-			return fmt.Errorf("update smt account state fail: %s", err)
-		}
-
-		nAfter := decodeProofForMPTPath(proof, out.AccountPath[1])
-		// SSTORE must has account existed
-		if nAfter.Type != trie.NodeTypeLeaf {
-			return fmt.Errorf("state has no valid %s account", acc)
-		}
-
-		if !bytes.Equal(nAfter.KeyPreimage[:], nBefore.KeyPreimage[:]) {
-			panic(fmt.Errorf("not expected address of before state from trie proof: %x vs %x", nBefore.KeyPreimage[:], nAfter.KeyPreimage[:]))
-		} else if !bytes.Equal(nAfter.KeyPreimage[:common.AddressLength], addrBytes) {
-			panic(fmt.Errorf("not expected address from trie proof: %x vs %x", addrBytes, nAfter.KeyPreimage[:]))
-		}
-
-		if k, err := nAfter.Key(); err != nil {
-			return fmt.Errorf("invalid account node key: %s", err)
-		} else {
-			out.AccountKey = k[:]
-		}
-
-		w.tracingAccounts[acc] = accData
+		out.CommonStateRoot = accData.Root[:]
 		w.outTrace = append(w.outTrace, out)
 	}
 

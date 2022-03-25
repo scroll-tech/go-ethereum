@@ -1366,6 +1366,8 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 			log.Info("no storage in trace")
 		} else if smtWriter, err := newSMTProofWriter(evmTrace.Storage); err != nil {
 			log.Error("build smt writer fail", "error", err)
+		} else if err = smtWriter.handleAccountCreate(evmTrace.Storage.AccountCreated); err != nil {
+			log.Error("handle contract create for SMT fail", "error", err)
 		} else if err = smtWriter.handleLogs(evmTrace.StructLogs); err != nil {
 			log.Error("handle logs for SMT fail", "error", err)
 		} else if err = smtWriter.handlePostTx(evmTrace.Storage.AccountsAfter); err != nil {

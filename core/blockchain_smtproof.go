@@ -257,7 +257,7 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 			return nil, fmt.Errorf("state BEFORE has no valid account: %s", err)
 		}
 		// we have ensured the nBefore has a key corresponding to the query one
-		out.AccountKey = nBefore.Entry[0].Bytes2()
+		out.AccountKey = nBefore.Entry[0].Bytes()
 	}
 
 	if accData != nil {
@@ -283,7 +283,7 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 			return nil, fmt.Errorf("state AFTER has no valid account: %s", err)
 		}
 		if out.AccountKey == nil {
-			out.AccountKey = nAfter.Entry[0].Bytes2()
+			out.AccountKey = nAfter.Entry[0].Bytes()
 		}
 		//now accountKey must has been filled
 	}
@@ -335,7 +335,7 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 			Value: sAfter.ValuePreimage[:],
 		}
 	} else {
-		stateUpdate[1] = &types.StateStorageL2{}
+		return nil, fmt.Errorf("not a leaf node after SSTORE")
 	}
 
 	accAfter := &types.StateAccount{
@@ -350,18 +350,8 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 		return nil, fmt.Errorf("update account %s in SSTORE fail: %s", w.currentContract, err)
 	}
 
-	if k, err := sBefore.Key(); err != nil {
-		return nil, fmt.Errorf("invalid stateBefore node key: %s", err)
-	} else {
-		out.StateKeyBefore = k[:]
-	}
-
-	if k, err := sAfter.Key(); err != nil {
-		return nil, fmt.Errorf("invalid stateAfter node key: %s", err)
-	} else {
-		out.StateKey = k[:]
-	}
-
+	// use Bytes, so we obtain big-endian key which should be test from less-significant bit
+	out.StateKey = sAfter.Entry[0].Bytes()
 	out.StatePath = statePath
 	out.StateUpdate = stateUpdate
 	return out, nil
@@ -390,6 +380,12 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 
 				if t, err := w.handleSStore(lBefore, &sLog); err == nil {
 					t.Index = i
+					// sanity check
+					keyRec, _ := hexutil.Decode(lBefore.ExtraData.ProofList[0].Storage.Key)
+					if !bytes.Equal(keyRec, t.StateUpdate[1].Key) {
+						panic(fmt.Errorf("SSTORE do not have proof corresponding to its record, want %x but has %x", keyRec, []byte(t.StateUpdate[1].Key)))
+					}
+
 					w.outTrace = append(w.outTrace, t)
 				} else {
 					return fmt.Errorf("handle SSTORE log fail: %s", err)
@@ -419,6 +415,7 @@ func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
 		return fmt.Errorf("update account %s for creation fail: %s", w.currentContract, err)
 	}
 
+	out.Index = -1
 	out.CommonStateRoot = accData.Root[:]
 	w.outTrace = append(w.outTrace, out)
 

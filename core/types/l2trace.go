@@ -45,7 +45,7 @@ type SMTPathNode struct {
 type SMTPath struct {
 	Root hexutil.Bytes `json:"root"`
 	Path []SMTPathNode `json:"path"`           //path start from top
-	Leaf *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf
+	Leaf *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the silbling indicate key
 }
 
 // StateAccountL2 is the represent of StateAccount in L2 circuit

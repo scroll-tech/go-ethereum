@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/utils"
+
 	"github.com/scroll-tech/go-ethereum/common"
 )
 

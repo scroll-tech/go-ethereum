@@ -1,8 +1,9 @@
 package db
 
 import (
-	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/syndtr/goleveldb/leveldb"
+
+	"github.com/scroll-tech/go-ethereum/ethdb"
 )
 
 // EthKVStorage implements the Storage interface

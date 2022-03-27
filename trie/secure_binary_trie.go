@@ -200,8 +200,13 @@ func (t *SecureBinaryTrie) Hash() common.Hash {
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *SecureBinaryTrie) Copy() *SecureBinaryTrie {
-	cpy := *t
-	return &cpy
+	cpy, err := NewMerkleTreeWithRoot(t.tree.db, t.tree.rootKey, t.tree.maxLevels)
+	if err != nil {
+		panic("clone trie failed")
+	}
+	return &SecureBinaryTrie{
+		tree: cpy,
+	}
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration

@@ -2141,7 +2141,6 @@ func TestReorgToShorterRemovesCanonMappingHeaderChain(t *testing.T) {
 }
 
 func TestTransactionIndices(t *testing.T) {
-	t.Skip("FIXME")
 	// Configure and generate a sample block chain
 	var (
 		gendb   = rawdb.NewMemoryDatabase()

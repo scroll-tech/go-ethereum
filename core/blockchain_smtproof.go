@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
@@ -184,23 +185,37 @@ func getAccountProof(l *types.StructLogRes) *types.AccountProofWrapper {
 	}
 }
 
-func getStorageProof(l *types.StructLogRes) []string {
+func getStorage(l *types.StructLogRes) *types.StorageProofWrapper {
 	if acc := getAccountProof(l); acc == nil {
 		return nil
 	} else if stg := acc.Storage; stg == nil {
 		return nil
 	} else {
-		return stg.Proof
+		return stg
 	}
 }
 
-func mustGetStorageProof(l *types.StructLogRes) []string {
-	ret := getStorageProof(l)
+func mustGetStorageValue(l *types.StructLogRes) *big.Int {
+	ret := getStorage(l)
 	if ret == nil {
 		panic("No storage proof in log")
 	}
 
-	return ret
+	bt, err := hexutil.Decode(ret.Value)
+	if err != nil {
+		panic(err)
+	}
+
+	return big.NewInt(0).SetBytes(bt)
+}
+
+func mustGetStorageProof(l *types.StructLogRes) []string {
+	ret := getStorage(l)
+	if ret == nil {
+		panic("No storage proof in log")
+	}
+
+	return ret.Proof
 }
 
 func verifyAccountNode(addr *common.Address, n *trie.Node) error {
@@ -376,9 +391,9 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 				w.sstoreBefore = nil
 				if lBefore == nil || lBefore.Pc != sLog.Pc {
 					return fmt.Errorf("unmatch SSTORE log found [%d]", sLog.Pc)
-				}
-
-				if t, err := w.handleSStore(lBefore, &sLog); err == nil {
+				} else if mustGetStorageValue(lBefore).Cmp(big.NewInt(0)) == 0 {
+					log.Debug("skip store with 0 value")
+				} else if t, err := w.handleSStore(lBefore, &sLog); err == nil {
 					t.Index = i
 					// sanity check
 					keyRec, _ := hexutil.Decode(lBefore.ExtraData.ProofList[0].Storage.Key)

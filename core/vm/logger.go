@@ -206,7 +206,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		l.storage[contractAddress][storageKey] = storageValue
 		storage = l.storage[contractAddress].Copy()
 
-		if err := traceContractProof(l, scope, extraData); err != nil {
+		if err := traceStorageProof(l, scope, extraData); err != nil {
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 		}
 	}
@@ -231,7 +231,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 }
 
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
-	if !l.cfg.DisableStorage && op == SLOAD {
+	if !l.cfg.DisableStorage && op == SSTORE {
 		logLen := len(l.logs)
 		if logLen <= 0 {
 			log.Error("Failed to trace after_state for sstore", "err", "empty length log")
@@ -239,7 +239,7 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 		}
 
 		lastLog := l.logs[logLen-1]
-		if lastLog.Op != SLOAD {
+		if lastLog.Op != SSTORE {
 			log.Error("Failed to trace after_state for sstore", "err", "op mismatch")
 			return
 		}
@@ -249,7 +249,7 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 		}
 
 		contractAddress := scope.Contract.Address()
-		var storageKey common.Hash // TODO: how to get this?
+		storageKey := common.Hash(lastLog.Stack[len(lastLog.Stack)-1].Bytes32())
 		proof, err := getWrappedProofForStorage(l, contractAddress, storageKey)
 		if err != nil {
 			log.Error("Failed to trace after_state storage_proof for sstore", "err", err)

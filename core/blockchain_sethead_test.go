@@ -2145,27 +2145,27 @@ func verifyCutoff(t *testing.T, chain *BlockChain, canonical bool, inserted type
 
 			log.Debug("currently trie commits real time, so this test should be disabled")
 			continue
-			if header := chain.GetHeader(inserted[i-1].Hash(), uint64(i)); header != nil {
-				if canonical {
-					t.Errorf("Canonical header   #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain header   #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-			if block := chain.GetBlock(inserted[i-1].Hash(), uint64(i)); block != nil {
-				if canonical {
-					t.Errorf("Canonical block    #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain block    #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
-			if receipts := chain.GetReceiptsByHash(inserted[i-1].Hash()); receipts != nil {
-				if canonical {
-					t.Errorf("Canonical receipts #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				} else {
-					t.Errorf("Sidechain receipts #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
-				}
-			}
+			//if header := chain.GetHeader(inserted[i-1].Hash(), uint64(i)); header != nil {
+			//	if canonical {
+			//		t.Errorf("Canonical header   #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
+			//	} else {
+			//		t.Errorf("Sidechain header   #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
+			//	}
+			//}
+			//if block := chain.GetBlock(inserted[i-1].Hash(), uint64(i)); block != nil {
+			//	if canonical {
+			//		t.Errorf("Canonical block    #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
+			//	} else {
+			//		t.Errorf("Sidechain block    #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
+			//	}
+			//}
+			//if receipts := chain.GetReceiptsByHash(inserted[i-1].Hash()); receipts != nil {
+			//	if canonical {
+			//		t.Errorf("Canonical receipts #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
+			//	} else {
+			//		t.Errorf("Sidechain receipts #%2d [%x...] present after cap %d", inserted[i-1].Number(), inserted[i-1].Hash().Bytes()[:3], head)
+			//	}
+			//}
 		}
 	}
 }

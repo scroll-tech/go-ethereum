@@ -186,35 +186,35 @@ type Tree struct {
 func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash, async bool, rebuild bool, recovery bool) (*Tree, error) {
 	panic("snapshot disabled")
 	// Create a new, empty snapshot tree
-	snap := &Tree{
-		diskdb: diskdb,
-		triedb: triedb,
-		cache:  cache,
-		layers: make(map[common.Hash]snapshot),
-	}
-	if !async {
-		defer snap.waitBuild()
-	}
-	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	head, disabled, err := loadSnapshot(diskdb, triedb, cache, root, recovery)
-	if disabled {
-		log.Warn("Snapshot maintenance disabled (syncing)")
-		return snap, nil
-	}
-	if err != nil {
-		if rebuild {
-			log.Warn("Failed to load snapshot, regenerating", "err", err)
-			snap.Rebuild(root)
-			return snap, nil
-		}
-		return nil, err // Bail out the error, don't rebuild automatically.
-	}
-	// Existing snapshot loaded, seed all the layers
-	for head != nil {
-		snap.layers[head.Root()] = head
-		head = head.Parent()
-	}
-	return snap, nil
+	//snap := &Tree{
+	//	diskdb: diskdb,
+	//	triedb: triedb,
+	//	cache:  cache,
+	//	layers: make(map[common.Hash]snapshot),
+	//}
+	//if !async {
+	//	defer snap.waitBuild()
+	//}
+	//// Attempt to load a previously persisted snapshot and rebuild one if failed
+	//head, disabled, err := loadSnapshot(diskdb, triedb, cache, root, recovery)
+	//if disabled {
+	//	log.Warn("Snapshot maintenance disabled (syncing)")
+	//	return snap, nil
+	//}
+	//if err != nil {
+	//	if rebuild {
+	//		log.Warn("Failed to load snapshot, regenerating", "err", err)
+	//		snap.Rebuild(root)
+	//		return snap, nil
+	//	}
+	//	return nil, err // Bail out the error, don't rebuild automatically.
+	//}
+	//// Existing snapshot loaded, seed all the layers
+	//for head != nil {
+	//	snap.layers[head.Root()] = head
+	//	head = head.Parent()
+	//}
+	//return snap, nil
 }
 
 // waitBuild blocks until the snapshot finishes rebuilding. This method is meant

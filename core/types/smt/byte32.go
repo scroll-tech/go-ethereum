@@ -37,8 +37,8 @@ func NewByte32FromBytesPadding(b []byte) *Byte32 {
 
 func pkcs7PadByte32(b []byte) *Byte32 {
 
-	if b == nil || len(b) == 0 {
-		//panic("invalid input data")
+	if b == nil {
+		panic("invalid input data")
 	}
 	if len(b) > 32 {
 		panic("invalid input data")

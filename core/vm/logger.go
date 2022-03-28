@@ -241,7 +241,9 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			storage = l.storage[contract.Address()].Copy()
 
 			extraData = types.NewExtraData()
-			if err := traceStorageProof(l, scope, extraData); err != nil {
+			if proof, err := getWrappedProofForStorage(l, scope.Contract.Address(), address); err == nil {
+				extraData.ProofList = append(extraData.ProofList, proof)
+			} else {
 				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
 			}
 
@@ -255,7 +257,9 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			storage = l.storage[contract.Address()].Copy()
 
 			extraData = types.NewExtraData()
-			if err := traceStorageProof(l, scope, extraData); err != nil {
+			if proof, err := getWrappedProofForStorage(l, scope.Contract.Address(), address); err == nil {
+				extraData.ProofList = append(extraData.ProofList, proof)
+			} else {
 				log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
 			}
 		}

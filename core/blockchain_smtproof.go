@@ -153,6 +153,12 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 
 	underlayerDb := memorydb.New()
 
+	accounts := make(map[string]*types.StateAccount)
+
+	// start with from/to's data
+	decodeProofForAccounts(proofListFromHex(storage.ProofFrom), underlayerDb, accounts)
+	decodeProofForAccounts(proofListFromHex(storage.ProofTo), underlayerDb, accounts)
+
 	smt, err := trie.NewSecureBinaryTrie(
 		*storage.RootBefore,
 		trie.NewDatabase(underlayerDb),
@@ -160,12 +166,6 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("smt create failure: %s", err)
 	}
-
-	accounts := make(map[string]*types.StateAccount)
-
-	// start with from/to's data
-	decodeProofForAccounts(proofListFromHex(storage.ProofFrom), underlayerDb, accounts)
-	decodeProofForAccounts(proofListFromHex(storage.ProofTo), underlayerDb, accounts)
 
 	return &smtProofWriter{
 		underlayerDb:    underlayerDb,
@@ -193,20 +193,6 @@ func getStorage(l *types.StructLogRes) *types.StorageProofWrapper {
 	} else {
 		return stg
 	}
-}
-
-func mustGetStorageValue(l *types.StructLogRes) *big.Int {
-	ret := getStorage(l)
-	if ret == nil {
-		panic("No storage proof in log")
-	}
-
-	bt, err := hexutil.Decode(ret.Value)
-	if err != nil {
-		panic(err)
-	}
-
-	return big.NewInt(0).SetBytes(bt)
 }
 
 func mustGetStorageProof(l *types.StructLogRes) []string {
@@ -306,7 +292,13 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 	return out, nil
 }
 
+//handleSStore would return nil for a non-op (i.e. SSTORE a value identify to before state)
 func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.StructLogRes) (*types.StateTrace, error) {
+
+	if lBefore.Stack == nil || len(*lBefore.Stack) == 0 {
+		panic("unexpected log stack for SSTACK")
+	}
+	storeAddr := hexutil.MustDecodeBig((*lBefore.Stack)[len(*lBefore.Stack)-1])
 
 	log.Debug("handle SSTORE", "pc", l.Pc)
 
@@ -325,7 +317,8 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 	}
 
 	sBefore := decodeProofForMPTPath(storageBeforeProof, statePath[0])
-	if sBefore.Type == trie.NodeTypeLeaf {
+	log.Debug("decode for sstore before", "node", sBefore)
+	if sBefore.Type == trie.NodeTypeLeaf && storeAddr.Cmp(big.NewInt(0).SetBytes(sBefore.KeyPreimage[:])) == 0 {
 		stateUpdate[0] = &types.StateStorageL2{
 			Key:   sBefore.KeyPreimage[:],
 			Value: sBefore.ValuePreimage[:],
@@ -344,13 +337,20 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 	}
 
 	sAfter := decodeProofForMPTPath(storageAfterProof, statePath[1])
-	if sAfter.Type == trie.NodeTypeLeaf {
+	log.Debug("decode for sstore after", "node", sAfter)
+	if sAfter.Type == trie.NodeTypeLeaf && storeAddr.Cmp(big.NewInt(0).SetBytes(sAfter.KeyPreimage[:])) == 0 {
 		stateUpdate[1] = &types.StateStorageL2{
 			Key:   sAfter.KeyPreimage[:],
 			Value: sAfter.ValuePreimage[:],
 		}
-	} else {
+	} else if stateUpdate[0].Key != nil {
+		// fast detection for possible malformed data
 		return nil, fmt.Errorf("not a leaf node after SSTORE")
+	}
+
+	//skip non-op SSTORE trace
+	if bytes.Equal(statePath[1].Root, statePath[0].Root) {
+		return nil, nil
 	}
 
 	accAfter := &types.StateAccount{
@@ -391,17 +391,20 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 				w.sstoreBefore = nil
 				if lBefore == nil || lBefore.Pc != sLog.Pc {
 					return fmt.Errorf("unmatch SSTORE log found [%d]", sLog.Pc)
-				} else if mustGetStorageValue(lBefore).Cmp(big.NewInt(0)) == 0 {
-					log.Debug("skip store with 0 value")
-				} else if t, err := w.handleSStore(lBefore, &sLog); err == nil {
-					t.Index = i
-					// sanity check
-					keyRec, _ := hexutil.Decode(lBefore.ExtraData.ProofList[0].Storage.Key)
-					if !bytes.Equal(keyRec, t.StateUpdate[1].Key) {
-						panic(fmt.Errorf("SSTORE do not have proof corresponding to its record, want %x but has %x", keyRec, []byte(t.StateUpdate[1].Key)))
-					}
+				}
 
-					w.outTrace = append(w.outTrace, t)
+				if t, err := w.handleSStore(lBefore, &sLog); err == nil {
+					if t != nil {
+						t.Index = i
+						// sanity check
+						keyRec, _ := hexutil.Decode(lBefore.ExtraData.ProofList[0].Storage.Key)
+						if !bytes.Equal(keyRec, t.StateUpdate[1].Key) {
+							panic(fmt.Errorf("SSTORE do not have proof corresponding to its record, want %x but has %x", keyRec, []byte(t.StateUpdate[1].Key)))
+						}
+						w.outTrace = append(w.outTrace, t)
+					} else {
+						log.Debug("skip non-op SSTORE", "pc", lBefore.Pc)
+					}
 				} else {
 					return fmt.Errorf("handle SSTORE log fail: %s", err)
 				}

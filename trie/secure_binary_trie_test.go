@@ -18,11 +18,13 @@ package trie
 
 import (
 	"bytes"
-	"github.com/scroll-tech/go-ethereum/core/types/smt"
-	"github.com/stretchr/testify/assert"
 	"runtime"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"

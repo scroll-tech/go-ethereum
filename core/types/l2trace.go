@@ -24,7 +24,7 @@ type ExecutionResult struct {
 	// It's exist only when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
-	ByteCode   string         `json:"byteCode,omitempty"`
+	ByteCode string `json:"byteCode,omitempty"`
 
 	// Deprecated: The account's proof.
 	// Proof      []string       `json:"proof,omitempty"`

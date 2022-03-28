@@ -18,10 +18,11 @@ package trie
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	mrand "math/rand"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"

@@ -24,6 +24,7 @@ import (
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
@@ -157,6 +158,8 @@ func (t *SecureBinaryTrie) Delete(key []byte) {
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureBinaryTrie) TryDelete(key []byte) error {
 	return t.TryUpdate(key, []byte{})
+	//kPreimage := smt.NewByte32FromBytesPadding(key)
+	//return t.tree.DeleteWord(kPreimage)
 }
 
 // GetKey returns the preimage of a hashed key that was
@@ -197,8 +200,13 @@ func (t *SecureBinaryTrie) Hash() common.Hash {
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *SecureBinaryTrie) Copy() *SecureBinaryTrie {
-	cpy := *t
-	return &cpy
+	cpy, err := NewMerkleTreeWithRoot(t.tree.db, t.tree.rootKey, t.tree.maxLevels)
+	if err != nil {
+		panic("clone trie failed")
+	}
+	return &SecureBinaryTrie{
+		tree: cpy,
+	}
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration

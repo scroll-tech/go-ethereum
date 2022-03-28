@@ -70,6 +70,12 @@ func NewMerkleTree(storage db.Storage, maxLevels int) (*MerkleTree, error) {
 func NewMerkleTreeWithRoot(storage db.Storage, root *smt.Hash, maxLevels int) (*MerkleTree, error) {
 	mt := MerkleTree{db: storage, maxLevels: maxLevels, writable: true}
 	mt.rootKey = root
+	if *root != smt.HashZero {
+		_, err := mt.GetNode(mt.rootKey)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &mt, nil
 }
 

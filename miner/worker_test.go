@@ -242,8 +242,7 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 
 	// Ignore empty commit here for less noise.
 	w.skipSealHook = func(task *task) bool {
-		//return len(task.receipts) == 0
-		return false
+		return len(task.receipts) == 0
 	}
 
 	// Wait for mined blocks.
@@ -256,8 +255,8 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 	for i := 0; i < 5; i++ {
 		b.txPool.AddLocal(b.newRandomTx(true))
 		b.txPool.AddLocal(b.newRandomTx(false))
-		//w.postSideBlock(core.ChainSideEvent{Block: b.newRandomUncle()})
-		//w.postSideBlock(core.ChainSideEvent{Block: b.newRandomUncle()})
+		w.postSideBlock(core.ChainSideEvent{Block: b.newRandomUncle()})
+		w.postSideBlock(core.ChainSideEvent{Block: b.newRandomUncle()})
 
 		select {
 		case ev := <-sub.Chan():

@@ -181,30 +181,34 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		}
 	}
 	var (
-		isStorageOp  bool = false
-		storage      Storage
-		storageKey   common.Hash
-		storageValue common.Hash
+		recordStorageDetail bool = false
+		storage             Storage
+		storageKey          common.Hash
+		storageValue        common.Hash
 	)
 	if !l.cfg.DisableStorage {
 		if op == SLOAD && stack.len() >= 1 {
-			isStorageOp = true
+			recordStorageDetail = true
 			storageKey = common.Hash(stack.data[stack.len()-1].Bytes32())
 			storageValue = l.env.StateDB.GetState(contract.Address(), storageKey)
 		} else if op == SSTORE && stack.len() >= 2 {
-			isStorageOp = true
+			recordStorageDetail = true
 			storageKey = common.Hash(stack.data[stack.len()-1].Bytes32())
 			storageValue = common.Hash(stack.data[stack.len()-2].Bytes32())
 		}
 	}
 	extraData := types.NewExtraData()
-	if isStorageOp {
+	if recordStorageDetail {
 		contractAddress := contract.Address()
 		if l.storage[contractAddress] == nil {
 			l.storage[contractAddress] = make(Storage)
 		}
 		l.storage[contractAddress][storageKey] = storageValue
 		storage = l.storage[contractAddress].Copy()
+
+		if err := traceContractProof(l, scope, extraData); err != nil {
+			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
+		}
 	}
 	var rdata []byte
 	if l.cfg.EnableReturnData {

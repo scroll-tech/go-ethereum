@@ -57,8 +57,7 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 	if scope.Stack.len() == 0 {
 		return nil
 	}
-	stack := scope.Stack
-	key := common.Hash(stack.data[stack.len()-1].Bytes32())
+	key := common.Hash(scope.Stack.peek().Bytes32())
 	proof, err := getWrappedProofForStorage(l, scope.Contract.Address(), key)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)

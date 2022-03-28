@@ -227,29 +227,32 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 }
 
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
-	logLen := len(l.logs)
-	if (l.cfg.Limit != 0 && l.cfg.Limit <= logLen) || l.cfg.DisableStorage || op != SSTORE {
-		return
-	}
-	var lastLog *StructLog = nil
-	for i := logLen - 1; i >= 0; i-- {
-		if l.logs[i].Op == SSTORE {
-			lastLog = &l.logs[i]
-			break
+	if !l.cfg.DisableStorage && op == SLOAD {
+		logLen := len(l.logs)
+		if logLen <= 0 {
+			log.Error("Failed to trace after_state for sstore", "err", "empty length log")
+			return
 		}
+
+		lastLog := l.logs[logLen-1]
+		if lastLog.Op != SLOAD {
+			log.Error("Failed to trace after_state for sstore", "err", "op mismatch")
+			return
+		}
+		if lastLog.ExtraData == nil || len(lastLog.ExtraData.ProofList) == 0 {
+			log.Error("Failed to trace after_state for sstore", "err", "empty before_state ExtraData")
+			return
+		}
+
+		contractAddress := scope.Contract.Address()
+		var storageKey common.Hash // TODO: how to get this?
+		proof, err := getWrappedProofForStorage(l, contractAddress, storageKey)
+		if err != nil {
+			log.Error("Failed to trace after_state storage_proof for sstore", "err", err)
+		}
+
+		l.logs[logLen-1].ExtraData.ProofList = append(lastLog.ExtraData.ProofList, proof)
 	}
-	if lastLog == nil {
-		return
-	}
-	lastProofList := lastLog.ExtraData.ProofList
-	lastProofListLen := len(lastProofList)
-	if lastProofListLen == 0 {
-		return
-	}
-	extraData := types.NewExtraData()
-	extraData.ProofList = append(extraData.ProofList, lastProofList[lastProofListLen-1])
-	log := StructLog{pc, op, gas, cost, nil, 0, nil, nil, nil, depth, l.env.StateDB.GetRefund(), extraData, err}
-	l.logs = append(l.logs, log)
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault

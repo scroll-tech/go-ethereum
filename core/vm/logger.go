@@ -205,18 +205,12 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		}
 		l.storage[contractAddress][storageKey] = storageValue
 		storage = l.storage[contractAddress].Copy()
-		if err := traceStorageProof(l, scope, extraData); err != nil {
-			log.Warn("Failed to get proof", "contract address", contractAddress.String(), "key", storageKey.String(), "err", err)
-		}
 	}
 	var rdata []byte
 	if l.cfg.EnableReturnData {
 		rdata = make([]byte, len(rData))
 		copy(rdata, rData)
 	}
-	// create a new snapshot of the EVM.
-	structLog := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), extraData, err}
-	l.logs = append(l.logs, structLog)
 	execFuncList, ok := OpcodeExecs[op]
 	if !ok {
 		return
@@ -227,11 +221,12 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 		}
 	}
-	structLog = StructLog{pc, op, gas, cost, nil, scope.Memory.Len(), nil, nil, nil, depth, l.env.StateDB.GetRefund(), extraData, err}
+	// create a new snapshot of the EVM.
+	structLog := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), extraData, err}
 	l.logs = append(l.logs, structLog)
 }
 
-// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+// TODO: CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
 }
 

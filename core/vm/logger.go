@@ -249,6 +249,10 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 		}
 
 		contractAddress := scope.Contract.Address()
+		if len(lastLog.Stack) <= 0 {
+			log.Error("Failed to trace after_state for sstore", "err", "empty stack for last log")
+			return
+		}
 		storageKey := common.Hash(lastLog.Stack[len(lastLog.Stack)-1].Bytes32())
 		proof, err := getWrappedProofForStorage(l, contractAddress, storageKey)
 		if err != nil {

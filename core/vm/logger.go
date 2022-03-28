@@ -226,8 +226,30 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	l.logs = append(l.logs, structLog)
 }
 
-// TODO: CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+	logLen := len(l.logs)
+	if (l.cfg.Limit != 0 && l.cfg.Limit <= logLen) || l.cfg.DisableStorage || op != SSTORE {
+		return
+	}
+	var lastLog *StructLog = nil
+	for i := logLen - 1; i >= 0; i-- {
+		if l.logs[i].Op == SSTORE {
+			lastLog = &l.logs[i]
+			break
+		}
+	}
+	if lastLog == nil {
+		return
+	}
+	lastProofList := lastLog.ExtraData.ProofList
+	lastProofListLen := len(lastProofList)
+	if lastProofListLen == 0 {
+		return
+	}
+	extraData := types.NewExtraData()
+	extraData.ProofList = append(extraData.ProofList, lastProofList[lastProofListLen-1])
+	log := StructLog{pc, op, gas, cost, nil, 0, nil, nil, nil, depth, l.env.StateDB.GetRefund(), extraData, err}
+	l.logs = append(l.logs, log)
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault

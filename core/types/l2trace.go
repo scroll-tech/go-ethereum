@@ -37,15 +37,15 @@ type ExecutionResult struct {
 
 // SMTPathNode represent a node in the SMT Path
 type SMTPathNode struct {
-	Value    hexutil.Bytes `json:"value"`
-	Silbling hexutil.Bytes `json:"silbiling"`
+	Value   hexutil.Bytes `json:"value"`
+	Sibling hexutil.Bytes `json:"sibling"`
 }
 
 // SMTPath is the whole path of SMT
 type SMTPath struct {
 	Root hexutil.Bytes `json:"root"`
 	Path []SMTPathNode `json:"path"`           //path start from top
-	Leaf *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the silbling indicate key
+	Leaf *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the sibling indicate key
 }
 
 // StateAccountL2 is the represent of StateAccount in L2 circuit

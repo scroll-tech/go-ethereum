@@ -80,13 +80,13 @@ func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map
 func appendSMTPath(lastNode *trie.Node, k []byte, path *types.SMTPath) {
 	if bytes.Equal(k, lastNode.ChildL[:]) {
 		path.Path = append(path.Path, types.SMTPathNode{
-			Value:    k,
-			Silbling: lastNode.ChildR[:],
+			Value:   k,
+			Sibling: lastNode.ChildR[:],
 		})
 	} else if bytes.Equal(k, lastNode.ChildR[:]) {
 		path.Path = append(path.Path, types.SMTPathNode{
-			Value:    k,
-			Silbling: lastNode.ChildL[:],
+			Value:   k,
+			Sibling: lastNode.ChildL[:],
 		})
 	} else {
 		panic("Unexpected proof form")
@@ -121,8 +121,8 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 			case trie.NodeTypeLeaf:
 				path.Leaf = &types.SMTPathNode{
 					//TODO: not sure here should be Bytes (reverse order) or Bytes2
-					Value:    n.Entry[1].Bytes(),
-					Silbling: n.Entry[0][:],
+					Value:   n.Entry[1].Bytes(),
+					Sibling: n.Entry[0][:],
 				}
 				return n
 			case trie.NodeTypeEmpty:

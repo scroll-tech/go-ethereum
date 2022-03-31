@@ -98,6 +98,8 @@ func appendSMTPath(lastNode *trie.Node, k []byte, path *types.SMTPath) {
 func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 
 	var lastNode *trie.Node
+	path.KeyPathPart = types.HexInt{big.NewInt(0)}
+	keyCounter := big.NewInt(1)
 
 	for _, buf := range proof {
 		n, err := trie.DecodeSMTProof(buf)
@@ -113,7 +115,21 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 				//use the copy of REVERSEORDER of k[:]
 				path.Root = k.Bytes()
 			} else {
-				appendSMTPath(lastNode, k[:], path)
+				if bytes.Equal(k[:], lastNode.ChildL[:]) {
+					path.Path = append(path.Path, types.SMTPathNode{
+						Value:   k[:],
+						Sibling: lastNode.ChildR[:],
+					})
+				} else if bytes.Equal(k[:], lastNode.ChildR[:]) {
+					path.Path = append(path.Path, types.SMTPathNode{
+						Value:   k[:],
+						Sibling: lastNode.ChildL[:],
+					})
+					path.KeyPathPart.Add(path.KeyPathPart.Int, keyCounter)
+				} else {
+					panic("Unexpected proof form")
+				}
+				keyCounter.Mul(keyCounter, big.NewInt(2))
 			}
 			switch n.Type {
 			case trie.NodeTypeMiddle:
@@ -121,9 +137,19 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 			case trie.NodeTypeLeaf:
 				path.Leaf = &types.SMTPathNode{
 					//TODO: not sure here should be Bytes (reverse order) or Bytes2
-					Value:   n.Entry[1].Bytes(),
+					Value:   n.Entry[1][:],
 					Sibling: n.Entry[0][:],
 				}
+				//sanity check
+				keyPart := path.KeyPathPart.Bytes()
+				for i, b := range keyPart {
+					ri := len(keyPart) - i
+					cb := path.Leaf.Sibling[ri-1] //notice the output is little-endian
+					if b&cb != b {
+						panic(fmt.Errorf("path key not match: part is %x but key is %x", keyPart, []byte(path.Leaf.Sibling[:])))
+					}
+				}
+
 				return n
 			case trie.NodeTypeEmpty:
 				//we omit the empty node because it can be derived from the
@@ -224,25 +250,19 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 	out.Address = addr.Bytes()
 	out.AccountPath = [2]*types.SMTPath{{}, {}}
 	//fill dummy
-	out.AccountUpdate = [2]*types.StateAccountL2{
-		{
-			Balance: []byte{0},
-		},
-		{
-			Balance: []byte{0},
-		},
-	}
+	out.AccountUpdate = [2]*types.StateAccountL2{{}, {}}
+
 	if accData != nil {
 		out.AccountUpdate[1] = &types.StateAccountL2{
 			Nonce:    int(accData.Nonce),
-			Balance:  accData.Balance.Bytes(),
+			Balance:  types.HexInt{Int: big.NewInt(0).Set(accData.Balance)},
 			CodeHash: accData.CodeHash,
 		}
 	}
 	if accDataBefore != nil {
 		out.AccountUpdate[0] = &types.StateAccountL2{
 			Nonce:    int(accDataBefore.Nonce),
-			Balance:  accDataBefore.Balance.Bytes(),
+			Balance:  types.HexInt{Int: big.NewInt(0).Set(accDataBefore.Balance)},
 			CodeHash: accDataBefore.CodeHash,
 		}
 	}

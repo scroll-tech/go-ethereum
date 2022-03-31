@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -35,6 +36,31 @@ type ExecutionResult struct {
 	StructLogs []StructLogRes `json:"structLogs"`
 }
 
+// HexInt wrap big.Int for hex encoding
+type HexInt struct {
+	*big.Int
+}
+
+// MarshalText implements encoding.TextMarshaler
+func (hi HexInt) MarshalJSON() ([]byte, error) {
+	if hi.Int == nil {
+		return json.Marshal("0x")
+	}
+	return json.Marshal(hexutil.Encode(hi.Bytes()))
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (hi *HexInt) UnmarshalJSON(input []byte) error {
+
+	var s string
+	if err := json.Unmarshal(input, &s); err != nil {
+		return err
+	}
+
+	hi.Int, _ = big.NewInt(0).SetString(string(input), 0)
+	return nil
+}
+
 // SMTPathNode represent a node in the SMT Path
 type SMTPathNode struct {
 	Value   hexutil.Bytes `json:"value"`
@@ -43,16 +69,17 @@ type SMTPathNode struct {
 
 // SMTPath is the whole path of SMT
 type SMTPath struct {
-	Root hexutil.Bytes `json:"root"`
-	Path []SMTPathNode `json:"path"`           //path start from top
-	Leaf *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the sibling indicate key
+	KeyPathPart HexInt        `json:"pathPart"` //the path part in key
+	Root        hexutil.Bytes `json:"root"`
+	Path        []SMTPathNode `json:"path,omitempty"` //path start from top
+	Leaf        *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the sibling indicate key
 }
 
 // StateAccountL2 is the represent of StateAccount in L2 circuit
 // Notice in L2 we have different hash scheme against StateAccount.MarshalByte
 type StateAccountL2 struct {
 	Nonce    int           `json:"nonce"`
-	Balance  hexutil.Bytes `json:"balance"` //just the common hex expression of integer (big-endian)
+	Balance  HexInt        `json:"balance"` //just the common hex expression of integer (big-endian)
 	CodeHash hexutil.Bytes `json:"codeHash,omitempty"`
 }
 

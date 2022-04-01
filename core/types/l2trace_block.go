@@ -44,7 +44,7 @@ func NewTraceBlock(config *params.ChainConfig, block *Block, coinbase *AccountPr
 
 	baseFee := block.BaseFee()
 	// due to the special logic of `baseFee`, if `baseFee` is a nil
-	// we would like to use new(big.Int) to replace it in order for `baseFee.String()` to return "0"
+	// we would like to use new(big.Int) to replace it so that `baseFee.String()` would return "0"
 	if baseFee == nil {
 		baseFee = new(big.Int)
 	}

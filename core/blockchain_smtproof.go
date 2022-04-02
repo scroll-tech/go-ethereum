@@ -8,6 +8,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -262,7 +263,7 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 			return nil, fmt.Errorf("state BEFORE has no valid account: %s", err)
 		}
 		// we have ensured the nBefore has a key corresponding to the query one
-		out.AccountKey = nBefore.Entry[0].Bytes()
+		out.AccountKey = nBefore.Entry[0][:]
 	}
 
 	if accData != nil {
@@ -288,7 +289,7 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 			return nil, fmt.Errorf("state AFTER has no valid account: %s", err)
 		}
 		if out.AccountKey == nil {
-			out.AccountKey = nAfter.Entry[0].Bytes()
+			out.AccountKey = nAfter.Entry[0][:]
 		}
 		//now accountKey must has been filled
 	}
@@ -332,8 +333,8 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 	}
 
 	//sanity check
-	if !bytes.Equal(acc.Root[:], statePath[0].Root) {
-		panic(fmt.Errorf("unexpected storage root before: [%s] vs [%s]", acc.Root, statePath[0].Root))
+	if accRootFromState := smt.ReverseByteOrder(statePath[0].Root); !bytes.Equal(acc.Root[:], accRootFromState) {
+		panic(fmt.Errorf("unexpected storage root before: [%s] vs [%s]", acc.Root, accRootFromState))
 	}
 
 	if storageAfterProof, err = proofListFromString(mustGetStorageProof(l)); err != nil {
@@ -361,7 +362,7 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 		Nonce:    acc.Nonce,
 		Balance:  acc.Balance,
 		CodeHash: acc.CodeHash,
-		Root:     common.BytesToHash(statePath[1].Root),
+		Root:     common.BytesToHash(smt.ReverseByteOrder(statePath[1].Root)),
 	}
 
 	out, err := w.traceAccountUpdate(&w.currentContract, acc, accAfter)
@@ -369,8 +370,7 @@ func (w *smtProofWriter) handleSStore(lBefore *types.StructLogRes, l *types.Stru
 		return nil, fmt.Errorf("update account %s in SSTORE fail: %s", w.currentContract, err)
 	}
 
-	// use Bytes, so we obtain big-endian key which should be test from less-significant bit
-	out.StateKey = sAfter.Entry[0].Bytes()
+	out.StateKey = sAfter.Entry[0][:]
 	out.StatePath = statePath
 	out.StateUpdate = stateUpdate
 	return out, nil
@@ -438,7 +438,7 @@ func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
 	}
 
 	out.Index = -1
-	out.CommonStateRoot = accData.Root[:]
+	out.CommonStateRoot = smt.ReverseByteOrder(accData.Root[:])
 	w.outTrace = append(w.outTrace, out)
 
 	return nil
@@ -471,7 +471,7 @@ func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
 		}
 
 		out.Index = -1
-		out.CommonStateRoot = accData.Root[:]
+		out.CommonStateRoot = smt.ReverseByteOrder(accData.Root[:])
 		w.outTrace = append(w.outTrace, out)
 	}
 

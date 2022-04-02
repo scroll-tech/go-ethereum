@@ -77,28 +77,12 @@ func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map
 	}
 }
 
-func appendSMTPath(lastNode *trie.Node, k []byte, path *types.SMTPath) {
-	if bytes.Equal(k, lastNode.ChildL[:]) {
-		path.Path = append(path.Path, types.SMTPathNode{
-			Value:   k,
-			Sibling: lastNode.ChildR[:],
-		})
-	} else if bytes.Equal(k, lastNode.ChildR[:]) {
-		path.Path = append(path.Path, types.SMTPathNode{
-			Value:   k,
-			Sibling: lastNode.ChildL[:],
-		})
-	} else {
-		panic("Unexpected proof form")
-	}
-}
-
 // we have a trick here which suppose the proof array include all middle nodes along the
 // whole path in sequence, from root to leaf, and return final node
 func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 
 	var lastNode *trie.Node
-	path.KeyPathPart = types.HexInt{big.NewInt(0)}
+	path.KeyPathPart = types.HexInt{Int: big.NewInt(0)}
 	keyCounter := big.NewInt(1)
 
 	for _, buf := range proof {
@@ -112,8 +96,8 @@ func decodeProofForMPTPath(proof proofList, path *types.SMTPath) *trie.Node {
 				return n
 			}
 			if lastNode == nil {
-				//use the copy of REVERSEORDER of k[:]
-				path.Root = k.Bytes()
+				//notice: use little-endian represent inside Hash ([:] or Bytes2())
+				path.Root = k[:]
 			} else {
 				if bytes.Equal(k[:], lastNode.ChildL[:]) {
 					path.Path = append(path.Path, types.SMTPathNode{

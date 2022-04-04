@@ -1376,7 +1376,7 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		} else if err = smtWriter.txFinal(evmTrace.Storage.RootAfter); err != nil {
 			log.Error("final tx verify fail", "error", err)
 		} else {
-			log.Info("write SMTTrace", "records", len(smtWriter.outTrace))
+			log.Info("write SMTTrace", "tx", i, "records", len(smtWriter.outTrace))
 			evmTrace.Storage.SMTTrace = smtWriter.outTrace
 		}
 	}

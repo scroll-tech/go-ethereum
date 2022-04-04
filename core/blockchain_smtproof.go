@@ -69,7 +69,7 @@ func decodeProofForAccounts(proof proofList, db *memorydb.Database, accounts map
 
 						return
 					} else {
-						log.Warn("decode account bytes fail", "error", err)
+						log.Warn("decode account bytes fail", "error", err, "data", hexutil.Encode(n.ValuePreimage))
 					}
 				}
 			}

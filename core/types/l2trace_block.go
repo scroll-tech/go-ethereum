@@ -9,45 +9,46 @@ import (
 )
 
 type BlockTrace struct {
-	Number       *big.Int            `json:"number"`
-	Hash         common.Hash         `json:"hash"`
-	GasLimit     uint64              `json:"gasLimit"`
-	Difficulty   *big.Int            `json:"difficulty"`
-	BaseFee      *big.Int            `json:"baseFee"`
-	Coinbase     common.Address      `json:"coinbase"`
-	Time         uint64              `json:"time"`
-	Transactions []*TransactionTrace `json:"transactions"`
+	Number       *hexutil.Big         `json:"number"`
+	Hash         common.Hash          `json:"hash"`
+	GasLimit     uint64               `json:"gasLimit"`
+	Difficulty   *hexutil.Big         `json:"difficulty"`
+	BaseFee      *hexutil.Big         `json:"baseFee"`
+	Coinbase     *AccountProofWrapper `json:"coinbase"`
+	Time         uint64               `json:"time"`
+	Transactions []*TransactionTrace  `json:"transactions"`
 }
 
 type TransactionTrace struct {
 	Type     uint8           `json:"type"`
 	Nonce    uint64          `json:"nonce"`
 	Gas      uint64          `json:"gas"`
-	GasPrice *big.Int        `json:"gasPrice"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
-	ChainId  *big.Int        `json:"chainId"`
-	Value    *big.Int        `json:"value"`
+	ChainId  *hexutil.Big    `json:"chainId"`
+	Value    *hexutil.Big    `json:"value"`
 	Data     string          `json:"data"`
 	IsCreate bool            `json:"isCreate"`
-	V        *big.Int        `json:"v"`
-	R        *big.Int        `json:"r"`
-	S        *big.Int        `json:"s"`
+	V        *hexutil.Big    `json:"v"`
+	R        *hexutil.Big    `json:"r"`
+	S        *hexutil.Big    `json:"s"`
 }
 
 // NewTraceBlock supports necessary fields for roller.
-func NewTraceBlock(config *params.ChainConfig, block *Block) *BlockTrace {
+func NewTraceBlock(config *params.ChainConfig, block *Block, coinbase *AccountProofWrapper) *BlockTrace {
 	txs := make([]*TransactionTrace, block.Transactions().Len())
 	for i, tx := range block.Transactions() {
 		txs[i] = newTraceTransaction(tx, block.NumberU64(), config)
 	}
+
 	return &BlockTrace{
-		Number:       block.Number(),
+		Number:       (*hexutil.Big)(block.Number()),
 		Hash:         block.Hash(),
 		GasLimit:     block.GasLimit(),
-		Difficulty:   block.Difficulty(),
-		BaseFee:      block.BaseFee(),
-		Coinbase:     block.Coinbase(),
+		Difficulty:   (*hexutil.Big)(block.Difficulty()),
+		BaseFee:      (*hexutil.Big)(block.BaseFee()),
+		Coinbase:     coinbase,
 		Time:         block.Time(),
 		Transactions: txs,
 	}
@@ -62,17 +63,17 @@ func newTraceTransaction(tx *Transaction, blockNumber uint64, config *params.Cha
 	result := &TransactionTrace{
 		Type:     tx.Type(),
 		Nonce:    tx.Nonce(),
-		ChainId:  tx.ChainId(),
+		ChainId:  (*hexutil.Big)(tx.ChainId()),
 		From:     from,
 		Gas:      tx.Gas(),
-		GasPrice: tx.GasPrice(),
+		GasPrice: (*hexutil.Big)(tx.GasPrice()),
 		To:       tx.To(),
-		Value:    tx.Value(),
+		Value:    (*hexutil.Big)(tx.Value()),
 		Data:     hexutil.Encode(tx.Data()),
 		IsCreate: tx.To() == nil,
-		V:        v,
-		R:        r,
-		S:        s,
+		V:        (*hexutil.Big)(v),
+		R:        (*hexutil.Big)(r),
+		S:        (*hexutil.Big)(s),
 	}
 	return result
 }

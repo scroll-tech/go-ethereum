@@ -1,9 +1,8 @@
 package types
 
 import (
-	"math/big"
-
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
 // BlockResult contains block execution traces and results required for rollers.
@@ -55,16 +54,17 @@ type StorageRes struct {
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc        uint64             `json:"pc"`
-	Op        string             `json:"op"`
-	Gas       uint64             `json:"gas"`
-	GasCost   uint64             `json:"gasCost"`
-	Depth     int                `json:"depth"`
-	Error     string             `json:"error,omitempty"`
-	Stack     *[]string          `json:"stack,omitempty"`
-	Memory    *[]string          `json:"memory,omitempty"`
-	Storage   *map[string]string `json:"storage,omitempty"`
-	ExtraData *ExtraData         `json:"extraData,omitempty"`
+	Pc            uint64             `json:"pc"`
+	Op            string             `json:"op"`
+	Gas           uint64             `json:"gas"`
+	GasCost       uint64             `json:"gasCost"`
+	Depth         int                `json:"depth"`
+	Error         string             `json:"error,omitempty"`
+	Stack         *[]string          `json:"stack,omitempty"`
+	Memory        *[]string          `json:"memory,omitempty"`
+	Storage       *map[string]string `json:"storage,omitempty"`
+	RefundCounter uint64             `json:"refund,omitempty"`
+	ExtraData     *ExtraData         `json:"extraData,omitempty"`
 }
 
 type ExtraData struct {
@@ -80,11 +80,12 @@ type ExtraData struct {
 }
 
 type AccountProofWrapper struct {
-	Address common.Address       `json:"address,omitempty"`
-	Nonce   uint64               `json:"nonce,omitempty"`
-	Balance *big.Int             `json:"balance,omitempty"`
-	Proof   []string             `json:"proof,omitempty"`
-	Storage *StorageProofWrapper `json:"storage,omitempty"` // StorageProofWrapper can be empty if irrelated to storage operation
+	Address  common.Address       `json:"address"`
+	Nonce    uint64               `json:"nonce"`
+	Balance  *hexutil.Big         `json:"balance"`
+	CodeHash common.Hash          `json:"codeHash,omitempty"`
+	Proof    []string             `json:"proof,omitempty"`
+	Storage  *StorageProofWrapper `json:"storage,omitempty"` // StorageProofWrapper can be empty if irrelated to storage operation
 }
 
 // while key & value can also be retrieved from StructLogRes.Storage,

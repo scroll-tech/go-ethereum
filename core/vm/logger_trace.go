@@ -55,9 +55,10 @@ func traceLastNAddressCode(n int) traceFunc {
 // traceStorageProof get contract's storage proof at storage_address
 func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 
-	lastLog := &l.logs[len(l.logs)-1]
-	stack := lastLog.Stack
-	key := common.Hash(stack[len(stack)-1].Bytes32())
+	if scope.Stack.len() == 0 {
+		return nil
+	}
+	key := common.Hash(scope.Stack.peek().Bytes32())
 	proof, err := getWrappedProofForStorage(l, scope.Contract.Address(), key)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)

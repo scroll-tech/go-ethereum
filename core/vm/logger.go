@@ -246,12 +246,6 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		l.storage[contractAddress][storageKey] = storageValue
 		storage = l.storage[contractAddress].Copy()
 
-		extraData = types.NewExtraData()
-		if proof, err := getWrappedProofForStorage(l, scope.Contract.Address(), address); err == nil {
-			extraData.ProofList = append(extraData.ProofList, proof)
-		} else {
-			log.Warn("Failed to get proof", "contract address", contract.Address().String(), "key", address.String(), "err", err)
-		}
 		if err := traceStorageProof(l, scope, extraData); err != nil {
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 		}

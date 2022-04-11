@@ -1189,17 +1189,17 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, blockResult *types.BlockResult, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces []*types.ExecutionResult, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if !bc.chainmu.TryLock() {
 		return NonStatTy, errInsertionInterrupted
 	}
 	defer bc.chainmu.Unlock()
-	return bc.writeBlockWithState(block, receipts, logs, blockResult, state, emitHeadEvent)
+	return bc.writeBlockWithState(block, receipts, logs, evmTraces, state, emitHeadEvent)
 }
 
 // writeBlockWithState writes the block and all associated state to the database,
 // but is expects the chain mutex to be held.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, blockResult *types.BlockResult, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces []*types.ExecutionResult, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if bc.insertStopped() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -1321,8 +1321,9 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	bc.futureBlocks.Remove(block.Hash())
 
 	// Fill blockResult content
-	if blockResult != nil {
-		bc.writeBlockResult(state, block, blockResult)
+	var blockResult *types.BlockResult
+	if evmTraces != nil {
+		blockResult = bc.writeBlockResult(state, block, evmTraces)
 		bc.blockResultCache.Add(block.Hash(), blockResult)
 	}
 
@@ -1346,12 +1347,42 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 }
 
 // Fill blockResult content
-func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, blockResult *types.BlockResult) {
-	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block)
+func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces []*types.ExecutionResult) *types.BlockResult {
+	blockResult := &types.BlockResult{
+		ExecutionResults: evmTraces,
+	}
+	coinbase := types.AccountProofWrapper{
+		Address:  block.Coinbase(),
+		Nonce:    state.GetNonce(block.Coinbase()),
+		Balance:  (*hexutil.Big)(state.GetBalance(block.Coinbase())),
+		CodeHash: state.GetCodeHash(block.Coinbase()),
+	}
+	// Get coinbase address's account proof.
+	proof, err := state.GetProof(block.Coinbase())
+	if err != nil {
+		log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", block.Coinbase().String(), "err", err)
+	} else {
+		coinbase.Proof = make([]string, len(proof))
+		for i := range proof {
+			coinbase.Proof[i] = hexutil.Encode(proof[i])
+		}
+	}
+
+	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block, &coinbase)
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
-		// Get the sender's address.
-		// from, _ := types.Sender(types.MakeSigner(bc.chainConfig, block.Number()), tx)
+		from := evmTrace.Sender.Address
+
+		// Get proof
+		proof, err := state.GetProof(from)
+		if err != nil {
+			log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", from.String(), "err", err)
+		} else {
+			evmTrace.Sender.Proof = make([]string, len(proof))
+			for i := range proof {
+				evmTrace.Sender.Proof[i] = hexutil.Encode(proof[i])
+			}
+		}
 
 		// Contract is called
 		if len(tx.Data()) != 0 && tx.To() != nil {
@@ -1380,6 +1411,7 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 			evmTrace.Storage.SMTTrace = smtWriter.outTrace
 		}
 	}
+	return blockResult
 }
 
 // addFutureBlock checks if the block is within the max allowed window to get

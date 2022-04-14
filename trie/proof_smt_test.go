@@ -28,7 +28,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 func init() {
@@ -63,7 +62,7 @@ func verifyValue(vHash []byte, vPreimage []byte) bool {
 }
 
 func TestSMTOneElementProof(t *testing.T) {
-	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
+	mt, _ := NewMerkleTree(NewEthKVStorage(NewDatabase(memorydb.New())), 64)
 	_, err := mt.UpdateWord(
 		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("k"), 32)),
 		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("v"), 32)),
@@ -139,7 +138,7 @@ func TestSMTBadProof(t *testing.T) {
 // Tests that missing keys can also be proven. The test explicitly uses a single
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
-	mt, _ := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
+	mt, _ := NewMerkleTree(NewEthKVStorage(NewDatabase(memorydb.New())), 64)
 	_, err := mt.UpdateWord(
 		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("k"), 20)),
 		smt.NewByte32FromBytesPadding(bytes.Repeat([]byte("v"), 20)),
@@ -166,7 +165,7 @@ func TestSMTMissingKeyProof(t *testing.T) {
 }
 
 func randomSMT(t *testing.T, n int) (*MerkleTree, map[string]*kv) {
-	mt, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), 64)
+	mt, err := NewMerkleTree(NewEthKVStorage(NewDatabase(memorydb.New())), 64)
 	if err != nil {
 		panic(err)
 	}

@@ -19,8 +19,6 @@ package trie
 import (
 	"fmt"
 
-	"github.com/scroll-tech/go-ethereum/trie/db"
-
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
@@ -53,7 +51,7 @@ func NewSecureBinaryTrie(root common.Hash, ethdb *Database) (*SecureBinaryTrie, 
 	if err != nil {
 		return nil, err
 	}
-	tree, err := NewMerkleTreeWithRoot(db.NewEthKVStorage(ethdb.diskdb), rootHash, 256)
+	tree, err := NewMerkleTreeWithRoot(NewEthKVStorage(ethdb), rootHash, 256)
 	if err != nil {
 		return nil, err
 	}

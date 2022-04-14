@@ -156,7 +156,6 @@ func TestShortSetHead(t *testing.T)              { testShortSetHead(t, false) }
 func TestShortSetHeadWithSnapshots(t *testing.T) { testShortSetHead(t, true) }
 
 func testShortSetHead(t *testing.T, snapshots bool) {
-
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//

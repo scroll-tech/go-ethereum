@@ -1,4 +1,4 @@
-package db
+package trie
 
 import (
 	"bytes"
@@ -32,8 +32,6 @@ type Tx interface {
 	Get([]byte) ([]byte, error)
 	// Put sets the key & value into the Tx
 	Put(k, v []byte) error
-	// Add adds the given Tx into the Tx
-	Add(Tx) error
 	Commit() error
 	Close()
 }

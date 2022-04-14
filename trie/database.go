@@ -68,7 +68,8 @@ var (
 // behind this split design is to provide read access to RPC handlers and sync
 // servers even while the trie is executing expensive garbage collection.
 type Database struct {
-	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
+	diskdb     ethdb.KeyValueStore // Persistent storage for matured trie nodes
+	rawDirties KvMap               // used only in new SecureBinaryTrie
 
 	cleans  *fastcache.Cache            // GC friendly memory cache of clean node RLPs
 	dirties map[common.Hash]*cachedNode // Data and references relationships of dirty trie nodes
@@ -305,6 +306,7 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 		dirties: map[common.Hash]*cachedNode{{}: {
 			children: make(map[common.Hash]uint16),
 		}},
+		rawDirties: make(KvMap),
 	}
 	if config == nil || config.Preimages { // TODO(karalabe): Flip to default off in the future
 		db.preimages = make(map[common.Hash][]byte)
@@ -696,15 +698,30 @@ func (db *Database) Cap(limit common.StorageSize) error {
 // Note, this method is a non-synchronized mutator. It is unsafe to call this
 // concurrently with other mutators.
 func (db *Database) Commit(node common.Hash, report bool, callback func(common.Hash)) error {
-	if node == zeroHash {
-		return nil
-	}
+
 	// Create a database batch to flush persistent data out. It is important that
 	// outside code doesn't see an inconsistent state (referenced data removed from
 	// memory cache during commit but not yet in persistent storage). This is ensured
 	// by only uncaching existing data when the database write finalizes.
 	start := time.Now()
 	batch := db.diskdb.NewBatch()
+
+	db.lock.Lock()
+	for _, v := range db.rawDirties {
+		batch.Put(v.K, v.V)
+	}
+	for k := range db.rawDirties {
+		delete(db.rawDirties, k)
+	}
+	db.lock.Unlock()
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	batch.Reset()
+
+	if node == zeroHash {
+		return nil
+	}
 
 	// Move all of the accumulated preimages into a write batch
 	if db.preimages != nil {

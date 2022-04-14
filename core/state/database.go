@@ -18,8 +18,6 @@ package state
 
 import (
 	"errors"
-	"fmt"
-
 	"github.com/VictoriaMetrics/fastcache"
 	lru "github.com/hashicorp/golang-lru"
 
@@ -134,7 +132,7 @@ type cachingDB struct {
 
 // OpenTrie opens the main account trie at a specific root hash.
 func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
-	tr, err := trie.NewSecureBinaryTrie(root, db.db)
+	tr, err := trie.NewSecure(root, db.db)
 	if err != nil {
 		return nil, err
 	}
@@ -143,21 +141,11 @@ func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
 
 // OpenStorageTrie opens the storage trie of an account.
 func (db *cachingDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
-	tr, err := trie.NewSecureBinaryTrie(root, db.db)
+	tr, err := trie.NewSecure(root, db.db)
 	if err != nil {
 		return nil, err
 	}
 	return tr, nil
-}
-
-// CopyTrie returns an independent copy of the given trie.
-func (db *cachingDB) CopyTrie(t Trie) Trie {
-	switch t := t.(type) {
-	case *trie.SecureBinaryTrie:
-		return t.Copy()
-	default:
-		panic(fmt.Errorf("unknown trie type %T", t))
-	}
 }
 
 // ContractCode retrieves a particular contract's code.

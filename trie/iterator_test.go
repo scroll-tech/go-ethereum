@@ -494,7 +494,7 @@ func makeLargeTestTrie() (*Database, *SecureBinaryTrie, *loggingDb) {
 	// Create an empty trie
 	logDb := &loggingDb{0, memorydb.New()}
 	triedb := NewDatabase(logDb)
-	trie, _ := NewSecureBinaryTrie(common.Hash{}, triedb)
+	trie, _ := NewSecure(common.Hash{}, triedb)
 
 	// Fill it with some arbitrary data
 	for i := 0; i < 10000; i++ {

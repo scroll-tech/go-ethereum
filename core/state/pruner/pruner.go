@@ -410,7 +410,7 @@ func extractGenesis(db ethdb.Database, stateBloom *stateBloom) error {
 	if genesis == nil {
 		return errors.New("missing genesis block")
 	}
-	t, err := trie.NewSecureBinaryTrie(genesis.Root(), trie.NewDatabase(db))
+	t, err := trie.NewSecure(genesis.Root(), trie.NewDatabase(db))
 	if err != nil {
 		return err
 	}
@@ -430,7 +430,7 @@ func extractGenesis(db ethdb.Database, stateBloom *stateBloom) error {
 				return err
 			}
 			if acc.Root != emptyRoot {
-				storageTrie, err := trie.NewSecureBinaryTrie(acc.Root, trie.NewDatabase(db))
+				storageTrie, err := trie.NewSecure(acc.Root, trie.NewDatabase(db))
 				if err != nil {
 					return err
 				}

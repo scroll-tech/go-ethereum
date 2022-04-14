@@ -1,3 +1,4 @@
+// +build !oldTree
 // Copyright 2015 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -18,6 +19,7 @@ package trie
 
 import (
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 
 	"github.com/scroll-tech/go-ethereum/trie/db"
 
@@ -45,10 +47,10 @@ type SecureBinaryTrie struct {
 	tree *MerkleTree
 }
 
-// NewSecureBinaryTrie creates a trie
+// NewSecure creates a trie
 // SecureBinaryTrie bypasses all the buffer mechanism in *Database, it directly uses the
 // underlying diskdb
-func NewSecureBinaryTrie(root common.Hash, ethdb *Database) (*SecureBinaryTrie, error) {
+func NewSecure(root common.Hash, ethdb *Database) (*SecureBinaryTrie, error) {
 	rootHash, err := smt.NewHashFromBytes(root.Bytes())
 	if err != nil {
 		return nil, err
@@ -230,4 +232,20 @@ func (t *SecureBinaryTrie) hashKey(key []byte) []byte {
 		panic(err)
 	}
 	return hash.Bytes()
+}
+
+// Prove constructs a merkle proof for key. The result contains all encoded nodes
+// on the path to the value at key. The value itself is also included in the last
+// node and can be retrieved by verifying the proof.
+//
+// If the trie does not contain a value for key, the returned proof contains all
+// nodes of the longest existing prefix of the key (at least the root node), ending
+// with the node that proves the absence of the key.
+func (t *SecureBinaryTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+	word := smt.NewByte32FromBytesPadding(key)
+	k, err := word.Hash()
+	if err != nil {
+		return err
+	}
+	return t.tree.Prove(k, fromLevel, proofDb)
 }

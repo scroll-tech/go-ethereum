@@ -1,3 +1,4 @@
+// +build oldTree
 // Copyright 2015 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -18,6 +19,7 @@ package trie
 
 import (
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -216,4 +218,8 @@ func (t *SecureTrie) getSecKeyCache() map[string][]byte {
 		t.secKeyCache = make(map[string][]byte)
 	}
 	return t.secKeyCache
+}
+
+func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+	panic("unimplemented")
 }

@@ -169,7 +169,7 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 	decodeProofForAccounts(proofListFromHex(storage.ProofFrom), underlayerDb, accounts)
 	decodeProofForAccounts(proofListFromHex(storage.ProofTo), underlayerDb, accounts)
 
-	smt, err := trie.NewSecureBinaryTrie(
+	smt, err := trie.NewSecure(
 		*storage.RootBefore,
 		trie.NewDatabase(underlayerDb),
 	)

@@ -4,6 +4,7 @@ package state
 
 import (
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 

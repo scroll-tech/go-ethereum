@@ -19,6 +19,7 @@ package trie
 
 import (
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/ethdb"
 
 	"github.com/scroll-tech/go-ethereum/common"

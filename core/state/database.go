@@ -18,6 +18,7 @@ package state
 
 import (
 	"errors"
+
 	"github.com/VictoriaMetrics/fastcache"
 	lru "github.com/hashicorp/golang-lru"
 

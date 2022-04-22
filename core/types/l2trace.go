@@ -79,7 +79,7 @@ type ExtraData struct {
 	// CREATE | CREATE2: [sender's accountProof, created contract address’s accountProof (before constructed),
 	// 					  created contract address's data (after constructed)]
 	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) address’s accountProof
-	//					  created contract address's data (before construced, value updated)]
+	//					  created contract address's data (before constructed, value updated)]
 	ProofList []*AccountProofWrapper `json:"proofList,omitempty"`
 }
 

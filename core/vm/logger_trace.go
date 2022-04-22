@@ -1,8 +1,6 @@
 package vm
 
 import (
-	"errors"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -76,7 +74,7 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 }
 
 /// traceCreatedContractProof get created contract address’s accountProof
-func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+/*func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	stack := scope.Stack
 	if stack.len() < 1 {
 		return nil
@@ -91,7 +89,7 @@ func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *
 		extraData.ProofList = append(extraData.ProofList, proof)
 	}
 	return err
-}
+}*/
 
 // traceLastNAddressProof returns func about the last N's address proof.
 func traceLastNAddressProof(n int) traceFunc {

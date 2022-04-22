@@ -133,9 +133,10 @@ type StructLogger struct {
 	createdAccount *types.StateAccount
 	stateRoot      *common.Hash
 
-	logs   []StructLog
-	output []byte
-	err    error
+	callStackLogInd []int
+	logs            []StructLog
+	output          []byte
+	err             error
 }
 
 // NewStructLogger returns a new logger
@@ -156,6 +157,7 @@ func (l *StructLogger) Reset() {
 	l.states = make(map[common.Address]struct{})
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
+	l.callStackLogInd = nil
 	l.err = nil
 	l.stateRoot = nil
 	l.accFromProof = nil
@@ -321,9 +323,76 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 }
 
 func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+	//the last logged op should be CALL/CREATE
+	lastLogPos := len(l.logs) - 1
+	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
+	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
+	//sanity check
+	if len(l.callStackLogInd) != l.env.depth {
+		panic("unexpected evm depth in capture enter")
+	}
+	theLog := l.logs[lastLogPos]
+
+	// handling additional updating for CREATE only
+	switch theLog.Op {
+	case CREATE, CREATE2:
+		proof, err := getWrappedProofForAddr(l, to)
+		if err != nil {
+			log.Error("get account proof fail", "error", err)
+		} else {
+			theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, proof)
+		}
+	default:
+		// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
+		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountProofWrapper{
+			Address:  to,
+			Nonce:    l.env.StateDB.GetNonce(to),
+			Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(to)),
+			CodeHash: l.env.StateDB.GetCodeHash(to),
+		})
+	}
+
 }
 
-func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
+// in CaptureExit phase, a CREATE has its target address's code being set and queryable
+func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
+	stackH := len(l.callStackLogInd)
+	if stackH == 0 {
+		panic("unexpected capture exit occur")
+	}
+
+	theLogPos := l.callStackLogInd[stackH-1]
+	l.callStackLogInd = l.callStackLogInd[:stackH-1]
+	theLog := l.logs[theLogPos]
+	//update "forecast" data
+	if err != nil {
+		theLog.ExtraData.CallFailed = true
+	}
+
+	// handling updating for CREATE only
+	switch theLog.Op {
+	case CREATE, CREATE2:
+		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
+		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList)
+		dataLen := len(theLog.ExtraData.ProofList)
+		if dataLen == 0 {
+			panic("unexpected data capture for target op")
+		}
+
+		lastAccData := theLog.ExtraData.ProofList[dataLen-1]
+		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountProofWrapper{
+			Address: lastAccData.Address,
+			Nonce:   lastAccData.Nonce,
+			Balance: lastAccData.Balance,
+			//only CodeHash need to be updated after CREATE
+			CodeHash: l.env.StateDB.GetCodeHash(lastAccData.Address),
+		})
+	default:
+		//do nothing for other op code
+		return
+	}
+
+}
 
 // CaptureFinal is used to collect all "touched" accounts just after all modification to state has finished
 func (l *StructLogger) UpdatedAccounts() (output map[common.Address]*types.StateAccount) {

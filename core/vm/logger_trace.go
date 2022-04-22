@@ -1,8 +1,6 @@
 package vm
 
 import (
-	"errors"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -17,10 +15,10 @@ var (
 		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
 		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1)},
-		CREATE:       {traceCreatedContractProof}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
-		CREATE2:      {traceCreatedContractProof}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
-		SLOAD:        {},                          // record storage_proof in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
-		SSTORE:       {},                          // record storage_proof in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
+		CREATE:       {}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
+		CREATE2:      {}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
+		SLOAD:        {}, // record storage_proof in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
+		SSTORE:       {}, // record storage_proof in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SELFDESTRUCT: {traceContractProof, traceLastNAddressProof(0)},
 		SELFBALANCE:  {traceContractProof},
 		BALANCE:      {traceLastNAddressProof(0)},
@@ -78,7 +76,7 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 }
 
 /// traceCreatedContractProof get created contract address’s accountProof
-func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+/*func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	stack := scope.Stack
 	if stack.len() < 1 {
 		return nil
@@ -94,7 +92,7 @@ func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *
 		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
-}
+}*/
 
 // traceLastNAddressProof returns func about the last N's address proof.
 func traceLastNAddressProof(n int) traceFunc {

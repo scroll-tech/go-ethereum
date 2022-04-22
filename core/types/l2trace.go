@@ -148,14 +148,18 @@ type StructLogRes struct {
 }
 
 type ExtraData struct {
+	// Indicate the call success or not for CALL/CREATE op
+	CallFailed bool `json:"callFailed,omitempty"`
 	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code, stack.nth_last(1) address’s code]
 	CodeList [][]byte `json:"codeList,omitempty"`
 	// SSTORE | SLOAD: [storageProof]
 	// SELFDESTRUCT: [contract address’s accountProof, stack.nth_last(0) address’s accountProof]
 	// SELFBALANCE: [contract address’s accountProof]
 	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
-	// CREATE | CREATE2: [sender's accountProof, created contract address’s accountProof]
-	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) address’s accountProof]
+	// CREATE | CREATE2: [sender's accountProof, created contract address’s accountProof (before constructed),
+	// 					  created contract address's data (after constructed)]
+	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) address’s accountProof
+	//					  created contract address's data (before constructed, value updated)]
 	ProofList []*AccountProofWrapper `json:"proofList,omitempty"`
 }
 

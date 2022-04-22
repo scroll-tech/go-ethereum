@@ -322,13 +322,26 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 		panic("unexpected evm depth in capture enter")
 	}
 	theLog := l.logs[lastLogPos]
-	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
-	theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountProofWrapper{
-		Address:  to,
-		Nonce:    l.env.StateDB.GetNonce(to),
-		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(to)),
-		CodeHash: l.env.StateDB.GetCodeHash(to),
-	})
+
+	// handling additional updating for CREATE only
+	switch theLog.Op {
+	case CREATE, CREATE2:
+		proof, err := getWrappedProofForAddr(l, to)
+		if err != nil {
+			log.Error("get account proof fail", "error", err)
+		} else {
+			theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, proof)
+		}
+	default:
+		// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
+		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountProofWrapper{
+			Address:  to,
+			Nonce:    l.env.StateDB.GetNonce(to),
+			Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(to)),
+			CodeHash: l.env.StateDB.GetCodeHash(to),
+		})
+	}
+
 }
 
 // in CaptureExit phase, a CREATE has its target address's code being set and queryable

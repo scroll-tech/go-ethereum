@@ -290,14 +290,6 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 // CaptureFault implements the EVMLogger interface to trace an execution fault
 // while running an opcode.
 func (l *StructLogger) CaptureFault(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, depth int, err error) {
-	//when captureFault is triggerred, the op has been logged as the last log and we should update it
-	failedLog := l.logs[len(l.logs)-1]
-	if failedLog.Op != op || failedLog.Pc != pc {
-		log.Error("unexpected capture fault behavior", "capture pc", pc, "last pc", failedLog.Pc)
-		return
-	}
-
-	failedLog.Err = err
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.

@@ -14,7 +14,7 @@ var (
 		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
 		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
-		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1)},
+		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressProof(1)},
 		CREATE:       {}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
 		CREATE2:      {}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
 		SLOAD:        {}, // record storage_proof in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag

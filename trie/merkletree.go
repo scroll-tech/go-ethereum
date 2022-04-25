@@ -57,6 +57,7 @@ type MerkleTree struct {
 	//rootNode  *Node
 	writable  bool
 	maxLevels int
+	Debug     bool
 }
 
 func NewMerkleTree(storage Storage, maxLevels int) (*MerkleTree, error) {
@@ -84,12 +85,13 @@ func (mt *MerkleTree) DB() Storage {
 
 // Root returns the MerkleRoot
 func (mt *MerkleTree) Root() *smt.Hash {
-	// FIXME
-	_, err := mt.GetNode(mt.rootKey)
-	if err != nil {
-		var hash common.Hash
-		hash.SetBytes(mt.rootKey.Bytes())
-		panic(fmt.Errorf("load trie root failed hash %v", hash))
+	if mt.Debug {
+		_, err := mt.GetNode(mt.rootKey)
+		if err != nil {
+			var hash common.Hash
+			hash.SetBytes(mt.rootKey.Bytes())
+			panic(fmt.Errorf("load trie root failed hash %v", hash))
+		}
 	}
 	return mt.rootKey
 }

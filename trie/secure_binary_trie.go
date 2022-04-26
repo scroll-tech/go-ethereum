@@ -1,4 +1,6 @@
+//go:build !oldTree
 // +build !oldTree
+
 // Copyright 2015 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -160,6 +162,11 @@ func (t *SecureBinaryTrie) Delete(key []byte) {
 // TryDelete removes any existing value for key from the trie.
 // If a node was not found in the database, a MissingNodeError is returned.
 func (t *SecureBinaryTrie) TryDelete(key []byte) error {
+	//mitigate the create-delete issue: do not delete unexisted key
+	if r := t.Get(key); r == nil {
+		return nil
+	}
+
 	return t.TryUpdate(key, []byte{})
 	//kPreimage := smt.NewByte32FromBytesPadding(key)
 	//return t.tree.DeleteWord(kPreimage)

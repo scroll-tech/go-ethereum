@@ -404,6 +404,7 @@ func (w *smtProofWriter) buildSStore(l *types.StructLogRes) (*types.StateTrace, 
 }
 
 func (w *smtProofWriter) buildCreate(l *types.StructLogRes) (*types.StateTrace, error) {
+	w.tracingAccounts[getAccountProof(l, posCREATE).Address.String()] = nil
 	return w.buildCreateOrCall(l, posCREATE, posCREATE)
 }
 
@@ -424,12 +425,6 @@ func (w *smtProofWriter) buildCreateOrCall(l *types.StructLogRes, posBefore, pos
 	addr, accData := getAccountDataFromProof(l, posAfter)
 	if accData == nil {
 		return nil, fmt.Errorf("unexpected data format for log %s", l.Op)
-	}
-
-	//both CALL (before EIP158) and CREATE would automatically create the account, and STATICCALL would also
-	//trigger a new stateobject for non-existed address (and AddBalance of 0 is called in StaticCall)
-	if _, existed := w.tracingAccounts[addr.String()]; !existed {
-		w.tracingAccounts[addr.String()] = nil
 	}
 
 	out, err := w.traceAccountUpdate(&addr, func(accBefore *types.StateAccount) *types.StateAccount {
@@ -497,11 +492,8 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 			}
 			//update contract to CREATE addr
 			callEnterAddress, _ = getAccountDataFromProof(&sLog, posCREATE)
-		case "CALL", "CALLCODE", "STATICCALL":
+		case "CALL", "CALLCODE":
 			pos := posCALL
-			if sLog.Op == "STATICCALL" {
-				pos = posSTATICCALL
-			}
 			if t, err := w.buildCreateOrCall(&sLog, pos, pos+1); err == nil {
 				t.Index = i
 				w.outTrace = append(w.outTrace, t)
@@ -509,6 +501,9 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 				return fmt.Errorf("handle %s log fail: %s", sLog.Op, err)
 			}
 			callEnterAddress, _ = getAccountDataFromProof(&sLog, pos)
+		case "STATICCALL":
+			//static call has no update on target address
+			callEnterAddress, _ = getAccountDataFromProof(&sLog, posSTATICCALL)
 		case "SSTORE":
 			if sLog.ExtraData == nil {
 				log.Warn("no storage data for SSTORE")

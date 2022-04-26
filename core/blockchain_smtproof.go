@@ -622,8 +622,8 @@ func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
 
 			//sanity check
 			if !bytes.Equal(accData.Root[:], accDataBefore.Root[:]) {
-				//panic(fmt.Errorf("accout %s is not cleaned for state: %x vs %x", acc, accData.Root[:], accDataBefore.Root[:]))
-				log.Error("not clean failure", "error", fmt.Errorf("accout %s is not cleaned for state: %x vs %x", acc, accData.Root[:], accDataBefore.Root[:]))
+				panic(fmt.Errorf("accout %s is not cleaned for state: %x vs %x", acc, accData.Root[:], accDataBefore.Root[:]))
+				//log.Error("not clean failure", "error", fmt.Errorf("accout %s is not cleaned for state: %x vs %x", acc, accData.Root[:], accDataBefore.Root[:]))
 			}
 			return accData
 		})

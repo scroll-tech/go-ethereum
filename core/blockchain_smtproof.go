@@ -482,6 +482,12 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 			}
 		}
 
+		if exD := sLog.ExtraData; exD != nil && exD.CallFailed {
+			//mark current op and next ops with more depth skippable
+			skipDepth = sLog.Depth
+			continue
+		}
+
 		switch sLog.Op {
 		case "CREATE", "CREATE2":
 			if t, err := w.buildCreate(&sLog); err == nil {
@@ -565,6 +571,12 @@ func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
 
 //finally update account status which is not traced in logs (Nonce added, gasBuy, gasRefund etc)
 func (w *smtProofWriter) handleCallEnd(calledLog *types.StructLogRes) error {
+
+	//no need to handle fail calling
+	if calledLog.ExtraData != nil && calledLog.ExtraData.CallFailed {
+		return nil
+	}
+
 	switch calledLog.Op {
 	case "CREATE", "CREATE2":
 		//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)

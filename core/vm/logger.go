@@ -373,7 +373,6 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	switch theLog.Op {
 	case CREATE, CREATE2:
 		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
-		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList)
 		dataLen := len(theLog.ExtraData.ProofList)
 		if dataLen == 0 {
 			panic("unexpected data capture for target op")

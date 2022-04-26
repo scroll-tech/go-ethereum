@@ -185,20 +185,40 @@ func newSMTProofWriter(storage *types.StorageRes) (*smtProofWriter, error) {
 	}, nil
 }
 
-func getAccountProof(l *types.StructLogRes, before bool) *types.AccountProofWrapper {
+const (
+	posSSTOREBefore = 0
+	posSSTOREAfter  = 1 // maybe deprecated later
+	posCREATE       = 0
+	posCREATEAfter  = 1
+	posCALL         = 1
+	posSTATICCALL   = 0
+)
+
+func getAccountProof(l *types.StructLogRes, pos int) *types.AccountProofWrapper {
 	if exData := l.ExtraData; exData == nil {
 		return nil
-	} else if len(exData.ProofList) == 0 {
+	} else if len(exData.ProofList) < pos {
 		return nil
-	} else if before {
-		return exData.ProofList[0]
 	} else {
-		return exData.ProofList[1]
+		return exData.ProofList[pos]
 	}
 }
 
-func getStorage(l *types.StructLogRes, before bool) *types.StorageProofWrapper {
-	if acc := getAccountProof(l, before); acc == nil {
+func getAccountDataFromProof(l *types.StructLogRes, pos int) (common.Address, *types.StateAccount) {
+	proof := getAccountProof(l, pos)
+	if proof == nil {
+		return common.Address{}, nil
+	}
+
+	return proof.Address, &types.StateAccount{
+		Nonce:    proof.Nonce,
+		Balance:  (*big.Int)(proof.Balance),
+		CodeHash: proof.CodeHash.Bytes(),
+	}
+}
+
+func getStorage(l *types.StructLogRes, pos int) *types.StorageProofWrapper {
+	if acc := getAccountProof(l, pos); acc == nil {
 		return nil
 	} else if stg := acc.Storage; stg == nil {
 		return nil
@@ -207,8 +227,8 @@ func getStorage(l *types.StructLogRes, before bool) *types.StorageProofWrapper {
 	}
 }
 
-func mustGetStorageProof(l *types.StructLogRes, before bool) []string {
-	ret := getStorage(l, before)
+func mustGetStorageProof(l *types.StructLogRes, pos int) []string {
+	ret := getStorage(l, pos)
 	if ret == nil {
 		panic("No storage proof in log")
 	}
@@ -227,9 +247,10 @@ func verifyAccountNode(addr *common.Address, n *trie.Node) error {
 	return nil
 }
 
-// update account state, and return the corresponding trace object which
+// update traced account state, and return the corresponding trace object which
 // is still opened for more infos
-func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore, accData *types.StateAccount) (*types.StateTrace, error) {
+// the updated accData state is obtained by a closure which enable it being derived from current status
+func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, getAccData func(*types.StateAccount) *types.StateAccount) (*types.StateTrace, error) {
 
 	out := new(types.StateTrace)
 	//account trie
@@ -238,19 +259,10 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 	//fill dummy
 	out.AccountUpdate = [2]*types.StateAccountL2{{}, {}}
 
-	if accData != nil {
-		out.AccountUpdate[1] = &types.StateAccountL2{
-			Nonce:    int(accData.Nonce),
-			Balance:  types.HexInt{Int: big.NewInt(0).Set(accData.Balance)},
-			CodeHash: accData.CodeHash,
-		}
-	}
-	if accDataBefore != nil {
-		out.AccountUpdate[0] = &types.StateAccountL2{
-			Nonce:    int(accDataBefore.Nonce),
-			Balance:  types.HexInt{Int: big.NewInt(0).Set(accDataBefore.Balance)},
-			CodeHash: accDataBefore.CodeHash,
-		}
+	accDataBefore, existed := w.tracingAccounts[addr.String()]
+	if !existed {
+		//sanity check
+		panic(fmt.Errorf("code do not add initialized status for account %s", addr))
 	}
 
 	var proof proofList
@@ -260,11 +272,33 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 
 	nBefore := decodeProofForMPTPath(proof, out.AccountPath[0])
 	if accDataBefore != nil {
+		//sanity check
 		if err := verifyAccountNode(addr, nBefore); err != nil {
-			return nil, fmt.Errorf("state BEFORE has no valid account: %s", err)
+			panic(fmt.Errorf("code fail to trace account status correctly: %s", err))
 		}
+		if bt := accDataBefore.MarshalBytes(); !bytes.Equal(bt, nBefore.ValuePreimage) {
+			panic(fmt.Errorf("code fail to trace account status correctly: %x vs %x", bt, nBefore.ValuePreimage))
+		}
+
+		//accH, _ := accDataBefore.Hash()
+		//log.Info("sanity check acc before", "addr", addr.String(), "key", nBefore.Entry[1].BigInt().Text(16), "hash", accH.Text(16))
+
 		// we have ensured the nBefore has a key corresponding to the query one
 		out.AccountKey = nBefore.Entry[0][:]
+		out.AccountUpdate[0] = &types.StateAccountL2{
+			Nonce:    int(accDataBefore.Nonce),
+			Balance:  types.HexInt{Int: big.NewInt(0).Set(accDataBefore.Balance)},
+			CodeHash: accDataBefore.CodeHash,
+		}
+	}
+
+	accData := getAccData(accDataBefore)
+	if accData != nil {
+		out.AccountUpdate[1] = &types.StateAccountL2{
+			Nonce:    int(accData.Nonce),
+			Balance:  types.HexInt{Int: big.NewInt(0).Set(accData.Balance)},
+			CodeHash: accData.CodeHash,
+		}
 	}
 
 	if accData != nil {
@@ -298,24 +332,19 @@ func (w *smtProofWriter) traceAccountUpdate(addr *common.Address, accDataBefore,
 	return out, nil
 }
 
-//handleSStore would return nil for a non-op (i.e. SSTORE a value identify to before state)
-func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (*types.StateTrace, error) {
+//buildSStore would return nil for a non-op (i.e. SSTORE a value identify to before state)
+func (w *smtProofWriter) buildSStore(l *types.StructLogRes) (*types.StateTrace, error) {
 
 	storeAddr := hexutil.MustDecodeBig((*l.Stack)[len(*l.Stack)-1])
 
-	log.Debug("handle SSTORE", "pc", l.Pc)
-
-	acc, existed := w.tracingAccounts[w.currentContract.String()]
-	if !existed {
-		return nil, fmt.Errorf("contract has no %s account for trace", w.currentContract)
-	}
+	log.Debug("build SSTORE", "pc", l.Pc)
 
 	statePath := [2]*types.SMTPath{{}, {}}
 	stateUpdate := [2]*types.StateStorageL2{}
 
 	var storageBeforeProof, storageAfterProof proofList
 	var err error
-	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(l, true)); err != nil {
+	if storageBeforeProof, err = proofListFromString(mustGetStorageProof(l, posSSTOREBefore)); err != nil {
 		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 
@@ -330,12 +359,7 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (*types.StateTrace,
 		stateUpdate[0] = &types.StateStorageL2{}
 	}
 
-	//sanity check
-	if accRootFromState := smt.ReverseByteOrder(statePath[0].Root); !bytes.Equal(acc.Root[:], accRootFromState) {
-		panic(fmt.Errorf("unexpected storage root before: [%s] vs [%s]", acc.Root, accRootFromState))
-	}
-
-	if storageAfterProof, err = proofListFromString(mustGetStorageProof(l, false)); err != nil {
+	if storageAfterProof, err = proofListFromString(mustGetStorageProof(l, posSSTOREAfter)); err != nil {
 		return nil, fmt.Errorf("invalid hex string: %s", err)
 	}
 
@@ -356,14 +380,19 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (*types.StateTrace,
 		return nil, nil
 	}
 
-	accAfter := &types.StateAccount{
-		Nonce:    acc.Nonce,
-		Balance:  acc.Balance,
-		CodeHash: acc.CodeHash,
-		Root:     common.BytesToHash(smt.ReverseByteOrder(statePath[1].Root)),
-	}
-
-	out, err := w.traceAccountUpdate(&w.currentContract, acc, accAfter)
+	out, err := w.traceAccountUpdate(&w.currentContract,
+		func(acc *types.StateAccount) *types.StateAccount {
+			//sanity check
+			if accRootFromState := smt.ReverseByteOrder(statePath[0].Root); !bytes.Equal(acc.Root[:], accRootFromState) {
+				panic(fmt.Errorf("unexpected storage root before: [%s] vs [%x]", acc.Root, accRootFromState))
+			}
+			return &types.StateAccount{
+				Nonce:    acc.Nonce,
+				Balance:  acc.Balance,
+				CodeHash: acc.CodeHash,
+				Root:     common.BytesToHash(smt.ReverseByteOrder(statePath[1].Root)),
+			}
+		})
 	if err != nil {
 		return nil, fmt.Errorf("update account %s in SSTORE fail: %s", w.currentContract, err)
 	}
@@ -374,11 +403,112 @@ func (w *smtProofWriter) handleSStore(l *types.StructLogRes) (*types.StateTrace,
 	return out, nil
 }
 
+func (w *smtProofWriter) buildCreate(l *types.StructLogRes) (*types.StateTrace, error) {
+	return w.buildCreateOrCall(l, posCREATE, posCREATE)
+}
+
+func (w *smtProofWriter) buildCreateOrCall(l *types.StructLogRes, posBefore, posAfter int) (*types.StateTrace, error) {
+
+	proof := getAccountProof(l, posBefore)
+	if proof == nil {
+		return nil, fmt.Errorf("unexpected storage data for %s log at %d", l.Op, l.Pc)
+	}
+
+	proofList, err := proofListFromString(proof.Proof)
+	if err != nil {
+		return nil, fmt.Errorf("parse prooflist failure: %s", err)
+	}
+
+	decodeProofForAccounts(proofList, w.underlayerDb, w.tracingAccounts)
+
+	addr, accData := getAccountDataFromProof(l, posAfter)
+	if accData == nil {
+		return nil, fmt.Errorf("unexpected data format for log %s", l.Op)
+	}
+
+	//both CALL (before EIP158) and CREATE would automatically create the account, and STATICCALL would also
+	//trigger a new stateobject for non-existed address (and AddBalance of 0 is called in StaticCall)
+	if _, existed := w.tracingAccounts[addr.String()]; !existed {
+		w.tracingAccounts[addr.String()] = nil
+	}
+
+	out, err := w.traceAccountUpdate(&addr, func(accBefore *types.StateAccount) *types.StateAccount {
+		if accBefore != nil {
+			accData.Root = accBefore.Root
+		}
+		return accData
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update account %s for creation fail: %s", addr, err)
+	}
+	out.CommonStateRoot = smt.ReverseByteOrder(accData.Root[:])
+
+	return out, nil
+}
+
 // Fill smtproof field for execResult
 func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
+	logStack := []*types.StructLogRes{nil}
+	contractStack := map[int]common.Address{}
+	skipDepth := 0
+	callEnterAddress := w.currentContract
+
 	// now trace every OP which could cause changes on state:
 	for i, sLog := range logs {
+
+		//trace log stack by depth rather than scanning specified op
+		if sl := len(logStack); sl < sLog.Depth {
+			logStack = append(logStack, &logs[i])
+			//update currentContract according to previous op
+			contractStack[sl] = w.currentContract
+			w.currentContract = callEnterAddress
+		} else if sl > sLog.Depth {
+			logStack = logStack[:sl-1]
+			w.currentContract = contractStack[sLog.Depth]
+			//reentry the last log which "cause" the calling, some handling may needed
+			if err := w.handleCallEnd(logStack[len(logStack)-1]); err != nil {
+				return fmt.Errorf("handle callstack popping fail: %s", err)
+			}
+
+		} else {
+			logStack[sl-1] = &logs[i]
+		}
+		//sanity check
+		if len(logStack) != sLog.Depth {
+			panic("tracking log stack failure")
+		}
+		callEnterAddress = w.currentContract
+
+		if skipDepth != 0 {
+			if skipDepth < sLog.Depth {
+				continue
+			} else {
+				skipDepth = 0
+			}
+		}
+
 		switch sLog.Op {
+		case "CREATE", "CREATE2":
+			if t, err := w.buildCreate(&sLog); err == nil {
+				t.Index = i
+				w.outTrace = append(w.outTrace, t)
+			} else {
+				return fmt.Errorf("handle %s log fail: %s", sLog.Op, err)
+			}
+			//update contract to CREATE addr
+			callEnterAddress, _ = getAccountDataFromProof(&sLog, posCREATE)
+		case "CALL", "CALLCODE", "STATICCALL":
+			pos := posCALL
+			if sLog.Op == "STATICCALL" {
+				pos = posSTATICCALL
+			}
+			if t, err := w.buildCreateOrCall(&sLog, pos, pos+1); err == nil {
+				t.Index = i
+				w.outTrace = append(w.outTrace, t)
+			} else {
+				return fmt.Errorf("handle %s log fail: %s", sLog.Op, err)
+			}
+			callEnterAddress, _ = getAccountDataFromProof(&sLog, pos)
 		case "SSTORE":
 			if sLog.ExtraData == nil {
 				log.Warn("no storage data for SSTORE")
@@ -388,7 +518,7 @@ func (w *smtProofWriter) handleLogs(logs []types.StructLogRes) error {
 				break
 			}
 
-			if t, err := w.handleSStore(&sLog); err == nil {
+			if t, err := w.buildSStore(&sLog); err == nil {
 				if t != nil {
 					t.Index = i
 					// sanity check
@@ -416,12 +546,17 @@ func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
 		return nil
 	}
 
+	//notice we need to init traced account status first for creation
+	//notice decoding ToProof may also insert account data with the same address
+	//(in the case of created on the same address)
+	w.tracingAccounts[w.currentContract.String()] = nil
+
 	accData, err := types.UnmarshalStateAccount(buf)
 	if err != nil {
 		return fmt.Errorf("unmarshall created acc fail: %s", err)
 	}
 
-	out, err := w.traceAccountUpdate(&w.currentContract, nil, accData)
+	out, err := w.traceAccountUpdate(&w.currentContract, func(_ *types.StateAccount) *types.StateAccount { return accData })
 	if err != nil {
 		return fmt.Errorf("update account %s for creation fail: %s", w.currentContract, err)
 	}
@@ -429,6 +564,32 @@ func (w *smtProofWriter) handleAccountCreate(buf []byte) error {
 	out.Index = -1
 	out.CommonStateRoot = smt.ReverseByteOrder(accData.Root[:])
 	w.outTrace = append(w.outTrace, out)
+
+	return nil
+}
+
+//finally update account status which is not traced in logs (Nonce added, gasBuy, gasRefund etc)
+func (w *smtProofWriter) handleCallEnd(calledLog *types.StructLogRes) error {
+	switch calledLog.Op {
+	case "CREATE", "CREATE2":
+		//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)
+		addr, accData := getAccountDataFromProof(calledLog, posCREATEAfter)
+		if accData == nil {
+			return fmt.Errorf("unexpected data format for log %s", calledLog.Op)
+		}
+
+		out, err := w.traceAccountUpdate(&addr, func(accDataBefore *types.StateAccount) *types.StateAccount {
+			//pick root from before state
+			accData.Root = accDataBefore.Root
+			return accData
+		})
+		if err != nil {
+			return fmt.Errorf("update account for %s (after CREATE) fail: %s", addr, err)
+		}
+		out.Index = -1
+		out.CommonStateRoot = smt.ReverseByteOrder(accData.Root[:])
+		w.outTrace = append(w.outTrace, out)
+	}
 
 	return nil
 }
@@ -443,18 +604,22 @@ func (w *smtProofWriter) handlePostTx(accs map[string]hexutil.Bytes) error {
 			return fmt.Errorf("unmarshall acc fail: %s", err)
 		}
 
-		accDataBefore, existed := w.tracingAccounts[acc]
-		// sanity check
-		if !existed {
-			panic(fmt.Errorf("account %s has not been traced in Log", acc))
-		} else if !bytes.Equal(accData.Root[:], accDataBefore.Root[:]) {
-			panic(fmt.Errorf("accout %s is not cleaned for state", acc))
-		}
-
 		addrBytes, _ := hexutil.Decode(acc)
 		addr := common.BytesToAddress(addrBytes)
 
-		out, err := w.traceAccountUpdate(&addr, accDataBefore, accData)
+		out, err := w.traceAccountUpdate(&addr, func(accDataBefore *types.StateAccount) *types.StateAccount {
+
+			//hBefore, _ := accDataBefore.Hash()
+			//hAfter, _ := accData.Hash()
+			//log.Info("post tx", "adr", addr.String(), "before", hBefore.Text(16), "after", hAfter.Text(16))
+
+			//sanity check
+			if !bytes.Equal(accData.Root[:], accDataBefore.Root[:]) {
+				//panic(fmt.Errorf("accout %s is not cleaned for state: %x vs %x", acc, accData.Root[:], accDataBefore.Root[:]))
+				log.Error("not clean failure", "error", fmt.Errorf("accout %s is not cleaned for state: %x vs %x", acc, accData.Root[:], accDataBefore.Root[:]))
+			}
+			return accData
+		})
 		if err != nil {
 			return fmt.Errorf("update account %s fail: %s", addr, err)
 		}

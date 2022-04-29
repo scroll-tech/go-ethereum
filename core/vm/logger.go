@@ -210,9 +210,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	}
 	// Copy a snapshot of the current stack state to a new buffer
 	if !l.cfg.DisableStack {
-		for _, item := range stack.Data() {
-			structlog.Stack = append(structlog.Stack, item)
-		}
+		structlog.Stack = append(structlog.Stack, stack.Data()...)
 	}
 	var (
 		recordStorageDetail bool

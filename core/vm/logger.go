@@ -196,7 +196,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	memory := scope.Memory
 	stack := scope.Stack
 	contract := scope.Contract
-	// create a new snapshot of the EVM.
+	// create a struct log.
 	structlog := NewStructlog(pc, op, gas, cost, depth)
 
 	// check if already accumulated the specified number of logs

@@ -8,7 +8,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types/smt"
 
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 const HashEmpty = 0
@@ -255,7 +254,7 @@ func proofToRows(p *CircomProcessorProof) ([]Row, error) {
 
 // notes: swap endians(little endian bits) to make the tree full utilized
 func generateTestData() error {
-	tree, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), numLevels)
+	tree, err := NewMerkleTree(NewEthKVStorage(NewDatabase(memorydb.New())), numLevels)
 	if err != nil {
 		return err
 	}

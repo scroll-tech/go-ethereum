@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/trie/db"
 )
 
 type Fatalable interface {
@@ -20,7 +19,7 @@ type Fatalable interface {
 }
 
 func newTestingMerkle(f Fatalable, numLevels int) *MerkleTree {
-	mt, err := NewMerkleTree(db.NewEthKVStorage(memorydb.New()), numLevels)
+	mt, err := NewMerkleTree(NewEthKVStorage(NewDatabase(memorydb.New())), numLevels)
 	if err != nil {
 		f.Fatal(err)
 		return nil

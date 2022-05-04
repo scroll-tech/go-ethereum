@@ -37,7 +37,6 @@ import (
 // Tests that updating a state trie does not leak any database writes prior to
 // actually committing the state.
 func TestUpdateLeaks(t *testing.T) {
-	t.Skip("Trie commits real time now, revisit this after trie.Commit / write buffer implemented")
 	// Create an empty state database
 	db := rawdb.NewMemoryDatabase()
 	state, _ := New(common.Hash{}, NewDatabase(db), nil)
@@ -71,7 +70,6 @@ func TestUpdateLeaks(t *testing.T) {
 // Tests that no intermediate state of an object is stored into the database,
 // only the one right before the commit.
 func TestIntermediateLeaks(t *testing.T) {
-	t.Skip("Trie commits real time now, revisit this after trie.Commit / write buffer implemented")
 	// Create two state databases, one transitioning to the final state, the other final from the beginning
 	transDb := rawdb.NewMemoryDatabase()
 	finalDb := rawdb.NewMemoryDatabase()

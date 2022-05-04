@@ -1,27 +1,50 @@
-package db
+package trie
 
 import (
 	"github.com/syndtr/goleveldb/leveldb"
-
-	"github.com/scroll-tech/go-ethereum/ethdb"
 )
+
+// EthKVStorageTx implements the Tx interface
+// A dummy implementation for legacy interface reason
+type EthKVStorageTx struct {
+	storage *EthKVStorage
+}
+
+// Get retreives a value from a key in the interface Tx
+func (tx *EthKVStorageTx) Get(key []byte) ([]byte, error) {
+	return tx.storage.Get(key)
+}
+
+// Put saves a key:value into the Storage
+func (tx *EthKVStorageTx) Put(k, v []byte) error {
+	return tx.storage.Put(k, v)
+}
+
+// Commit implements the method Commit of the interface Tx
+func (tx *EthKVStorageTx) Commit() error {
+	return nil
+}
 
 // EthKVStorage implements the Storage interface
 type EthKVStorage struct {
-	db     ethdb.KeyValueStore
+	db *Database
+	//cache  KvMap
 	prefix []byte
 }
 
-// EthKVStorageTx implements the Tx interface
-type EthKVStorageTx struct {
-	*EthKVStorage
-	cache KvMap
+// Close implements the method Close of the interface Tx
+func (tx *EthKVStorageTx) Close() {
 }
 
-func NewEthKVStorage(db ethdb.KeyValueStore) Storage {
+func NewEthKVStorage(db *Database) Storage {
 	return &EthKVStorage{db, []byte{}}
 }
 
+/*
+func NewEthKVStorageWithCache(db ethdb.KeyValueStore, cache KvMap) Storage {
+	return &EthKVStorage{db, cache, []byte{}}
+}
+*/
 // WithPrefix implements the method WithPrefix of the interface Storage
 func (l *EthKVStorage) WithPrefix(prefix []byte) Storage {
 	return &EthKVStorage{l.db, Concat(l.prefix, prefix)}
@@ -29,13 +52,27 @@ func (l *EthKVStorage) WithPrefix(prefix []byte) Storage {
 
 // NewTx implements the method NewTx of the interface Storage
 func (l *EthKVStorage) NewTx() (Tx, error) {
-	return &EthKVStorageTx{l, make(KvMap)}, nil
+	return &EthKVStorageTx{l}, nil
+}
+
+// Put saves a key:value into the Storage
+func (l *EthKVStorage) Put(k, v []byte) error {
+	l.db.lock.Lock()
+	l.db.rawDirties.Put(Concat(l.prefix, k[:]), v)
+	l.db.lock.Unlock()
+	return nil
 }
 
 // Get retrieves a value from a key in the Storage
 func (l *EthKVStorage) Get(key []byte) ([]byte, error) {
 	concatKey := Concat(l.prefix, key[:])
-	v, err := l.db.Get(concatKey)
+	l.db.lock.RLock()
+	value, ok := l.db.rawDirties.Get(concatKey)
+	l.db.lock.RUnlock()
+	if ok {
+		return value, nil
+	}
+	v, err := l.db.diskdb.Get(concatKey)
 	if err == leveldb.ErrNotFound {
 		return nil, ErrNotFound
 	}
@@ -44,7 +81,7 @@ func (l *EthKVStorage) Get(key []byte) ([]byte, error) {
 
 // Iterate implements the method Iterate of the interface Storage
 func (l *EthKVStorage) Iterate(f func([]byte, []byte) (bool, error)) error {
-	iter := l.db.NewIterator(l.prefix, nil)
+	iter := l.db.diskdb.NewIterator(l.prefix, nil)
 	defer iter.Release()
 	for iter.Next() {
 		localKey := iter.Key()[len(l.prefix):]
@@ -58,58 +95,10 @@ func (l *EthKVStorage) Iterate(f func([]byte, []byte) (bool, error)) error {
 	return iter.Error()
 }
 
-// Get retreives a value from a key in the interface Tx
-func (tx *EthKVStorageTx) Get(key []byte) ([]byte, error) {
-	var err error
-
-	fullkey := Concat(tx.prefix, key)
-
-	if value, ok := tx.cache.Get(fullkey); ok {
-		return value, nil
-	}
-
-	value, err := tx.db.Get(fullkey)
-	if err == leveldb.ErrNotFound {
-		return nil, ErrNotFound
-	}
-
-	return value, err
-}
-
-// Put saves a key:value into the Storage
-func (tx *EthKVStorageTx) Put(k, v []byte) error {
-	tx.cache.Put(Concat(tx.prefix, k[:]), v)
-	return nil
-}
-
-// Add implements the method Add of the interface Tx
-func (tx *EthKVStorageTx) Add(atx Tx) error {
-	ldbtx := atx.(*EthKVStorageTx)
-	for _, v := range ldbtx.cache {
-		tx.cache.Put(v.K, v.V)
-	}
-	return nil
-}
-
-// Commit implements the method Commit of the interface Tx
-func (tx *EthKVStorageTx) Commit() error {
-	batch := tx.db.NewBatch()
-	for _, v := range tx.cache {
-		batch.Put(v.K, v.V)
-	}
-
-	tx.cache = nil
-	return batch.Write()
-}
-
-// Close implements the method Close of the interface Tx
-func (tx *EthKVStorageTx) Close() {
-	tx.cache = nil
-}
-
 // Close implements the method Close of the interface Storage
 func (l *EthKVStorage) Close() {
-	if err := l.db.Close(); err != nil {
+	// FIXME: is this correct?
+	if err := l.db.diskdb.Close(); err != nil {
 		panic(err)
 	}
 }

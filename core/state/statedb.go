@@ -342,7 +342,6 @@ func (s *StateDB) GetStateData(addr common.Address) *types.StateAccount {
 	if !ok {
 		return nil
 	}
-
 	return &obj.data
 }
 

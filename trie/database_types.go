@@ -10,20 +10,6 @@ import (
 // when a key is not found in the storage
 var ErrNotFound = errors.New("key not found")
 
-// Tx is the interface that defines the methods for the db transaction used in
-// the merkletree storage. Examples of the interface implementation can be
-// found at db/memory and db/leveldb directories.
-type Tx interface {
-	// Get retreives the value for the given key
-	// looking first in the content of the Tx, and
-	// then into the content of the Storage
-	Get([]byte) ([]byte, error)
-	// Put sets the key & value into the Tx
-	Put(k, v []byte) error
-	Commit() error
-	Close()
-}
-
 // KV contains a key (K) and a value (V)
 type KV struct {
 	K []byte

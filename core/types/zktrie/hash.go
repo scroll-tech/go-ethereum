@@ -93,7 +93,6 @@ func NewBigIntFromHashBytes(b []byte) (*big.Int, error) {
 func NewHashFromBigInt(b *big.Int) *Hash {
 	r := &Hash{}
 	copy(r[:], ReverseByteOrder(b.Bytes()))
-	//copy(r[:], b.Bytes())
 	return r
 }
 

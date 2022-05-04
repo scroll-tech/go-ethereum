@@ -282,12 +282,18 @@ func (s *stateObject) SetState(db Database, key, value common.Hash) {
 
 	// always update trie
 	tr := s.getTrie(db)
+	// copied from "updateTrie"
+	var v []byte
 	if (value == common.Hash{}) {
 		s.setError(tr.TryDelete(key[:]))
 		//s.db.StorageDeleted += 1
 	} else {
-		// Encoding []byte cannot fail, ok to ignore the error.
-		v, _ := rlp.EncodeToBytes(common.TrimLeftZeroes(value[:]))
+		if db.TrieDB().Zktrie {
+			v = common.CopyBytes(value[:])
+		} else {
+			// Encoding []byte cannot fail, ok to ignore the error.
+			v, _ = rlp.EncodeToBytes(common.TrimLeftZeroes(value[:]))
+		}
 		s.setError(tr.TryUpdate(key[:], v))
 		//s.db.StorageUpdated += 1
 	}

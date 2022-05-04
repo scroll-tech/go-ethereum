@@ -11,8 +11,6 @@ import (
 // NodeType defines the type of node in the MT.
 type NodeType byte
 
-var byte32Zero zkt.Byte32
-
 const (
 	// NodeTypeMiddle indicates the type of middle Node that has children.
 	NodeTypeMiddle NodeType = 0

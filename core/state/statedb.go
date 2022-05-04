@@ -321,8 +321,7 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
 	if s.zktrie() {
 		var proof proofList
-		var err error
-		err = s.trie.Prove(addr.Bytes32(), 0, &proof)
+		err := s.trie.Prove(addr.Bytes32(), 0, &proof)
 		return proof, err
 	}
 	return s.GetProofByHash(crypto.Keccak256Hash(addr.Bytes()))

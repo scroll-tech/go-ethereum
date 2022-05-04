@@ -94,8 +94,8 @@ func TestZktrieDelete(t *testing.T) {
 
 func TestZktrieGetKey(t *testing.T) {
 	trie := newEmptyZkTrie()
-	key := []byte("0a1b2c3d4e5f6g7h8i9j")
-	value := []byte("9j8i7h6g5f4e3d2c1b0a")
+	key := []byte("0a1b2c3d4e5f6g7h8i9j0a1b2c3d4e5f")
+	value := []byte("9j8i7h6g5f4e3d2c1b0a9j8i7h6g5f4e")
 	trie.Update(key, value)
 
 	kPreimage := zkt.NewByte32FromBytesPaddingZero(key)

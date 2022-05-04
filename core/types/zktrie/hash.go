@@ -64,7 +64,7 @@ func (h *Hash) BigInt() *big.Int {
 func (h *Hash) Bytes() []byte {
 	b := [32]byte{}
 	copy(b[:], h[:])
-	return b[:]
+	return ReverseByteOrder(b[:])
 	/*
 		buf := make([]byte, 32)
 		bi := new(big.Int).SetBytes(h[:])

@@ -125,10 +125,13 @@ type StructLogger struct {
 	cfg LogConfig
 	env *EVM
 
-	storage      map[common.Address]Storage
-	accFromProof [][]byte
-	accToProof   [][]byte
-	stateRoot    *common.Hash
+	states         map[common.Address]struct{}
+	storage        map[common.Address]Storage
+	accFromProof   [][]byte
+	accToProof     [][]byte
+	accountTo      common.Address
+	createdAccount *types.StateAccount
+	stateRoot      *common.Hash
 
 	callStackLogInd []int
 	logs            []StructLog
@@ -140,6 +143,7 @@ type StructLogger struct {
 func NewStructLogger(cfg *LogConfig) *StructLogger {
 	logger := &StructLogger{
 		storage: make(map[common.Address]Storage),
+		states:  make(map[common.Address]struct{}),
 	}
 	if cfg != nil {
 		logger.cfg = *cfg
@@ -150,6 +154,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 // Reset clears the data held by the logger.
 func (l *StructLogger) Reset() {
 	l.storage = make(map[common.Address]Storage)
+	l.states = make(map[common.Address]struct{})
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.callStackLogInd = nil
@@ -157,13 +162,23 @@ func (l *StructLogger) Reset() {
 	l.stateRoot = nil
 	l.accFromProof = nil
 	l.accToProof = nil
+	l.createdAccount = nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
+	l.accountTo = to
 
-	log.Info("capture address", "from", from, "to", to)
+	if create {
+		//Notice codeHash is set AFTER CreateTx has exited, so heree codeHash is still empty
+		l.createdAccount = &types.StateAccount{
+			//Nonce is 1 after EIP158, so we query it from stateDb
+			Nonce:   env.StateDB.GetNonce(to),
+			Balance: value,
+		}
+	}
+
 	pf, err := env.StateDB.GetProof(from)
 	if err != nil {
 		log.Warn("Failed to get base proof", "from", from.String(), " err", err)
@@ -174,6 +189,9 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 	if err != nil {
 		log.Warn("Failed to get base proof", "to", to.String(), " err", err)
 	}
+
+	l.states[from] = struct{}{}
+	l.states[to] = struct{}{}
 
 	root := env.StateDB.GetRootHash()
 	l.stateRoot = &root
@@ -355,7 +373,6 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	switch theLog.Op {
 	case CREATE, CREATE2:
 		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
-		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList)
 		dataLen := len(theLog.ExtraData.ProofList)
 		if dataLen == 0 {
 			panic("unexpected data capture for target op")
@@ -376,8 +393,37 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 
 }
 
+// CaptureFinal is used to collect all "touched" accounts just after all modification to state has finished
+func (l *StructLogger) UpdatedAccounts() (output map[common.Address]*types.StateAccount) {
+	output = make(map[common.Address]*types.StateAccount)
+
+	for addr := range l.states {
+
+		acc := l.env.StateDB.GetStateData(addr)
+		if acc == nil {
+			log.Error("Failed to query data", "account addr", addr)
+		} else {
+			//deep copy is required, except for codehash (it should not change)
+			output[addr] = &types.StateAccount{
+				Nonce:    acc.Nonce,
+				Balance:  big.NewInt(0).Set(acc.Balance),
+				Root:     acc.Root,
+				CodeHash: acc.CodeHash,
+			}
+		}
+	}
+
+	return
+}
+
 // BaseProofs returns the account proof of 2 accounts which must being mutated in tx (from and to)
 func (l *StructLogger) BaseProofs() ([][]byte, [][]byte) { return l.accFromProof, l.accToProof }
+
+// ToAddress return the tx to addr, in create tx it return the contract address
+func (l *StructLogger) ToAddress() common.Address { return l.accountTo }
+
+// CreatedAccount return the account data in case it is a create tx
+func (l *StructLogger) CreatedAccount() *types.StateAccount { return l.createdAccount }
 
 // StateRootBefore returns the root of state before execution begins
 func (l *StructLogger) StateRootBefore() *common.Hash { return l.stateRoot }

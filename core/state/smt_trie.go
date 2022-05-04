@@ -1,3 +1,4 @@
+//go:build !oldTree
 // +build !oldTree
 
 package state

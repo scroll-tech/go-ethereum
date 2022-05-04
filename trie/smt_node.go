@@ -148,8 +148,8 @@ func (n *Node) Value() []byte {
 		bytes = append(bytes, tmp...)
 		bytes = append(bytes, n.ValuePreimage[:]...)
 		return bytes
-	case NodeTypeEmpty: // {}
-		return []byte{}
+	case NodeTypeEmpty: // { Type }
+		return []byte{byte(n.Type)}
 	default:
 		return []byte{}
 	}

@@ -1,8 +1,6 @@
 package vm
 
 import (
-	"errors"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -16,7 +14,7 @@ var (
 		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
 		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
-		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1)},
+		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressProof(1)},
 		CREATE:       {}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
 		CREATE2:      {}, // sender's wrapped_proof is already recorded in BlockChain.writeBlockResult
 		SLOAD:        {}, // record storage_proof in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
@@ -54,6 +52,7 @@ func traceLastNAddressCode(n int) traceFunc {
 
 // traceStorageProof get contract's storage proof at storage_address
 func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+
 	if scope.Stack.len() == 0 {
 		return nil
 	}
@@ -71,12 +70,13 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 	proof, err := getWrappedProofForAddr(l, scope.Contract.Address())
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
+		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }
 
 /// traceCreatedContractProof get created contract address’s accountProof
-func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+/*func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	stack := scope.Stack
 	if stack.len() < 1 {
 		return nil
@@ -89,9 +89,10 @@ func traceCreatedContractProof(l *StructLogger, scope *ScopeContext, extraData *
 	proof, err := getWrappedProofForAddr(l, address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
+		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
-}
+}*/
 
 // traceLastNAddressProof returns func about the last N's address proof.
 func traceLastNAddressProof(n int) traceFunc {
@@ -105,6 +106,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		proof, err := getWrappedProofForAddr(l, address)
 		if err == nil {
 			extraData.ProofList = append(extraData.ProofList, proof)
+			l.states[scope.Contract.Address()] = struct{}{}
 		}
 		return err
 	}
@@ -116,6 +118,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	proof, err := getWrappedProofForAddr(l, address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
+		l.states[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }

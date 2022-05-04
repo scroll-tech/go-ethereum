@@ -214,6 +214,17 @@ func buildSMTProof(rootKey *smt.Hash, k *big.Int, lvl int, getNode func(key *smt
 
 }
 
+// DecodeProof try to decode a node bytes, return can be nil for any non-node data (magic code)
+func DecodeSMTProof(data []byte) (*Node, error) {
+
+	if bytes.Equal(magicSMTBytes, data) {
+		//skip magic bytes node
+		return nil, nil
+	}
+
+	return NewNodeFromBytes(data)
+}
+
 // VerifyProof checks merkle proofs. The given proof must contain the value for
 // key in a trie with the given root hash. VerifyProof returns an error if the
 // proof contains invalid trie nodes or the wrong value.

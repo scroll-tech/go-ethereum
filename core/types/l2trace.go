@@ -1,6 +1,9 @@
 package types
 
 import (
+	"encoding/json"
+	"math/big"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
@@ -20,6 +23,7 @@ type ExecutionResult struct {
 	ReturnValue string `json:"returnValue,omitempty"`
 	// Sender's account proof.
 	Sender *AccountProofWrapper `json:"sender,omitempty"`
+
 	// It's exist only when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
@@ -28,11 +32,77 @@ type ExecutionResult struct {
 	// Deprecated: The account's proof.
 	// Proof      []string       `json:"proof,omitempty"`
 
-	// The base account's ([from, to]) proof
-	Proofs [2][][]byte `json:"-"`
-
 	Storage    *StorageRes    `json:"storage,omitempty"`
 	StructLogs []StructLogRes `json:"structLogs"`
+}
+
+// HexInt wrap big.Int for hex encoding
+type HexInt struct {
+	*big.Int
+}
+
+// MarshalText implements encoding.TextMarshaler
+func (hi HexInt) MarshalJSON() ([]byte, error) {
+	if hi.Int == nil {
+		return json.Marshal("0x")
+	}
+	return json.Marshal(hexutil.Encode(hi.Bytes()))
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (hi *HexInt) UnmarshalJSON(input []byte) error {
+
+	var s string
+	if err := json.Unmarshal(input, &s); err != nil {
+		return err
+	}
+
+	hi.Int, _ = big.NewInt(0).SetString(string(input), 0)
+	return nil
+}
+
+// SMTPathNode represent a node in the SMT Path
+type SMTPathNode struct {
+	Value   hexutil.Bytes `json:"value"`
+	Sibling hexutil.Bytes `json:"sibling"`
+}
+
+// SMTPath is the whole path of SMT
+type SMTPath struct {
+	KeyPathPart HexInt        `json:"pathPart"` //the path part in key
+	Root        hexutil.Bytes `json:"root"`
+	Path        []SMTPathNode `json:"path,omitempty"` //path start from top
+	Leaf        *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the sibling indicate key
+}
+
+// StateAccountL2 is the represent of StateAccount in L2 circuit
+// Notice in L2 we have different hash scheme against StateAccount.MarshalByte
+type StateAccountL2 struct {
+	Nonce    int           `json:"nonce"`
+	Balance  HexInt        `json:"balance"` //just the common hex expression of integer (big-endian)
+	CodeHash hexutil.Bytes `json:"codeHash,omitempty"`
+}
+
+// StateStorageL2 is the represent of a stored key-value pair for specified account
+type StateStorageL2 struct {
+	Key   hexutil.Bytes `json:"key"` //notice this is the preimage of storage key
+	Value hexutil.Bytes `json:"value"`
+}
+
+// StateTrace record the updating on state trie and (if changed) account trie
+// represent by the [before, after] updating of SMTPath amont tries and Account
+type StateTrace struct {
+	// which log the trace is responded for, -1 indicate not caused
+	// by opcode (like gasRefund, coinbase, setNonce, etc)
+	Index           int                `json:"index"`
+	Address         hexutil.Bytes      `json:"address"`
+	AccountKey      hexutil.Bytes      `json:"accountKey"`
+	AccountPath     [2]*SMTPath        `json:"accountPath"`
+	AccountUpdate   [2]*StateAccountL2 `json:"accountUpdate"`
+	StateKey        hexutil.Bytes      `json:"stateKey,omitempty"`
+	CommonStateRoot hexutil.Bytes      `json:"commonStateRoot,omitempty"` //CommonStateRoot is used if there is no state update
+	StatePath       [2]*SMTPath        `json:"statePath,omitempty"`
+	StateUpdate     [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
 }
 
 // StorageRes stores data required in storage circuit
@@ -42,13 +112,23 @@ type StorageRes struct {
 	RootBefore *common.Hash `json:"rootBefore,omitempty"`
 	// Root hash after execution, is nil if execution has failed
 	RootAfter *common.Hash `json:"rootAfter,omitempty"`
+	// AccountsAfter recode and encoded all accounts
+	AccountsAfter map[string]hexutil.Bytes `json:"accountAfter"`
 
 	// The from account's proof BEFORE execution
-	ProofFrom []string `json:"proofFrom,omitempty"`
+	ProofFrom []hexutil.Bytes `json:"proofFrom,omitempty"`
 	// The to account's proof BEFORE execution, these proof,
 	// along with account proof's inside structLogs, form the
 	// dataset required by tracing the updates of account trie
-	ProofTo []string `json:"proofTo,omitempty"`
+	ProofTo []hexutil.Bytes `json:"proofTo,omitempty"`
+
+	// The To Address, would be valid even when tx is creation
+	ToAddress common.Address `json:"to"`
+	// AccountCreated record the account in case tx is create
+	// (for creating inside contracts we handle CREATE op)
+	AccountCreated hexutil.Bytes `json:"accountCreated,omitempty"`
+
+	SMTTrace []*StateTrace `json:"smtTrace,omitempty"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a
@@ -76,10 +156,12 @@ type ExtraData struct {
 	// SELFDESTRUCT: [contract address’s accountProof, stack.nth_last(0) address’s accountProof]
 	// SELFBALANCE: [contract address’s accountProof]
 	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
-	// CREATE | CREATE2: [sender's accountProof, created contract address’s accountProof (before constructed),
+	// CREATE | CREATE2: [created contract address’s accountProof (before constructed),
 	// 					  created contract address's data (after constructed)]
-	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) address’s accountProof
-	//					  created contract address's data (before construced, value updated)]
+	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) (i.e. called) address’s accountProof
+	//					  called contract address's data (before constructed, value updated)]
+	// STATICCALL: [stack.nth_last(1) (i.e. called) address’s accountProof
+	//					  called contract address's data (before constructed, value updated)]
 	ProofList []*AccountProofWrapper `json:"proofList,omitempty"`
 }
 

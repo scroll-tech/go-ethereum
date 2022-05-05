@@ -6,7 +6,8 @@ ARG BUILDNUM=""
 # Build Geth in a stock Go builder container
 FROM golang:1.17-alpine as builder
 
-ENV GOPROXY https://goproxy.io,direct
+RUN go env -w GO111MODULE=on
+RUN go env -w GOPROXY=https://goproxy.io,direct
 
 ADD . /go-ethereum
 RUN apk add --no-cache gcc musl-dev linux-headers git ca-certificates \

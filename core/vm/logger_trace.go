@@ -169,5 +169,4 @@ func encodeProof(res *[]string, proof [][]byte) {
 	for _, node := range proof {
 		*res = append(*res, hexutil.Encode(node))
 	}
-	return
 }

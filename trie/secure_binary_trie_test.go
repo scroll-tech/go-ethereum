@@ -18,6 +18,8 @@ package trie
 
 import (
 	"bytes"
+	"fmt"
+	"math/rand"
 	"runtime"
 	"sync"
 	"testing"
@@ -147,4 +149,44 @@ func TestSecureTrieConcurrency(t *testing.T) {
 	}
 	// Wait for all threads to finish
 	pend.Wait()
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes32() string {
+	b := make([]byte, 32)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func TestSmtIterator(t *testing.T) {
+	trie := newEmptySecure()
+	vals := make([]struct{ k, v string }, 10)
+	fmt.Println("------GENERATED--DATA---------")
+	for i := range vals {
+		rand.Seed(int64(i))
+		vals[i] = struct{ k, v string }{k: randStringBytes32(), v: randStringBytes32()}
+		fmt.Printf("%s %s\n", vals[i].k, vals[i].v)
+	}
+	all := make(map[string]string)
+	for _, val := range vals {
+		all[val.k] = val.v
+		trie.Update([]byte(val.k), []byte(val.v))
+	}
+
+	fmt.Println("------ITERATOR-RESULT--------")
+	found := make(map[string]string)
+	it := NewIterator(trie.NodeIterator(nil))
+	for it.Next() {
+		fmt.Printf("%s %s\n", string(it.Key), string(it.Value))
+		found[string(it.Key)] = string(it.Value)
+	}
+
+	for k, v := range all {
+		if found[k] != v {
+			t.Errorf("iterator value mismatch for %s: got %q want %q", k, found[k], v)
+		}
+	}
 }

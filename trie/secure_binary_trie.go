@@ -18,7 +18,9 @@
 package trie
 
 import (
+	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/scroll-tech/go-ethereum/ethdb"
 
@@ -215,8 +217,116 @@ func (t *SecureBinaryTrie) Copy() *SecureBinaryTrie {
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
 // starts at the key after the given start key.
 func (t *SecureBinaryTrie) NodeIterator(start []byte) NodeIterator {
-	/// FIXME
-	panic("not implemented")
+	return newSmtIterator(t.tree, start)
+}
+
+type smtIterator struct {
+	tree        *MerkleTree
+	channel     chan *Node
+	wg          *sync.WaitGroup
+	currentNode *Node
+	err         error
+}
+
+func newSmtIterator(tree *MerkleTree, start []byte) NodeIterator {
+	it := &smtIterator{
+		tree:    tree,
+		channel: make(chan *Node, 1),
+		wg:      &sync.WaitGroup{},
+	}
+
+	root := it.tree.rootKey
+
+	it.wg.Add(1)
+	go recursiveIterator(it, root, start)
+	go func() {
+		it.wg.Wait()
+		it.err = errIteratorEnd
+	}()
+
+	return it
+}
+
+func recursiveIterator(it *smtIterator, root *smt.Hash, skipBefore []byte) {
+	rootNode, err := it.tree.GetNode(root)
+	if err != nil {
+		it.err = seekError{
+			key: root.Bytes(),
+			err: err,
+		}
+	}
+
+	switch rootNode.Type {
+	case NodeTypeLeaf:
+		key, _ := rootNode.Key()
+		if bytes.Compare(key[:], skipBefore) < 0 {
+			// skip this
+			return
+		}
+		it.channel <- rootNode
+	case NodeTypeEmpty:
+		it.wg.Done()
+		return
+	default:
+		it.wg.Add(1)
+		recursiveIterator(it, rootNode.ChildL, skipBefore)
+		it.wg.Add(1)
+		recursiveIterator(it, rootNode.ChildR, skipBefore)
+	}
+	it.wg.Done()
+}
+
+func (it *smtIterator) Next(b bool) bool {
+	if it.err == errIteratorEnd {
+		return false
+	}
+	if _, ok := it.err.(seekError); ok {
+		return false
+	}
+	if it.err != nil {
+		return false
+	}
+	leafNode := <-it.channel
+	it.currentNode = leafNode
+	return true
+}
+
+func (it *smtIterator) Error() error {
+	return it.err
+}
+
+func (it *smtIterator) Hash() common.Hash {
+	return common.Hash(*it.currentNode.key)
+}
+
+func (it *smtIterator) Parent() common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (it *smtIterator) Path() []byte {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (it *smtIterator) Leaf() bool {
+	return true
+}
+
+func (it *smtIterator) LeafKey() []byte {
+	return smt.UnPadBytes32(it.currentNode.KeyPreimage[:])
+}
+
+func (it *smtIterator) LeafBlob() []byte {
+	return it.currentNode.ValuePreimage
+}
+
+func (it *smtIterator) LeafProof() [][]byte {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (it *smtIterator) AddResolver(store ethdb.KeyValueStore) {
 }
 
 // hashKey returns the hash of key as an ephemeral buffer.

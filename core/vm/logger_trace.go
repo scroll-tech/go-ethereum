@@ -126,14 +126,15 @@ func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.Acc
 	if err != nil {
 		return nil, err
 	}
+	accountProof := types.NewAccountProofWrapper(
+		address,
+		l.env.StateDB.GetNonce(address),
+		(*hexutil.Big)(l.env.StateDB.GetBalance(address)),
+		l.env.StateDB.GetCodeHash(address),
+	)
+	encodeProof(&accountProof.Proof, proof)
 
-	return &types.AccountProofWrapper{
-		Address:  address,
-		Nonce:    l.env.StateDB.GetNonce(address),
-		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		CodeHash: l.env.StateDB.GetCodeHash(address),
-		Proof:    encodeProof(proof),
-	}, nil
+	return accountProof, nil
 }
 
 func getWrappedProofForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountProofWrapper, error) {
@@ -147,26 +148,26 @@ func getWrappedProofForStorage(l *StructLogger, address common.Address, key comm
 		return nil, err
 	}
 
-	return &types.AccountProofWrapper{
-		Address:  address,
-		Nonce:    l.env.StateDB.GetNonce(address),
-		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		CodeHash: l.env.StateDB.GetCodeHash(address),
-		Proof:    encodeProof(proof),
-		Storage: &types.StorageProofWrapper{
-			Key:   key.String(),
-			Value: l.env.StateDB.GetState(address, key).String(),
-			Proof: encodeProof(storageProof),
-		},
-	}, nil
+	accountProof := types.NewAccountProofWrapper(
+		address,
+		l.env.StateDB.GetNonce(address),
+		(*hexutil.Big)(l.env.StateDB.GetBalance(address)),
+		l.env.StateDB.GetCodeHash(address),
+	)
+	encodeProof(&accountProof.Proof, proof)
+	storage := accountProof.Storage
+	storage.Key, storage.Value = key.String(), l.env.StateDB.GetState(address, key).String()
+	encodeProof(&storage.Proof, storageProof)
+
+	return accountProof, nil
 }
 
-func encodeProof(proof [][]byte) (res []string) {
+func encodeProof(res *[]string, proof [][]byte) {
 	if len(proof) == 0 {
-		return nil
+		return
 	}
 	for _, node := range proof {
-		res = append(res, hexutil.Encode(node))
+		*res = append(*res, hexutil.Encode(node))
 	}
 	return
 }

@@ -40,11 +40,6 @@ type revision struct {
 	journalIndex int
 }
 
-var (
-	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-)
-
 type proofList [][]byte
 
 func (n *proofList) Put(key []byte, value []byte) error {
@@ -562,7 +557,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				data.CodeHash = emptyCodeHash
 			}
 			if data.Root == (common.Hash{}) {
-				data.Root = emptyRoot
+				data.Root = s.db.TrieDB().EmptyRoot()
 			}
 		}
 	}
@@ -980,7 +975,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		if err := rlp.DecodeBytes(leaf, &account); err != nil {
 			return nil
 		}
-		if account.Root != emptyRoot {
+		if account.Root != s.db.TrieDB().EmptyRoot() {
 			s.db.TrieDB().Reference(account.Root, parent)
 		}
 		return nil

@@ -1396,7 +1396,7 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 
 		if evmTrace.Storage == nil {
 			log.Info("no storage in trace")
-		} else {
+		} else if bc.chainConfig.Zktrie {
 
 			smtWriter, err := newZkTrieProofWriter(evmTrace.Storage)
 			var postTxStatus map[string]hexutil.Bytes

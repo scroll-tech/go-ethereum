@@ -803,38 +803,43 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
-	var storage *types.StorageRes
-	if w.config.SMTTrace {
-		proofFrom, proofTo := tracer.BaseProofs()
-		proofFromEnc := make([]hexutil.Bytes, len(proofFrom))
-		for i := range proofFrom {
-			proofFromEnc[i] = proofFrom[i]
-		}
-		proofToEnc := make([]hexutil.Bytes, len(proofTo))
-		for i := range proofTo {
-			proofToEnc[i] = proofTo[i]
-		}
-		accs := tracer.UpdatedAccounts()
-		accsEnc := make(map[string]hexutil.Bytes)
-		for addr, data := range accs {
-			accsEnc[addr.String()] = data.MarshalBytes()
-		}
 
-		finalRoot := w.current.state.GetRootHash()
-		var createdAcc []byte
-		if acc := tracer.CreatedAccount(); acc != nil {
-			createdAcc = acc.MarshalBytes()
-		}
+	proofFrom, proofTo := tracer.BaseProofs()
+	proofFromEnc := make([]hexutil.Bytes, len(proofFrom))
+	for i := range proofFrom {
+		proofFromEnc[i] = proofFrom[i]
+	}
+	proofToEnc := make([]hexutil.Bytes, len(proofTo))
+	for i := range proofTo {
+		proofToEnc[i] = proofTo[i]
+	}
 
-		storage = &types.StorageRes{
-			RootBefore:     tracer.StateRootBefore(),
-			ToAddress:      tracer.ToAddress(),
-			RootAfter:      &finalRoot,
-			AccountCreated: createdAcc,
-			ProofFrom:      proofFromEnc,
-			ProofTo:        proofToEnc,
-			AccountsAfter:  accsEnc,
-		}
+	var finalRoot common.Hash
+	if len(receipt.PostState) == 0 {
+		finalRoot = w.current.state.IntermediateRoot(w.chainConfig.IsEIP158(w.current.header.Number))
+	} else {
+		finalRoot = common.BytesToHash(receipt.PostState)
+	}
+
+	accs := tracer.UpdatedAccounts()
+	accsEnc := make(map[string]hexutil.Bytes)
+	for addr, data := range accs {
+		accsEnc[addr.String()] = data.MarshalBytes()
+	}
+
+	var createdAcc []byte
+	if acc := tracer.CreatedAccount(); acc != nil {
+		createdAcc = acc.MarshalBytes()
+	}
+
+	storage := &types.StorageRes{
+		RootBefore:     tracer.StateRootBefore(),
+		ToAddress:      tracer.ToAddress(),
+		RootAfter:      &finalRoot,
+		AccountCreated: createdAcc,
+		ProofFrom:      proofFromEnc,
+		ProofTo:        proofToEnc,
+		AccountsAfter:  accsEnc,
 	}
 
 	w.current.executionResults = append(w.current.executionResults, &types.ExecutionResult{

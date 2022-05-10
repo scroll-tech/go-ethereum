@@ -40,11 +40,6 @@ type revision struct {
 	journalIndex int
 }
 
-var (
-	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-)
-
 type proofList [][]byte
 
 func (n *proofList) Put(key []byte, value []byte) error {
@@ -187,6 +182,10 @@ func (s *StateDB) Error() error {
 	return s.dbErr
 }
 
+func (s *StateDB) zktrie() bool {
+	return s.db.TrieDB().Zktrie
+}
+
 func (s *StateDB) AddLog(log *types.Log) {
 	s.journal.append(addLogChange{txhash: s.thash})
 
@@ -315,24 +314,53 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
+	if s.zktrie() {
+		var proof proofList
+		err := s.trie.Prove(addr.Bytes32(), 0, &proof)
+		return proof, err
+	}
 	return s.GetProofByHash(crypto.Keccak256Hash(addr.Bytes()))
 }
 
 // GetProofByHash returns the Merkle proof for a given account.
 func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
+	if s.zktrie() {
+		panic("unimplemented")
+	}
 	var proof proofList
 	err := s.trie.Prove(addrHash[:], 0, &proof)
 	return proof, err
 }
 
+func (s *StateDB) GetStateData(addr common.Address) *types.StateAccount {
+	obj, ok := s.stateObjects[addr]
+	if !ok {
+		return nil
+	}
+	return &obj.data
+}
+
+func (s *StateDB) GetRootHash() common.Hash {
+	return s.trie.Hash()
+}
+
 // GetStorageProof returns the Merkle proof for given storage slot.
 func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
 	var proof proofList
-	trie := s.StorageTrie(a)
+	stateObject := s.getStateObject(a)
+	if stateObject == nil {
+		return proof, errors.New("storage trie for requested address does not exist")
+	}
+	trie := stateObject.trie
 	if trie == nil {
 		return proof, errors.New("storage trie for requested address does not exist")
 	}
-	err := trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
+	var err error
+	if s.zktrie() {
+		err = trie.Prove(key.Bytes(), 0, &proof)
+	} else {
+		err = trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
+	}
 	return proof, err
 }
 
@@ -529,7 +557,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				data.CodeHash = emptyCodeHash
 			}
 			if data.Root == (common.Hash{}) {
-				data.Root = emptyRoot
+				data.Root = s.db.TrieDB().EmptyRoot()
 			}
 		}
 	}
@@ -547,7 +575,12 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 			return nil
 		}
 		data = new(types.StateAccount)
-		if err := rlp.DecodeBytes(enc, data); err != nil {
+		if s.zktrie() {
+			data, err = types.UnmarshalStateAccount(enc)
+		} else {
+			err = rlp.DecodeBytes(enc, data)
+		}
+		if err != nil {
 			log.Error("Failed to decode state object", "addr", addr, "err", err)
 			return nil
 		}
@@ -942,7 +975,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		if err := rlp.DecodeBytes(leaf, &account); err != nil {
 			return nil
 		}
-		if account.Root != emptyRoot {
+		if account.Root != s.db.TrieDB().EmptyRoot() {
 			s.db.TrieDB().Reference(account.Root, parent)
 		}
 		return nil

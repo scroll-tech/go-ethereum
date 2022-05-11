@@ -126,15 +126,15 @@ func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.Acc
 	if err != nil {
 		return nil, err
 	}
-	accountProof := types.NewAccountProofWrapper(
-		address,
-		l.env.StateDB.GetNonce(address),
-		(*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		l.env.StateDB.GetCodeHash(address),
-	)
-	encodeProof(&accountProof.Proof, proof)
 
-	return accountProof, nil
+	return &types.AccountProofWrapper{
+		Address:  address,
+		Nonce:    l.env.StateDB.GetNonce(address),
+		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
+		CodeHash: l.env.StateDB.GetCodeHash(address),
+		Proof:    encodeProof(proof),
+		Storage:  nil,
+	}, nil
 }
 
 func getWrappedProofForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountProofWrapper, error) {
@@ -147,26 +147,26 @@ func getWrappedProofForStorage(l *StructLogger, address common.Address, key comm
 	if err != nil {
 		return nil, err
 	}
-
-	accountProof := types.NewAccountProofWrapper(
-		address,
-		l.env.StateDB.GetNonce(address),
-		(*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		l.env.StateDB.GetCodeHash(address),
-	)
-	encodeProof(&accountProof.Proof, proof)
-	storage := accountProof.Storage
-	storage.Key, storage.Value = key.String(), l.env.StateDB.GetState(address, key).String()
-	encodeProof(&storage.Proof, storageProof)
-
-	return accountProof, nil
+	return &types.AccountProofWrapper{
+		Address: address,
+		Nonce:   l.env.StateDB.GetNonce(address),
+		Balance: (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
+		Proof:   encodeProof(proof),
+		Storage: &types.StorageProofWrapper{
+			Key:   key.String(),
+			Value: l.env.StateDB.GetState(address, key).String(),
+			Proof: encodeProof(storageProof),
+		},
+	}, nil
 }
 
-func encodeProof(res *[]string, proof [][]byte) {
+func encodeProof(proof [][]byte) []string {
 	if len(proof) == 0 {
-		return
+		return nil
 	}
+	res := make([]string, 0, len(proof))
 	for _, node := range proof {
-		*res = append(*res, hexutil.Encode(node))
+		res = append(res, hexutil.Encode(node))
 	}
+	return res
 }

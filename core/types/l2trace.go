@@ -1,9 +1,6 @@
 package types
 
 import (
-	"runtime"
-	"sync"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
@@ -58,18 +55,6 @@ type ExtraData struct {
 	ProofList []*AccountProofWrapper `json:"proofList,omitempty"`
 }
 
-var (
-	proofPool = sync.Pool{
-		New: func() interface{} {
-			return &AccountProofWrapper{
-				Storage: &StorageProofWrapper{
-					Proof: make([]string, 0),
-				},
-			}
-		},
-	}
-)
-
 type AccountProofWrapper struct {
 	Address  common.Address       `json:"address"`
 	Nonce    uint64               `json:"nonce"`
@@ -79,38 +64,12 @@ type AccountProofWrapper struct {
 	Storage  *StorageProofWrapper `json:"storage,omitempty"` // StorageProofWrapper can be empty if irrelated to storage operation
 }
 
-func NewAccountProofWrapper(addr common.Address, nonce uint64, balance *hexutil.Big, codeHash common.Hash) *AccountProofWrapper {
-	proof := proofPool.Get().(*AccountProofWrapper)
-	proof.Address, proof.Nonce, proof.Balance, proof.CodeHash = addr, nonce, balance, codeHash
-	runtime.SetFinalizer(proof, func(proof *AccountProofWrapper) {
-		proof.clean()
-	})
-	return proof
-}
-
-func (a *AccountProofWrapper) clean() {
-	a.Balance = nil
-	a.Nonce = 0
-	if a.Proof != nil {
-		a.Proof = a.Proof[:0]
-	}
-	if a.Storage != nil {
-		a.Storage.clean()
-	}
-}
-
 // while key & value can also be retrieved from StructLogRes.Storage,
 // we still stored in here for roller's processing convenience.
 type StorageProofWrapper struct {
 	Key   string   `json:"key,omitempty"`
 	Value string   `json:"value,omitempty"`
 	Proof []string `json:"proof,omitempty"`
-}
-
-func (s *StorageProofWrapper) clean() {
-	if s.Proof != nil {
-		s.Proof = s.Proof[:0]
-	}
 }
 
 // NewExtraData create, init and return ExtraData

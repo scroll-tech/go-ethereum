@@ -86,13 +86,14 @@ var (
 )
 
 const (
-	bodyCacheLimit      = 256
-	blockCacheLimit     = 256
-	receiptsCacheLimit  = 32
-	txLookupCacheLimit  = 1024
-	maxFutureBlocks     = 256
-	maxTimeFutureBlocks = 30
-	TriesInMemory       = 128
+	bodyCacheLimit        = 256
+	blockCacheLimit       = 256
+	receiptsCacheLimit    = 32
+	txLookupCacheLimit    = 1024
+	maxFutureBlocks       = 256
+	maxTimeFutureBlocks   = 30
+	TriesInMemory         = 128
+	blockResultCacheLimit = 128
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -231,7 +232,10 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	blockCache, _ := lru.New(blockCacheLimit)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	futureBlocks, _ := lru.New(maxFutureBlocks)
-	blockResultCache, _ := lru.New(cacheConfig.TraceCacheLimit)
+	blockResultCache, _ := lru.New(blockResultCacheLimit)
+	if cacheConfig.TraceCacheLimit != 0 {
+		blockResultCache, _ = lru.New(cacheConfig.TraceCacheLimit)
+	}
 
 	bc := &BlockChain{
 		chainConfig: chainConfig,

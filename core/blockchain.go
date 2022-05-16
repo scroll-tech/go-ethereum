@@ -1393,41 +1393,8 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		} else if tx.To() == nil { // Contract is created.
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())
 		}
-
-		if evmTrace.Storage == nil {
-			log.Info("no storage in trace")
-		} else if bc.chainConfig.Zktrie {
-
-			smtWriter, err := newZkTrieProofWriter(evmTrace.Storage)
-			var postTxStatus map[string]hexutil.Bytes
-			if err != nil {
-				log.Error("build smt writer fail", "error", err)
-			} else if evmTrace.Failed {
-				//only need to handle the status change of From addr
-				fromAddr := evmTrace.Sender.Address.String()
-				postTxStatus = map[string]hexutil.Bytes{
-					fromAddr: evmTrace.Storage.AccountsAfter[fromAddr],
-				}
-			} else if err = smtWriter.handleAccountCreate(evmTrace.Storage.AccountCreated); err != nil {
-				log.Error("handle contract create for SMT fail", "error", err)
-			} else if err = smtWriter.handleLogs(evmTrace.StructLogs); err != nil {
-				log.Error("handle logs for SMT fail", "error", err)
-			} else {
-				postTxStatus = evmTrace.Storage.AccountsAfter
-			}
-
-			if err == nil {
-				if err = smtWriter.handlePostTx(postTxStatus); err != nil {
-					log.Error("handle post tx account state for SMT fail", "error", err)
-				} else if err = smtWriter.txFinal(evmTrace.Storage.RootAfter); err != nil {
-					log.Error("final tx verify fail", "error", err)
-				} else {
-					log.Info("write SMTTrace", "tx", i, "records", len(smtWriter.outTrace))
-					evmTrace.Storage.SMTTrace = smtWriter.outTrace
-				}
-			}
-		}
 	}
+
 	return blockResult
 }
 

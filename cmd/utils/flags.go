@@ -433,10 +433,6 @@ var (
 		Name:  "mine",
 		Usage: "Enable mining",
 	}
-	MinerSMTTraceFlag = cli.BoolFlag{
-		Name:  "miner.SMTTrace",
-		Usage: "Enable worker to output SMTTrace in blockResult",
-	}
 	MinerThreadsFlag = cli.IntFlag{
 		Name:  "miner.threads",
 		Usage: "Number of CPU threads to use for mining",
@@ -1402,9 +1398,6 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.GlobalIsSet(MinerNoVerifyFlag.Name) {
 		cfg.Noverify = ctx.GlobalBool(MinerNoVerifyFlag.Name)
-	}
-	if ctx.GlobalIsSet(MinerSMTTraceFlag.Name) {
-		cfg.SMTTrace = ctx.GlobalBool(MinerSMTTraceFlag.Name)
 	}
 	if ctx.GlobalIsSet(LegacyMinerGasTargetFlag.Name) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")

@@ -795,7 +795,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		CodeHash: w.current.state.GetCodeHash(from),
 	}
 	// Get receiver's address.
-	to, _ := types.Sender(w.current.signer, tx) // TODO: fix
+	to := *tx.To()
 	receiver := &types.AccountProofWrapper{
 		Address:  to,
 		Nonce:    w.current.state.GetNonce(to),

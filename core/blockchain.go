@@ -1388,8 +1388,8 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 			}
 		}
 
-		to := evmTrace.To.Address
-		if to != nil {
+		if evmTrace.To != nil {
+			to := evmTrace.To.Address
 			// Get proof
 			proof, err = state.GetProof(to)
 			if err != nil {

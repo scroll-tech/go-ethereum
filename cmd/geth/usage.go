@@ -58,7 +58,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		},
 	},
 	{
-		Name: "NoTrace CLIENT",
+		Name: "NOTRACE CLIENT",
 		Flags: []cli.Flag{
 			utils.TraceCacheLimit,
 		},

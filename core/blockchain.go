@@ -1384,14 +1384,16 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		}
 
 		to := evmTrace.To.Address
-		// Get proof
-		proof, err = state.GetProof(to)
-		if err != nil {
-			log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", to.String(), "err", err)
-		} else {
-			evmTrace.To.Proof = make([]string, len(proof))
-			for i := range proof {
-				evmTrace.To.Proof[i] = hexutil.Encode(proof[i])
+		if to != nil {
+			// Get proof
+			proof, err = state.GetProof(to)
+			if err != nil {
+				log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", to.String(), "err", err)
+			} else {
+				evmTrace.To.Proof = make([]string, len(proof))
+				for i := range proof {
+					evmTrace.To.Proof[i] = hexutil.Encode(proof[i])
+				}
 			}
 		}
 

@@ -57,7 +57,7 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 		return nil
 	}
 	key := common.Hash(scope.Stack.peek().Bytes32())
-	proof, err := getWrappedProofForStorage(l, scope.Contract.Address(), key)
+	proof, err := getWrappedForStorage(l, scope.Contract.Address(), key)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
 	}
@@ -67,7 +67,7 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 // traceContractProof gets the contract's account proof
 func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	// Get account proof.
-	proof, err := getWrappedProofForAddr(l, scope.Contract.Address())
+	proof, err := getWrappedForAddr(l, scope.Contract.Address())
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
 		l.states[scope.Contract.Address()] = struct{}{}
@@ -103,7 +103,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		}
 
 		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
-		proof, err := getWrappedProofForAddr(l, address)
+		proof, err := getWrappedForAddr(l, address)
 		if err == nil {
 			extraData.ProofList = append(extraData.ProofList, proof)
 			l.states[scope.Contract.Address()] = struct{}{}
@@ -115,7 +115,7 @@ func traceLastNAddressProof(n int) traceFunc {
 // traceCallerProof gets caller address's proof.
 func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	address := scope.Contract.CallerAddress
-	proof, err := getWrappedProofForAddr(l, address)
+	proof, err := getWrappedForAddr(l, address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
 		l.states[scope.Contract.Address()] = struct{}{}
@@ -123,53 +123,36 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	return err
 }
 
-// StorageProofWrapper will be empty
-func getWrappedProofForAddr(l *StructLogger, address common.Address) (*types.AccountProofWrapper, error) {
-	proof, err := l.env.StateDB.GetProof(address)
-	if err != nil {
-		return nil, err
-	}
+// StorageWrapper will be empty
+func getWrappedForAddr(l *StructLogger, address common.Address) (*types.AccountWrapper, error) {
 
-	return &types.AccountProofWrapper{
+	return &types.AccountWrapper{
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),
 		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
 		CodeHash: l.env.StateDB.GetCodeHash(address),
-		Proof:    encodeProof(proof),
 	}, nil
 }
 
-func getWrappedProofForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountProofWrapper, error) {
-	proof, err := l.env.StateDB.GetProof(address)
-	if err != nil {
-		return nil, err
-	}
+func getWrappedForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountWrapper, error) {
+	/*	proof, err := l.env.StateDB.GetProof(address)
+		if err != nil {
+			return nil, err
+		}
 
-	storageProof, err := l.env.StateDB.GetStorageProof(address, key)
-	if err != nil {
-		return nil, err
-	}
+		storageProof, err := l.env.StateDB.GetStorageProof(address, key)
+		if err != nil {
+			return nil, err
+		}*/
 
-	return &types.AccountProofWrapper{
+	return &types.AccountWrapper{
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),
 		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
 		CodeHash: l.env.StateDB.GetCodeHash(address),
-		Proof:    encodeProof(proof),
-		Storage: &types.StorageProofWrapper{
+		Storage: &types.StorageWrapper{
 			Key:   key.String(),
 			Value: l.env.StateDB.GetState(address, key).String(),
-			Proof: encodeProof(storageProof),
 		},
 	}, nil
-}
-
-func encodeProof(proof [][]byte) (res []string) {
-	if len(proof) == 0 {
-		return nil
-	}
-	for _, node := range proof {
-		res = append(res, hexutil.Encode(node))
-	}
-	return
 }

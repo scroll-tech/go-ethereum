@@ -11,7 +11,26 @@ import (
 // BlockResult contains block execution traces and results required for rollers.
 type BlockResult struct {
 	BlockTrace       *BlockTrace        `json:"blockTrace"`
+	StorageTrace     *StorageTrace      `json:"storageTrace"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
+}
+
+// StorageTrace stores proofs of storage needed by storage circuit
+type StorageTrace struct {
+
+	// Root hash before block execution:
+	RootBefore *common.Hash `json:"rootBefore,omitempty"`
+	// Root hash after block execution, is nil if execution has failed
+	RootAfter *common.Hash `json:"rootAfter,omitempty"`
+
+	// All proofs BEFORE execution, for accounts which would be used in tracing
+	Proofs map[string][]hexutil.Bytes `json:"proofs"`
+
+	// All storage proofs BEFORE execution
+	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
+
+	// post-handled output for ready-to-use trace
+	SMTTrace []*StateTrace `json:"smtTrace,omitempty"`
 }
 
 // ExecutionResult groups all structured logs emitted by the EVM
@@ -21,8 +40,16 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
-	// Sender's account proof.
-	Sender *AccountProofWrapper `json:"sender,omitempty"`
+	// Sender's account data (before Tx).
+	Sender *AccountWrapper `json:"sender,omitempty"`
+
+	// AccountCreated record the account in case tx is create
+	// (for creating inside contracts we handle CREATE op)
+	AccountCreated *AccountWrapper `json:"accountCreated,omitempty"`
+
+	// Record all accounts' state which would be affected AFTER tx executed
+	// currently they are just sender and to account
+	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
 	// It's exist only when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
@@ -31,8 +58,6 @@ type ExecutionResult struct {
 
 	// Deprecated: The account's proof.
 	// Proof      []string       `json:"proof,omitempty"`
-
-	Storage    *StorageRes    `json:"storage,omitempty"`
 	StructLogs []StructLogRes `json:"structLogs"`
 }
 
@@ -105,32 +130,6 @@ type StateTrace struct {
 	StateUpdate     [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
 }
 
-// StorageRes stores data required in storage circuit
-type StorageRes struct {
-
-	// Root hash before execution:
-	RootBefore *common.Hash `json:"rootBefore,omitempty"`
-	// Root hash after execution, is nil if execution has failed
-	RootAfter *common.Hash `json:"rootAfter,omitempty"`
-	// AccountsAfter recode and encoded all accounts
-	AccountsAfter map[string]hexutil.Bytes `json:"accountAfter"`
-
-	// The from account's proof BEFORE execution
-	ProofFrom []hexutil.Bytes `json:"proofFrom,omitempty"`
-	// The to account's proof BEFORE execution, these proof,
-	// along with account proof's inside structLogs, form the
-	// dataset required by tracing the updates of account trie
-	ProofTo []hexutil.Bytes `json:"proofTo,omitempty"`
-
-	// The To Address, would be valid even when tx is creation
-	ToAddress common.Address `json:"to"`
-	// AccountCreated record the account in case tx is create
-	// (for creating inside contracts we handle CREATE op)
-	AccountCreated hexutil.Bytes `json:"accountCreated,omitempty"`
-
-	SMTTrace []*StateTrace `json:"smtTrace,omitempty"`
-}
-
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
@@ -159,34 +158,34 @@ type ExtraData struct {
 	// CREATE | CREATE2: [created contract address’s accountProof (before constructed),
 	// 					  created contract address's data (after constructed)]
 	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) (i.e. called) address’s accountProof
-	//					  called contract address's data (before constructed, value updated)]
+	//					  called contract address's data (value updated, before called)]
 	// STATICCALL: [stack.nth_last(1) (i.e. called) address’s accountProof
-	//					  called contract address's data (before constructed, value updated)]
-	ProofList []*AccountProofWrapper `json:"proofList,omitempty"`
+	//					  called contract address's data (before called)]
+	ProofList []*AccountWrapper `json:"proofList,omitempty"`
 }
 
-type AccountProofWrapper struct {
-	Address  common.Address       `json:"address"`
-	Nonce    uint64               `json:"nonce"`
-	Balance  *hexutil.Big         `json:"balance"`
-	CodeHash common.Hash          `json:"codeHash,omitempty"`
-	Proof    []string             `json:"proof,omitempty"`
-	Storage  *StorageProofWrapper `json:"storage,omitempty"` // StorageProofWrapper can be empty if irrelated to storage operation
+type AccountWrapper struct {
+	Address  common.Address `json:"address"`
+	Nonce    uint64         `json:"nonce"`
+	Balance  *hexutil.Big   `json:"balance"`
+	CodeHash common.Hash    `json:"codeHash,omitempty"`
+	//Proof    []string             `json:"proof,omitempty"`
+	Storage *StorageWrapper `json:"storage,omitempty"` // StorageProofWrapper can be empty if irrelated to storage operation
 }
 
 // while key & value can also be retrieved from StructLogRes.Storage,
 // we still stored in here for roller's processing convenience.
-type StorageProofWrapper struct {
-	Key   string   `json:"key,omitempty"`
-	Value string   `json:"value,omitempty"`
-	Proof []string `json:"proof,omitempty"`
+type StorageWrapper struct {
+	Key   string `json:"key,omitempty"`
+	Value string `json:"value,omitempty"`
+	//Proof []string `json:"proof,omitempty"`
 }
 
 // NewExtraData create, init and return ExtraData
 func NewExtraData() *ExtraData {
 	return &ExtraData{
 		CodeList:  make([][]byte, 0),
-		ProofList: make([]*AccountProofWrapper, 0),
+		ProofList: make([]*AccountWrapper, 0),
 	}
 }
 

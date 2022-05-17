@@ -1351,39 +1351,30 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 	blockResult := &types.BlockResult{
 		ExecutionResults: evmTraces,
 	}
-	coinbase := types.AccountProofWrapper{
+	coinbase := types.AccountWrapper{
 		Address:  block.Coinbase(),
 		Nonce:    state.GetNonce(block.Coinbase()),
 		Balance:  (*hexutil.Big)(state.GetBalance(block.Coinbase())),
 		CodeHash: state.GetCodeHash(block.Coinbase()),
 	}
-	// Get coinbase address's account proof.
-	proof, err := state.GetProof(block.Coinbase())
-	if err != nil {
-		log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", block.Coinbase().String(), "err", err)
-	} else {
-		coinbase.Proof = make([]string, len(proof))
-		for i := range proof {
-			coinbase.Proof[i] = hexutil.Encode(proof[i])
-		}
-	}
 
 	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block, &coinbase)
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
-		from := evmTrace.Sender.Address
+		/*
+			from := evmTrace.Sender.Address
 
-		// Get proof
-		proof, err := state.GetProof(from)
-		if err != nil {
-			log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", from.String(), "err", err)
-		} else {
-			evmTrace.Sender.Proof = make([]string, len(proof))
-			for i := range proof {
-				evmTrace.Sender.Proof[i] = hexutil.Encode(proof[i])
+			// Get proof
+			proof, err := state.GetProof(from)
+			if err != nil {
+				log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", from.String(), "err", err)
+			} else {
+				evmTrace.Sender.Proof = make([]string, len(proof))
+				for i := range proof {
+					evmTrace.Sender.Proof[i] = hexutil.Encode(proof[i])
+				}
 			}
-		}
-
+		*/
 		// Contract is called
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(state.GetCode(*tx.To()))

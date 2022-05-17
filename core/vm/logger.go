@@ -161,11 +161,7 @@ type StructLogger struct {
 
 	states         map[common.Address]struct{}
 	storage        map[common.Address]Storage
-	accFromProof   [][]byte
-	accToProof     [][]byte
-	accountTo      common.Address
-	createdAccount *types.StateAccount
-	stateRoot      *common.Hash
+	createdAccount *types.AccountWrapper
 
 	callStackLogInd []int
 	logs            []StructLog
@@ -193,42 +189,25 @@ func (l *StructLogger) Reset() {
 	l.logs = l.logs[:0]
 	l.callStackLogInd = nil
 	l.err = nil
-	l.stateRoot = nil
-	l.accFromProof = nil
-	l.accToProof = nil
 	l.createdAccount = nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
-	l.accountTo = to
 
 	if create {
 		//Notice codeHash is set AFTER CreateTx has exited, so heree codeHash is still empty
-		l.createdAccount = &types.StateAccount{
+		l.createdAccount = &types.AccountWrapper{
 			//Nonce is 1 after EIP158, so we query it from stateDb
 			Nonce:   env.StateDB.GetNonce(to),
-			Balance: value,
+			Balance: (*hexutil.Big)(value),
+			Address: to,
 		}
-	}
-
-	pf, err := env.StateDB.GetProof(from)
-	if err != nil {
-		log.Warn("Failed to get base proof", "from", from.String(), " err", err)
-	}
-	l.accFromProof = pf
-
-	l.accToProof, err = env.StateDB.GetProof(to)
-	if err != nil {
-		log.Warn("Failed to get base proof", "to", to.String(), " err", err)
 	}
 
 	l.states[from] = struct{}{}
 	l.states[to] = struct{}{}
-
-	root := env.StateDB.GetRootHash()
-	l.stateRoot = &root
 }
 
 // CaptureState logs a new structured log message and pushes it out to the environment
@@ -323,12 +302,12 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 			return
 		}
 		storageKey := common.Hash(lastLog.Stack[len(lastLog.Stack)-1].Bytes32())
-		proof, err := getWrappedProofForStorage(l, contractAddress, storageKey)
+		wrappedStatus, err := getWrappedForStorage(l, contractAddress, storageKey)
 		if err != nil {
 			log.Error("Failed to trace after_state storage_proof for sstore", "err", err)
 		}
 
-		l.logs[logLen-1].ExtraData.ProofList = append(lastLog.ExtraData.ProofList, proof)
+		l.logs[logLen-1].ExtraData.ProofList = append(lastLog.ExtraData.ProofList, wrappedStatus)
 	}
 }
 
@@ -358,25 +337,30 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 	if len(l.callStackLogInd) != l.env.depth {
 		panic("unexpected evm depth in capture enter")
 	}
+	l.states[to] = struct{}{}
+
 	theLog := l.logs[lastLogPos]
 
 	// handling additional updating for CREATE only
 	switch theLog.Op {
-	case CREATE, CREATE2:
-		proof, err := getWrappedProofForAddr(l, to)
+	/*	case CREATE, CREATE2:
+		proof, err := getWrappedForAddr(l, to)
 		if err != nil {
 			log.Error("get account proof fail", "error", err)
 		} else {
 			theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, proof)
-		}
+		}*/
 	default:
 		// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
-		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountProofWrapper{
-			Address:  to,
-			Nonce:    l.env.StateDB.GetNonce(to),
-			Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(to)),
-			CodeHash: l.env.StateDB.GetCodeHash(to),
-		})
+		wrappedStatus, _ := getWrappedForAddr(l, to)
+		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
+		/*
+			theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountWrapper{
+				Address:  to,
+				Nonce:    l.env.StateDB.GetNonce(to),
+				Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(to)),
+				CodeHash: l.env.StateDB.GetCodeHash(to),
+			})*/
 	}
 
 }
@@ -406,13 +390,8 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 		}
 
 		lastAccData := theLog.ExtraData.ProofList[dataLen-1]
-		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, &types.AccountProofWrapper{
-			Address: lastAccData.Address,
-			Nonce:   lastAccData.Nonce,
-			Balance: lastAccData.Balance,
-			//only CodeHash need to be updated after CREATE
-			CodeHash: l.env.StateDB.GetCodeHash(lastAccData.Address),
-		})
+		wrappedStatus, _ := getWrappedForAddr(l, lastAccData.Address)
+		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
 	default:
 		//do nothing for other op code
 		return
@@ -420,40 +399,18 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 
 }
 
-// CaptureFinal is used to collect all "touched" accounts just after all modification to state has finished
-func (l *StructLogger) UpdatedAccounts() (output map[common.Address]*types.StateAccount) {
-	output = make(map[common.Address]*types.StateAccount)
-
-	for addr := range l.states {
-
-		acc := l.env.StateDB.GetStateData(addr)
-		if acc == nil {
-			log.Error("Failed to query data", "account addr", addr)
-		} else {
-			//deep copy is required, except for codehash (it should not change)
-			output[addr] = &types.StateAccount{
-				Nonce:    acc.Nonce,
-				Balance:  big.NewInt(0).Set(acc.Balance),
-				Root:     acc.Root,
-				CodeHash: acc.CodeHash,
-			}
-		}
-	}
-
-	return
+// UpdatedAccounts is used to collect all "touched" accounts
+func (l *StructLogger) UpdatedAccounts() map[common.Address]struct{} {
+	return l.states
 }
 
-// BaseProofs returns the account proof of 2 accounts which must being mutated in tx (from and to)
-func (l *StructLogger) BaseProofs() ([][]byte, [][]byte) { return l.accFromProof, l.accToProof }
-
-// ToAddress return the tx to addr, in create tx it return the contract address
-func (l *StructLogger) ToAddress() common.Address { return l.accountTo }
+// UpdatedStorages is used to collect all "touched" storage slots
+func (l *StructLogger) UpdatedStorages() map[common.Address]Storage {
+	return l.storage
+}
 
 // CreatedAccount return the account data in case it is a create tx
-func (l *StructLogger) CreatedAccount() *types.StateAccount { return l.createdAccount }
-
-// StateRootBefore returns the root of state before execution begins
-func (l *StructLogger) StateRootBefore() *common.Hash { return l.stateRoot }
+func (l *StructLogger) CreatedAccount() *types.AccountWrapper { return l.createdAccount }
 
 // StructLogs returns the captured log entries.
 func (l *StructLogger) StructLogs() []StructLog { return l.logs }

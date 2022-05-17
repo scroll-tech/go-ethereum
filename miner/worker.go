@@ -788,7 +788,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	tracer.Reset()
 	// Get sender's address.
 	from, _ := types.Sender(w.current.signer, tx)
-	sender := &types.AccountProofWrapper{
+	sender := &types.AccountWrapper{
 		Address:  from,
 		Nonce:    w.current.state.GetNonce(from),
 		Balance:  (*hexutil.Big)(w.current.state.GetBalance(from)),
@@ -801,54 +801,37 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		return nil, err
 	}
 
+	createdAcc := tracer.CreatedAccount()
+	var after []*types.AccountWrapper
+	to := tx.To()
+
+	if to == nil {
+		if createdAcc == nil {
+			panic("unexpected tx: address for created contract unavialable")
+		}
+		to = &createdAcc.Address
+	}
+
+	for _, acc := range []*common.Address{&from, to} {
+		after = append(after, &types.AccountWrapper{
+			Address:  *acc,
+			Nonce:    w.current.state.GetNonce(*acc),
+			Balance:  (*hexutil.Big)(w.current.state.GetBalance(*acc)),
+			CodeHash: w.current.state.GetCodeHash(*acc),
+		})
+	}
+
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 
-	proofFrom, proofTo := tracer.BaseProofs()
-	proofFromEnc := make([]hexutil.Bytes, len(proofFrom))
-	for i := range proofFrom {
-		proofFromEnc[i] = proofFrom[i]
-	}
-	proofToEnc := make([]hexutil.Bytes, len(proofTo))
-	for i := range proofTo {
-		proofToEnc[i] = proofTo[i]
-	}
-
-	var finalRoot common.Hash
-	if len(receipt.PostState) == 0 {
-		finalRoot = w.current.state.IntermediateRoot(w.chainConfig.IsEIP158(w.current.header.Number))
-	} else {
-		finalRoot = common.BytesToHash(receipt.PostState)
-	}
-
-	accs := tracer.UpdatedAccounts()
-	accsEnc := make(map[string]hexutil.Bytes)
-	for addr, data := range accs {
-		accsEnc[addr.String()] = data.MarshalBytes()
-	}
-
-	var createdAcc []byte
-	if acc := tracer.CreatedAccount(); acc != nil {
-		createdAcc = acc.MarshalBytes()
-	}
-
-	storage := &types.StorageRes{
-		RootBefore:     tracer.StateRootBefore(),
-		ToAddress:      tracer.ToAddress(),
-		RootAfter:      &finalRoot,
-		AccountCreated: createdAcc,
-		ProofFrom:      proofFromEnc,
-		ProofTo:        proofToEnc,
-		AccountsAfter:  accsEnc,
-	}
-
 	w.current.executionResults = append(w.current.executionResults, &types.ExecutionResult{
-		Gas:         receipt.GasUsed,
-		Sender:      sender,
-		Failed:      receipt.Status != types.ReceiptStatusSuccessful,
-		ReturnValue: fmt.Sprintf("%x", receipt.ReturnValue),
-		StructLogs:  vm.FormatLogs(tracer.StructLogs()),
-		Storage:     storage,
+		Gas:            receipt.GasUsed,
+		Sender:         sender,
+		AccountCreated: createdAcc,
+		AccountsAfter:  after,
+		Failed:         receipt.Status != types.ReceiptStatusSuccessful,
+		ReturnValue:    fmt.Sprintf("%x", receipt.ReturnValue),
+		StructLogs:     vm.FormatLogs(tracer.StructLogs()),
 	})
 
 	return receipt.Logs, nil
@@ -948,6 +931,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
 			txs.Shift()
 		}
+
 	}
 
 	if !w.isRunning() && len(coalescedLogs) > 0 {

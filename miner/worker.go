@@ -645,6 +645,7 @@ func (w *worker) resultLoop() {
 				receipts  = make([]*types.Receipt, len(task.receipts))
 				evmTraces = &core.EvmTxTraces{
 					TxResults: make([]*types.ExecutionResult, len(task.executionResults)),
+					Storage:   new(types.StorageTrace),
 				}
 				logs []*types.Log
 			)
@@ -820,6 +821,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		to = &createdAcc.Address
 	}
 
+	//collect affected account after tx being applied
 	for _, acc := range []*common.Address{&from, to} {
 		after = append(after, &types.AccountWrapper{
 			Address:  *acc,
@@ -827,6 +829,50 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			Balance:  (*hexutil.Big)(w.current.state.GetBalance(*acc)),
 			CodeHash: w.current.state.GetCodeHash(*acc),
 		})
+	}
+
+	//merge required proof data
+	proofAcc := tracer.UpdatedAccounts()
+	for addr := range proofAcc {
+		addrs := addr.String()
+		if _, existed := w.current.proofs[addrs]; !existed {
+			proof, err := w.current.state.GetProof(addr)
+			if err != nil {
+				log.Error("Proof not avaliable", "address", addrs)
+				//but we still mark the proofs map with nil array
+			}
+			wrappedProof := make([]hexutil.Bytes, len(proof))
+			for _, bt := range proof {
+				wrappedProof = append(wrappedProof, hexutil.Bytes(bt))
+			}
+			w.current.proofs[addrs] = wrappedProof
+		}
+	}
+
+	proofStg := tracer.UpdatedStorages()
+	for addr, stgM := range proofStg {
+		for key := range stgM {
+			addrs := addr.String()
+			keys := key.String()
+			m, existed := w.current.storageProofs[addrs]
+			if !existed {
+				m = make(map[string][]hexutil.Bytes)
+				w.current.storageProofs[addrs] = m
+			}
+
+			if _, existed := m[keys]; !existed {
+				proof, err := w.current.state.GetStorageProof(addr, key)
+				if err != nil {
+					log.Error("Storage proof not avaliable", "address", addrs, "key", keys)
+					//but we still mark the proofs map with nil array
+				}
+				wrappedProof := make([]hexutil.Bytes, len(proof))
+				for _, bt := range proof {
+					wrappedProof = append(wrappedProof, hexutil.Bytes(bt))
+				}
+				m[keys] = wrappedProof
+			}
+		}
 	}
 
 	w.current.txs = append(w.current.txs, tx)

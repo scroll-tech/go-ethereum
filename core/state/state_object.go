@@ -279,24 +279,25 @@ func (s *stateObject) SetState(db Database, key, value common.Hash) {
 		prevalue: prev,
 	})
 	s.setState(key, value)
-
-	// always update trie
-	tr := s.getTrie(db)
-	// copied from "updateTrie"
-	var v []byte
-	if (value == common.Hash{}) {
-		s.setError(tr.TryDelete(key[:]))
-		//s.db.StorageDeleted += 1
-	} else {
-		if db.TrieDB().Zktrie {
-			v = common.CopyBytes(value[:])
+	/*
+		// always update trie
+		tr := s.getTrie(db)
+		// copied from "updateTrie"
+		var v []byte
+		if (value == common.Hash{}) {
+			s.setError(tr.TryDelete(key[:]))
+			//s.db.StorageDeleted += 1
 		} else {
-			// Encoding []byte cannot fail, ok to ignore the error.
-			v, _ = rlp.EncodeToBytes(common.TrimLeftZeroes(value[:]))
+			if db.TrieDB().Zktrie {
+				v = common.CopyBytes(value[:])
+			} else {
+				// Encoding []byte cannot fail, ok to ignore the error.
+				v, _ = rlp.EncodeToBytes(common.TrimLeftZeroes(value[:]))
+			}
+			s.setError(tr.TryUpdate(key[:], v))
+			//s.db.StorageUpdated += 1
 		}
-		s.setError(tr.TryUpdate(key[:], v))
-		//s.db.StorageUpdated += 1
-	}
+	*/
 }
 
 // SetStorage replaces the entire state storage with the given one.

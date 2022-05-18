@@ -19,9 +19,9 @@ type BlockResult struct {
 type StorageTrace struct {
 
 	// Root hash before block execution:
-	RootBefore *common.Hash `json:"rootBefore,omitempty"`
+	RootBefore common.Hash `json:"rootBefore,omitempty"`
 	// Root hash after block execution, is nil if execution has failed
-	RootAfter *common.Hash `json:"rootAfter,omitempty"`
+	RootAfter common.Hash `json:"rootAfter,omitempty"`
 
 	// All proofs BEFORE execution, for accounts which would be used in tracing
 	Proofs map[string][]hexutil.Bytes `json:"proofs"`

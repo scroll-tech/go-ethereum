@@ -96,12 +96,15 @@ type environment struct {
 	txs              []*types.Transaction
 	receipts         []*types.Receipt
 	executionResults []*types.ExecutionResult
+	proofs           map[string][]hexutil.Bytes
+	storageProofs    map[string]map[string][]hexutil.Bytes
 }
 
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
 	receipts         []*types.Receipt
 	executionResults []*types.ExecutionResult
+	storageResults   *types.StorageTrace
 	state            *state.StateDB
 	block            *types.Block
 	createdAt        time.Time
@@ -640,8 +643,10 @@ func (w *worker) resultLoop() {
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
 				receipts  = make([]*types.Receipt, len(task.receipts))
-				evmTraces = make([]*types.ExecutionResult, len(task.executionResults))
-				logs      []*types.Log
+				evmTraces = &core.EvmTxTraces{
+					TxResults: make([]*types.ExecutionResult, len(task.executionResults)),
+				}
+				logs []*types.Log
 			)
 			for i, taskReceipt := range task.receipts {
 				receipt := new(types.Receipt)
@@ -649,8 +654,9 @@ func (w *worker) resultLoop() {
 				*receipt = *taskReceipt
 
 				evmTrace := new(types.ExecutionResult)
-				evmTraces[i] = evmTrace
+				evmTraces.TxResults[i] = evmTrace
 				*evmTrace = *task.executionResults[i]
+				*evmTraces.Storage = *task.storageResults
 
 				// add block location fields
 				receipt.BlockHash = hash
@@ -700,12 +706,14 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	state.StartPrefetcher("miner")
 
 	env := &environment{
-		signer:    types.MakeSigner(w.chainConfig, header.Number),
-		state:     state,
-		ancestors: mapset.NewSet(),
-		family:    mapset.NewSet(),
-		uncles:    mapset.NewSet(),
-		header:    header,
+		signer:        types.MakeSigner(w.chainConfig, header.Number),
+		state:         state,
+		ancestors:     mapset.NewSet(),
+		family:        mapset.NewSet(),
+		uncles:        mapset.NewSet(),
+		header:        header,
+		proofs:        make(map[string][]hexutil.Bytes),
+		storageProofs: make(map[string]map[string][]hexutil.Bytes),
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -1089,6 +1097,13 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(w.current.receipts)
 	s := w.current.state.Copy()
+	// complete storage before Finalize state (only RootAfter left unknown)
+	storage := &types.StorageTrace{
+		RootBefore:    s.GetRootHash(),
+		Proofs:        w.current.proofs,
+		StorageProofs: w.current.storageProofs,
+	}
+
 	block, err := w.engine.FinalizeAndAssemble(w.chain, w.current.header, s, w.current.txs, uncles, receipts)
 	if err != nil {
 		return err
@@ -1098,7 +1113,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			interval()
 		}
 		select {
-		case w.taskCh <- &task{receipts: receipts, executionResults: w.current.executionResults, state: s, block: block, createdAt: time.Now()}:
+		case w.taskCh <- &task{receipts: receipts, executionResults: w.current.executionResults, storageResults: storage, state: s, block: block, createdAt: time.Now()}:
 			w.unconfirmed.Shift(block.NumberU64() - 1)
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"uncles", len(uncles), "txs", w.current.tcount,

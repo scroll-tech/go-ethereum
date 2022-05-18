@@ -158,8 +158,9 @@ func (t *ZkTrie) TryDelete(key []byte) error {
 		return nil
 	}
 
+	zeroBt := common.Hash{}
 	// FIXME: delete should not be implemented as Update(0)
-	return t.TryUpdate(key, []byte{})
+	return t.TryUpdate(key, zeroBt[:])
 	//kPreimage := smt.NewByte32FromBytesPadding(key)
 	//return t.tree.DeleteWord(kPreimage)
 }

@@ -1367,6 +1367,7 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 	}
 
 	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block, &coinbase)
+	blockResult.StorageTrace.RootAfter = state.GetRootHash()
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
 		/*

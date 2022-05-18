@@ -279,7 +279,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 }
 
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
-	if !l.cfg.DisableStorage && op == SSTORE {
+	/*	if !l.cfg.DisableStorage && op == SSTORE {
 		logLen := len(l.logs)
 		if logLen <= 0 {
 			log.Error("Failed to trace after_state for sstore", "err", "empty length log")
@@ -308,7 +308,7 @@ func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64,
 		}
 
 		l.logs[logLen-1].ExtraData.ProofList = append(lastLog.ExtraData.ProofList, wrappedStatus)
-	}
+	}*/
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault

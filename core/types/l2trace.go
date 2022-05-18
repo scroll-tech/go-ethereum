@@ -37,9 +37,10 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
-	// Sender's account data (before Tx).
-	Sender *AccountWrapper `json:"sender,omitempty"`
-
+	// Sender's account proof (before Tx)..
+	From *AccountWrapper `json:"from,omitempty"`
+	// Receiver's account proof.
+	To *AccountWrapper `json:"to,omitempty"`
 	// AccountCreated record the account in case tx is create
 	// (for creating inside contracts we handle CREATE op)
 	AccountCreated *AccountWrapper `json:"accountCreated,omitempty"`

@@ -28,9 +28,6 @@ type StorageTrace struct {
 
 	// All storage proofs BEFORE execution
 	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
-
-	// post-handled output for ready-to-use trace
-	SMTTrace []*StateTrace `json:"smtTrace,omitempty"`
 }
 
 // ExecutionResult groups all structured logs emitted by the EVM
@@ -84,50 +81,6 @@ func (hi *HexInt) UnmarshalJSON(input []byte) error {
 
 	hi.Int, _ = big.NewInt(0).SetString(string(input), 0)
 	return nil
-}
-
-// SMTPathNode represent a node in the SMT Path
-type SMTPathNode struct {
-	Value   hexutil.Bytes `json:"value"`
-	Sibling hexutil.Bytes `json:"sibling"`
-}
-
-// SMTPath is the whole path of SMT
-type SMTPath struct {
-	KeyPathPart HexInt        `json:"pathPart"` //the path part in key
-	Root        hexutil.Bytes `json:"root"`
-	Path        []SMTPathNode `json:"path,omitempty"` //path start from top
-	Leaf        *SMTPathNode  `json:"leaf,omitempty"` //would be omitted for empty leaf, the sibling indicate key
-}
-
-// StateAccountL2 is the represent of StateAccount in L2 circuit
-// Notice in L2 we have different hash scheme against StateAccount.MarshalByte
-type StateAccountL2 struct {
-	Nonce    int           `json:"nonce"`
-	Balance  HexInt        `json:"balance"` //just the common hex expression of integer (big-endian)
-	CodeHash hexutil.Bytes `json:"codeHash,omitempty"`
-}
-
-// StateStorageL2 is the represent of a stored key-value pair for specified account
-type StateStorageL2 struct {
-	Key   hexutil.Bytes `json:"key"` //notice this is the preimage of storage key
-	Value hexutil.Bytes `json:"value"`
-}
-
-// StateTrace record the updating on state trie and (if changed) account trie
-// represent by the [before, after] updating of SMTPath amont tries and Account
-type StateTrace struct {
-	// which log the trace is responded for, -1 indicate not caused
-	// by opcode (like gasRefund, coinbase, setNonce, etc)
-	Index           int                `json:"index"`
-	Address         hexutil.Bytes      `json:"address"`
-	AccountKey      hexutil.Bytes      `json:"accountKey"`
-	AccountPath     [2]*SMTPath        `json:"accountPath"`
-	AccountUpdate   [2]*StateAccountL2 `json:"accountUpdate"`
-	StateKey        hexutil.Bytes      `json:"stateKey,omitempty"`
-	CommonStateRoot hexutil.Bytes      `json:"commonStateRoot,omitempty"` //CommonStateRoot is used if there is no state update
-	StatePath       [2]*SMTPath        `json:"statePath,omitempty"`
-	StateUpdate     [2]*StateStorageL2 `json:"stateUpdate,omitempty"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

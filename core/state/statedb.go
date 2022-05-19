@@ -347,11 +347,7 @@ func (s *StateDB) GetRootHash() common.Hash {
 // GetStorageProof returns the Merkle proof for given storage slot.
 func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
 	var proof proofList
-	stateObject := s.getStateObject(a)
-	if stateObject == nil {
-		return proof, errors.New("storage trie for requested address does not exist")
-	}
-	trie := stateObject.trie
+	trie := s.StorageTrie(a)
 	if trie == nil {
 		return proof, errors.New("storage trie for requested address does not exist")
 	}

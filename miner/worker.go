@@ -997,7 +997,6 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
 			txs.Shift()
 		}
-
 	}
 
 	if !w.isRunning() && len(coalescedLogs) > 0 {

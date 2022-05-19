@@ -1193,7 +1193,7 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces []*types.ExecutionResult, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *types.EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if !bc.chainmu.TryLock() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -1203,7 +1203,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 // writeBlockWithState writes the block and all associated state to the database,
 // but is expects the chain mutex to be held.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces []*types.ExecutionResult, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *types.EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if bc.insertStopped() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -1351,57 +1351,22 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 }
 
 // Fill blockResult content
-func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces []*types.ExecutionResult) *types.BlockResult {
+func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces *types.EvmTxTraces) *types.BlockResult {
 	blockResult := &types.BlockResult{
-		ExecutionResults: evmTraces,
+		ExecutionResults: evmTraces.TxResults,
+		StorageTrace:     evmTraces.Storage,
 	}
-	coinbase := types.AccountProofWrapper{
+	coinbase := types.AccountWrapper{
 		Address:  block.Coinbase(),
 		Nonce:    state.GetNonce(block.Coinbase()),
 		Balance:  (*hexutil.Big)(state.GetBalance(block.Coinbase())),
 		CodeHash: state.GetCodeHash(block.Coinbase()),
 	}
-	// Get coinbase address's account proof.
-	proof, err := state.GetProof(block.Coinbase())
-	if err != nil {
-		log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", block.Coinbase().String(), "err", err)
-	} else {
-		coinbase.Proof = make([]string, len(proof))
-		for i := range proof {
-			coinbase.Proof[i] = hexutil.Encode(proof[i])
-		}
-	}
 
 	blockResult.BlockTrace = types.NewTraceBlock(bc.chainConfig, block, &coinbase)
+	blockResult.StorageTrace.RootAfter = state.GetRootHash()
 	for i, tx := range block.Transactions() {
 		evmTrace := blockResult.ExecutionResults[i]
-
-		from := evmTrace.From.Address
-		// Get proof
-		proof, err := state.GetProof(from)
-		if err != nil {
-			log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", from.String(), "err", err)
-		} else {
-			evmTrace.From.Proof = make([]string, len(proof))
-			for i := range proof {
-				evmTrace.From.Proof[i] = hexutil.Encode(proof[i])
-			}
-		}
-
-		if evmTrace.To != nil {
-			to := evmTrace.To.Address
-			// Get proof
-			proof, err = state.GetProof(to)
-			if err != nil {
-				log.Error("Failed to get proof", "blockNumber", block.NumberU64(), "address", to.String(), "err", err)
-			} else {
-				evmTrace.To.Proof = make([]string, len(proof))
-				for i := range proof {
-					evmTrace.To.Proof[i] = hexutil.Encode(proof[i])
-				}
-			}
-		}
-
 		// Contract is called
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(state.GetCode(*tx.To()))

@@ -30,6 +30,13 @@ type StorageTrace struct {
 	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
 }
 
+// EvmTxTraces groups trace data from each executation of tx and left
+// some field to be finished from blockResult
+type EvmTxTraces struct {
+	TxResults []*ExecutionResult
+	Storage   *StorageTrace
+}
+
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
@@ -54,8 +61,6 @@ type ExecutionResult struct {
 	// If it is a contract call, the contract code is returned.
 	ByteCode string `json:"byteCode,omitempty"`
 
-	// Deprecated: The account's proof.
-	// Proof      []string       `json:"proof,omitempty"`
 	StructLogs []StructLogRes `json:"structLogs"`
 }
 

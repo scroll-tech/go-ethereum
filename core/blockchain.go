@@ -1193,15 +1193,8 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 	return nil
 }
 
-// EvmTxTraces groups trace data from each executation of tx and left
-// some field to be finished from blockResult
-type EvmTxTraces struct {
-	TxResults []*types.ExecutionResult
-	Storage   *types.StorageTrace
-}
-
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *types.EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if !bc.chainmu.TryLock() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -1211,7 +1204,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 // writeBlockWithState writes the block and all associated state to the database,
 // but is expects the chain mutex to be held.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *types.EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if bc.insertStopped() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -1359,7 +1352,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 }
 
 // Fill blockResult content
-func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces *EvmTxTraces) *types.BlockResult {
+func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces *types.EvmTxTraces) *types.BlockResult {
 	blockResult := &types.BlockResult{
 		ExecutionResults: evmTraces.TxResults,
 		StorageTrace:     evmTraces.Storage,

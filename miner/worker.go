@@ -643,7 +643,7 @@ func (w *worker) resultLoop() {
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
 				receipts  = make([]*types.Receipt, len(task.receipts))
-				evmTraces = &core.EvmTxTraces{
+				evmTraces = &types.EvmTxTraces{
 					TxResults: make([]*types.ExecutionResult, len(task.executionResults)),
 					Storage:   new(types.StorageTrace),
 				}

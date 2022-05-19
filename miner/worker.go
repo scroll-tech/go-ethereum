@@ -872,7 +872,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			}
 
 			if _, existed := m[keys]; !existed {
-				proof, err := w.current.state.GetStorageProof(addr, key)
+				proof, err := w.current.state.GetStorageTrieProof(addr, key)
 				if err != nil {
 					log.Error("Storage proof not available", "address", addrs, "key", keys)
 					//but we still mark the proofs map with nil array

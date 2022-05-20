@@ -1,9 +1,6 @@
 package types
 
 import (
-	"encoding/json"
-	"math/big"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
@@ -61,30 +58,6 @@ type ExecutionResult struct {
 	ByteCode string `json:"byteCode,omitempty"`
 
 	StructLogs []StructLogRes `json:"structLogs"`
-}
-
-// HexInt wrap big.Int for hex encoding
-type HexInt struct {
-	*big.Int
-}
-
-// MarshalText implements encoding.TextMarshaler
-func (hi HexInt) MarshalJSON() ([]byte, error) {
-	if hi.Int == nil {
-		return json.Marshal("0x")
-	}
-	return json.Marshal(hexutil.Encode(hi.Bytes()))
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (hi *HexInt) UnmarshalJSON(input []byte) error {
-	var s string
-	if err := json.Unmarshal(input, &s); err != nil {
-		return err
-	}
-
-	hi.Int, _ = big.NewInt(0).SetString(string(input), 0)
-	return nil
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

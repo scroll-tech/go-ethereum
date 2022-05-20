@@ -854,7 +854,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			}
 			wrappedProof := make([]hexutil.Bytes, len(proof))
 			for _, bt := range proof {
-				wrappedProof = append(wrappedProof, hexutil.Bytes(bt))
+				wrappedProof = append(wrappedProof, bt)
 			}
 			w.current.proofs[addrs] = wrappedProof
 		}

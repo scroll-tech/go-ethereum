@@ -59,7 +59,9 @@ type StructLogRes struct {
 	ExtraData     *ExtraData        `json:"extraData,omitempty"`
 }
 
-func NewStructLogRes(pc uint64, op string, gas, gasCost uint64, depth int, refundCounter uint64, err error) *StructLogRes {
+// Basic StructLogRes skeleton, Stack&Memory&Storage&ExtraData are seperated from it for GC optimization;
+// still need to fill in with Stack&Memory&Storage&ExtraData
+func NewStructLogResBasic(pc uint64, op string, gas, gasCost uint64, depth int, refundCounter uint64, err error) *StructLogRes {
 	logRes := loggerResPool.Get().(*StructLogRes)
 	logRes.Pc, logRes.Op, logRes.Gas, logRes.GasCost, logRes.Depth, logRes.RefundCounter = pc, op, gas, gasCost, depth, refundCounter
 	logRes.Error = err

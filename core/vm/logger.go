@@ -452,7 +452,6 @@ func FormatLogs(logs []StructLog) []*types.StructLogRes {
 
 	for _, trace := range logs {
 		logRes := types.NewStructLogRes(trace.Pc, trace.Op.String(), trace.Gas, trace.GasCost, trace.Depth, trace.RefundCounter, trace.Err)
-		formatted = append(formatted, logRes)
 		for _, stackValue := range trace.Stack {
 			logRes.Stack = append(logRes.Stack, stackValue.Hex())
 		}
@@ -467,6 +466,8 @@ func FormatLogs(logs []StructLog) []*types.StructLogRes {
 			logRes.Storage = storage
 		}
 		logRes.ExtraData = trace.ExtraData
+
+		formatted = append(formatted, logRes)
 	}
 	return formatted
 }

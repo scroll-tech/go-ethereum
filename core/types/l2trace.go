@@ -138,30 +138,3 @@ type StorageWrapper struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
 }
-
-// NewExtraData create, init and return ExtraData
-func NewExtraData() *ExtraData {
-	return &ExtraData{
-		CodeList:  make([][]byte, 0),
-		ProofList: make([]*AccountWrapper, 0),
-	}
-}
-
-func (e *ExtraData) Clean() {
-	e.CodeList = e.CodeList[:0]
-	e.ProofList = e.ProofList[:0]
-}
-
-// SealExtraData doesn't show empty fields.
-func (e *ExtraData) SealExtraData() *ExtraData {
-	if len(e.CodeList) == 0 {
-		e.CodeList = nil
-	}
-	if len(e.ProofList) == 0 {
-		e.ProofList = nil
-	}
-	if e.CodeList == nil && e.ProofList == nil {
-		return nil
-	}
-	return e
-}

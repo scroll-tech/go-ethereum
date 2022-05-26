@@ -85,6 +85,7 @@ var (
 	loggerPool = sync.Pool{
 		New: func() interface{} {
 			return &StructLog{
+				// init arrays here; other types are inited with default values
 				Stack: make([]uint256.Int, 0),
 			}
 		},
@@ -110,7 +111,7 @@ func (s *StructLog) clean() {
 	s.ExtraData = nil
 }
 
-func (s *StructLog) extraData() *types.ExtraData {
+func (s *StructLog) getOrInitExtraData() *types.ExtraData {
 	if s.ExtraData == nil {
 		s.ExtraData = &types.ExtraData{}
 	}
@@ -241,7 +242,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		l.storage[contractAddress][storageKey] = storageValue
 		structlog.Storage = l.storage[contractAddress].Copy()
 
-		if err := traceStorageProof(l, scope, structlog.extraData()); err != nil {
+		if err := traceStorageProof(l, scope, structlog.getOrInitExtraData()); err != nil {
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 		}
 	}
@@ -252,7 +253,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	if ok {
 		// execute trace func list.
 		for _, exec := range execFuncList {
-			if err = exec(l, scope, structlog.extraData()); err != nil {
+			if err = exec(l, scope, structlog.getOrInitExtraData()); err != nil {
 				log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 			}
 		}
@@ -451,8 +452,7 @@ func FormatLogs(logs []StructLog) []*types.StructLogRes {
 	formatted := make([]*types.StructLogRes, 0, len(logs))
 
 	for _, trace := range logs {
-		logRes := types.NewStructLogRes(trace.Pc, trace.Op.String(), trace.Gas, trace.GasCost, trace.Depth, trace.RefundCounter, trace.Err)
-		formatted = append(formatted, logRes)
+		logRes := types.NewStructLogResBasic(trace.Pc, trace.Op.String(), trace.Gas, trace.GasCost, trace.Depth, trace.RefundCounter, trace.Err)
 		for _, stackValue := range trace.Stack {
 			logRes.Stack = append(logRes.Stack, stackValue.Hex())
 		}
@@ -467,6 +467,8 @@ func FormatLogs(logs []StructLog) []*types.StructLogRes {
 			logRes.Storage = storage
 		}
 		logRes.ExtraData = trace.ExtraData
+
+		formatted = append(formatted, logRes)
 	}
 	return formatted
 }

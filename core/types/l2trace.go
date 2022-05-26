@@ -1,8 +1,23 @@
 package types
 
 import (
+	"runtime"
+	"sync"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
+)
+
+var (
+	loggerResPool = sync.Pool{
+		New: func() interface{} {
+			// init arrays here; other types are inited with default values
+			return &StructLogRes{
+				Stack:  []string{},
+				Memory: []string{},
+			}
+		},
+	}
 )
 
 // BlockResult contains block execution traces and results required for rollers.
@@ -55,9 +70,8 @@ type ExecutionResult struct {
 	// It's exist only when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
-	ByteCode string `json:"byteCode,omitempty"`
-
-	StructLogs []StructLogRes `json:"structLogs"`
+	ByteCode   string          `json:"byteCode,omitempty"`
+	StructLogs []*StructLogRes `json:"structLogs"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a
@@ -68,12 +82,28 @@ type StructLogRes struct {
 	Gas           uint64            `json:"gas"`
 	GasCost       uint64            `json:"gasCost"`
 	Depth         int               `json:"depth"`
-	Error         string            `json:"error,omitempty"`
+	Error         error             `json:"error,omitempty"`
 	Stack         []string          `json:"stack,omitempty"`
 	Memory        []string          `json:"memory,omitempty"`
 	Storage       map[string]string `json:"storage,omitempty"`
 	RefundCounter uint64            `json:"refund,omitempty"`
 	ExtraData     *ExtraData        `json:"extraData,omitempty"`
+}
+
+// Basic StructLogRes skeleton, Stack&Memory&Storage&ExtraData are separated from it for GC optimization;
+// still need to fill in with Stack&Memory&Storage&ExtraData
+func NewStructLogResBasic(pc uint64, op string, gas, gasCost uint64, depth int, refundCounter uint64, err error) *StructLogRes {
+	logRes := loggerResPool.Get().(*StructLogRes)
+	logRes.Pc, logRes.Op, logRes.Gas, logRes.GasCost, logRes.Depth, logRes.RefundCounter = pc, op, gas, gasCost, depth, refundCounter
+	logRes.Error = err
+	runtime.SetFinalizer(logRes, func(logRes *StructLogRes) {
+		logRes.Stack = logRes.Stack[:0]
+		logRes.Memory = logRes.Memory[:0]
+		logRes.Storage = nil
+		logRes.ExtraData = nil
+		loggerResPool.Put(logRes)
+	})
+	return logRes
 }
 
 type ExtraData struct {

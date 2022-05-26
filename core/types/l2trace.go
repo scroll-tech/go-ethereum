@@ -11,6 +11,8 @@ import (
 var (
 	loggerResPool = sync.Pool{
 		New: func() interface{} {
+			// init arrays here
+			// other types are inited with default values
 			return &StructLogRes{
 				Stack:  []string{},
 				Memory: []string{},

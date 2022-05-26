@@ -110,7 +110,7 @@ func (s *StructLog) clean() {
 	s.ExtraData = nil
 }
 
-func (s *StructLog) extraData() *types.ExtraData {
+func (s *StructLog) getOrInitExtraData() *types.ExtraData {
 	if s.ExtraData == nil {
 		s.ExtraData = &types.ExtraData{}
 	}
@@ -241,7 +241,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		l.storage[contractAddress][storageKey] = storageValue
 		structlog.Storage = l.storage[contractAddress].Copy()
 
-		if err := traceStorageProof(l, scope, structlog.extraData()); err != nil {
+		if err := traceStorageProof(l, scope, structlog.getOrInitExtraData()); err != nil {
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 		}
 	}
@@ -252,7 +252,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	if ok {
 		// execute trace func list.
 		for _, exec := range execFuncList {
-			if err = exec(l, scope, structlog.extraData()); err != nil {
+			if err = exec(l, scope, structlog.getOrInitExtraData()); err != nil {
 				log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 			}
 		}

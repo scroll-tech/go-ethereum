@@ -85,6 +85,7 @@ var (
 	loggerPool = sync.Pool{
 		New: func() interface{} {
 			return &StructLog{
+				// init arrays here; other types are inited with default values
 				Stack: make([]uint256.Int, 0),
 			}
 		},

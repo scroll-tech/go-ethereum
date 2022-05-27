@@ -369,6 +369,11 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 
 	// commit aborts in-flight transaction execution with given signal and resubmits a new one.
 	commit := func(noempty bool, s int32) {
+		// Short circuit if no new transaction arrives.
+		if atomic.LoadInt32(&w.newTxs) == 0 {
+			timer.Reset(recommit)
+			return
+		}
 		if interrupt != nil {
 			atomic.StoreInt32(interrupt, s)
 		}
@@ -408,11 +413,6 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// If mining is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
-				// Short circuit if no new transaction arrives.
-				if atomic.LoadInt32(&w.newTxs) == 0 {
-					timer.Reset(recommit)
-					continue
-				}
 				commit(true, commitInterruptResubmit)
 			}
 

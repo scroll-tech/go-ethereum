@@ -199,16 +199,16 @@ func (l *StructLogger) Reset() {
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, isCreate bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
 
-	if create {
-		//Notice codeHash is set AFTER CreateTx has exited, so heree codeHash is still empty
+	if isCreate {
+		// notice codeHash is set AFTER CreateTx has exited, so here codeHash is still empty
 		l.createdAccount = &types.AccountWrapper{
-			//Nonce is 1 after EIP158, so we query it from stateDb
+			Address: to,
+			// nonce is 1 after EIP158, so we query it from stateDb
 			Nonce:   env.StateDB.GetNonce(to),
 			Balance: (*hexutil.Big)(value),
-			Address: to,
 		}
 	}
 

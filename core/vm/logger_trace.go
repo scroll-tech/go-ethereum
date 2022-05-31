@@ -69,7 +69,7 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 	proof, err := getWrappedForAddr(l, scope.Contract.Address())
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
-		l.states[scope.Contract.Address()] = struct{}{}
+		l.statesAffected[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }
@@ -86,7 +86,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		proof, err := getWrappedForAddr(l, address)
 		if err == nil {
 			extraData.ProofList = append(extraData.ProofList, proof)
-			l.states[scope.Contract.Address()] = struct{}{}
+			l.statesAffected[scope.Contract.Address()] = struct{}{}
 		}
 		return err
 	}
@@ -98,7 +98,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 	proof, err := getWrappedForAddr(l, address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
-		l.states[scope.Contract.Address()] = struct{}{}
+		l.statesAffected[scope.Contract.Address()] = struct{}{}
 	}
 	return err
 }

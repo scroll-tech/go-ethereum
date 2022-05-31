@@ -165,7 +165,7 @@ type StructLogger struct {
 	cfg LogConfig
 	env *EVM
 
-	states         map[common.Address]struct{}
+	statesAffected map[common.Address]struct{}
 	storage        map[common.Address]Storage
 	createdAccount *types.AccountWrapper
 
@@ -178,8 +178,8 @@ type StructLogger struct {
 // NewStructLogger returns a new logger
 func NewStructLogger(cfg *LogConfig) *StructLogger {
 	logger := &StructLogger{
-		storage: make(map[common.Address]Storage),
-		states:  make(map[common.Address]struct{}),
+		storage:        make(map[common.Address]Storage),
+		statesAffected: make(map[common.Address]struct{}),
 	}
 	if cfg != nil {
 		logger.cfg = *cfg
@@ -190,7 +190,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 // Reset clears the data held by the logger.
 func (l *StructLogger) Reset() {
 	l.storage = make(map[common.Address]Storage)
-	l.states = make(map[common.Address]struct{})
+	l.statesAffected = make(map[common.Address]struct{})
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.callStackLogInd = nil
@@ -212,8 +212,8 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 		}
 	}
 
-	l.states[from] = struct{}{}
-	l.states[to] = struct{}{}
+	l.statesAffected[from] = struct{}{}
+	l.statesAffected[to] = struct{}{}
 }
 
 // CaptureState logs a new structured log message and pushes it out to the environment
@@ -313,7 +313,7 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 	if len(l.callStackLogInd) != l.env.depth {
 		panic("unexpected evm depth in capture enter")
 	}
-	l.states[to] = struct{}{}
+	l.statesAffected[to] = struct{}{}
 	theLog := l.logs[lastLogPos]
 	// handling additional updating for CREATE only
 	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
@@ -357,7 +357,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 
 // UpdatedAccounts is used to collect all "touched" accounts
 func (l *StructLogger) UpdatedAccounts() map[common.Address]struct{} {
-	return l.states
+	return l.statesAffected
 }
 
 // UpdatedStorages is used to collect all "touched" storage slots

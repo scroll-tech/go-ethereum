@@ -642,12 +642,10 @@ func (w *worker) resultLoop() {
 			}
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
-				receipts  = make([]*types.Receipt, len(task.receipts))
-				evmTraces = &types.EvmTxTraces{
-					TxResults: make([]*types.ExecutionResult, len(task.executionResults)),
-					Storage:   new(types.StorageTrace),
-				}
-				logs []*types.Log
+				receipts     = make([]*types.Receipt, len(task.receipts))
+				evmTraces    = make([]*types.ExecutionResult, len(task.executionResults))
+				logs         []*types.Log
+				storageTrace = new(types.StorageTrace)
 			)
 			for i, taskReceipt := range task.receipts {
 				receipt := new(types.Receipt)
@@ -655,9 +653,9 @@ func (w *worker) resultLoop() {
 				*receipt = *taskReceipt
 
 				evmTrace := new(types.ExecutionResult)
-				evmTraces.TxResults[i] = evmTrace
+				evmTraces[i] = evmTrace
 				*evmTrace = *task.executionResults[i]
-				*evmTraces.Storage = *task.storageResults
+				*storageTrace = *task.storageResults
 
 				// add block location fields
 				receipt.BlockHash = hash
@@ -676,7 +674,7 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-			_, err := w.chain.WriteBlockWithState(block, receipts, logs, evmTraces, task.state, true)
+			_, err := w.chain.WriteBlockWithState(block, receipts, logs, evmTraces, storageTrace, task.state, true)
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue

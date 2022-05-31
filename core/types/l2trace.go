@@ -41,13 +41,6 @@ type StorageTrace struct {
 	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
 }
 
-// EvmTxTraces groups trace data from each executation of tx and left
-// some field to be finished from blockResult
-type EvmTxTraces struct {
-	TxResults []*ExecutionResult
-	Storage   *StorageTrace
-}
-
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value

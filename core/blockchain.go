@@ -1692,7 +1692,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
-		// EvmTraces & StorageTrace are nil is safe because l2geth's p2p server is stoped and the code will not execute there.
+		// EvmTraces & StorageTrace being nil is safe because l2geth's p2p server is stoped and the code will not execute there.
 		status, err := bc.writeBlockWithState(block, receipts, logs, nil, nil, statedb, false)
 		atomic.StoreUint32(&followupInterrupt, 1)
 		if err != nil {

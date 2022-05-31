@@ -48,7 +48,7 @@ type StateDB interface {
 	SetState(common.Address, common.Hash, common.Hash)
 
 	GetRootHash() common.Hash
-	GetLiveStateObject(addr common.Address) *types.StateAccount
+	GetLiveStateAccount(addr common.Address) *types.StateAccount
 	GetProof(addr common.Address) ([][]byte, error)
 	GetProofByHash(addrHash common.Hash) ([][]byte, error)
 	GetStorageProof(a common.Address, key common.Hash) ([][]byte, error)

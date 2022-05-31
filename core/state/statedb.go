@@ -325,7 +325,7 @@ func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
 	return proof, err
 }
 
-func (s *StateDB) GetStateData(addr common.Address) *types.StateAccount {
+func (s *StateDB) GetLiveStateObject(addr common.Address) *types.StateAccount {
 	obj, ok := s.stateObjects[addr]
 	if !ok {
 		return nil

@@ -52,15 +52,15 @@ type ExecutionResult struct {
 	From *AccountWrapper `json:"from,omitempty"`
 	// Receiver's account proof (before Tx)
 	To *AccountWrapper `json:"to,omitempty"`
-	// AccountCreated record the account in case tx is create
-	// (for creating inside contracts we handle CREATE op)
+	// AccountCreated record the account if the tx is "create"
+	// (for creating inside a contract, we just handle CREATE op)
 	AccountCreated *AccountWrapper `json:"accountCreated,omitempty"`
 
 	// Record all accounts' state which would be affected AFTER tx executed
 	// currently they are just `from` and `to` account
 	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
-	// It's exist only when tx is a contract call.
+	// `CodeHash` only exists when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
 	ByteCode   string          `json:"byteCode,omitempty"`
@@ -100,20 +100,20 @@ func NewStructLogResBasic(pc uint64, op string, gas, gasCost uint64, depth int, 
 }
 
 type ExtraData struct {
-	// Indicate the call success or not for CALL/CREATE op
+	// Indicate the call succeeds or not for CALL/CREATE op
 	CallFailed bool `json:"callFailed,omitempty"`
 	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code, stack.nth_last(1) address’s code]
 	CodeList [][]byte `json:"codeList,omitempty"`
 	// SSTORE | SLOAD: [storageProof]
-	// SELFDESTRUCT: [contract address’s accountProof, stack.nth_last(0) address’s accountProof]
-	// SELFBALANCE: [contract address’s accountProof]
-	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
-	// CREATE | CREATE2: [created contract address’s accountProof (before constructed),
-	// 					  created contract address's data (after constructed)]
-	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) (i.e. called) address’s accountProof
-	//					  called contract address's data (value updated, before called)]
-	// STATICCALL: [stack.nth_last(1) (i.e. called) address’s accountProof
-	//					  called contract address's data (before called)]
+	// SELFDESTRUCT: [contract address’s account, stack.nth_last(0) address’s account]
+	// SELFBALANCE: [contract address’s account]
+	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s account]
+	// CREATE | CREATE2: [created contract address’s account (before constructed),
+	// 					  created contract address's account (after constructed)]
+	// CALL | CALLCODE: [caller contract address’s account, stack.nth_last(1) (i.e. callee) address’s account
+	//					  callee contract address's account (value updated, before called)]
+	// STATICCALL: [stack.nth_last(1) (i.e. callee) address’s account,
+	//					  callee contract address's account (before called)]
 	ProofList []*AccountWrapper `json:"proofList,omitempty"`
 }
 

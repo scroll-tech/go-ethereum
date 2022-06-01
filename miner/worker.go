@@ -830,7 +830,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		to = &createdAcc.Address
 	}
 
-	//collect affected account after tx being applied
+	// collect affected account after tx being applied
 	for _, acc := range []*common.Address{&from, to} {
 		after = append(after, &types.AccountWrapper{
 			Address:  *acc,
@@ -840,46 +840,46 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		})
 	}
 
-	//merge required proof data
-	proofAcc := tracer.UpdatedAccounts()
-	for addr := range proofAcc {
-		addrs := addr.String()
-		if _, existed := w.current.proofs[addrs]; !existed {
+	// merge required proof data
+	proofAccounts := tracer.UpdatedAccounts()
+	for addr := range proofAccounts {
+		addrStr := addr.String()
+		if _, existed := w.current.proofs[addrStr]; !existed {
 			proof, err := w.current.state.GetProof(addr)
 			if err != nil {
-				log.Error("Proof not available", "address", addrs)
-				//but we still mark the proofs map with nil array
+				log.Error("Proof not available", "address", addrStr)
+				// but we still mark the proofs map with nil array
 			}
 			wrappedProof := make([]hexutil.Bytes, len(proof))
 			for _, bt := range proof {
 				wrappedProof = append(wrappedProof, bt)
 			}
-			w.current.proofs[addrs] = wrappedProof
+			w.current.proofs[addrStr] = wrappedProof
 		}
 	}
 
-	proofStg := tracer.UpdatedStorages()
-	for addr, stgM := range proofStg {
-		for key := range stgM {
-			addrs := addr.String()
-			keys := key.String()
-			m, existed := w.current.storageProofs[addrs]
+	proofStorages := tracer.UpdatedStorages()
+	for addr, keys := range proofStorages {
+		for key := range keys {
+			addrStr := addr.String()
+			m, existed := w.current.storageProofs[addrStr]
 			if !existed {
 				m = make(map[string][]hexutil.Bytes)
-				w.current.storageProofs[addrs] = m
+				w.current.storageProofs[addrStr] = m
 			}
 
-			if _, existed := m[keys]; !existed {
+			keyStr := key.String()
+			if _, existed := m[keyStr]; !existed {
 				proof, err := w.current.state.GetStorageTrieProof(addr, key)
 				if err != nil {
-					log.Error("Storage proof not available", "address", addrs, "key", keys)
-					//but we still mark the proofs map with nil array
+					log.Error("Storage proof not available", "address", addrStr, "key", keyStr)
+					// but we still mark the proofs map with nil array
 				}
 				wrappedProof := make([]hexutil.Bytes, len(proof))
 				for _, bt := range proof {
 					wrappedProof = append(wrappedProof, hexutil.Bytes(bt))
 				}
-				m[keys] = wrappedProof
+				m[keyStr] = wrappedProof
 			}
 		}
 	}

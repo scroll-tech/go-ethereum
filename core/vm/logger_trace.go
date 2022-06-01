@@ -66,7 +66,7 @@ func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.Ex
 // traceContractProof gets the contract's account proof
 func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	// Get account proof.
-	proof, err := getWrappedForAddr(l, scope.Contract.Address())
+	proof, err := getWrappedAccountForAddr(l, scope.Contract.Address())
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
 		l.statesAffected[scope.Contract.Address()] = struct{}{}
@@ -83,7 +83,7 @@ func traceLastNAddressProof(n int) traceFunc {
 		}
 
 		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
-		proof, err := getWrappedForAddr(l, address)
+		proof, err := getWrappedAccountForAddr(l, address)
 		if err == nil {
 			extraData.ProofList = append(extraData.ProofList, proof)
 			l.statesAffected[scope.Contract.Address()] = struct{}{}
@@ -95,7 +95,7 @@ func traceLastNAddressProof(n int) traceFunc {
 // traceCallerProof gets caller address's proof.
 func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	address := scope.Contract.CallerAddress
-	proof, err := getWrappedForAddr(l, address)
+	proof, err := getWrappedAccountForAddr(l, address)
 	if err == nil {
 		extraData.ProofList = append(extraData.ProofList, proof)
 		l.statesAffected[scope.Contract.Address()] = struct{}{}
@@ -104,7 +104,7 @@ func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.Ext
 }
 
 // StorageWrapper will be empty
-func getWrappedForAddr(l *StructLogger, address common.Address) (*types.AccountWrapper, error) {
+func getWrappedAccountForAddr(l *StructLogger, address common.Address) (*types.AccountWrapper, error) {
 	return &types.AccountWrapper{
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),

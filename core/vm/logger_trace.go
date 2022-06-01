@@ -50,15 +50,15 @@ func traceLastNAddressCode(n int) traceFunc {
 	}
 }
 
-// traceStorageProof get contract's storage proof at storage_address
-func traceStorageProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+// traceStorage get contract's storage at storage_address
+func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	if scope.Stack.len() == 0 {
 		return nil
 	}
 	key := common.Hash(scope.Stack.peek().Bytes32())
-	proof, err := getWrappedForStorage(l, scope.Contract.Address(), key)
+	storage, err := getWrappedAccountForStorage(l, scope.Contract.Address(), key)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, proof)
+		extraData.ProofList = append(extraData.ProofList, storage)
 	}
 	return err
 }
@@ -113,7 +113,7 @@ func getWrappedAccountForAddr(l *StructLogger, address common.Address) (*types.A
 	}, nil
 }
 
-func getWrappedForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountWrapper, error) {
+func getWrappedAccountForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountWrapper, error) {
 	return &types.AccountWrapper{
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),

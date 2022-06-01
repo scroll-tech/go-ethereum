@@ -305,11 +305,11 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 }
 
 func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
-	//the last logged op should be CALL/CREATE
+	// the last logged op should be CALL/CREATE
 	lastLogPos := len(l.logs) - 1
 	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
 	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
-	//sanity check
+	// sanity check
 	if len(l.callStackLogInd) != l.env.depth {
 		panic("unexpected evm depth in capture enter")
 	}
@@ -331,7 +331,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	theLogPos := l.callStackLogInd[stackH-1]
 	l.callStackLogInd = l.callStackLogInd[:stackH-1]
 	theLog := l.logs[theLogPos]
-	//update "forecast" data
+	// update "forecast" data
 	if err != nil {
 		theLog.ExtraData.CallFailed = true
 	}

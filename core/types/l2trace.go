@@ -48,16 +48,16 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
-	// Sender's account proof (before Tx)..
+	// Sender's account proof (before Tx)
 	From *AccountWrapper `json:"from,omitempty"`
-	// Receiver's account proof.
+	// Receiver's account proof (before Tx)
 	To *AccountWrapper `json:"to,omitempty"`
 	// AccountCreated record the account in case tx is create
 	// (for creating inside contracts we handle CREATE op)
 	AccountCreated *AccountWrapper `json:"accountCreated,omitempty"`
 
 	// Record all accounts' state which would be affected AFTER tx executed
-	// currently they are just sender and to account
+	// currently they are just `from` and `to` account
 	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
 	// It's exist only when tx is a contract call.

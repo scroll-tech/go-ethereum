@@ -642,12 +642,10 @@ func (w *worker) resultLoop() {
 			}
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
-				receipts  = make([]*types.Receipt, len(task.receipts))
-				evmTraces = &types.EvmTxTraces{
-					TxResults: make([]*types.ExecutionResult, len(task.executionResults)),
-					Storage:   new(types.StorageTrace),
-				}
-				logs []*types.Log
+				receipts     = make([]*types.Receipt, len(task.receipts))
+				evmTraces    = make([]*types.ExecutionResult, len(task.executionResults))
+				logs         []*types.Log
+				storageTrace = new(types.StorageTrace)
 			)
 			for i, taskReceipt := range task.receipts {
 				receipt := new(types.Receipt)
@@ -655,9 +653,9 @@ func (w *worker) resultLoop() {
 				*receipt = *taskReceipt
 
 				evmTrace := new(types.ExecutionResult)
-				evmTraces.TxResults[i] = evmTrace
+				evmTraces[i] = evmTrace
 				*evmTrace = *task.executionResults[i]
-				*evmTraces.Storage = *task.storageResults
+				*storageTrace = *task.storageResults
 
 				// add block location fields
 				receipt.BlockHash = hash
@@ -676,7 +674,7 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-			_, err := w.chain.WriteBlockWithState(block, receipts, logs, evmTraces, task.state, true)
+			_, err := w.chain.WriteBlockWithState(block, receipts, logs, evmTraces, storageTrace, task.state, true)
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
@@ -832,7 +830,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		to = &createdAcc.Address
 	}
 
-	//collect affected account after tx being applied
+	// collect affected account after tx being applied
 	for _, acc := range []*common.Address{&from, to} {
 		after = append(after, &types.AccountWrapper{
 			Address:  *acc,
@@ -842,46 +840,46 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		})
 	}
 
-	//merge required proof data
-	proofAcc := tracer.UpdatedAccounts()
-	for addr := range proofAcc {
-		addrs := addr.String()
-		if _, existed := w.current.proofs[addrs]; !existed {
+	// merge required proof data
+	proofAccounts := tracer.UpdatedAccounts()
+	for addr := range proofAccounts {
+		addrStr := addr.String()
+		if _, existed := w.current.proofs[addrStr]; !existed {
 			proof, err := w.current.state.GetProof(addr)
 			if err != nil {
-				log.Error("Proof not available", "address", addrs)
-				//but we still mark the proofs map with nil array
+				log.Error("Proof not available", "address", addrStr)
+				// but we still mark the proofs map with nil array
 			}
 			wrappedProof := make([]hexutil.Bytes, len(proof))
 			for _, bt := range proof {
 				wrappedProof = append(wrappedProof, bt)
 			}
-			w.current.proofs[addrs] = wrappedProof
+			w.current.proofs[addrStr] = wrappedProof
 		}
 	}
 
-	proofStg := tracer.UpdatedStorages()
-	for addr, stgM := range proofStg {
-		for key := range stgM {
-			addrs := addr.String()
-			keys := key.String()
-			m, existed := w.current.storageProofs[addrs]
+	proofStorages := tracer.UpdatedStorages()
+	for addr, keys := range proofStorages {
+		for key := range keys {
+			addrStr := addr.String()
+			m, existed := w.current.storageProofs[addrStr]
 			if !existed {
 				m = make(map[string][]hexutil.Bytes)
-				w.current.storageProofs[addrs] = m
+				w.current.storageProofs[addrStr] = m
 			}
 
-			if _, existed := m[keys]; !existed {
+			keyStr := key.String()
+			if _, existed := m[keyStr]; !existed {
 				proof, err := w.current.state.GetStorageTrieProof(addr, key)
 				if err != nil {
-					log.Error("Storage proof not available", "address", addrs, "key", keys)
-					//but we still mark the proofs map with nil array
+					log.Error("Storage proof not available", "address", addrStr, "key", keyStr)
+					// but we still mark the proofs map with nil array
 				}
 				wrappedProof := make([]hexutil.Bytes, len(proof))
 				for _, bt := range proof {
 					wrappedProof = append(wrappedProof, hexutil.Bytes(bt))
 				}
-				m[keys] = wrappedProof
+				m[keyStr] = wrappedProof
 			}
 		}
 	}

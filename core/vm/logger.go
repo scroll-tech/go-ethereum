@@ -165,7 +165,7 @@ type StructLogger struct {
 	cfg LogConfig
 	env *EVM
 
-	states         map[common.Address]struct{}
+	statesAffected map[common.Address]struct{}
 	storage        map[common.Address]Storage
 	createdAccount *types.AccountWrapper
 
@@ -178,8 +178,8 @@ type StructLogger struct {
 // NewStructLogger returns a new logger
 func NewStructLogger(cfg *LogConfig) *StructLogger {
 	logger := &StructLogger{
-		storage: make(map[common.Address]Storage),
-		states:  make(map[common.Address]struct{}),
+		storage:        make(map[common.Address]Storage),
+		statesAffected: make(map[common.Address]struct{}),
 	}
 	if cfg != nil {
 		logger.cfg = *cfg
@@ -190,7 +190,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 // Reset clears the data held by the logger.
 func (l *StructLogger) Reset() {
 	l.storage = make(map[common.Address]Storage)
-	l.states = make(map[common.Address]struct{})
+	l.statesAffected = make(map[common.Address]struct{})
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.callStackLogInd = nil
@@ -199,21 +199,21 @@ func (l *StructLogger) Reset() {
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Address, isCreate bool, input []byte, gas uint64, value *big.Int) {
 	l.env = env
 
-	if create {
-		//Notice codeHash is set AFTER CreateTx has exited, so heree codeHash is still empty
+	if isCreate {
+		// notice codeHash is set AFTER CreateTx has exited, so here codeHash is still empty
 		l.createdAccount = &types.AccountWrapper{
-			//Nonce is 1 after EIP158, so we query it from stateDb
+			Address: to,
+			// nonce is 1 after EIP158, so we query it from stateDb
 			Nonce:   env.StateDB.GetNonce(to),
 			Balance: (*hexutil.Big)(value),
-			Address: to,
 		}
 	}
 
-	l.states[from] = struct{}{}
-	l.states[to] = struct{}{}
+	l.statesAffected[from] = struct{}{}
+	l.statesAffected[to] = struct{}{}
 }
 
 // CaptureState logs a new structured log message and pushes it out to the environment
@@ -263,7 +263,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		l.storage[contractAddress][storageKey] = storageValue
 		structlog.Storage = l.storage[contractAddress].Copy()
 
-		if err := traceStorageProof(l, scope, structlog.getOrInitExtraData()); err != nil {
+		if err := traceStorage(l, scope, structlog.getOrInitExtraData()); err != nil {
 			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 		}
 	}
@@ -305,20 +305,20 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 }
 
 func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
-	//the last logged op should be CALL/CREATE
+	// the last logged op should be CALL/STATICCALL/CALLCODE/CREATE/CREATE2
 	lastLogPos := len(l.logs) - 1
 	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
 	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
-	//sanity check
+	// sanity check
 	if len(l.callStackLogInd) != l.env.depth {
 		panic("unexpected evm depth in capture enter")
 	}
-	l.states[to] = struct{}{}
+	l.statesAffected[to] = struct{}{}
 	theLog := l.logs[lastLogPos]
-	// handling additional updating for CREATE only
+	// handling additional updating for CALL/STATICCALL/CALLCODE/CREATE/CREATE2 only
 	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
-	wrappedStatus, _ := getWrappedForAddr(l, to)
-	theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
+	wrappedStatus, _ := getWrappedAccountForAddr(l, to)
+	theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
 }
 
 // in CaptureExit phase, a CREATE has its target address's code being set and queryable
@@ -331,7 +331,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	theLogPos := l.callStackLogInd[stackH-1]
 	l.callStackLogInd = l.callStackLogInd[:stackH-1]
 	theLog := l.logs[theLogPos]
-	//update "forecast" data
+	// update "forecast" data
 	if err != nil {
 		theLog.ExtraData.CallFailed = true
 	}
@@ -340,14 +340,14 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	switch theLog.Op {
 	case CREATE, CREATE2:
 		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
-		dataLen := len(theLog.ExtraData.ProofList)
+		dataLen := len(theLog.ExtraData.StateList)
 		if dataLen == 0 {
 			panic("unexpected data capture for target op")
 		}
 
-		lastAccData := theLog.ExtraData.ProofList[dataLen-1]
-		wrappedStatus, _ := getWrappedForAddr(l, lastAccData.Address)
-		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
+		lastAccData := theLog.ExtraData.StateList[dataLen-1]
+		wrappedStatus, _ := getWrappedAccountForAddr(l, lastAccData.Address)
+		theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
 	default:
 		//do nothing for other op code
 		return
@@ -357,7 +357,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 
 // UpdatedAccounts is used to collect all "touched" accounts
 func (l *StructLogger) UpdatedAccounts() map[common.Address]struct{} {
-	return l.states
+	return l.statesAffected
 }
 
 // UpdatedStorages is used to collect all "touched" storage slots

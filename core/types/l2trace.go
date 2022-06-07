@@ -41,13 +41,6 @@ type StorageTrace struct {
 	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
 }
 
-// EvmTxTraces groups trace data from each executation of tx and left
-// some field to be finished from blockResult
-type EvmTxTraces struct {
-	TxResults []*ExecutionResult
-	Storage   *StorageTrace
-}
-
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
@@ -55,19 +48,19 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
-	// Sender's account proof (before Tx)..
+	// Sender's account state (before Tx)
 	From *AccountWrapper `json:"from,omitempty"`
-	// Receiver's account proof.
+	// Receiver's account state (before Tx)
 	To *AccountWrapper `json:"to,omitempty"`
-	// AccountCreated record the account in case tx is create
-	// (for creating inside contracts we handle CREATE op)
+	// AccountCreated record the account if the tx is "create"
+	// (for creating inside a contract, we just handle CREATE op)
 	AccountCreated *AccountWrapper `json:"accountCreated,omitempty"`
 
 	// Record all accounts' state which would be affected AFTER tx executed
-	// currently they are just sender and to account
+	// currently they are just `from` and `to` account
 	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
-	// It's exist only when tx is a contract call.
+	// `CodeHash` only exists when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
 	ByteCode   string          `json:"byteCode,omitempty"`
@@ -107,21 +100,22 @@ func NewStructLogResBasic(pc uint64, op string, gas, gasCost uint64, depth int, 
 }
 
 type ExtraData struct {
-	// Indicate the call success or not for CALL/CREATE op
+	// Indicate the call succeeds or not for CALL/CREATE op
 	CallFailed bool `json:"callFailed,omitempty"`
 	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code, stack.nth_last(1) address’s code]
 	CodeList [][]byte `json:"codeList,omitempty"`
 	// SSTORE | SLOAD: [storageProof]
-	// SELFDESTRUCT: [contract address’s accountProof, stack.nth_last(0) address’s accountProof]
-	// SELFBALANCE: [contract address’s accountProof]
-	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s accountProof]
-	// CREATE | CREATE2: [created contract address’s accountProof (before constructed),
-	// 					  created contract address's data (after constructed)]
-	// CALL | CALLCODE: [caller contract address’s accountProof, stack.nth_last(1) (i.e. called) address’s accountProof
-	//					  called contract address's data (value updated, before called)]
-	// STATICCALL: [stack.nth_last(1) (i.e. called) address’s accountProof
-	//					  called contract address's data (before called)]
-	ProofList []*AccountWrapper `json:"proofList,omitempty"`
+	// SELFDESTRUCT: [contract address’s account, stack.nth_last(0) address’s account]
+	// SELFBALANCE: [contract address’s account]
+	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s account]
+	// CREATE | CREATE2: [created contract address’s account (before constructed),
+	// 					  created contract address's account (after constructed)]
+	// CALL | CALLCODE: [caller contract address’s account,
+	// 					stack.nth_last(1) (i.e. callee) address’s account,
+	//					callee contract address's account (value updated, before called)]
+	// STATICCALL: [stack.nth_last(1) (i.e. callee) address’s account,
+	//					  callee contract address's account (before called)]
+	StateList []*AccountWrapper `json:"proofList,omitempty"`
 }
 
 type AccountWrapper struct {

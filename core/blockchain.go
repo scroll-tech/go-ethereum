@@ -1193,17 +1193,17 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *types.EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces []*types.ExecutionResult, storageTrace *types.StorageTrace, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if !bc.chainmu.TryLock() {
 		return NonStatTy, errInsertionInterrupted
 	}
 	defer bc.chainmu.Unlock()
-	return bc.writeBlockWithState(block, receipts, logs, evmTraces, state, emitHeadEvent)
+	return bc.writeBlockWithState(block, receipts, logs, evmTraces, storageTrace, state, emitHeadEvent)
 }
 
 // writeBlockWithState writes the block and all associated state to the database,
 // but is expects the chain mutex to be held.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces *types.EvmTxTraces, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, evmTraces []*types.ExecutionResult, storageTrace *types.StorageTrace, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
 	if bc.insertStopped() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -1327,7 +1327,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// Fill blockResult content
 	var blockResult *types.BlockResult
 	if evmTraces != nil {
-		blockResult = bc.writeBlockResult(state, block, evmTraces)
+		blockResult = bc.writeBlockResult(state, block, evmTraces, storageTrace)
 		bc.blockResultCache.Add(block.Hash(), blockResult)
 	}
 
@@ -1351,10 +1351,10 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 }
 
 // Fill blockResult content
-func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces *types.EvmTxTraces) *types.BlockResult {
+func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block, evmTraces []*types.ExecutionResult, storageTrace *types.StorageTrace) *types.BlockResult {
 	blockResult := &types.BlockResult{
-		ExecutionResults: evmTraces.TxResults,
-		StorageTrace:     evmTraces.Storage,
+		ExecutionResults: evmTraces,
+		StorageTrace:     storageTrace,
 	}
 	coinbase := types.AccountWrapper{
 		Address:  block.Coinbase(),
@@ -1692,8 +1692,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
-		// EvmTraces is nil is safe because l2geth's p2p server is stoped and the code will not execute there.
-		status, err := bc.writeBlockWithState(block, receipts, logs, nil, statedb, false)
+		// EvmTraces & StorageTrace being nil is safe because l2geth's p2p server is stoped and the code will not execute there.
+		status, err := bc.writeBlockWithState(block, receipts, logs, nil, nil, statedb, false)
 		atomic.StoreUint32(&followupInterrupt, 1)
 		if err != nil {
 			return it.index, err

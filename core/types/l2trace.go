@@ -48,9 +48,9 @@ type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
 	ReturnValue string `json:"returnValue,omitempty"`
-	// Sender's account proof (before Tx)
+	// Sender's account state (before Tx)
 	From *AccountWrapper `json:"from,omitempty"`
-	// Receiver's account proof (before Tx)
+	// Receiver's account state (before Tx)
 	To *AccountWrapper `json:"to,omitempty"`
 	// AccountCreated record the account if the tx is "create"
 	// (for creating inside a contract, we just handle CREATE op)
@@ -110,8 +110,9 @@ type ExtraData struct {
 	// BALANCE | EXTCODEHASH: [stack.nth_last(0) address’s account]
 	// CREATE | CREATE2: [created contract address’s account (before constructed),
 	// 					  created contract address's account (after constructed)]
-	// CALL | CALLCODE: [caller contract address’s account, stack.nth_last(1) (i.e. callee) address’s account
-	//					  callee contract address's account (value updated, before called)]
+	// CALL | CALLCODE: [caller contract address’s account,
+	// 					stack.nth_last(1) (i.e. callee) address’s account,
+	//					callee contract address's account (value updated, before called)]
 	// STATICCALL: [stack.nth_last(1) (i.e. callee) address’s account,
 	//					  callee contract address's account (before called)]
 	StateList []*AccountWrapper `json:"proofList,omitempty"`

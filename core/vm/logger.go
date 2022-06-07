@@ -305,7 +305,7 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 }
 
 func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
-	// the last logged op should be CALL/CALLCODE/CREATE/CREATE2
+	// the last logged op should be CALL/STATICCALL/CALLCODE/CREATE/CREATE2
 	lastLogPos := len(l.logs) - 1
 	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
 	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
@@ -315,7 +315,7 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 	}
 	l.statesAffected[to] = struct{}{}
 	theLog := l.logs[lastLogPos]
-	// handling additional updating for CREATE/CREATE2 only
+	// handling additional updating for CALL/STATICCALL/CALLCODE/CREATE/CREATE2 only
 	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
 	wrappedStatus, _ := getWrappedAccountForAddr(l, to)
 	theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)

@@ -11,18 +11,18 @@ type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.Extra
 var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
-		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
-		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
+		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceCaller, traceLastNAddressAccount(1)},
+		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCaller, traceLastNAddressAccount(1)},
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
-		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressProof(1)},
+		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
 		CREATE:       {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
 		CREATE2:      {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
 		SLOAD:        {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SSTORE:       {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
-		SELFDESTRUCT: {traceContractProof, traceLastNAddressProof(0)},
-		SELFBALANCE:  {traceContractProof},
-		BALANCE:      {traceLastNAddressProof(0)},
-		EXTCODEHASH:  {traceLastNAddressProof(0)},
+		SELFDESTRUCT: {traceContractAccount, traceLastNAddressAccount(0)},
+		SELFBALANCE:  {traceContractAccount},
+		BALANCE:      {traceLastNAddressAccount(0)},
+		EXTCODEHASH:  {traceLastNAddressAccount(0)},
 	}
 )
 
@@ -63,8 +63,8 @@ func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraDa
 	return err
 }
 
-// traceContractProof gets the contract's account proof
-func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+// traceContractAccount gets the contract's account
+func traceContractAccount(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	// Get account proof.
 	proof, err := getWrappedAccountForAddr(l, scope.Contract.Address())
 	if err == nil {
@@ -74,8 +74,8 @@ func traceContractProof(l *StructLogger, scope *ScopeContext, extraData *types.E
 	return err
 }
 
-// traceLastNAddressProof returns func about the last N's address proof.
-func traceLastNAddressProof(n int) traceFunc {
+// traceLastNAddressAccount returns func about the last N's address account.
+func traceLastNAddressAccount(n int) traceFunc {
 	return func(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 		stack := scope.Stack
 		if stack.len() <= n {
@@ -92,8 +92,8 @@ func traceLastNAddressProof(n int) traceFunc {
 	}
 }
 
-// traceCallerProof gets caller address's proof.
-func traceCallerProof(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+// traceCaller gets caller address's account.
+func traceCaller(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	address := scope.Contract.CallerAddress
 	proof, err := getWrappedAccountForAddr(l, address)
 	if err == nil {

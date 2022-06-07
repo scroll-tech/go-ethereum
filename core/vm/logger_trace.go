@@ -58,17 +58,17 @@ func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraDa
 	key := common.Hash(scope.Stack.peek().Bytes32())
 	storage, err := getWrappedAccountForStorage(l, scope.Contract.Address(), key)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, storage)
+		extraData.StateList = append(extraData.StateList, storage)
 	}
 	return err
 }
 
 // traceContractAccount gets the contract's account
 func traceContractAccount(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
-	// Get account proof.
-	proof, err := getWrappedAccountForAddr(l, scope.Contract.Address())
+	// Get account state.
+	state, err := getWrappedAccountForAddr(l, scope.Contract.Address())
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, proof)
+		extraData.StateList = append(extraData.StateList, state)
 		l.statesAffected[scope.Contract.Address()] = struct{}{}
 	}
 	return err
@@ -83,9 +83,9 @@ func traceLastNAddressAccount(n int) traceFunc {
 		}
 
 		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
-		proof, err := getWrappedAccountForAddr(l, address)
+		state, err := getWrappedAccountForAddr(l, address)
 		if err == nil {
-			extraData.ProofList = append(extraData.ProofList, proof)
+			extraData.StateList = append(extraData.StateList, state)
 			l.statesAffected[scope.Contract.Address()] = struct{}{}
 		}
 		return err
@@ -95,9 +95,9 @@ func traceLastNAddressAccount(n int) traceFunc {
 // traceCaller gets caller address's account.
 func traceCaller(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	address := scope.Contract.CallerAddress
-	proof, err := getWrappedAccountForAddr(l, address)
+	state, err := getWrappedAccountForAddr(l, address)
 	if err == nil {
-		extraData.ProofList = append(extraData.ProofList, proof)
+		extraData.StateList = append(extraData.StateList, state)
 		l.statesAffected[scope.Contract.Address()] = struct{}{}
 	}
 	return err

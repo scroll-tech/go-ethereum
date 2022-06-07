@@ -318,7 +318,7 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 	// handling additional updating for CREATE/CREATE2 only
 	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter) // TODO: ???
 	wrappedStatus, _ := getWrappedAccountForAddr(l, to)
-	theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
+	theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
 }
 
 // in CaptureExit phase, a CREATE has its target address's code being set and queryable
@@ -340,14 +340,14 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	switch theLog.Op {
 	case CREATE, CREATE2:
 		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit) // TODO: ???
-		dataLen := len(theLog.ExtraData.ProofList)
+		dataLen := len(theLog.ExtraData.StateList)
 		if dataLen == 0 {
 			panic("unexpected data capture for target op")
 		}
 
-		lastAccData := theLog.ExtraData.ProofList[dataLen-1]
+		lastAccData := theLog.ExtraData.StateList[dataLen-1]
 		wrappedStatus, _ := getWrappedAccountForAddr(l, lastAccData.Address)
-		theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
+		theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
 	default:
 		//do nothing for other op code
 		return

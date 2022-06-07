@@ -114,7 +114,7 @@ type ExtraData struct {
 	//					  callee contract address's account (value updated, before called)]
 	// STATICCALL: [stack.nth_last(1) (i.e. callee) address’s account,
 	//					  callee contract address's account (before called)]
-	ProofList []*AccountWrapper `json:"proofList,omitempty"`
+	StateList []*AccountWrapper `json:"proofList,omitempty"`
 }
 
 type AccountWrapper struct {

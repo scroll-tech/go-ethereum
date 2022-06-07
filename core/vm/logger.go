@@ -316,7 +316,7 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 	l.statesAffected[to] = struct{}{}
 	theLog := l.logs[lastLogPos]
 	// handling additional updating for CREATE/CREATE2 only
-	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter) // TODO: ???
+	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
 	wrappedStatus, _ := getWrappedAccountForAddr(l, to)
 	theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
 }
@@ -339,7 +339,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	// handling updating for CREATE only
 	switch theLog.Op {
 	case CREATE, CREATE2:
-		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit) // TODO: ???
+		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
 		dataLen := len(theLog.ExtraData.StateList)
 		if dataLen == 0 {
 			panic("unexpected data capture for target op")

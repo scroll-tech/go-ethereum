@@ -305,7 +305,7 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 }
 
 func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
-	// the last logged op should be CALL/CREATE
+	// the last logged op should be CALL/CALLCODE/CREATE/CREATE2
 	lastLogPos := len(l.logs) - 1
 	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
 	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
@@ -315,8 +315,8 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 	}
 	l.statesAffected[to] = struct{}{}
 	theLog := l.logs[lastLogPos]
-	// handling additional updating for CREATE only
-	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
+	// handling additional updating for CREATE/CREATE2 only
+	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter) // TODO: ???
 	wrappedStatus, _ := getWrappedAccountForAddr(l, to)
 	theLog.ExtraData.ProofList = append(theLog.ExtraData.ProofList, wrappedStatus)
 }
@@ -339,7 +339,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 	// handling updating for CREATE only
 	switch theLog.Op {
 	case CREATE, CREATE2:
-		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
+		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit) // TODO: ???
 		dataLen := len(theLog.ExtraData.ProofList)
 		if dataLen == 0 {
 			panic("unexpected data capture for target op")

@@ -15,8 +15,8 @@ var (
 		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCallerProof, traceLastNAddressProof(1)},
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
 		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressProof(1)},
-		CREATE:       {}, // sender is already recorded in ExecutionResult
-		CREATE2:      {}, // sender is already recorded in ExecutionResult
+		CREATE:       {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
+		CREATE2:      {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
 		SLOAD:        {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SSTORE:       {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SELFDESTRUCT: {traceContractProof, traceLastNAddressProof(0)},

@@ -86,9 +86,9 @@ func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
 	}
 	s.Balance.FillBytes(fields[1][:])
 
-	copy(fields[2][:], s.Root.Bytes())
-	copy(fields[3][:], s.CodeHash)
-	return fields, 8
+	copy(fields[2][:], s.CodeHash)
+	copy(fields[3][:], s.Root.Bytes())
+	return fields, 4
 }
 
 func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
@@ -98,9 +98,10 @@ func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
 	acc := new(StateAccount)
 	acc.Nonce = binary.BigEndian.Uint64(bytes[24:])
 	acc.Balance = new(big.Int).SetBytes(bytes[32:64])
-	acc.Root = common.Hash{}
-	acc.Root.SetBytes(bytes[64:96])
 	acc.CodeHash = make([]byte, 32)
-	copy(acc.CodeHash, bytes[96:128])
+	copy(acc.CodeHash, bytes[64:96])
+	acc.Root = common.Hash{}
+	acc.Root.SetBytes(bytes[96:128])
+
 	return acc, nil
 }

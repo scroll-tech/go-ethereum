@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"unsafe"
 
 	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
 )
@@ -155,8 +156,9 @@ func (n *Node) Data() []byte {
 	switch n.Type {
 	case NodeTypeLeaf:
 		var data []byte
-		hdata := (*reflect.SliceHeader)(reflect.ValueOf(&data).UnsafePointer())
-		hdata.Data = uintptr(reflect.ValueOf(n.ValuePreimage).UnsafePointer())
+		hdata := (*reflect.SliceHeader)(unsafe.Pointer(&data))
+		//TODO: uintptr(reflect.ValueOf(n.ValuePreimage).UnsafePointer()) should be more elegant but only avaliable until go 1.18
+		hdata.Data = uintptr(unsafe.Pointer(&n.ValuePreimage[0]))
 		hdata.Len = 32 * len(n.ValuePreimage)
 		hdata.Cap = hdata.Len
 		return data

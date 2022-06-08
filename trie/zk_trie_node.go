@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
 )
@@ -34,18 +35,25 @@ type Node struct {
 	ChildL *zkt.Hash
 	// ChildR is the right child of a middle node.
 	ChildR *zkt.Hash
-	// Entry is the data stored in a leaf node.
-	Entry [2]*zkt.Hash
-	// key is a cache used to avoid recalculating key
-	key              *zkt.Hash
-	KeyPreimage      *zkt.Byte32
-	ValuePreimageLen uint32
-	ValuePreimage    []byte
+	// NodeKey is the node's key stored in a leaf node.
+	NodeKey *zkt.Hash
+	// ValuePreimage can store at most 256 byte32 as fields (represnted by BIG-ENDIAN integer)
+	// and the first 24 can be compressed (each bytes32 consider as 2 fields), in hashing the compressed
+	// elemments would be calculated first
+	ValuePreimage []zkt.Byte32
+	// CompressedFlags use each bit for indicating the compressed flag for the first 24 fields
+	CompressedFlags uint32
+	// key is the cache of entry key used to avoid recalculating
+	key *zkt.Hash
+	// valueHash is the cache of hashes of valuePreimage, used to avoid recalculating
+	valueHash *zkt.Hash
+	// KeyPreimage is kept here only for proof
+	KeyPreimage *zkt.Byte32
 }
 
 // NewNodeLeaf creates a new leaf node.
-func NewNodeLeaf(k, v *zkt.Hash, keyPreimage *zkt.Byte32, valuePreimage []byte) *Node {
-	return &Node{Type: NodeTypeLeaf, Entry: [2]*zkt.Hash{k, v}, KeyPreimage: keyPreimage, ValuePreimageLen: uint32(len(valuePreimage)), ValuePreimage: valuePreimage[:]}
+func NewNodeLeaf(k *zkt.Hash, valueFlags uint32, valuePreimage []zkt.Byte32) *Node {
+	return &Node{Type: NodeTypeLeaf, NodeKey: k, CompressedFlags: valueFlags, ValuePreimage: valuePreimage}
 }
 
 // NewNodeMiddle creates a new middle node.
@@ -74,17 +82,25 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 		copy(n.ChildL[:], b[:zkt.ElemBytesLen])
 		copy(n.ChildR[:], b[zkt.ElemBytesLen:zkt.ElemBytesLen*2])
 	case NodeTypeLeaf:
-		if len(b) < 4*zkt.ElemBytesLen+4 {
+		if len(b) < zkt.ElemBytesLen+4 {
 			return nil, ErrNodeBytesBadSize
 		}
-		n.Entry = [2]*zkt.Hash{{}, {}}
-		copy(n.Entry[0][:], b[0:32])
-		copy(n.Entry[1][:], b[32:64])
-		n.KeyPreimage = &zkt.Byte32{}
-		copy(n.KeyPreimage[:], b[64:96])
-		n.ValuePreimageLen = binary.LittleEndian.Uint32(b[96:100])
-		n.ValuePreimage = make([]byte, n.ValuePreimageLen)
-		copy(n.ValuePreimage[:], b[100:100+n.ValuePreimageLen])
+		n.NodeKey = &zkt.Hash{}
+		copy(n.NodeKey[:], b[0:32])
+		mark := binary.LittleEndian.Uint32(b[32:36])
+		preimageLen := int(mark & 255)
+		n.CompressedFlags = mark >> 8
+		n.ValuePreimage = make([]zkt.Byte32, preimageLen)
+		curPos := 36
+		for i := 0; i < preimageLen; i++ {
+			copy(n.ValuePreimage[i][:], b[i*32+curPos:(i+1)*32+curPos])
+		}
+		curPos = 36 + preimageLen*32
+		preImageFlag := int(b[curPos])
+		curPos += 1
+		if preImageFlag != 0 {
+			copy(n.KeyPreimage[:], b[curPos:curPos+32])
+		}
 	case NodeTypeEmpty:
 		break
 	default:
@@ -96,7 +112,7 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 // LeafKey computes the key of a leaf node given the hIndex and hValue of the
 // entry of the leaf.
 func LeafKey(k, v *zkt.Hash) (*zkt.Hash, error) {
-	return zkt.HashElemsKey(big.NewInt(1), k.BigInt(), v.BigInt())
+	return zkt.HashElems(big.NewInt(1), k.BigInt(), v.BigInt())
 }
 
 // Key computes the key of the node by hashing the content in a specific way
@@ -114,10 +130,16 @@ func (n *Node) Key() (*zkt.Hash, error) {
 			}
 		case NodeTypeLeaf:
 			var err error
-			n.key, err = LeafKey(n.Entry[0], n.Entry[1])
+			n.valueHash, err = zkt.PreHandlingElems(n.CompressedFlags, n.ValuePreimage)
 			if err != nil {
 				return nil, err
 			}
+
+			n.key, err = LeafKey(n.NodeKey, n.valueHash)
+			if err != nil {
+				return nil, err
+			}
+
 		case NodeTypeEmpty: // Zero
 			n.key = &zkt.HashZero
 		default:
@@ -125,6 +147,22 @@ func (n *Node) Key() (*zkt.Hash, error) {
 		}
 	}
 	return n.key, nil
+}
+
+// Data returns the wrapped data inside LeafNode and cast them into bytes
+// for other node type it just return nil
+func (n *Node) Data() []byte {
+	switch n.Type {
+	case NodeTypeLeaf:
+		var data []byte
+		hdata := (*reflect.SliceHeader)(reflect.ValueOf(&data).UnsafePointer())
+		hdata.Data = uintptr(reflect.ValueOf(n.ValuePreimage).UnsafePointer())
+		hdata.Len = 32 * len(n.ValuePreimage)
+		hdata.Cap = hdata.Len
+		return data
+	default:
+		return nil
+	}
 }
 
 // Value returns the value of the node.  This is the content that is stored in
@@ -138,13 +176,21 @@ func (n *Node) Value() []byte {
 		return bytes
 	case NodeTypeLeaf: // {Type || Data...}
 		bytes := []byte{byte(n.Type)}
-		bytes = append(bytes, n.Entry[0][:]...)
-		bytes = append(bytes, n.Entry[1][:]...)
-		bytes = append(bytes, n.KeyPreimage[:]...)
+		bytes = append(bytes, n.NodeKey[:]...)
 		tmp := make([]byte, 4)
-		binary.LittleEndian.PutUint32(tmp, n.ValuePreimageLen)
+		compressedFlag := (n.CompressedFlags << 8) + uint32(len(n.ValuePreimage))
+		binary.LittleEndian.PutUint32(tmp, compressedFlag)
 		bytes = append(bytes, tmp...)
-		bytes = append(bytes, n.ValuePreimage[:]...)
+		for _, elm := range n.ValuePreimage {
+			bytes = append(bytes, elm[:]...)
+		}
+		if n.KeyPreimage != nil {
+			bytes = append(bytes, 1)
+			bytes = append(bytes, n.KeyPreimage[:]...)
+		} else {
+			bytes = append(bytes, 0)
+		}
+
 		return bytes
 	case NodeTypeEmpty: // { Type }
 		return []byte{byte(n.Type)}
@@ -159,7 +205,7 @@ func (n *Node) String() string {
 	case NodeTypeMiddle: // {Type || ChildL || ChildR}
 		return fmt.Sprintf("Middle L:%s R:%s", n.ChildL, n.ChildR)
 	case NodeTypeLeaf: // {Type || Data...}
-		return fmt.Sprintf("Leaf I:%v D:%v", n.Entry[0], n.Entry[1])
+		return fmt.Sprintf("Leaf I:%v Items: %d, First:%v", n.NodeKey, len(n.ValuePreimage), n.ValuePreimage[0])
 	case NodeTypeEmpty: // {}
 		return "Empty"
 	default:

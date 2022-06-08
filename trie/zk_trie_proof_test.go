@@ -47,18 +47,14 @@ func makeSMTProvers(mt *ZkTrieImpl) []func(key []byte) *memorydb.Database {
 			panic(err)
 		}
 		proof := memorydb.New()
-		mt.Prove(k, 0, proof)
+		mt.Prove(k.Bytes(), 0, proof)
 		return proof
 	})
 	return provers
 }
 
-func verifyValue(vHash []byte, vPreimage []byte) bool {
-	hv, err := zkt.NewByte32FromBytesPaddingZero(vPreimage).Hash()
-	if err != nil {
-		panic(err)
-	}
-	return bytes.Equal(vHash, hv.Bytes())
+func verifyValue(proveVal []byte, vPreimage []byte) bool {
+	return bytes.Equal(proveVal, vPreimage)
 }
 
 func TestSMTOneElementProof(t *testing.T) {
@@ -82,7 +78,7 @@ func TestSMTOneElementProof(t *testing.T) {
 			t.Fatalf("prover %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
 		}
 		if !verifyValue(val, bytes.Repeat([]byte("v"), 32)) {
-			t.Fatalf("prover %d: verified value mismatch: want 'k'", i)
+			t.Fatalf("prover %d: verified value mismatch: want 'v' get %x", i, val)
 		}
 	}
 }
@@ -100,8 +96,8 @@ func TestSMTProof(t *testing.T) {
 			if err != nil {
 				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x\n", i, kv.k, err, proof)
 			}
-			if !verifyValue(val, kv.v) {
-				t.Fatalf("prover %d: verified value mismatch for key %x, want %x", i, kv.k, kv.v)
+			if !verifyValue(val, zkt.NewByte32FromBytesPaddingZero(kv.v)[:]) {
+				t.Fatalf("prover %d: verified value mismatch for key %x, want %x, get %x", i, kv.k, kv.v, val)
 			}
 		}
 	}

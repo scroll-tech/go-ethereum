@@ -72,23 +72,23 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 	return hash4, nil
 }
 
-// MarshalBytes
-// [0:7] Nonce uint64 little-endian
+// MarshalFields, the bytes scheme is:
+// [0:32] Nonce uint64 big-endian in 32 byte
 // [32:64] Balance
 // [64:96] Root
 // [96:128] CodeHash
-func (s *StateAccount) MarshalBytes() []byte {
-	bytes := make([]byte, 128)
-	binary.LittleEndian.PutUint64(bytes, s.Nonce)
+func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
+	fields := make([]zkt.Byte32, 4)
+	binary.BigEndian.PutUint64(fields[0][24:], s.Nonce)
 
 	if !utils.CheckBigIntInField(s.Balance) {
 		panic("balance overflow")
 	}
-	s.Balance.FillBytes(bytes[32:64])
+	s.Balance.FillBytes(fields[1][:])
 
-	copy(bytes[64:96], s.Root.Bytes())
-	copy(bytes[96:128], s.CodeHash)
-	return bytes
+	copy(fields[2][:], s.Root.Bytes())
+	copy(fields[3][:], s.CodeHash)
+	return fields, 8
 }
 
 func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
@@ -96,7 +96,7 @@ func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
 		return nil, ErrInvalidLength
 	}
 	acc := new(StateAccount)
-	acc.Nonce = binary.LittleEndian.Uint64(bytes[:8])
+	acc.Nonce = binary.BigEndian.Uint64(bytes[24:])
 	acc.Balance = new(big.Int).SetBytes(bytes[32:64])
 	acc.Root = common.Hash{}
 	acc.Root.SetBytes(bytes[64:96])

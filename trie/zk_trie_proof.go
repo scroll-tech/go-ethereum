@@ -2,11 +2,8 @@ package trie
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
-
-	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
@@ -26,14 +23,8 @@ func init() {
 
 // Prove constructs a merkle proof for SMT, it respect the protocol used by the ethereum-trie
 // but save the node data with a compact form
-func (mt *ZkTrieImpl) Prove(k *big.Int, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+func (mt *ZkTrieImpl) prove(kHash *zkt.Hash, fromLevel uint, writeNode func(*Node) error) error {
 
-	// verify that k is valid and fit inside the Finite Field.
-	if !cryptoUtils.CheckBigIntInField(k) {
-		return errors.New("key not inside the Finite Field")
-	}
-
-	kHash := zkt.NewHashFromBigInt(k)
 	path := getPath(mt.maxLevels, kHash[:])
 	var nodes []*Node
 	tn := mt.rootKey
@@ -75,21 +66,36 @@ func (mt *ZkTrieImpl) Prove(k *big.Int, fromLevel uint, proofDb ethdb.KeyValueWr
 		// TODO: notice here we may have broken some implicit on the proofDb:
 		// the key is not kecca(value) and it even can not be derived from
 		// the value by any means without a actually decoding
+		if err := writeNode(n); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (mt *ZkTrieImpl) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+
+	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
+	if err != nil {
+		return err
+	}
+
+	err = mt.prove(kHash, fromLevel, func(n *Node) error {
 		key, err := n.Key()
 		if err != nil {
 			return err
 		}
-		proofDb.Put(key.Bytes(), n.Value())
-	}
+		return proofDb.Put(key.Bytes(), n.Value())
+	})
 
 	// we put this special kv pair in db so we can distinguish the type and
 	// make suitable Proof
-	proofDb.Put(magicHash, magicSMTBytes)
-	return nil
+	return proofDb.Put(magicHash, magicSMTBytes)
 }
 
 func buildZkTrieProof(rootKey *zkt.Hash, k *big.Int, lvl int, getNode func(key *zkt.Hash) (*Node, error)) (*Proof,
-	*big.Int, error) {
+	*Node, error) {
 
 	p := &Proof{}
 	var siblingKey *zkt.Hash
@@ -105,15 +111,15 @@ func buildZkTrieProof(rootKey *zkt.Hash, k *big.Int, lvl int, getNode func(key *
 		}
 		switch n.Type {
 		case NodeTypeEmpty:
-			return p, big.NewInt(0), nil
+			return p, n, nil
 		case NodeTypeLeaf:
-			if bytes.Equal(kHash[:], n.Entry[0][:]) {
+			if bytes.Equal(kHash[:], n.NodeKey[:]) {
 				p.Existence = true
-				return p, n.Entry[1].BigInt(), nil
+				return p, n, nil
 			}
 			// We found a leaf whose entry didn't match hIndex
-			p.NodeAux = &NodeAux{Key: n.Entry[0], Value: n.Entry[1]}
-			return p, n.Entry[1].BigInt(), nil
+			p.NodeAux = &NodeAux{Key: n.NodeKey, Value: n.valueHash}
+			return p, n, nil
 		case NodeTypeMiddle:
 			if path[p.depth] {
 				nextKey = n.ChildR
@@ -161,7 +167,7 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 		return nil, err
 	}
 
-	proof, v, err := buildZkTrieProof(h, k, len(key)*8, func(key *zkt.Hash) (*Node, error) {
+	proof, n, err := buildZkTrieProof(h, k, len(key)*8, func(key *zkt.Hash) (*Node, error) {
 		buf, _ := proofDb.Get(key.Bytes())
 		if buf == nil {
 			return nil, ErrKeyNotFound
@@ -177,8 +183,8 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 		return nil, nil
 	}
 
-	if VerifyProofZkTrie(h, proof, k, v) {
-		return v.Bytes(), nil
+	if VerifyProofZkTrie(h, proof, n) {
+		return n.Data(), nil
 	} else {
 		return nil, fmt.Errorf("bad proof node %v", proof)
 	}

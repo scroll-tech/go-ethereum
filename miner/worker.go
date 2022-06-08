@@ -847,7 +847,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		if _, existed := w.current.proofs[addrStr]; !existed {
 			proof, err := w.current.state.GetProof(addr)
 			if err != nil {
-				log.Error("Proof not available", "address", addrStr)
+				log.Error("Proof not available", "address", addrStr, "error", err)
 				// but we still mark the proofs map with nil array
 			}
 			wrappedProof := make([]hexutil.Bytes, len(proof))
@@ -872,7 +872,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			if _, existed := m[keyStr]; !existed {
 				proof, err := w.current.state.GetStorageTrieProof(addr, key)
 				if err != nil {
-					log.Error("Storage proof not available", "address", addrStr, "key", keyStr)
+					log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 					// but we still mark the proofs map with nil array
 				}
 				wrappedProof := make([]hexutil.Bytes, len(proof))

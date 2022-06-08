@@ -8,6 +8,8 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/constants"
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -95,16 +97,21 @@ func TestMerkleTree_AddUpdateGetWord(t *testing.T) {
 	assert.Nil(t, err)
 	err = mt.AddWord(&zkt.Byte32{5}, &zkt.Byte32{6})
 	assert.Nil(t, err)
+	err = mt.AddWord(&zkt.Byte32{5}, &zkt.Byte32{7})
+	assert.Equal(t, ErrEntryIndexAlreadyExists, err)
 
 	node, err := mt.GetLeafNodeByWord(&zkt.Byte32{1})
 	assert.Nil(t, err)
-	assert.Equal(t, (&zkt.Byte32{2})[:], node.ValuePreimage)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&zkt.Byte32{2})[:], node.ValuePreimage[0][:])
 	node, err = mt.GetLeafNodeByWord(&zkt.Byte32{3})
 	assert.Nil(t, err)
-	assert.Equal(t, (&zkt.Byte32{4})[:], node.ValuePreimage)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&zkt.Byte32{4})[:], node.ValuePreimage[0][:])
 	node, err = mt.GetLeafNodeByWord(&zkt.Byte32{5})
 	assert.Nil(t, err)
-	assert.Equal(t, (&zkt.Byte32{6})[:], node.ValuePreimage)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&zkt.Byte32{6})[:], node.ValuePreimage[0][:])
 
 	err = mt.UpdateWord(&zkt.Byte32{1}, &zkt.Byte32{7})
 	assert.Nil(t, err)
@@ -115,11 +122,64 @@ func TestMerkleTree_AddUpdateGetWord(t *testing.T) {
 
 	node, err = mt.GetLeafNodeByWord(&zkt.Byte32{1})
 	assert.Nil(t, err)
-	assert.Equal(t, (&zkt.Byte32{7})[:], node.ValuePreimage)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&zkt.Byte32{7})[:], node.ValuePreimage[0][:])
 	node, err = mt.GetLeafNodeByWord(&zkt.Byte32{3})
 	assert.Nil(t, err)
-	assert.Equal(t, (&zkt.Byte32{8})[:], node.ValuePreimage)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&zkt.Byte32{8})[:], node.ValuePreimage[0][:])
 	node, err = mt.GetLeafNodeByWord(&zkt.Byte32{5})
 	assert.Nil(t, err)
-	assert.Equal(t, (&zkt.Byte32{9})[:], node.ValuePreimage)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&zkt.Byte32{9})[:], node.ValuePreimage[0][:])
+	_, err = mt.GetLeafNodeByWord(&zkt.Byte32{100})
+	assert.Equal(t, ErrKeyNotFound, err)
+}
+
+func TestMerkleTree_UpdateAccount(t *testing.T) {
+
+	mt := newTestingMerkle(t, 10)
+
+	acc1 := &types.StateAccount{
+		Nonce:    1,
+		Balance:  big.NewInt(10000000),
+		Root:     common.HexToHash("22fb59aa5410ed465267023713ab42554c250f394901455a3366e223d5f7d147"),
+		CodeHash: common.HexToHash("cc0a77f6e063b4b62eb7d9ed6f427cf687d8d0071d751850cfe5d136bc60d3ab").Bytes(),
+	}
+
+	err := mt.TryUpdateAccount(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes(), acc1)
+	assert.Nil(t, err)
+
+	acc2 := &types.StateAccount{
+		Nonce:    5,
+		Balance:  big.NewInt(50000000),
+		Root:     common.HexToHash("0"),
+		CodeHash: common.HexToHash("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+	}
+	err = mt.TryUpdateAccount(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes(), acc2)
+	assert.Nil(t, err)
+
+	bt, err := mt.TryGet(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes())
+	assert.Nil(t, err)
+
+	acc, err := types.UnmarshalStateAccount(bt)
+	assert.Nil(t, err)
+	assert.Equal(t, acc1.Nonce, acc.Nonce)
+	assert.Equal(t, acc1.Balance.Uint64(), acc.Balance.Uint64())
+	assert.Equal(t, acc1.Root.Bytes(), acc.Root.Bytes())
+	assert.Equal(t, acc1.CodeHash, acc.CodeHash)
+
+	bt, err = mt.TryGet(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes())
+	assert.Nil(t, err)
+
+	acc, err = types.UnmarshalStateAccount(bt)
+	assert.Nil(t, err)
+	assert.Equal(t, acc2.Nonce, acc.Nonce)
+	assert.Equal(t, acc2.Balance.Uint64(), acc.Balance.Uint64())
+	assert.Equal(t, acc2.Root.Bytes(), acc.Root.Bytes())
+	assert.Equal(t, acc2.CodeHash, acc.CodeHash)
+
+	bt, err = mt.TryGet(common.HexToAddress("0x8dE13967F19410A7991D63c2c0179feBFDA0c261").Bytes())
+	assert.Nil(t, err)
+	assert.Nil(t, bt)
 }

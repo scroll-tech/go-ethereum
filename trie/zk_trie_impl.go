@@ -41,7 +41,7 @@ var (
 	ErrEntryIndexAlreadyExists = errors.New("the entry index already exists in the tree")
 	// ErrNotWritable is used when the ZkTrieImpl is not writable and a
 	// write function is called
-	ErrNotWritable = errors.New("Merkle Tree not writable")
+	ErrNotWritable = errors.New("merkle Tree not writable")
 
 	dbKeyRootNode = []byte("currentroot")
 )
@@ -299,10 +299,10 @@ func (mt *ZkTrieImpl) addNode(n *Node) (*zkt.Hash, error) {
 	if err == nil {
 		if !bytes.Equal(oldV, v) {
 			return nil, ErrNodeKeyAlreadyExists
+		} else {
+			// duplicated
+			return k, nil
 		}
-	} else if err == ErrNotFound {
-		// expected, do nothing
-		//return nil, ErrKeyNotFound
 	}
 	err = mt.db.Put(k[:], v)
 	return k, err

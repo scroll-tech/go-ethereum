@@ -89,6 +89,10 @@ func (mt *ZkTrieImpl) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWr
 		return proofDb.Put(key.Bytes(), n.Value())
 	})
 
+	if err != nil {
+		return err
+	}
+
 	// we put this special kv pair in db so we can distinguish the type and
 	// make suitable Proof
 	return proofDb.Put(magicHash, magicSMTBytes)

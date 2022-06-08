@@ -157,7 +157,7 @@ func (n *Node) Data() []byte {
 	case NodeTypeLeaf:
 		var data []byte
 		hdata := (*reflect.SliceHeader)(unsafe.Pointer(&data))
-		//TODO: uintptr(reflect.ValueOf(n.ValuePreimage).UnsafePointer()) should be more elegant but only avaliable until go 1.18
+		//TODO: uintptr(reflect.ValueOf(n.ValuePreimage).UnsafePointer()) should be more elegant but only available until go 1.18
 		hdata.Data = uintptr(unsafe.Pointer(&n.ValuePreimage[0]))
 		hdata.Len = 32 * len(n.ValuePreimage)
 		hdata.Cap = hdata.Len

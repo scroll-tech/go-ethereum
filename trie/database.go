@@ -71,8 +71,9 @@ type Database struct {
 	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
 
 	// zktrie related stuff
-	Zktrie     bool
-	rawDirties KvMap // used only in ZkTrie. It's a quick&dirty implementation. FIXME later.
+	Zktrie bool
+	// TODO: It's a quick&dirty implementation. FIXME later.
+	rawDirties KvMap
 
 	cleans  *fastcache.Cache            // GC friendly memory cache of clean node RLPs
 	dirties map[common.Hash]*cachedNode // Data and references relationships of dirty trie nodes

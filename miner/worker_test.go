@@ -196,6 +196,19 @@ func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
 	return tx
 }
 
+// Generate replay-protected transactions(EIP155) for testing
+func (b *testWorkerBackend) newRandomEIP155Tx(creation bool, chainID *big.Int) *types.Transaction {
+	var tx *types.Transaction
+	eip155Signer := types.NewEIP155Signer(chainID)
+	gasPrice := big.NewInt(10 * params.InitialBaseFee)
+	if creation {
+		tx, _ = types.SignTx(types.NewContractCreation(b.txPool.Nonce(testBankAddress), big.NewInt(0), testGas, gasPrice, common.FromHex(testCode)), eip155Signer, testBankKey)
+	} else {
+		tx, _ = types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, gasPrice, nil), eip155Signer, testBankKey)
+	}
+	return tx
+}
+
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.AddLocals(pendingTxs)
@@ -252,8 +265,9 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 	w.start()
 
 	for i := 0; i < 5; i++ {
-		b.txPool.AddLocal(b.newRandomTx(true))
-		b.txPool.AddLocal(b.newRandomTx(false))
+		// Randomly generate replay-protected transactions based on current chainID (Default value: 1337)
+		b.txPool.AddLocal(b.newRandomEIP155Tx(true, w.chainConfig.ChainID))
+		b.txPool.AddLocal(b.newRandomEIP155Tx(true, w.chainConfig.ChainID))
 		w.postSideBlock(core.ChainSideEvent{Block: b.newRandomUncle()})
 		w.postSideBlock(core.ChainSideEvent{Block: b.newRandomUncle()})
 

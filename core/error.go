@@ -96,4 +96,6 @@ var (
 
 	// ErrSenderNoEOA is returned if the sender of a transaction is a contract.
 	ErrSenderNoEOA = errors.New("sender not an eoa")
+
+	ErrNonProtectedTx = errors.New("only replay-protected (EIP-155) transactions are allowed to be added to the Transaction Pool")
 )

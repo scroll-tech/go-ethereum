@@ -600,6 +600,13 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
+
+	// Reject non-protected transaction for resisting Replay Attack.
+	// Todo: It looks like too many test cases rely on Non-EIP155 transactions (Temporary Idle).
+	// if !tx.Protected() {
+	//	 return ErrNonProtectedTx
+	// }
+
 	// Accept only legacy transactions until EIP-2718/2930 activates.
 	if !pool.eip2718 && tx.Type() != types.LegacyTxType {
 		return ErrTxTypeNotSupported

@@ -341,6 +341,21 @@ func TestTransactionQueue(t *testing.T) {
 	}
 }
 
+// Test TxPool validate Non-protected transaction
+// Expected failed when meet Non-protected transaction
+//func TestValidateNonProtectedTransaction(t *testing.T) {
+//	pool, key := setupTxPool()
+//	defer pool.Stop()
+//
+//	tx1 := transaction(0, 100000, key)
+//	from, _ := deriveSender(tx1)
+//	testAddBalance(pool, from, big.NewInt(10000000))
+//
+//	if err := pool.validateTx(tx1, true); err != nil {
+//		t.Error("expected the transaction pool reject such non-protected transaction", err)
+//	}
+//}
+
 func TestTransactionQueue2(t *testing.T) {
 	t.Parallel()
 

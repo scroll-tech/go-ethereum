@@ -81,6 +81,17 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	return bc.chainHeadFeed.Subscribe(ch)
 }
 
+// Used for generating mocked EIP155transaction
+func EIP155transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
+	return pricedEIP155Transaction(nonce, params.TestChainConfig.ChainID, gaslimit, big.NewInt(1), key)
+}
+
+func pricedEIP155Transaction(nonce uint64, chainID *big.Int, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) *types.Transaction {
+	eip155Signer := types.NewEIP155Signer(chainID)
+	tx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, big.NewInt(100), gaslimit, gasprice, nil), eip155Signer, key)
+	return tx
+}
+
 func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
 	return pricedTransaction(nonce, gaslimit, big.NewInt(1), key)
 }
@@ -122,6 +133,23 @@ func setupTxPoolWithConfig(config *params.ChainConfig) (*TxPool, *ecdsa.PrivateK
 	blockchain := &testBlockChain{10000000, statedb, new(event.Feed)}
 
 	key, _ := crypto.GenerateKey()
+	pool := NewTxPool(testTxPoolConfig, config, blockchain)
+
+	// wait for the pool to initialize
+	<-pool.initDoneCh
+	return pool, key
+}
+
+func setupTxPoolWithEIP155Config() (*TxPool, *ecdsa.PrivateKey) {
+	config := params.TestChainConfig
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	blockchain := &testBlockChain{10000000, statedb, new(event.Feed)}
+
+	key, _ := crypto.GenerateKey()
+	// Make Sure the TxPool use EIP155
+	// TODO: The setting here is strange and needs to be checked elsewhere to see if the wrong Signer is generated (func LatestSigner).
+	config.LondonBlock = nil
+	config.BerlinBlock = nil
 	pool := NewTxPool(testTxPoolConfig, config, blockchain)
 
 	// wait for the pool to initialize
@@ -341,20 +369,20 @@ func TestTransactionQueue(t *testing.T) {
 	}
 }
 
-// Test TxPool validate Non-protected transaction
-// Expected failed when meet Non-protected transaction
-//func TestValidateNonProtectedTransaction(t *testing.T) {
-//	pool, key := setupTxPool()
-//	defer pool.Stop()
-//
-//	tx1 := transaction(0, 100000, key)
-//	from, _ := deriveSender(tx1)
-//	testAddBalance(pool, from, big.NewInt(10000000))
-//
-//	if err := pool.validateTx(tx1, true); err != nil {
-//		t.Error("expected the transaction pool reject such non-protected transaction", err)
-//	}
-//}
+//Test TxPool validate Non-protected transaction
+//Expected failed when meet Non-protected transaction
+func TestValidateNonProtectedTransaction(t *testing.T) {
+	pool, key := setupTxPool()
+	defer pool.Stop()
+
+	tx1 := transaction(0, 100000, key)
+	from, _ := deriveSender(tx1)
+	testAddBalance(pool, from, big.NewInt(10000000))
+
+	if err := pool.validateTx(tx1, true); !errors.Is(err, ErrNonProtectedTx) {
+		t.Error("expected the transaction pool reject such non-protected transaction", err)
+	}
+}
 
 func TestTransactionQueue2(t *testing.T) {
 	t.Parallel()
@@ -512,12 +540,15 @@ func TestTransactionDoubleNonce(t *testing.T) {
 func TestTransactionMissingNonce(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupTxPool()
+	//pool, key := setupTxPool()
+	pool, key := setupTxPoolWithEIP155Config()
 	defer pool.Stop()
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 	testAddBalance(pool, addr, big.NewInt(100000000000000))
-	tx := transaction(1, 100000, key)
+	//tx := transaction(1, 100000, key)
+	tx := EIP155transaction(1, 100000, key)
+
 	if _, err := pool.add(tx, false); err != nil {
 		t.Error("didn't expect error", err)
 	}
@@ -842,7 +873,8 @@ func TestTransactionQueueAccountLimiting(t *testing.T) {
 
 	// Keep queuing up transactions and make sure all above a limit are dropped
 	for i := uint64(1); i <= testTxPoolConfig.AccountQueue+5; i++ {
-		if err := pool.addRemoteSync(transaction(i, 100000, key)); err != nil {
+		// Use EIP155 Transaction
+		if err := pool.addRemoteSync(EIP155transaction(i, 100000, key)); err != nil {
 			t.Fatalf("tx %d: failed to add transaction: %v", i, err)
 		}
 		if len(pool.pending) != 0 {
@@ -989,10 +1021,14 @@ func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 	testAddBalance(pool, crypto.PubkeyToAddress(remote.PublicKey), big.NewInt(1000000000))
 
 	// Add the two transactions and ensure they both are queued up
-	if err := pool.AddLocal(pricedTransaction(1, 100000, big.NewInt(1), local)); err != nil {
+
+	//if err := pool.AddLocal(pricedTransaction(1, 100000, big.NewInt(1), local)); err != nil {
+	//	t.Fatalf("failed to add local transaction: %v", err)
+	//}
+	if err := pool.AddLocal(pricedEIP155Transaction(1, params.TestChainConfig.ChainID, 100000, big.NewInt(1), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(1, 100000, big.NewInt(1), remote)); err != nil {
+	if err := pool.AddRemote(pricedEIP155Transaction(1, params.TestChainConfig.ChainID, 100000, big.NewInt(1), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	pending, queued := pool.Stats()
@@ -1059,19 +1095,19 @@ func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 	}
 
 	// Queue gapped transactions
-	if err := pool.AddLocal(pricedTransaction(4, 100000, big.NewInt(1), local)); err != nil {
+	if err := pool.AddLocal(pricedEIP155Transaction(4, params.TestChainConfig.ChainID, 100000, big.NewInt(1), local)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
-	if err := pool.addRemoteSync(pricedTransaction(4, 100000, big.NewInt(1), remote)); err != nil {
+	if err := pool.addRemoteSync(pricedEIP155Transaction(4, params.TestChainConfig.ChainID, 100000, big.NewInt(1), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	time.Sleep(5 * evictionInterval) // A half lifetime pass
 
 	// Queue executable transactions, the life cycle should be restarted.
-	if err := pool.AddLocal(pricedTransaction(2, 100000, big.NewInt(1), local)); err != nil {
+	if err := pool.AddLocal(pricedEIP155Transaction(2, params.TestChainConfig.ChainID, 100000, big.NewInt(1), local)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
-	if err := pool.addRemoteSync(pricedTransaction(2, 100000, big.NewInt(1), remote)); err != nil {
+	if err := pool.addRemoteSync(pricedEIP155Transaction(2, params.TestChainConfig.ChainID, 100000, big.NewInt(1), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	time.Sleep(6 * evictionInterval)

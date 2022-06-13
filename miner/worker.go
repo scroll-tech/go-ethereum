@@ -950,15 +950,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(w.current.signer, tx)
-		// Check whether the tx is replay protected. If we're not in the EIP155 hf
-		// phase, start ignoring the sender until we do.
-		// Todo: This if statement will always be false while EIP155 is enabled on block 0
-		if tx.Protected() && !w.chainConfig.IsEIP155(w.current.header.Number) {
-			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
 
-			txs.Pop()
-			continue
-		}
 		// Ignoring the unprotected transactions after enable EIP155
 		if !tx.Protected() && w.chainConfig.IsEIP155(w.current.header.Number) {
 			log.Trace("Ignoring non-protected transaction", "hash", tx.Hash())

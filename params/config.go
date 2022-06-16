@@ -356,8 +356,8 @@ type ChainConfig struct {
 	Ethash *EthashConfig `json:"ethash,omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty"`
 
-	// use zktrie
-	Zktrie bool `json:"zktrie"`
+	// Use zktrie
+	Zktrie bool `json:"zktrie,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

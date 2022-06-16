@@ -182,7 +182,7 @@ func (s *StateDB) Error() error {
 	return s.dbErr
 }
 
-func (s *StateDB) zktrie() bool {
+func (s *StateDB) IsZktrie() bool {
 	return s.db.TrieDB().Zktrie
 }
 
@@ -314,7 +314,7 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
-	if s.zktrie() {
+	if s.IsZktrie() {
 		var proof proofList
 		err := s.trie.Prove(addr.Bytes32(), 0, &proof)
 		return proof, err
@@ -324,7 +324,7 @@ func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
 
 // GetProofByHash returns the Merkle proof for a given account.
 func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
-	if s.zktrie() {
+	if s.IsZktrie() {
 		panic("unimplemented")
 	}
 	var proof proofList
@@ -364,7 +364,7 @@ func (s *StateDB) GetStorageTrieProof(a common.Address, key common.Hash) ([][]by
 	}
 
 	var proof proofList
-	if s.zktrie() {
+	if s.IsZktrie() {
 		err = trie.Prove(key.Bytes(), 0, &proof)
 	} else {
 		err = trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
@@ -380,7 +380,7 @@ func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, 
 		return proof, errors.New("storage trie for requested address does not exist")
 	}
 	var err error
-	if s.zktrie() {
+	if s.IsZktrie() {
 		err = trie.Prove(key.Bytes(), 0, &proof)
 	} else {
 		err = trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
@@ -599,7 +599,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 			return nil
 		}
 		data = new(types.StateAccount)
-		if s.zktrie() {
+		if s.IsZktrie() {
 			data, err = types.UnmarshalStateAccount(enc)
 		} else {
 			err = rlp.DecodeBytes(enc, data)

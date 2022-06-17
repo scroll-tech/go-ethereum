@@ -172,7 +172,7 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 	}
 
 	proof, n, err := buildZkTrieProof(h, k, len(key)*8, func(key *zkt.Hash) (*Node, error) {
-		buf, _ := proofDb.Get(key.Bytes())
+		buf, _ := proofDb.Get(key[:])
 		if buf == nil {
 			return nil, ErrKeyNotFound
 		}

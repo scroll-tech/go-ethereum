@@ -86,7 +86,7 @@ func (mt *ZkTrieImpl) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWr
 		if err != nil {
 			return err
 		}
-		return proofDb.Put(key.Bytes(), n.Value())
+		return proofDb.Put(key[:], n.Value())
 	})
 
 	if err != nil {

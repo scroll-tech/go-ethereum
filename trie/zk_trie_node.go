@@ -150,6 +150,13 @@ func (n *Node) Key() (*zkt.Hash, error) {
 	return n.key, nil
 }
 
+func (n *Node) ValueKey() (*zkt.Hash, error) {
+	if _, err := n.Key(); err != nil {
+		return nil, err
+	}
+	return n.valueHash, nil
+}
+
 // Data returns the wrapped data inside LeafNode and cast them into bytes
 // for other node type it just return nil
 func (n *Node) Data() []byte {

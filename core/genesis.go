@@ -186,9 +186,12 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, override
 	if genesis == nil {
 		storedcfg := rawdb.ReadChainConfig(db, stored)
 		if storedcfg == nil {
-			panic("this should never be reached: if genesis is nil, the config is already present or 'geth init' is being called which created it (in the code above, which means genesis != nil)")
+			log.Warn("Found genesis block without chain config")
+		} else {
+			trieCfg = &trie.Config{Zktrie: storedcfg.Zktrie}
 		}
-		trieCfg = &trie.Config{Zktrie: storedcfg.Zktrie}
+	} else {
+		trieCfg = &trie.Config{Zktrie: genesis.Config.Zktrie}
 	}
 
 	if _, err := state.New(header.Root, state.NewDatabaseWithConfig(db, trieCfg), nil); err != nil {

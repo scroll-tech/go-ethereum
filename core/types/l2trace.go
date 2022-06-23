@@ -88,7 +88,9 @@ type StructLogRes struct {
 func NewStructLogResBasic(pc uint64, op string, gas, gasCost uint64, depth int, refundCounter uint64, err error) *StructLogRes {
 	logRes := loggerResPool.Get().(*StructLogRes)
 	logRes.Pc, logRes.Op, logRes.Gas, logRes.GasCost, logRes.Depth, logRes.RefundCounter = pc, op, gas, gasCost, depth, refundCounter
-	logRes.Error = err.Error()
+	if err != nil {
+		logRes.Error = err.Error()
+	}
 	runtime.SetFinalizer(logRes, func(logRes *StructLogRes) {
 		logRes.Stack = logRes.Stack[:0]
 		logRes.Memory = logRes.Memory[:0]

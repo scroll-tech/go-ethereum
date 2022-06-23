@@ -4,8 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
-
 	"github.com/iden3/go-iden3-crypto/constants"
 	cryptoUtils "github.com/iden3/go-iden3-crypto/utils"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +11,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-
+	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 

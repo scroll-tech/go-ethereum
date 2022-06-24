@@ -15,7 +15,8 @@
     "clique": {
       "period": 15,
       "epoch": 30000
-    }
+    },
+    "zktrie": false
   },
   "nonce": "0x0",
   "timestamp": "0x61bc34a0",

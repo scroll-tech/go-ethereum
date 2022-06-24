@@ -100,7 +100,7 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 		preImageSize := int(b[curPos])
 		curPos += 1
 		if preImageSize != 0 {
-			copy(n.KeyPreimage[:], b[curPos:curPos+int(preImageSize)])
+			copy(n.KeyPreimage[:], b[curPos:curPos+preImageSize])
 		}
 	case NodeTypeEmpty:
 		break

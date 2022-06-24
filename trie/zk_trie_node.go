@@ -97,10 +97,10 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 			copy(n.ValuePreimage[i][:], b[i*32+curPos:(i+1)*32+curPos])
 		}
 		curPos = 36 + preimageLen*32
-		preImageFlag := int(b[curPos])
+		preImageSize := int(b[curPos])
 		curPos += 1
-		if preImageFlag != 0 {
-			copy(n.KeyPreimage[:], b[curPos:curPos+32])
+		if preImageSize != 0 {
+			copy(n.KeyPreimage[:], b[curPos:curPos+int(preImageSize)])
 		}
 	case NodeTypeEmpty:
 		break
@@ -194,7 +194,7 @@ func (n *Node) Value() []byte {
 			bytes = append(bytes, elm[:]...)
 		}
 		if n.KeyPreimage != nil {
-			bytes = append(bytes, 1)
+			bytes = append(bytes, byte(len(n.KeyPreimage)))
 			bytes = append(bytes, n.KeyPreimage[:]...)
 		} else {
 			bytes = append(bytes, 0)

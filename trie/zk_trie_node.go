@@ -100,6 +100,7 @@ func NewNodeFromBytes(b []byte) (*Node, error) {
 		preImageSize := int(b[curPos])
 		curPos += 1
 		if preImageSize != 0 {
+			n.KeyPreimage = new(zkt.Byte32)
 			copy(n.KeyPreimage[:], b[curPos:curPos+preImageSize])
 		}
 	case NodeTypeEmpty:

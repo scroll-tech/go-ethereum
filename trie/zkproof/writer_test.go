@@ -71,21 +71,17 @@ func TestGreeterTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	od := &simpleOrderer{}
 	theTx := trace.ExecutionResults[0]
+	handleTx(od, theTx)
 
-	err = writer.handleLogs(theTx.To.Address, theTx.StructLogs)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Log(od)
 
-	writer, err = NewZkTrieProofWriter(trace.StorageTrace)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = writer.handleTx(theTx)
-	if err != nil {
-		t.Fatal(err)
+	for _, op := range od.savedOp {
+		_, err = writer.HandleNewState(op)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	traces, err := HandleBlockResult(trace)

@@ -141,8 +141,6 @@ type zktrieProofWriter struct {
 	tracingZktrie       *trie.ZkTrie
 	tracingStorageTries map[common.Address]*trie.ZkTrie
 	tracingAccounts     map[common.Address]*types.StateAccount
-
-	outTrace []*StorageTrace
 }
 
 func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, error) {
@@ -243,6 +241,16 @@ func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {
 		return nil
 	} else {
 		return exData.StateList[pos]
+	}
+}
+
+func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
+	return &types.AccountWrapper{
+		Nonce:    st.Nonce,
+		Balance:  st.Balance,
+		CodeHash: st.CodeHash,
+		Address:  st.Address,
+		Storage:  st.Storage,
 	}
 }
 
@@ -398,7 +406,7 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 }
 
 // update traced storage state, and return the corresponding trace object
-func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, valueBefore, value []byte) (*StorageTrace, error) {
+func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value []byte) (*StorageTrace, error) {
 
 	trie := w.tracingStorageTries[addr]
 	if trie == nil {
@@ -409,13 +417,13 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, valueBe
 	stateUpdate := [2]*StateStorage{}
 
 	storeKey := zkt.NewByte32FromBytesPaddingZero(common.BytesToHash(key).Bytes())
-	storeValueBefore := zkt.NewByte32FromBytes(valueBefore)
+	storeValueBefore := trie.Get(storeKey[:])
 	storeValue := zkt.NewByte32FromBytes(value)
 
-	if !bytes.Equal(storeValueBefore[:], common.Hash{}.Bytes()) {
+	if storeValueBefore != nil && !bytes.Equal(storeValueBefore[:], common.Hash{}.Bytes()) {
 		stateUpdate[0] = &StateStorage{
 			Key:   storeKey.Bytes(),
-			Value: storeValueBefore.Bytes(),
+			Value: storeValueBefore,
 		}
 	}
 
@@ -425,7 +433,7 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, valueBe
 	}
 
 	decodeProofForMPTPath(storageBeforeProof, statePath[0])
-	if err := verifyStorage(storeKey, storeValueBefore, statePath[0].Leaf); err != nil {
+	if err := verifyStorage(storeKey, zkt.NewByte32FromBytes(storeValueBefore), statePath[0].Leaf); err != nil {
 		panic(fmt.Errorf("storage BEFORE has no valid data: %s (%v)", err, statePath[0]))
 	}
 
@@ -453,6 +461,10 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, valueBe
 
 	out, err := w.traceAccountUpdate(addr,
 		func(acc *types.StateAccount) *types.StateAccount {
+			if acc == nil {
+				panic("unexpected")
+			}
+
 			//sanity check
 			if accRootFromState := zkt.ReverseByteOrder(statePath[0].Root); !bytes.Equal(acc.Root[:], accRootFromState) {
 				panic(fmt.Errorf("unexpected storage root before: [%s] vs [%x]", acc.Root, accRootFromState))
@@ -473,7 +485,13 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, valueBe
 	} else if stateUpdate[0] != nil {
 		out.StateKey = statePath[0].Leaf.Sibling
 	} else {
-		return nil, fmt.Errorf("can not handle an non-op (update 0 to 0)")
+		// it occurs when we are handling SLOAD with non-exist value
+		// still no pretty idea, had to touch the internal behavior in zktrie ....
+		if h, err := storeKey.Hash(); err != nil {
+			return nil, fmt.Errorf("hash storekey fail: %s", err)
+		} else {
+			out.StateKey = zkt.NewHashFromBigInt(h)[:]
+		}
 	}
 
 	out.StatePath = statePath
@@ -481,58 +499,36 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, valueBe
 	return out, nil
 }
 
-func (w *zktrieProofWriter) buildSStore(accountState *types.AccountWrapper, storeValue []byte) (*StorageTrace, error) {
+func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (*StorageTrace, error) {
 
-	if accountState.Storage == nil {
-		return nil, fmt.Errorf("invalid extraData structure for SSTORE")
-	}
+	if accountState.Storage != nil {
+		storeAddr := hexutil.MustDecode(accountState.Storage.Key)
+		storeValue := hexutil.MustDecode(accountState.Storage.Value)
+		return w.traceStorageUpdate(accountState.Address, storeAddr, storeValue)
+	} else {
 
-	storeAddr := hexutil.MustDecode(accountState.Storage.Key)
-	storeValueBefore := hexutil.MustDecode(accountState.Storage.Value)
+		accData := getAccountDataFromLogState(accountState)
 
-	trace, err := w.traceStorageUpdate(accountState.Address, storeAddr, storeValueBefore, storeValue)
-	if err != nil {
-		return nil, err
-	}
-
-	//skip non-op SSTORE trace
-	if bytes.Equal(trace.StatePath[1].Root, trace.StatePath[0].Root) {
-		return nil, nil
-	}
-
-	return trace, nil
-}
-
-func (w *zktrieProofWriter) buildCreate(state *types.AccountWrapper) (*StorageTrace, error) {
-	w.tracingAccounts[state.Address] = nil
-	return w.buildCreateOrCall(state)
-}
-
-// build a trace handling update becore CREATE/CALL op
-func (w *zktrieProofWriter) buildCreateOrCall(state *types.AccountWrapper) (*StorageTrace, error) {
-
-	accData := getAccountDataFromLogState(state)
-
-	out, err := w.traceAccountUpdate(state.Address, func(accBefore *types.StateAccount) *types.StateAccount {
-		if accBefore != nil {
-			accData.Root = accBefore.Root
+		out, err := w.traceAccountUpdate(accountState.Address, func(accBefore *types.StateAccount) *types.StateAccount {
+			if accBefore != nil {
+				accData.Root = accBefore.Root
+			}
+			return accData
+		})
+		if err != nil {
+			return nil, fmt.Errorf("update account state %s fail: %s", accountState.Address, err)
 		}
-		return accData
-	})
-	if err != nil {
-		return nil, fmt.Errorf("update account %s for creation / call fail: %s", state.Address, err)
+		hash, err := zkt.NewHashFromBytes(accData.Root[:])
+		if err != nil {
+			return nil, fmt.Errorf("malform of state root in account %s", accountState.Address)
+		}
+		out.CommonStateRoot = hash[:]
+		return out, nil
 	}
-	hash, err := zkt.NewHashFromBytes(accData.Root[:])
-	if err != nil {
-		return nil, fmt.Errorf("malform of state root in account %s", state.Address)
-	}
-	out.CommonStateRoot = hash[:]
 
-	return out, nil
 }
 
-// Fill smtproof field for execResult
-func (w *zktrieProofWriter) handleLogs(currentContract common.Address, logs []*types.StructLogRes) error {
+func handleLogs(od opOrderer, currentContract common.Address, logs []*types.StructLogRes) {
 	logStack := []int{0}
 	contractStack := map[int]common.Address{}
 	skipDepth := 0
@@ -559,13 +555,7 @@ func (w *zktrieProofWriter) handleLogs(currentContract common.Address, logs []*t
 				switch calledLog.Op {
 				case "CREATE", "CREATE2":
 					//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)
-					state := getAccountState(calledLog, posCREATEAfter)
-					if t, err := w.buildCreateOrCall(state); err == nil {
-						t.Index = resumePos
-						w.outTrace = append(w.outTrace, t)
-					} else {
-						return fmt.Errorf("handle %s log in resume stack fail: %s", calledLog.Op, err)
-					}
+					od.absorb(getAccountState(calledLog, posCREATEAfter))
 				}
 			}
 
@@ -595,51 +585,37 @@ func (w *zktrieProofWriter) handleLogs(currentContract common.Address, logs []*t
 		switch sLog.Op {
 		case "CREATE", "CREATE2":
 			state := getAccountState(sLog, posCREATE)
-			if t, err := w.buildCreate(state); err == nil {
-				t.Index = i
-				w.outTrace = append(w.outTrace, t)
-			} else {
-				return fmt.Errorf("handle %s log fail: %s", sLog.Op, err)
-			}
+			od.absorb(state)
 			//update contract to CREATE addr
 
 			callEnterAddress = state.Address
 		case "CALL", "CALLCODE":
 			state := getAccountState(sLog, posCALL)
-			if t, err := w.buildCreateOrCall(state); err == nil {
-				t.Index = i
-				w.outTrace = append(w.outTrace, t)
-			} else {
-				return fmt.Errorf("handle %s log fail: %s", sLog.Op, err)
-			}
+			od.absorb(state)
 			callEnterAddress = state.Address
 		case "STATICCALL":
 			//static call has no update on target address
-			state := getAccountState(sLog, posSTATICCALL)
-			callEnterAddress = state.Address
+			callEnterAddress = getAccountState(sLog, posSTATICCALL).Address
+		case "SLOAD":
+			accountState := getAccountState(sLog, posSSTOREBefore)
+			od.absorb(accountState)
 		case "SSTORE":
 			log.Debug("build SSTORE", "pc", sLog.Pc, "key", sLog.Stack[len(sLog.Stack)-1])
-			accountState := getAccountState(sLog, posSSTOREBefore)
-
-			if t, err := w.buildSStore(accountState, hexutil.MustDecode(sLog.Stack[len(sLog.Stack)-2])); err == nil {
-				if t != nil {
-					t.Index = i
-					w.outTrace = append(w.outTrace, t)
-				} else {
-					log.Debug("skip non-op SSTORE", "pc", sLog.Pc)
-				}
-			} else {
-				return fmt.Errorf("handle SSTORE log fail: %s", err)
+			accountState := copyAccountState(getAccountState(sLog, posSSTOREBefore))
+			// notice the log only provide the value BEFORE store and it is not suitable for our protocol,
+			// here we change it into value AFTER update
+			accountState.Storage = &types.StorageWrapper{
+				Key:   sLog.Stack[len(sLog.Stack)-1],
+				Value: sLog.Stack[len(sLog.Stack)-2],
 			}
+			od.absorb(accountState)
 
 		default:
 		}
 	}
-
-	return nil
 }
 
-func (w *zktrieProofWriter) handleTx(txResult *types.ExecutionResult) error {
+func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 
 	// handle failed tx
 	if txResult.Failed {
@@ -648,48 +624,28 @@ func (w *zktrieProofWriter) handleTx(txResult *types.ExecutionResult) error {
 			if state.Address != txResult.From.Address {
 				continue
 			}
-			out, err := w.buildCreateOrCall(state)
-			if err != nil {
-				return fmt.Errorf("update caller account %s for failed postTx fail: %s", state.Address, err)
-			}
-			out.Index = -1
-			w.outTrace = append(w.outTrace, out)
-			handled = true
+			od.absorb(state)
 		}
 		if !handled {
-			return fmt.Errorf("no caller account in postTx status")
+			panic(fmt.Errorf("no caller account in postTx status"))
 		}
-
-		return nil
 	}
 
 	var toAddr common.Address
 
 	if state := txResult.AccountCreated; state != nil {
-		out, err := w.buildCreateOrCall(state)
-		if err != nil {
-			return fmt.Errorf("update account %s for creation fail: %s", state.Address, err)
-		}
-		out.Index = -1
-		w.outTrace = append(w.outTrace, out)
+		od.absorb(state)
 		toAddr = state.Address
 	} else {
 		toAddr = txResult.To.Address
 	}
 
-	if err := w.handleLogs(toAddr, txResult.StructLogs); err != nil {
-		return err
-	}
+	handleLogs(od, toAddr, txResult.StructLogs)
 
 	for _, state := range txResult.AccountsAfter {
-		out, err := w.buildCreateOrCall(state)
-		if err != nil {
-			return fmt.Errorf("update account %s for postTx fail: %s", state.Address, err)
-		}
-		out.Index = -1
-		w.outTrace = append(w.outTrace, out)
+		od.absorb(state)
 	}
-	return nil
+
 }
 
 func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
@@ -698,29 +654,34 @@ func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
 		return nil, err
 	}
 
+	od := &simpleOrderer{}
 	for _, tx := range block.ExecutionResults {
-		if err := writer.handleTx(tx); err != nil {
-			return nil, err
-		}
+		handleTx(od, tx)
 	}
 
 	// notice some coinbase addr (like all zero) is in fact not exist and should not be update
 	// TODO: not a good solution, just for patch ...
 	if coinbaseData := writer.tracingAccounts[block.BlockTrace.Coinbase.Address]; coinbaseData != nil {
-		out, err := writer.buildCreateOrCall(block.BlockTrace.Coinbase)
+		od.absorb(block.BlockTrace.Coinbase)
+	}
+
+	opDisp := od.end_absorb()
+	var outTrace []*StorageTrace
+
+	for op := opDisp.next(); op != nil; op = opDisp.next() {
+		trace, err := writer.HandleNewState(op)
 		if err != nil {
-			return nil, fmt.Errorf("update account %s for coinbase final fail: %s", block.BlockTrace.Coinbase.Address, err)
+			return nil, err
 		}
-		out.Index = -1
-		writer.outTrace = append(writer.outTrace, out)
+		outTrace = append(outTrace, trace)
 	}
 
 	finalHash := writer.tracingZktrie.Hash()
 	if !bytes.Equal(finalHash.Bytes(), block.StorageTrace.RootAfter.Bytes()) {
-		return writer.outTrace, fmt.Errorf("unmatch hash: [%x] vs [%x]", finalHash.Bytes(), block.StorageTrace.RootAfter.Bytes())
+		return outTrace, fmt.Errorf("unmatch hash: [%x] vs [%x]", finalHash.Bytes(), block.StorageTrace.RootAfter.Bytes())
 	}
 
-	return writer.outTrace, nil
+	return outTrace, nil
 }
 
 func FillBlockResultForMPTWitness(order int, block *types.BlockResult) error {

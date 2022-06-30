@@ -38,7 +38,6 @@ type StateStorage struct {
 type StorageTrace struct {
 	// which log the trace is responded for, -1 indicate not caused
 	// by opcode (like gasRefund, coinbase, setNonce, etc)
-	Index           int              `json:"index"`
 	Address         hexutil.Bytes    `json:"address"`
 	AccountKey      hexutil.Bytes    `json:"accountKey"`
 	AccountPath     [2]*SMTPath      `json:"accountPath"`

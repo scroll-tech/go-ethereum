@@ -93,6 +93,7 @@ var Defaults = Config{
 	GPO:             FullNodeGPO,
 	RPCTxFeeCap:     1, // 1 ether
 	TraceCacheLimit: 32,
+	MPTWitness:      0,
 }
 
 func init() {
@@ -208,6 +209,7 @@ type Config struct {
 
 	// Trace option
 	TraceCacheLimit int
+	MPTWitness      int
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

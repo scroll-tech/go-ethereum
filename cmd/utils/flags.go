@@ -255,6 +255,12 @@ var (
 		Usage: "Handle the latest several blockResults",
 		Value: ethconfig.Defaults.TraceCacheLimit,
 	}
+	// mpt witness settings
+	MPTWitness = cli.IntFlag{
+		Name:  "trace.mptwitness",
+		Usage: "Output witness for mpt circuit with Specified order (default = no output, 1 = by executing order",
+		Value: ethconfig.Defaults.MPTWitness,
+	}
 	// Light server and client settings
 	LightServeFlag = cli.IntFlag{
 		Name:  "light.serve",
@@ -1105,6 +1111,8 @@ func setTrace(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(TraceCacheLimit.Name) {
 		cfg.TraceCacheLimit = ctx.GlobalInt(TraceCacheLimit.Name)
 	}
+
+	cfg.MPTWitness = ctx.GlobalInt(MPTWitness.Name)
 }
 
 // setEtherbase retrieves the etherbase either from the directly specified

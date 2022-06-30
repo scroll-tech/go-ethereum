@@ -2,6 +2,7 @@ package zkproof
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -698,4 +699,26 @@ func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
 	}
 
 	return writer.outTrace, nil
+}
+
+func FillBlockResultForMPTWitness(order int, block *types.BlockResult) error {
+
+	if order == 0 {
+		return nil
+	}
+
+	trace, err := HandleBlockResult(block)
+	if err != nil {
+		return err
+	}
+
+	msg, err := json.Marshal(trace)
+	if err != nil {
+		return err
+	}
+
+	rawmsg := json.RawMessage(msg)
+
+	block.MPTWitness = &rawmsg
+	return nil
 }

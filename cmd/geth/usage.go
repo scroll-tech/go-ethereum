@@ -61,6 +61,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		Name: "NOTRACE CLIENT",
 		Flags: []cli.Flag{
 			utils.TraceCacheLimit,
+			utils.MPTWitness,
 		},
 	},
 	{

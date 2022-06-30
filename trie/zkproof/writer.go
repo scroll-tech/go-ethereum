@@ -641,6 +641,28 @@ func (w *zktrieProofWriter) handleLogs(currentContract common.Address, logs []*t
 
 func (w *zktrieProofWriter) handleTx(txResult *types.ExecutionResult) error {
 
+	// handle failed tx
+	if txResult.Failed {
+		handled := false
+		for _, state := range txResult.AccountsAfter {
+			if state.Address != txResult.From.Address {
+				continue
+			}
+			out, err := w.buildCreateOrCall(state)
+			if err != nil {
+				return fmt.Errorf("update caller account %s for failed postTx fail: %s", state.Address, err)
+			}
+			out.Index = -1
+			w.outTrace = append(w.outTrace, out)
+			handled = true
+		}
+		if !handled {
+			return fmt.Errorf("no caller account in postTx status")
+		}
+
+		return nil
+	}
+
 	var toAddr common.Address
 
 	if state := txResult.AccountCreated; state != nil {

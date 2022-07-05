@@ -648,13 +648,32 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 
 }
 
+var defaultOrdererScheme = 2
+
+// HandleBlockResult only for backward compatibility
 func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
+	return HandleBlockResultEx(block, defaultOrdererScheme)
+}
+
+func HandleBlockResultEx(block *types.BlockResult, ordererScheme int) ([]*StorageTrace, error) {
+
 	writer, err := NewZkTrieProofWriter(block.StorageTrace)
 	if err != nil {
 		return nil, err
 	}
 
-	od := &simpleOrderer{}
+	var od opOrderer
+	switch ordererScheme {
+	case 0:
+		panic("should not come here when scheme is 0")
+	case 1:
+		od = &simpleOrderer{}
+	case 2:
+		od = newRWTblOrderer(writer.tracingAccounts)
+	default:
+		return nil, fmt.Errorf("unrecognized scheme %d", ordererScheme)
+	}
+
 	for _, tx := range block.ExecutionResults {
 		handleTx(od, tx)
 	}
@@ -682,6 +701,7 @@ func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
 	}
 
 	return outTrace, nil
+
 }
 
 func FillBlockResultForMPTWitness(order int, block *types.BlockResult) error {
@@ -690,7 +710,7 @@ func FillBlockResultForMPTWitness(order int, block *types.BlockResult) error {
 		return nil
 	}
 
-	trace, err := HandleBlockResult(block)
+	trace, err := HandleBlockResultEx(block, order)
 	if err != nil {
 		return err
 	}

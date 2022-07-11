@@ -648,14 +648,14 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 
 }
 
-var defaultOrdererScheme = 2
+var defaultOrdererScheme = MPTWitnessRWTbl
 
 // HandleBlockResult only for backward compatibility
 func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
 	return HandleBlockResultEx(block, defaultOrdererScheme)
 }
 
-func HandleBlockResultEx(block *types.BlockResult, ordererScheme int) ([]*StorageTrace, error) {
+func HandleBlockResultEx(block *types.BlockResult, ordererScheme MPTWitnessType) ([]*StorageTrace, error) {
 
 	writer, err := NewZkTrieProofWriter(block.StorageTrace)
 	if err != nil {
@@ -664,11 +664,11 @@ func HandleBlockResultEx(block *types.BlockResult, ordererScheme int) ([]*Storag
 
 	var od opOrderer
 	switch ordererScheme {
-	case 0:
+	case MPTWitnessNothing:
 		panic("should not come here when scheme is 0")
-	case 1:
+	case MPTWitnessNatural:
 		od = &simpleOrderer{}
-	case 2:
+	case MPTWitnessRWTbl:
 		od = newRWTblOrderer(writer.tracingAccounts)
 	default:
 		return nil, fmt.Errorf("unrecognized scheme %d", ordererScheme)
@@ -704,9 +704,9 @@ func HandleBlockResultEx(block *types.BlockResult, ordererScheme int) ([]*Storag
 
 }
 
-func FillBlockResultForMPTWitness(order int, block *types.BlockResult) error {
+func FillBlockResultForMPTWitness(order MPTWitnessType, block *types.BlockResult) error {
 
-	if order == 0 {
+	if order == MPTWitnessNothing {
 		return nil
 	}
 

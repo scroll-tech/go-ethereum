@@ -16,7 +16,7 @@ func init() {
 	var orderSchemeI int
 	if orderScheme != "" {
 		if n, err := fmt.Sscanf(orderScheme, "%d", &orderSchemeI); err == nil && n == 1 {
-			defaultOrdererScheme = orderSchemeI
+			defaultOrdererScheme = MPTWitnessType(orderSchemeI)
 		}
 	}
 }

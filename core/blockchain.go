@@ -149,7 +149,7 @@ var defaultCacheConfig = &CacheConfig{
 	SnapshotLimit:   256,
 	SnapshotWait:    true,
 	TraceCacheLimit: 32,
-	MPTWitness:      0,
+	MPTWitness:      int(zkproof.MPTWitnessNothing),
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -1386,7 +1386,7 @@ func (bc *BlockChain) writeBlockResult(state *state.StateDB, block *types.Block,
 		}
 	}
 
-	if err := zkproof.FillBlockResultForMPTWitness(bc.cacheConfig.MPTWitness, blockResult); err != nil {
+	if err := zkproof.FillBlockResultForMPTWitness(zkproof.MPTWitnessType(bc.cacheConfig.MPTWitness), blockResult); err != nil {
 		log.Error("fill mpt witness fail", "error", err)
 	}
 

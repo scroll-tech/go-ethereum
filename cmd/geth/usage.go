@@ -58,13 +58,6 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		},
 	},
 	{
-		Name: "NOTRACE CLIENT",
-		Flags: []cli.Flag{
-			utils.TraceCacheLimit,
-			utils.MPTWitness,
-		},
-	},
-	{
 		Name: "LIGHT CLIENT",
 		Flags: []cli.Flag{
 			utils.LightServeFlag,

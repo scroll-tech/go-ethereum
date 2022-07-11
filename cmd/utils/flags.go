@@ -249,18 +249,6 @@ var (
 		Name:  "override.arrowglacier",
 		Usage: "Manually specify Arrow Glacier fork-block, overriding the bundled setting",
 	}
-	// NoTrace settings
-	TraceCacheLimit = cli.IntFlag{
-		Name:  "trace.limit",
-		Usage: "Handle the latest several blockResults",
-		Value: ethconfig.Defaults.TraceCacheLimit,
-	}
-	// mpt witness settings
-	MPTWitness = cli.IntFlag{
-		Name:  "trace.mptwitness",
-		Usage: "Output witness for mpt circuit with Specified order (default = no output, 1 = by executing order",
-		Value: ethconfig.Defaults.MPTWitness,
-	}
 	// Light server and client settings
 	LightServeFlag = cli.IntFlag{
 		Name:  "light.serve",
@@ -1106,15 +1094,6 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	return accs[index], nil
 }
 
-func setTrace(ctx *cli.Context, cfg *ethconfig.Config) {
-	// NoTrace flag
-	if ctx.GlobalIsSet(TraceCacheLimit.Name) {
-		cfg.TraceCacheLimit = ctx.GlobalInt(TraceCacheLimit.Name)
-	}
-
-	cfg.MPTWitness = ctx.GlobalInt(MPTWitness.Name)
-}
-
 // setEtherbase retrieves the etherbase either from the directly specified
 // command line flags or from the keystore if CLI indexed.
 func setEtherbase(ctx *cli.Context, ks *keystore.KeyStore, cfg *ethconfig.Config) {
@@ -1506,7 +1485,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if keystores := stack.AccountManager().Backends(keystore.KeyStoreType); len(keystores) > 0 {
 		ks = keystores[0].(*keystore.KeyStore)
 	}
-	setTrace(ctx, cfg)
 	setEtherbase(ctx, ks, cfg)
 	setGPO(ctx, &cfg.GPO, ctx.GlobalString(SyncModeFlag.Name) == "light")
 	setTxPool(ctx, &cfg.TxPool)

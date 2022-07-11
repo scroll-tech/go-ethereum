@@ -625,10 +625,12 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 				continue
 			}
 			od.absorb(state)
+			handled = true
 		}
 		if !handled {
 			panic(fmt.Errorf("no caller account in postTx status"))
 		}
+		return
 	}
 
 	var toAddr common.Address

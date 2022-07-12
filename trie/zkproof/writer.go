@@ -650,11 +650,13 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 
 }
 
-var defaultOrdererScheme = MPTWitnessRWTbl
+const defaultOrdererScheme = MPTWitnessRWTbl
+
+var usedOrdererScheme = defaultOrdererScheme
 
 // HandleBlockResult only for backward compatibility
 func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
-	return HandleBlockResultEx(block, defaultOrdererScheme)
+	return HandleBlockResultEx(block, usedOrdererScheme)
 }
 
 func HandleBlockResultEx(block *types.BlockResult, ordererScheme MPTWitnessType) ([]*StorageTrace, error) {

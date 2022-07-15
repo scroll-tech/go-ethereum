@@ -245,12 +245,21 @@ func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {
 }
 
 func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
+
+	var stg *types.StorageWrapper
+	if st.Storage != nil {
+		stg = &types.StorageWrapper{
+			Key:   st.Storage.Key,
+			Value: st.Storage.Value,
+		}
+	}
+
 	return &types.AccountWrapper{
 		Nonce:    st.Nonce,
-		Balance:  st.Balance,
+		Balance:  (*hexutil.Big)(big.NewInt(0).Set(st.Balance.ToInt())),
 		CodeHash: st.CodeHash,
 		Address:  st.Address,
-		Storage:  st.Storage,
+		Storage:  stg,
 	}
 }
 
@@ -550,7 +559,7 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			calledLog := logs[resumePos]
 
 			//no need to handle fail calling
-			if calledLog.ExtraData == nil || !calledLog.ExtraData.CallFailed {
+			if !(calledLog.ExtraData != nil && calledLog.ExtraData.CallFailed) {
 				//reentry the last log which "cause" the calling, some handling may needed
 				switch calledLog.Op {
 				case "CREATE", "CREATE2":

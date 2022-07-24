@@ -100,17 +100,6 @@ func traceLastNAddressAccount(n int) traceFunc {
 	}
 }
 
-// traceCaller gets caller address's account.
-func traceCaller(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
-	address := scope.Contract.CallerAddress
-	state := getWrappedAccountForAddr(l, address)
-
-	extraData.StateList = append(extraData.StateList, state)
-	l.statesAffected[scope.Contract.Address()] = struct{}{}
-
-	return nil
-}
-
 // StorageWrapper will be empty
 func getWrappedAccountForAddr(l *StructLogger, address common.Address) *types.AccountWrapper {
 	return &types.AccountWrapper{

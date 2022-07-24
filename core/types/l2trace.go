@@ -103,6 +103,7 @@ func NewStructLogResBasic(pc uint64, op string, gas, gasCost uint64, depth int, 
 	return logRes
 }
 
+// init
 type ExtraData struct {
 	// Indicate the call succeeds or not for CALL/CREATE op
 	CallFailed bool `json:"callFailed,omitempty"`

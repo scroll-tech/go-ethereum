@@ -54,6 +54,16 @@ func traceLastNAddressCode(n int) traceFunc {
 	}
 }
 
+// traceContractCode
+func traceContractCode() traceFunc {
+	return func(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+		address := scope.Contract.Address()
+		code := l.env.StateDB.GetCode(address)
+		extraData.CodeList = append(extraData.CodeList, hexutil.Encode(code))
+		return nil
+	}
+}
+
 // traceStorage get contract's storage at storage_address
 func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	if scope.Stack.len() == 0 {

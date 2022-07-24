@@ -54,7 +54,7 @@ func traceLastNAddressCode(n int) traceFunc {
 	}
 }
 
-// traceContractCode
+// traceContractCode gets the contract's code
 func traceContractCode(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	code := l.env.StateDB.GetCode(scope.Contract.Address())
 	extraData.CodeList = append(extraData.CodeList, hexutil.Encode(code))

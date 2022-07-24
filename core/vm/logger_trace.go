@@ -15,8 +15,8 @@ var (
 		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCaller, traceContractAccount, traceLastNAddressAccount(1)}, // TODO: is scope.Contract.Address() ==scope.Contract.CallerAddress?
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
 		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
-		CREATE:       {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit TODO????
-		CREATE2:      {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit TODO????
+		CREATE:       {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
+		CREATE2:      {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
 		SLOAD:        {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SSTORE:       {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SELFDESTRUCT: {traceContractAccount, traceLastNAddressAccount(0)},
@@ -132,4 +132,8 @@ func getWrappedAccountForStorage(l *StructLogger, address common.Address, key co
 			Value: l.env.StateDB.GetState(address, key).String(),
 		},
 	}
+}
+
+func getCodeForAddr(l *StructLogger, address common.Address) []byte {
+	return l.env.StateDB.GetCode(address)
 }

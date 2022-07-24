@@ -9,6 +9,8 @@ import (
 type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error
 
 var (
+	//init
+
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
 		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceCaller, traceLastNAddressAccount(1)},

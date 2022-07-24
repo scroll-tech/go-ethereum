@@ -11,8 +11,8 @@ type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.Extra
 var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
-		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, last 1th is the callee
-		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, last 1th is the callee
+		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
+		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
 		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
 		CREATE:       {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit

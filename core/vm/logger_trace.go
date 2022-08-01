@@ -11,8 +11,8 @@ type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.Extra
 var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
-		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceCaller, traceLastNAddressAccount(1)},
-		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceCaller, traceLastNAddressAccount(1)},
+		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
+		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
 		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
 		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
 		CREATE:       {}, // sender is already recorded in ExecutionResult, callee is recorded in CaptureEnter&CaptureExit
@@ -23,6 +23,10 @@ var (
 		SELFBALANCE:  {traceContractAccount},
 		BALANCE:      {traceLastNAddressAccount(0)},
 		EXTCODEHASH:  {traceLastNAddressAccount(0)},
+		CODESIZE:     {traceContractCode},
+		CODECOPY:     {traceContractCode},
+		EXTCODESIZE:  {traceLastNAddressCode(0)},
+		EXTCODECOPY:  {traceLastNAddressCode(0)},
 	}
 )
 
@@ -50,28 +54,33 @@ func traceLastNAddressCode(n int) traceFunc {
 	}
 }
 
+// traceContractCode gets the contract's code
+func traceContractCode(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+	code := l.env.StateDB.GetCode(scope.Contract.Address())
+	extraData.CodeList = append(extraData.CodeList, hexutil.Encode(code))
+	return nil
+}
+
 // traceStorage get contract's storage at storage_address
 func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	if scope.Stack.len() == 0 {
 		return nil
 	}
 	key := common.Hash(scope.Stack.peek().Bytes32())
-	storage, err := getWrappedAccountForStorage(l, scope.Contract.Address(), key)
-	if err == nil {
-		extraData.StateList = append(extraData.StateList, storage)
-	}
-	return err
+	storage := getWrappedAccountForStorage(l, scope.Contract.Address(), key)
+	extraData.StateList = append(extraData.StateList, storage)
+
+	return nil
 }
 
 // traceContractAccount gets the contract's account
 func traceContractAccount(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
 	// Get account state.
-	state, err := getWrappedAccountForAddr(l, scope.Contract.Address())
-	if err == nil {
-		extraData.StateList = append(extraData.StateList, state)
-		l.statesAffected[scope.Contract.Address()] = struct{}{}
-	}
-	return err
+	state := getWrappedAccountForAddr(l, scope.Contract.Address())
+	extraData.StateList = append(extraData.StateList, state)
+	l.statesAffected[scope.Contract.Address()] = struct{}{}
+
+	return nil
 }
 
 // traceLastNAddressAccount returns func about the last N's address account.
@@ -83,37 +92,25 @@ func traceLastNAddressAccount(n int) traceFunc {
 		}
 
 		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
-		state, err := getWrappedAccountForAddr(l, address)
-		if err == nil {
-			extraData.StateList = append(extraData.StateList, state)
-			l.statesAffected[scope.Contract.Address()] = struct{}{}
-		}
-		return err
-	}
-}
-
-// traceCaller gets caller address's account.
-func traceCaller(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
-	address := scope.Contract.CallerAddress
-	state, err := getWrappedAccountForAddr(l, address)
-	if err == nil {
+		state := getWrappedAccountForAddr(l, address)
 		extraData.StateList = append(extraData.StateList, state)
 		l.statesAffected[scope.Contract.Address()] = struct{}{}
+
+		return nil
 	}
-	return err
 }
 
 // StorageWrapper will be empty
-func getWrappedAccountForAddr(l *StructLogger, address common.Address) (*types.AccountWrapper, error) {
+func getWrappedAccountForAddr(l *StructLogger, address common.Address) *types.AccountWrapper {
 	return &types.AccountWrapper{
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),
 		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
 		CodeHash: l.env.StateDB.GetCodeHash(address),
-	}, nil
+	}
 }
 
-func getWrappedAccountForStorage(l *StructLogger, address common.Address, key common.Hash) (*types.AccountWrapper, error) {
+func getWrappedAccountForStorage(l *StructLogger, address common.Address, key common.Hash) *types.AccountWrapper {
 	return &types.AccountWrapper{
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),
@@ -123,5 +120,9 @@ func getWrappedAccountForStorage(l *StructLogger, address common.Address, key co
 			Key:   key.String(),
 			Value: l.env.StateDB.GetState(address, key).String(),
 		},
-	}, nil
+	}
+}
+
+func getCodeForAddr(l *StructLogger, address common.Address) []byte {
+	return l.env.StateDB.GetCode(address)
 }

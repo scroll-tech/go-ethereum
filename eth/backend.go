@@ -176,7 +176,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		vmConfig = vm.Config{
 			EnablePreimageRecording: config.EnablePreimageRecording,
 			Debug:                   true,
-			Tracer:                  vm.NewStructLogger(&vm.LogConfig{EnableMemory: true}),
+			Tracer:                  vm.NewStructLogger(&vm.LogConfig{EnableMemory: false}),
 		}
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:      config.TrieCleanCache,
@@ -189,6 +189,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			SnapshotLimit:       config.SnapshotCache,
 			Preimages:           config.Preimages,
 			TraceCacheLimit:     config.TraceCacheLimit,
+			MPTWitness:          config.MPTWitness,
 		}
 	)
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)

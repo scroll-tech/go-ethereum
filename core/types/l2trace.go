@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"runtime"
 	"sync"
 
@@ -25,6 +26,7 @@ type BlockResult struct {
 	BlockTrace       *BlockTrace        `json:"blockTrace"`
 	StorageTrace     *StorageTrace      `json:"storageTrace"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
+	MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
 }
 
 // StorageTrace stores proofs of storage needed by storage circuit
@@ -105,6 +107,9 @@ type ExtraData struct {
 	// Indicate the call succeeds or not for CALL/CREATE op
 	CallFailed bool `json:"callFailed,omitempty"`
 	// CALL | CALLCODE | DELEGATECALL | STATICCALL: [tx.to address’s code, stack.nth_last(1) address’s code]
+	// CREATE | CREATE2: [created contract’s code]
+	// CODESIZE | CODECOPY: [contract’s code]
+	// EXTCODESIZE | EXTCODECOPY: [stack.nth_last(0) address’s code]
 	CodeList []string `json:"codeList,omitempty"`
 	// SSTORE | SLOAD: [storageProof]
 	// SELFDESTRUCT: [contract address’s account, stack.nth_last(0) address’s account]

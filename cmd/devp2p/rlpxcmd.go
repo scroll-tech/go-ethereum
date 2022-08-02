@@ -31,20 +31,20 @@ import (
 )
 
 var (
-	rlpxCommand = cli.Command{
+	rlpxCommand = &cli.Command{
 		Name:  "rlpx",
 		Usage: "RLPx Commands",
-		Subcommands: []cli.Command{
+		Subcommands: []*cli.Command{
 			rlpxPingCommand,
 			rlpxEthTestCommand,
 		},
 	}
-	rlpxPingCommand = cli.Command{
+	rlpxPingCommand = &cli.Command{
 		Name:   "ping",
 		Usage:  "ping <node>",
 		Action: rlpxPing,
 	}
-	rlpxEthTestCommand = cli.Command{
+	rlpxEthTestCommand = &cli.Command{
 		Name:      "eth-test",
 		Usage:     "Runs tests against a node",
 		ArgsUsage: "<node> <chain.rlp> <genesis.json>",
@@ -96,14 +96,9 @@ func rlpxEthTest(ctx *cli.Context) error {
 	if ctx.NArg() < 3 {
 		exit("missing path to chain.rlp as command-line argument")
 	}
-	suite, err := ethtest.NewSuite(getNodeArg(ctx), ctx.Args()[1], ctx.Args()[2])
+	suite, err := ethtest.NewSuite(getNodeArg(ctx), ctx.Args().Get(1), ctx.Args().Get(2))
 	if err != nil {
 		exit(err)
 	}
-	// check if given node supports eth66, and if so, run eth66 protocol tests as well
-	is66Failed, _ := utesting.Run(utesting.Test{Name: "Is_66", Fn: suite.Is_66})
-	if is66Failed {
-		return runTests(ctx, suite.EthTests())
-	}
-	return runTests(ctx, suite.AllEthTests())
+	return runTests(ctx, suite.EthTests())
 }

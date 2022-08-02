@@ -51,6 +51,14 @@ func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
 	return b.eth.chainConfig
 }
 
+func (b *LesApiBackend) CacheConfig() *core.CacheConfig {
+	return nil
+}
+
+func (b *LesApiBackend) Coinbase() common.Address {
+	return common.Address{}
+}
+
 func (b *LesApiBackend) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(b.eth.BlockChain().CurrentHeader())
 }
@@ -330,4 +338,8 @@ func (b *LesApiBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 
 func (b *LesApiBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error) {
 	return b.eth.stateAtTransaction(ctx, block, txIndex, reexec)
+}
+
+func (b *LesApiBackend) GetBlockResultByHash(blockHash common.Hash) *types.BlockResult {
+	return nil
 }

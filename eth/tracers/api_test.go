@@ -130,6 +130,14 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chainConfig
 }
 
+func (b *testBackend) CacheConfig() *core.CacheConfig {
+	return nil
+}
+
+func (b *testBackend) Coinbase() common.Address {
+	return common.Address{}
+}
+
 func (b *testBackend) Engine() consensus.Engine {
 	return b.engine
 }
@@ -174,6 +182,10 @@ func (b *testBackend) StateAtTransaction(ctx context.Context, block *types.Block
 		statedb.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
 	}
 	return nil, vm.BlockContext{}, nil, fmt.Errorf("transaction index %d out of range for block %#x", txIndex, block.Hash())
+}
+
+func (b *testBackend) GetBlockResultByHash(blockHash common.Hash) *types.BlockResult {
+	return nil
 }
 
 func TestTraceCall(t *testing.T) {

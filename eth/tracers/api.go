@@ -72,6 +72,8 @@ type Backend interface {
 	GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	RPCGasCap() uint64
 	ChainConfig() *params.ChainConfig
+	CacheConfig() *core.CacheConfig
+	Coinbase() common.Address
 	Engine() consensus.Engine
 	ChainDb() ethdb.Database
 	// StateAtBlock returns the state corresponding to the stateroot of the block.
@@ -79,6 +81,9 @@ type Backend interface {
 	// so this method should be called with the parent.
 	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive, preferDisk bool) (*state.StateDB, error)
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error)
+
+	// GetBlockResultByHash get block trace from cache
+	GetBlockResultByHash(blockHash common.Hash) *types.BlockResult
 }
 
 // API is the collection of tracing APIs exposed over the private debugging endpoint.
@@ -908,7 +913,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 	switch tracer := tracer.(type) {
 	case *vm.StructLogger:
 		// If the result contains a revert reason, return it.
-		returnVal := fmt.Sprintf("%x", result.Return())
+		returnVal := hexutil.Encode(result.Return())
 		if len(result.Revert()) > 0 {
 			returnVal = fmt.Sprintf("%x", result.Revert())
 		}
@@ -935,7 +940,7 @@ func APIs(backend Backend) []rpc.API {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewAPI(backend),
-			Public:    false,
+			Public:    true,
 		},
 	}
 }

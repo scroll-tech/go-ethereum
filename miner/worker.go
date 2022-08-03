@@ -400,7 +400,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-w.startCh:
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
-			commit(true, commitInterruptNewHead)
+			commit(false, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
 			clearPending(head.Block.NumberU64())
@@ -847,7 +847,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	if to == nil {
 		if createdAcc == nil {
-			panic("unexpected tx: address for created contract unavialable")
+			panic("unexpected tx: address for created contract unavailable")
 		}
 		to = &createdAcc.Address
 	}

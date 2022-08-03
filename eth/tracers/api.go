@@ -81,9 +81,6 @@ type Backend interface {
 	// so this method should be called with the parent.
 	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive, preferDisk bool) (*state.StateDB, error)
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error)
-
-	// GetBlockResultByHash get block trace from cache
-	GetBlockResultByHash(blockHash common.Hash) *types.BlockResult
 }
 
 // API is the collection of tracing APIs exposed over the private debugging endpoint.
@@ -913,7 +910,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 	switch tracer := tracer.(type) {
 	case *vm.StructLogger:
 		// If the result contains a revert reason, return it.
-		returnVal := hexutil.Encode(result.Return())
+		returnVal := fmt.Sprintf("%x", result.Return())
 		if len(result.Revert()) > 0 {
 			returnVal = fmt.Sprintf("%x", result.Revert())
 		}

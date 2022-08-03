@@ -31,10 +31,9 @@ type environment struct {
 	sMu sync.Mutex
 	*types.StorageTrace
 	executionResults []*types.ExecutionResult
-
-	err error
 }
 
+// Make trace environment for current block.
 func (api *API) makecurrent(ctx context.Context, config *TraceConfig, block *types.Block) (*environment, error) {
 	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
 	if err != nil {
@@ -85,6 +84,7 @@ func (api *API) makecurrent(ctx context.Context, config *TraceConfig, block *typ
 	return env, nil
 }
 
+// GetBlockResultByNumberOrHash replay the block and returns the structured blockResult by hash or number.
 func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockResult, err error) {
 	var block *types.Block
 	if number, ok := blockNrOrHash.Number(); ok {
@@ -112,10 +112,10 @@ func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash 
 		return nil, err
 	}
 
-	return api.getBlockResult(ctx, block, env)
+	return api.getBlockResult(block, env)
 }
 
-func (api *API) getBlockResult(ctx context.Context, block *types.Block, env *environment) (*types.BlockResult, error) {
+func (api *API) getBlockResult(block *types.Block, env *environment) (*types.BlockResult, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs  = block.Transactions()
@@ -216,7 +216,7 @@ func (api *API) traceTx2(env *environment, state *state.StateDB, index int, bloc
 	var after []*types.AccountWrapper
 	if to == nil {
 		if createdAcc == nil {
-			panic("unexpected tx: address for created contract unavialable")
+			return errors.New("unexpected tx: address for created contract unavailable")
 		}
 		to = &createdAcc.Address
 	}
@@ -297,6 +297,7 @@ func (api *API) traceTx2(env *environment, state *state.StateDB, index int, bloc
 	return nil
 }
 
+// Fill blockResult content after all the txs are finished running.
 func (api *API) writeBlockResult(env *environment, block *types.Block) (*types.BlockResult, error) {
 	statedb := env.state
 	txs := block.Transactions()

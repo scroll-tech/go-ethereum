@@ -18,6 +18,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
+type TraceBlock interface {
+	GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockResult, err error)
+}
+
 type environment struct {
 	config *TraceConfig
 
@@ -31,6 +35,42 @@ type environment struct {
 	sMu sync.Mutex
 	*types.StorageTrace
 	executionResults []*types.ExecutionResult
+}
+
+// GetBlockResultByNumberOrHash replay the block and returns the structured blockResult by hash or number.
+func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockResult, err error) {
+	var block *types.Block
+	if number, ok := blockNrOrHash.Number(); ok {
+		block, err = api.blockByNumber(ctx, number)
+	}
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		block, err = api.blockByHash(ctx, hash)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if block.NumberU64() == 0 {
+		return nil, errors.New("genesis is not traceable")
+	}
+	if config == nil {
+		config = &TraceConfig{
+			LogConfig: &vm.LogConfig{
+				EnableMemory:     false,
+				EnableReturnData: true,
+			},
+		}
+	} else if config.Tracer != nil {
+		config.Tracer = nil
+		log.Warn("Tracer params is unsupported")
+	}
+
+	// create current execution environment.
+	env, err := api.makecurrent(ctx, config, block)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.getBlockResult(block, env)
 }
 
 // Make trace environment for current block.
@@ -82,37 +122,6 @@ func (api *API) makecurrent(ctx context.Context, config *TraceConfig, block *typ
 		}
 	}
 	return env, nil
-}
-
-// GetBlockResultByNumberOrHash replay the block and returns the structured blockResult by hash or number.
-func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockResult, err error) {
-	var block *types.Block
-	if number, ok := blockNrOrHash.Number(); ok {
-		block, err = api.blockByNumber(ctx, number)
-	}
-	if hash, ok := blockNrOrHash.Hash(); ok {
-		block, err = api.blockByHash(ctx, hash)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if block.NumberU64() == 0 {
-		return nil, errors.New("genesis is not traceable")
-	}
-	if config == nil {
-		config = &TraceConfig{}
-	} else if config.Tracer != nil {
-		config.Tracer = nil
-		log.Warn("Tracer params is unsupported")
-	}
-
-	// create current execution environment.
-	env, err := api.makecurrent(ctx, config, block)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.getBlockResult(block, env)
 }
 
 func (api *API) getBlockResult(block *types.Block, env *environment) (*types.BlockResult, error) {

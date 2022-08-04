@@ -937,6 +937,12 @@ func APIs(backend Backend) []rpc.API {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewAPI(backend),
+			Public:    false,
+		},
+		{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   TraceBlock(NewAPI(backend)),
 			Public:    true,
 		},
 	}

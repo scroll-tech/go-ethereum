@@ -120,3 +120,44 @@ Related commits:
 
 + [35f6a91cd5d5bd2ecfc865f6c0c0b239727f55ee](https://github.com/scroll-tech/go-ethereum/commit/35f6a91cd5d5bd2ecfc865f6c0c0b239727f55ee) (PR [#111](https://github.com/scroll-tech/go-ethereum/pull/111))
 + [3410a56d866735f6a81eb8e5bae3976751ab0691](https://github.com/scroll-tech/go-ethereum/commit/3410a56d866735f6a81eb8e5bae3976751ab0691) (PR [#121](https://github.com/scroll-tech/go-ethereum/pull/121))
+
+## 2022-07-30
+
+Tag: None.
+
+Current rev: d421337df58074bdee8d8cb8fa592ece5a2300e8.
+
+Based on https://github.com/ethereum/go-ethereum v1.10.13.
+
+**Notable changes:**
+
+### 1. Disable memory trace
+
+Related commits:
+
++ [d421337df58074bdee8d8cb8fa592ece5a2300e8](https://github.com/scroll-tech/go-ethereum/commit/d421337df58074bdee8d8cb8fa592ece5a2300e8) (PR [#134](https://github.com/scroll-tech/go-ethereum/pull/134))
+
+### 2. Add more opcode handlings
+
+Related commits:
+
++ [eb11a84c56b30bf7e2345db9b7532542336a5581](https://github.com/scroll-tech/go-ethereum/commit/eb11a84c56b30bf7e2345db9b7532542336a5581) (PR [#128](https://github.com/scroll-tech/go-ethereum/pull/128))
+
+### 3. Include zktrie witness in block trace; add demo for generating witness data for mpt circuit
+
+Related commits:
+
++ [3682e05f3f2495af437234e2036412e9f7ed51b7](https://github.com/scroll-tech/go-ethereum/commit/3682e05f3f2495af437234e2036412e9f7ed51b7) (PR [#123](https://github.com/scroll-tech/go-ethereum/pull/123))
+
+(
+
+Fields change:
+
++ [f9952a396fb558fe1a3f5804f66a8a1683cd44d6](https://github.com/scroll-tech/go-ethereum/commit/f9952a396fb558fe1a3f5804f66a8a1683cd44d6) (PR [#133](https://github.com/scroll-tech/go-ethereum/pull/133))
+
+Bug fix:
+
++ [fefa8b99c7b3dea8f15e8350245f71c3bbafa046](https://github.com/scroll-tech/go-ethereum/commit/fefa8b99c7b3dea8f15e8350245f71c3bbafa046) (PR [#132](https://github.com/scroll-tech/go-ethereum/pull/132))
++ [37dbb86aa615ba1ab583946f084b0ce190975478](https://github.com/scroll-tech/go-ethereum/commit/37dbb86aa615ba1ab583946f084b0ce190975478) (PR [#126](https://github.com/scroll-tech/go-ethereum/pull/126))
+
+)

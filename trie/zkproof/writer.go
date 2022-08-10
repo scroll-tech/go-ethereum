@@ -232,6 +232,7 @@ const (
 	posCREATEAfter  = 1
 	posCALL         = 2
 	posSTATICCALL   = 0
+	posSELFDESTRUCT = 2
 )
 
 func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {
@@ -263,7 +264,16 @@ func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
 	}
 }
 
+func isDeletedAccount(state *types.AccountWrapper) bool {
+	return state.Nonce == 0 && bytes.Equal(state.CodeHash.Bytes(), common.Hash{}.Bytes())
+}
+
 func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount {
+
+	if isDeletedAccount(state) {
+		return nil
+	}
+
 	return &types.StateAccount{
 		Nonce:    state.Nonce,
 		Balance:  (*big.Int)(state.Balance),
@@ -516,18 +526,24 @@ func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (
 		return w.traceStorageUpdate(accountState.Address, storeAddr, storeValue)
 	} else {
 
+		var stateRoot common.Hash
 		accData := getAccountDataFromLogState(accountState)
 
 		out, err := w.traceAccountUpdate(accountState.Address, func(accBefore *types.StateAccount) *types.StateAccount {
 			if accBefore != nil {
-				accData.Root = accBefore.Root
+				stateRoot = accBefore.Root
+			}
+			// we need to restore stateRoot from before
+			if accData != nil {
+				accData.Root = stateRoot
 			}
 			return accData
 		})
 		if err != nil {
 			return nil, fmt.Errorf("update account state %s fail: %s", accountState.Address, err)
 		}
-		hash, err := zkt.NewHashFromBytes(accData.Root[:])
+
+		hash, err := zkt.NewHashFromBytes(stateRoot[:])
 		if err != nil {
 			return nil, fmt.Errorf("malform of state root in account %s", accountState.Address)
 		}
@@ -592,6 +608,14 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 		}
 
 		switch sLog.Op {
+		case "SELFDESTRUCT":
+			//in SELFDESTRUCT, a call on target address is made so the balance would be updated
+			//in the last item
+			stateTarget := getAccountState(sLog, posSELFDESTRUCT)
+			od.absorb(stateTarget)
+			//then build an "deleted state", only address and other are default
+			od.absorb(&types.AccountWrapper{Address: currentContract})
+
 		case "CREATE", "CREATE2":
 			state := getAccountState(sLog, posCREATE)
 			od.absorb(state)
@@ -654,6 +678,13 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 	handleLogs(od, toAddr, txResult.StructLogs)
 
 	for _, state := range txResult.AccountsAfter {
+		// special case: for suicide, the state has been captured in SELFDESTRUCT
+		// and we skip it here
+		if isDeletedAccount(state) {
+			log.Debug("skip suicide address", "address", state.Address)
+			continue
+		}
+
 		od.absorb(state)
 	}
 

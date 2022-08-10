@@ -71,10 +71,11 @@ func (opss *multiOpIterator) next() *types.AccountWrapper {
 type rwTblOrderer struct {
 	traced map[string]*types.AccountWrapper
 
-	opAccNonce    map[string]*types.AccountWrapper
-	opAccBalance  map[string]*types.AccountWrapper
-	opAccCodeHash map[string]*types.AccountWrapper
-	opStorage     map[string]map[string]*types.StorageWrapper
+	opAccNonce      map[string]*types.AccountWrapper
+	opAccBalance    map[string]*types.AccountWrapper
+	opAccCodeHash   map[string]*types.AccountWrapper
+	opAccDestructed map[string]*types.AccountWrapper
+	opStorage       map[string]map[string]*types.StorageWrapper
 }
 
 func newRWTblOrderer(inited map[common.Address]*types.StateAccount) *rwTblOrderer {
@@ -100,11 +101,12 @@ func newRWTblOrderer(inited map[common.Address]*types.StateAccount) *rwTblOrdere
 	}
 
 	return &rwTblOrderer{
-		traced:        traced,
-		opAccNonce:    make(map[string]*types.AccountWrapper),
-		opAccBalance:  make(map[string]*types.AccountWrapper),
-		opAccCodeHash: make(map[string]*types.AccountWrapper),
-		opStorage:     make(map[string]map[string]*types.StorageWrapper),
+		traced:          traced,
+		opAccNonce:      make(map[string]*types.AccountWrapper),
+		opAccBalance:    make(map[string]*types.AccountWrapper),
+		opAccCodeHash:   make(map[string]*types.AccountWrapper),
+		opAccDestructed: make(map[string]*types.AccountWrapper),
+		opStorage:       make(map[string]map[string]*types.StorageWrapper),
 	}
 }
 
@@ -114,10 +116,24 @@ func (od *rwTblOrderer) absorb(st *types.AccountWrapper) {
 
 	start, existed := od.traced[addrStr]
 	if !existed {
-		start = &types.AccountWrapper{
-			Balance: (*hexutil.Big)(big.NewInt(0)),
+		// edgecase: we first try to obtain the state from destructed before
+		start, existed = od.opAccDestructed[addrStr]
+		if !existed {
+			start = &types.AccountWrapper{
+				Balance: (*hexutil.Big)(big.NewInt(0)),
+			}
 		}
 	}
+
+	// handle destruct first
+	if isDeletedAccount(st) {
+		od.opAccDestructed[addrStr] = start
+		delete(od.traced, addrStr)
+		return
+	} else {
+		delete(od.opAccDestructed, addrStr)
+	}
+
 	od.traced[addrStr] = st
 
 	// notice there would be at least one entry for all 3 fields when accessing an address
@@ -184,6 +200,7 @@ func (od *rwTblOrderer) end_absorb() opIterator {
 	var iterStorage []*types.AccountWrapper
 
 	for _, addrStr := range sortedAddrs {
+
 		if v, existed := od.opAccNonce[addrStr]; existed {
 			iterNonce = append(iterNonce, v)
 		}
@@ -218,8 +235,21 @@ func (od *rwTblOrderer) end_absorb() opIterator {
 
 	}
 
+	var iterDestruct []*types.AccountWrapper
+	if l := len(od.opAccDestructed); l > 0 {
+		sortedAddrs := make([]string, 0, l)
+		for addrs := range od.opAccDestructed {
+			sortedAddrs = append(sortedAddrs, addrs)
+		}
+		sort.Strings(sortedAddrs)
+
+		for _, addrStr := range sortedAddrs {
+			iterDestruct = append(iterDestruct, &types.AccountWrapper{Address: od.opAccDestructed[addrStr].Address})
+		}
+	}
+
 	var finalRet []opIterator
-	for _, arr := range [][]*types.AccountWrapper{iterNonce, iterBalance, iterCodeHash, iterStorage} {
+	for _, arr := range [][]*types.AccountWrapper{iterNonce, iterBalance, iterCodeHash, iterStorage, iterDestruct} {
 		wrappedIter := iterateOp(arr)
 		finalRet = append(finalRet, &wrappedIter)
 	}

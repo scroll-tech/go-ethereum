@@ -1,0 +1,465 @@
+{
+    "blockTrace": {
+        "number": "0x36",
+        "hash": "0x97c4bc37cf692580e997e6358688d9d360ec8649e8cb3b310ea1b31b118dbadc",
+        "gasLimit": 7085701,
+        "difficulty": "0x2",
+        "baseFee": "0x35a207",
+        "coinbase": {
+            "address": "0x0000000000000000000000000000000000000000",
+            "nonce": 0,
+            "balance": "0x0",
+            "codeHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "time": 1660040484,
+        "transactions": [
+            {
+                "type": 2,
+                "nonce": 67,
+                "gas": 3021272,
+                "gasPrice": "0x43e110",
+                "from": "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571",
+                "to": "0x79033a6a330aa415838e7d9ae0e0c9e21b554e52",
+                "chainId": "0xcf55",
+                "value": "0x0",
+                "data": "0xd9ef8209",
+                "isCreate": false,
+                "v": "0x1",
+                "r": "0xd79876b1f06a03602d5cf219badb41a66e59e3a9efbb42ad9030cd2360e24c9f",
+                "s": "0x4781510401a9cc7035f4fe70c07a7587cd1e3c39dc60c0e228d5a80619762897"
+            }
+        ]
+    },
+    "storageTrace": {
+        "rootBefore": "0x14761a6c449fb3454ea7a8a2bfb5d6cc8ab1a0c3f55c1203287ab20e3333f68a",
+        "rootAfter": "0x251c808d9033ee595c576c0c073ec40041d6c17de401abad077497b37c8cf693",
+        "proofs": {
+            "0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571": [
+                "0x002103b372e552b26e31fa3cea420833392d194bf305c2ba4a28f8e299648ac7680c69d54181829e11afe5c471706bd74240ba3e9d17ea1d70a17f4b93b442b89a",
+                "0x0002f28e92038baad66217d089206f2291b5817007a352b89dfb66fc7b0c28314329ab4080b0ab74684126f382a93d2df02c160c02dcc9a4c841d7024bd0f0a3b7",
+                "0x0010e5560b97c1011634cba55dc9060aea724a8d6ca71a7e77a02b1903b1cd92182c166dde0528fc0609936fdee060bcb4df56093f621e3d2b2ba7e2fb52ec25fa",
+                "0x000d4efb2fb6c3c3efc8fd3f89b6f9cf0dc65779b790a3fd54eb0e360651a1fc56131c4cb3f40252d92fb6bbe40f451092487ffe275b5c530665f3fd2e60e15dc3",
+                "0x0000000000000000000000000000000000000000000000000000000000000000001833a62626f85d998632f9f537399c7f95099ac046e5f193055092902e6c3973",
+                "0x002248f47a53d7e981b187961b71a36033d9ef59273228ec127666f43c5d0fd2c51dc2a292217d6bcf8e5ce0d95f2e12fa47a7ebafab0522a42c5722154393ccec",
+                "0x00000000000000000000000000000000000000000000000000000000000000000027edf3f4cb277d61c7ae3fef9691af523eeb21b57d6831fe6d49a550b72a5048",
+                "0x0017be1842a34f16df178c44c0810856cb95fc65702e117c9fc63423a5140587972fe8b70043185278f8f6c75d7057d75ebc62e82052f480dfc207de3b0e89700e",
+                "0x0129bdbea092f4f7e6de593fd1a16ddb50b1c2a6297d4ae141a60f8da631e481750404000000000000000000000000000000000000000000000000000000000000000000430056bc75e2d630ffffffffffffffffffffffffffffffffffff4b269f0a32b88cc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000000000000000000000000000000000000000000",
+                "0x5448495320495320534f4d45204d4147494320425954455320464f5220534d54206d3172525867503278704449"
+            ],
+            "0x79033a6a330Aa415838E7D9Ae0e0C9e21B554E52": [
+                "0x002103b372e552b26e31fa3cea420833392d194bf305c2ba4a28f8e299648ac7680c69d54181829e11afe5c471706bd74240ba3e9d17ea1d70a17f4b93b442b89a",
+                "0x0002f28e92038baad66217d089206f2291b5817007a352b89dfb66fc7b0c28314329ab4080b0ab74684126f382a93d2df02c160c02dcc9a4c841d7024bd0f0a3b7",
+                "0x0002a2b5a0e59ba57b1f31b75545df8e2d13085860ce904b97dce9c388431caf3a03cdf1a6097d106c93bc26a07d4dae888e15df53abe718c95c6c101d91687d64",
+                "0x001d5227f314ca3dbb42db4fbbe2c38c138ac55f69d645d0c7a88d97acf4b4986622c083410ab240abbdde86b67ce30251af15803369fdbd34a7d8fa55b36d7dbe",
+                "0x0000000000000000000000000000000000000000000000000000000000000000002bd76d3fedf85dd7ce2618e599b52cb7446481fb0dac7c1fd8e1968e5029ef63",
+                "0x00122fb6c6eaf240dadc31c87c959036511b292bcc7d4166477795aa2fa3dfed7a1fc41e7ab89d44f11d29214e1c8a0167e6d95a46b6c4978a447ca8bde07386d2",
+                "0x002a25548ab2e6f14014da64499c5f48ca691d47df02e2057534fdd10f777dbcf90000000000000000000000000000000000000000000000000000000000000000",
+                "0x00186e3bc8671a30faf6df5baf764612251da795ec479bb9a624a5f8df12918841287f8cbb10dc2b68f535b95832206a6bb7893ad333257fcc38bf7bfd6c296e4a",
+                "0x01228ef44e7fc5c3416dfd845000bd96519fd9bd6c977b0b7a8349a63cde24379f04040000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000006a0a6bded31da7de0dec0a486b96d1ae6b54f8c3ff821959d9b15346e1b5a68c000000000000000000000000000000000000000000000000000000000000000000",
+                "0x5448495320495320534f4d45204d4147494320425954455320464f5220534d54206d3172525867503278704449"
+            ]
+        }
+    },
+    "executionResults": [
+        {
+            "gas": 26185,
+            "failed": false,
+            "from": {
+                "address": "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571",
+                "nonce": 67,
+                "balance": "0x56bc75e2d630ffffffffffffffffffffffffffffffffffff4b269f0a32b88c",
+                "codeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+            },
+            "to": {
+                "address": "0x79033a6a330aa415838e7d9ae0e0c9e21b554e52",
+                "nonce": 1,
+                "balance": "0x0",
+                "codeHash": "0x6a0a6bded31da7de0dec0a486b96d1ae6b54f8c3ff821959d9b15346e1b5a68c"
+            },
+            "accountAfter": [
+                {
+                    "address": "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571",
+                    "nonce": 68,
+                    "balance": "0x56bc75e2d630ffffffffffffffffffffffffffffffffffff4b26899c58ba8d",
+                    "codeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+                },
+                {
+                    "address": "0x79033a6a330aa415838e7d9ae0e0c9e21b554e52",
+                    "nonce": 0,
+                    "balance": "0x0",
+                    "codeHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                }
+            ],
+            "codeHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "byteCode": "0x",
+            "structLogs": [
+                {
+                    "pc": 0,
+                    "op": "PUSH1",
+                    "gas": 3000208,
+                    "gasCost": 3,
+                    "depth": 1
+                },
+                {
+                    "pc": 2,
+                    "op": "PUSH1",
+                    "gas": 3000205,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x80"
+                    ]
+                },
+                {
+                    "pc": 4,
+                    "op": "MSTORE",
+                    "gas": 3000202,
+                    "gasCost": 12,
+                    "depth": 1,
+                    "stack": [
+                        "0x80",
+                        "0x40"
+                    ]
+                },
+                {
+                    "pc": 5,
+                    "op": "CALLVALUE",
+                    "gas": 3000190,
+                    "gasCost": 2,
+                    "depth": 1
+                },
+                {
+                    "pc": 6,
+                    "op": "DUP1",
+                    "gas": 3000188,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x0"
+                    ]
+                },
+                {
+                    "pc": 7,
+                    "op": "ISZERO",
+                    "gas": 3000185,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x0",
+                        "0x0"
+                    ]
+                },
+                {
+                    "pc": 8,
+                    "op": "PUSH1",
+                    "gas": 3000182,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x0",
+                        "0x1"
+                    ]
+                },
+                {
+                    "pc": 10,
+                    "op": "JUMPI",
+                    "gas": 3000179,
+                    "gasCost": 10,
+                    "depth": 1,
+                    "stack": [
+                        "0x0",
+                        "0x1",
+                        "0xf"
+                    ]
+                },
+                {
+                    "pc": 15,
+                    "op": "JUMPDEST",
+                    "gas": 3000169,
+                    "gasCost": 1,
+                    "depth": 1,
+                    "stack": [
+                        "0x0"
+                    ]
+                },
+                {
+                    "pc": 16,
+                    "op": "POP",
+                    "gas": 3000168,
+                    "gasCost": 2,
+                    "depth": 1,
+                    "stack": [
+                        "0x0"
+                    ]
+                },
+                {
+                    "pc": 17,
+                    "op": "PUSH1",
+                    "gas": 3000166,
+                    "gasCost": 3,
+                    "depth": 1
+                },
+                {
+                    "pc": 19,
+                    "op": "CALLDATASIZE",
+                    "gas": 3000163,
+                    "gasCost": 2,
+                    "depth": 1,
+                    "stack": [
+                        "0x4"
+                    ]
+                },
+                {
+                    "pc": 20,
+                    "op": "LT",
+                    "gas": 3000161,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x4",
+                        "0x4"
+                    ]
+                },
+                {
+                    "pc": 21,
+                    "op": "PUSH1",
+                    "gas": 3000158,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x0"
+                    ]
+                },
+                {
+                    "pc": 23,
+                    "op": "JUMPI",
+                    "gas": 3000155,
+                    "gasCost": 10,
+                    "depth": 1,
+                    "stack": [
+                        "0x0",
+                        "0x28"
+                    ]
+                },
+                {
+                    "pc": 24,
+                    "op": "PUSH1",
+                    "gas": 3000145,
+                    "gasCost": 3,
+                    "depth": 1
+                },
+                {
+                    "pc": 26,
+                    "op": "CALLDATALOAD",
+                    "gas": 3000142,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0x0"
+                    ]
+                },
+                {
+                    "pc": 27,
+                    "op": "PUSH1",
+                    "gas": 3000139,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef820900000000000000000000000000000000000000000000000000000000"
+                    ]
+                },
+                {
+                    "pc": 29,
+                    "op": "SHR",
+                    "gas": 3000136,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef820900000000000000000000000000000000000000000000000000000000",
+                        "0xe0"
+                    ]
+                },
+                {
+                    "pc": 30,
+                    "op": "DUP1",
+                    "gas": 3000133,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209"
+                    ]
+                },
+                {
+                    "pc": 31,
+                    "op": "PUSH4",
+                    "gas": 3000130,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0xd9ef8209"
+                    ]
+                },
+                {
+                    "pc": 36,
+                    "op": "EQ",
+                    "gas": 3000127,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0xd9ef8209",
+                        "0xd9ef8209"
+                    ]
+                },
+                {
+                    "pc": 37,
+                    "op": "PUSH1",
+                    "gas": 3000124,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x1"
+                    ]
+                },
+                {
+                    "pc": 39,
+                    "op": "JUMPI",
+                    "gas": 3000121,
+                    "gasCost": 10,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x1",
+                        "0x2d"
+                    ]
+                },
+                {
+                    "pc": 45,
+                    "op": "JUMPDEST",
+                    "gas": 3000111,
+                    "gasCost": 1,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209"
+                    ]
+                },
+                {
+                    "pc": 46,
+                    "op": "PUSH1",
+                    "gas": 3000110,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209"
+                    ]
+                },
+                {
+                    "pc": 48,
+                    "op": "PUSH1",
+                    "gas": 3000107,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33"
+                    ]
+                },
+                {
+                    "pc": 50,
+                    "op": "JUMP",
+                    "gas": 3000104,
+                    "gasCost": 8,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33",
+                        "0x35"
+                    ]
+                },
+                {
+                    "pc": 53,
+                    "op": "JUMPDEST",
+                    "gas": 3000096,
+                    "gasCost": 1,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33"
+                    ]
+                },
+                {
+                    "pc": 54,
+                    "op": "CALLER",
+                    "gas": 3000095,
+                    "gasCost": 2,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33"
+                    ]
+                },
+                {
+                    "pc": 55,
+                    "op": "PUSH20",
+                    "gas": 3000093,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33",
+                        "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571"
+                    ]
+                },
+                {
+                    "pc": 76,
+                    "op": "AND",
+                    "gas": 3000090,
+                    "gasCost": 3,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33",
+                        "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571",
+                        "0xffffffffffffffffffffffffffffffffffffffff"
+                    ]
+                },
+                {
+                    "pc": 77,
+                    "op": "SELFDESTRUCT",
+                    "gas": 3000087,
+                    "gasCost": 5000,
+                    "depth": 1,
+                    "stack": [
+                        "0xd9ef8209",
+                        "0x33",
+                        "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571"
+                    ],
+                    "extraData": {
+                        "proofList": [
+                            {
+                                "address": "0x79033a6a330aa415838e7d9ae0e0c9e21b554e52",
+                                "nonce": 1,
+                                "balance": "0x0",
+                                "codeHash": "0x6a0a6bded31da7de0dec0a486b96d1ae6b54f8c3ff821959d9b15346e1b5a68c"
+                            },
+                            {
+                                "address": "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571",
+                                "nonce": 68,
+                                "balance": "0x56bc75e2d630ffffffffffffffffffffffffffffffffffff4b1cf682dd53a4",
+                                "codeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+                            },
+                            {
+                                "address": "0x4cb1ab63af5d8931ce09673ebd8ae2ce16fd6571",
+                                "nonce": 68,
+                                "balance": "0x56bc75e2d630ffffffffffffffffffffffffffffffffffff4b1cf682dd53a4",
+                                "codeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}

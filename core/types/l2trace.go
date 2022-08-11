@@ -47,7 +47,7 @@ func getIndex(cache map[string]int, content string) string {
 
 // get origin content from freCache by index
 func getOrigin(freqCache []string, sIndex string) string {
-	if len(sIndex) > 0 && sIndex[0] == 's' {
+	if len(sIndex) > 1 && sIndex[0] == 's' {
 		idx, _ := strconv.Atoi(sIndex[1:])
 		return freqCache[idx]
 	}

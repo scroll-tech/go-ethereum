@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"runtime"
+	"strconv"
 	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -27,6 +28,117 @@ type BlockResult struct {
 	StorageTrace     *StorageTrace      `json:"storageTrace"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
 	MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
+}
+
+type AliasBlockResult BlockResult
+
+func getCache(cache map[string]int, val string) string {
+	if len(val) < 10 {
+		return val
+	}
+	idx, ok := cache[val]
+	if !ok {
+		idx = len(cache)
+		cache[val] = idx
+	}
+	return "s" + strconv.Itoa(idx)
+}
+
+func revert(freqCache []string, val string) string {
+	if len(val) > 0 && val[0] == 's' {
+		idx, _ := strconv.Atoi(val[1:])
+		return freqCache[idx]
+	}
+	return val
+}
+
+// MarshalJSON marshal block trace.
+func (b *BlockResult) MarshalJSON() ([]byte, error) {
+	js := struct {
+		FreqCache []string `json:"freqCache,omitempty"`
+		AliasBlockResult
+		cache map[string]int
+		err   error
+	}{nil, AliasBlockResult(*b), make(map[string]int), nil}
+
+	for _, results := range js.ExecutionResults {
+		for _, logs := range results.StructLogs {
+			// replace stack
+			for i, stack := range logs.Stack {
+				logs.Stack[i] = getCache(js.cache, stack)
+			}
+			// replace memory
+			for i, mem := range logs.Memory {
+				logs.Memory[i] = getCache(js.cache, mem)
+			}
+			// replace storage
+			storage := make(map[string]string, len(logs.Storage))
+			for key, val := range logs.Storage {
+				storage[getCache(js.cache, key)] = getCache(js.cache, val)
+			}
+			logs.Storage = storage
+			// replace extra data
+			extra := logs.ExtraData
+			if extra != nil {
+				for i, code := range extra.CodeList {
+					extra.CodeList[i] = getCache(js.cache, code)
+				}
+				for _, lst := range extra.StateList {
+					lst.Storage.Key = getCache(js.cache, lst.Storage.Key)
+					lst.Storage.Value = getCache(js.cache, lst.Storage.Value)
+				}
+			}
+		}
+	}
+	js.FreqCache = make([]string, len(js.cache))
+	for key, idx := range js.cache {
+		js.FreqCache[idx] = key
+	}
+
+	return json.Marshal(&js)
+}
+
+// UnmarshalJSON unmarshal bytes to blockResult struct.
+func (b *BlockResult) UnmarshalJSON(input []byte) error {
+	var js struct {
+		AliasBlockResult
+		FreqCache []string `json:"freqCache"`
+	}
+	if err := json.Unmarshal(input, &js); err != nil {
+		return err
+	}
+
+	for _, results := range js.ExecutionResults {
+		for _, logs := range results.StructLogs {
+			// revert stack
+			for i, stack := range logs.Stack {
+				logs.Stack[i] = revert(js.FreqCache, stack)
+			}
+			// replace memory
+			for i, mem := range logs.Memory {
+				logs.Memory[i] = revert(js.FreqCache, mem)
+			}
+			storage := make(map[string]string, len(logs.Storage))
+			for key, val := range logs.Storage {
+				storage[revert(js.FreqCache, key)] = revert(js.FreqCache, val)
+			}
+			logs.Storage = storage
+			// replace extra data
+			extra := logs.ExtraData
+			if extra != nil {
+				for i, code := range extra.CodeList {
+					extra.CodeList[i] = revert(js.FreqCache, code)
+				}
+				for _, lst := range extra.StateList {
+					lst.Storage.Key = revert(js.FreqCache, lst.Storage.Key)
+					lst.Storage.Value = revert(js.FreqCache, lst.Storage.Value)
+				}
+			}
+		}
+	}
+
+	*b = BlockResult(js.AliasBlockResult)
+	return nil
 }
 
 // StorageTrace stores proofs of storage needed by storage circuit

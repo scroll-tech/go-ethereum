@@ -32,24 +32,26 @@ type BlockResult struct {
 
 type AliasBlockResult BlockResult
 
-func getCache(cache map[string]int, val string) string {
-	if len(val) < 10 {
-		return val
+// Store content in cache and return the "'s'+index".
+func getIndex(cache map[string]int, content string) string {
+	if len(content) < 10 {
+		return content
 	}
-	idx, ok := cache[val]
+	idx, ok := cache[content]
 	if !ok {
 		idx = len(cache)
-		cache[val] = idx
+		cache[content] = idx
 	}
 	return "s" + strconv.Itoa(idx)
 }
 
-func revert(freqCache []string, val string) string {
-	if len(val) > 0 && val[0] == 's' {
-		idx, _ := strconv.Atoi(val[1:])
+// get origin content from freCache by index
+func getOrigin(freqCache []string, sIndex string) string {
+	if len(sIndex) > 0 && sIndex[0] == 's' {
+		idx, _ := strconv.Atoi(sIndex[1:])
 		return freqCache[idx]
 	}
-	return val
+	return sIndex
 }
 
 // MarshalJSON marshal block trace.
@@ -65,27 +67,27 @@ func (b *BlockResult) MarshalJSON() ([]byte, error) {
 		for _, logs := range results.StructLogs {
 			// replace stack
 			for i, stack := range logs.Stack {
-				logs.Stack[i] = getCache(js.cache, stack)
+				logs.Stack[i] = getIndex(js.cache, stack)
 			}
 			// replace memory
 			for i, mem := range logs.Memory {
-				logs.Memory[i] = getCache(js.cache, mem)
+				logs.Memory[i] = getIndex(js.cache, mem)
 			}
 			// replace storage
 			storage := make(map[string]string, len(logs.Storage))
 			for key, val := range logs.Storage {
-				storage[getCache(js.cache, key)] = getCache(js.cache, val)
+				storage[getIndex(js.cache, key)] = getIndex(js.cache, val)
 			}
 			logs.Storage = storage
 			// replace extra data
 			extra := logs.ExtraData
 			if extra != nil {
 				for i, code := range extra.CodeList {
-					extra.CodeList[i] = getCache(js.cache, code)
+					extra.CodeList[i] = getIndex(js.cache, code)
 				}
 				for _, lst := range extra.StateList {
-					lst.Storage.Key = getCache(js.cache, lst.Storage.Key)
-					lst.Storage.Value = getCache(js.cache, lst.Storage.Value)
+					lst.Storage.Key = getIndex(js.cache, lst.Storage.Key)
+					lst.Storage.Value = getIndex(js.cache, lst.Storage.Value)
 				}
 			}
 		}
@@ -110,28 +112,28 @@ func (b *BlockResult) UnmarshalJSON(input []byte) error {
 
 	for _, results := range js.ExecutionResults {
 		for _, logs := range results.StructLogs {
-			// revert stack
+			// getOrigin stack
 			for i, stack := range logs.Stack {
-				logs.Stack[i] = revert(js.FreqCache, stack)
+				logs.Stack[i] = getOrigin(js.FreqCache, stack)
 			}
 			// replace memory
 			for i, mem := range logs.Memory {
-				logs.Memory[i] = revert(js.FreqCache, mem)
+				logs.Memory[i] = getOrigin(js.FreqCache, mem)
 			}
 			storage := make(map[string]string, len(logs.Storage))
 			for key, val := range logs.Storage {
-				storage[revert(js.FreqCache, key)] = revert(js.FreqCache, val)
+				storage[getOrigin(js.FreqCache, key)] = getOrigin(js.FreqCache, val)
 			}
 			logs.Storage = storage
 			// replace extra data
 			extra := logs.ExtraData
 			if extra != nil {
 				for i, code := range extra.CodeList {
-					extra.CodeList[i] = revert(js.FreqCache, code)
+					extra.CodeList[i] = getOrigin(js.FreqCache, code)
 				}
 				for _, lst := range extra.StateList {
-					lst.Storage.Key = revert(js.FreqCache, lst.Storage.Key)
-					lst.Storage.Value = revert(js.FreqCache, lst.Storage.Value)
+					lst.Storage.Key = getOrigin(js.FreqCache, lst.Storage.Key)
+					lst.Storage.Value = getOrigin(js.FreqCache, lst.Storage.Value)
 				}
 			}
 		}

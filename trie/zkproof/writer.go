@@ -232,6 +232,7 @@ const (
 	posCREATEAfter  = 1
 	posCALL         = 2
 	posSTATICCALL   = 0
+	posSELFDESTRUCT = 2
 )
 
 func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {
@@ -263,7 +264,16 @@ func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
 	}
 }
 
+func isDeletedAccount(state *types.AccountWrapper) bool {
+	return state.Nonce == 0 && bytes.Equal(state.CodeHash.Bytes(), common.Hash{}.Bytes())
+}
+
 func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount {
+
+	if isDeletedAccount(state) {
+		return nil
+	}
+
 	return &types.StateAccount{
 		Nonce:    state.Nonce,
 		Balance:  (*big.Int)(state.Balance),
@@ -392,7 +402,8 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 		if err := w.tracingZktrie.TryDelete(addr.Bytes32()); err != nil {
 			return nil, fmt.Errorf("delete zktrie account state fail: %s", err)
 		}
-		delete(w.tracingAccounts, addr)
+		w.tracingAccounts[addr] = nil
+
 	}
 
 	proof = proofList{}
@@ -516,18 +527,24 @@ func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (
 		return w.traceStorageUpdate(accountState.Address, storeAddr, storeValue)
 	} else {
 
+		var stateRoot common.Hash
 		accData := getAccountDataFromLogState(accountState)
 
 		out, err := w.traceAccountUpdate(accountState.Address, func(accBefore *types.StateAccount) *types.StateAccount {
 			if accBefore != nil {
-				accData.Root = accBefore.Root
+				stateRoot = accBefore.Root
+			}
+			// we need to restore stateRoot from before
+			if accData != nil {
+				accData.Root = stateRoot
 			}
 			return accData
 		})
 		if err != nil {
 			return nil, fmt.Errorf("update account state %s fail: %s", accountState.Address, err)
 		}
-		hash, err := zkt.NewHashFromBytes(accData.Root[:])
+
+		hash, err := zkt.NewHashFromBytes(stateRoot[:])
 		if err != nil {
 			return nil, fmt.Errorf("malform of state root in account %s", accountState.Address)
 		}
@@ -540,7 +557,6 @@ func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (
 func handleLogs(od opOrderer, currentContract common.Address, logs []*types.StructLogRes) {
 	logStack := []int{0}
 	contractStack := map[int]common.Address{}
-	skipDepth := 0
 	callEnterAddress := currentContract
 
 	// now trace every OP which could cause changes on state:
@@ -559,12 +575,16 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			calledLog := logs[resumePos]
 
 			//no need to handle fail calling
-			if !(calledLog.ExtraData != nil && calledLog.ExtraData.CallFailed) {
-				//reentry the last log which "cause" the calling, some handling may needed
-				switch calledLog.Op {
-				case "CREATE", "CREATE2":
-					//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)
-					od.absorb(getAccountState(calledLog, posCREATEAfter))
+			if calledLog.ExtraData != nil {
+				if !calledLog.ExtraData.CallFailed {
+					//reentry the last log which "cause" the calling, some handling may needed
+					switch calledLog.Op {
+					case "CREATE", "CREATE2":
+						//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)
+						od.absorb(getAccountState(calledLog, posCREATEAfter))
+					}
+				} else {
+					od.readonly(false)
 				}
 			}
 
@@ -577,47 +597,53 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 		}
 		callEnterAddress = currentContract
 
-		if skipDepth != 0 {
-			if skipDepth < sLog.Depth {
-				continue
-			} else {
-				skipDepth = 0
-			}
-		}
-
-		if exD := sLog.ExtraData; exD != nil && exD.CallFailed {
-			//mark current op and next ops with more depth skippable
-			skipDepth = sLog.Depth
-			continue
-		}
-
 		switch sLog.Op {
+		case "SELFDESTRUCT":
+			//in SELFDESTRUCT, a call on target address is made so the balance would be updated
+			//in the last item
+			stateTarget := getAccountState(sLog, posSELFDESTRUCT)
+			od.absorb(stateTarget)
+			//then build an "deleted state", only address and other are default
+			od.absorb(&types.AccountWrapper{Address: currentContract})
+
 		case "CREATE", "CREATE2":
+			if sLog.ExtraData.CallFailed {
+				od.readonly(true)
+			}
 			state := getAccountState(sLog, posCREATE)
 			od.absorb(state)
 			//update contract to CREATE addr
 
 			callEnterAddress = state.Address
 		case "CALL", "CALLCODE":
+			if sLog.ExtraData.CallFailed {
+				od.readonly(true)
+			}
 			state := getAccountState(sLog, posCALL)
 			od.absorb(state)
 			callEnterAddress = state.Address
 		case "STATICCALL":
+			if sLog.ExtraData.CallFailed {
+				od.readonly(true)
+			}
 			//static call has no update on target address
 			callEnterAddress = getAccountState(sLog, posSTATICCALL).Address
+		case "DELEGATECALL":
+
 		case "SLOAD":
 			accountState := getAccountState(sLog, posSSTOREBefore)
-			od.absorb(accountState)
+			od.absorbStorage(accountState, nil)
 		case "SSTORE":
 			log.Debug("build SSTORE", "pc", sLog.Pc, "key", sLog.Stack[len(sLog.Stack)-1])
 			accountState := copyAccountState(getAccountState(sLog, posSSTOREBefore))
 			// notice the log only provide the value BEFORE store and it is not suitable for our protocol,
 			// here we change it into value AFTER update
+			before := accountState.Storage
 			accountState.Storage = &types.StorageWrapper{
 				Key:   sLog.Stack[len(sLog.Stack)-1],
 				Value: sLog.Stack[len(sLog.Stack)-2],
 			}
-			od.absorb(accountState)
+			od.absorbStorage(accountState, before)
 
 		default:
 		}
@@ -626,24 +652,16 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 
 func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 
-	// handle failed tx
+	// the from state is read before tx is handled and nonce is added, we combine both
+	preTxSt := copyAccountState(txResult.From)
+	preTxSt.Nonce += 1
+	od.absorb(preTxSt)
+
 	if txResult.Failed {
-		handled := false
-		for _, state := range txResult.AccountsAfter {
-			if state.Address != txResult.From.Address {
-				continue
-			}
-			od.absorb(state)
-			handled = true
-		}
-		if !handled {
-			panic(fmt.Errorf("no caller account in postTx status"))
-		}
-		return
+		od.readonly(true)
 	}
 
 	var toAddr common.Address
-
 	if state := txResult.AccountCreated; state != nil {
 		od.absorb(state)
 		toAddr = state.Address
@@ -652,8 +670,16 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 	}
 
 	handleLogs(od, toAddr, txResult.StructLogs)
+	od.readonly(false)
 
 	for _, state := range txResult.AccountsAfter {
+		// special case: for suicide, the state has been captured in SELFDESTRUCT
+		// and we skip it here
+		if isDeletedAccount(state) {
+			log.Debug("skip suicide address", "address", state.Address)
+			continue
+		}
+
 		od.absorb(state)
 	}
 

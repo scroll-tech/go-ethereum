@@ -49,7 +49,7 @@ type StorageTrace struct {
 type ExecutionResult struct {
 	Gas         uint64 `json:"gas"`
 	Failed      bool   `json:"failed"`
-	ReturnValue string `json:"returnValue,omitempty"`
+	ReturnValue string `json:"returnValue"`
 	// Sender's account state (before Tx)
 	From *AccountWrapper `json:"from,omitempty"`
 	// Receiver's account state (before Tx)
@@ -60,7 +60,7 @@ type ExecutionResult struct {
 
 	// Record all accounts' state which would be affected AFTER tx executed
 	// currently they are just `from` and `to` account
-	AccountsAfter []*AccountWrapper `json:"accountAfter"`
+	AccountsAfter []*AccountWrapper `json:"accountAfter,omitempty"`
 
 	// `CodeHash` only exists when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`

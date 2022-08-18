@@ -49,28 +49,16 @@ func TestWriterCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(writer.tracingAccounts) != 4 {
+	if len(writer.tracingAccounts) != 2 {
 		t.Error("unexpected tracing account data", writer.tracingAccounts)
 	}
 
-	if v, existed := writer.tracingAccounts[common.HexToAddress("0x000000000000000000636F6e736F6c652e6c6f67")]; !existed || v != nil {
-		t.Error("wrong tracing status for uninited address", v, existed)
-	}
-
-	if v, existed := writer.tracingAccounts[common.HexToAddress("0xb36feAEaF76c2A33335b73bEF9aEf7a23d9af1e3")]; !existed || v != nil {
+	if v, existed := writer.tracingAccounts[common.HexToAddress("0xDf1f3c8fdcE862A2E34B9295523C3fc1c675Da47")]; !existed || v != nil {
 		t.Error("wrong tracing status for uninited address", v, existed)
 	}
 
 	if v, existed := writer.tracingAccounts[common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571")]; !existed || v == nil {
 		t.Error("wrong tracing status for establied address", v, existed)
-	}
-
-	if len(writer.tracingStorageTries) != 1 {
-		t.Error("unexpected tracing storage data", writer.tracingStorageTries)
-	}
-
-	if v, existed := writer.tracingStorageTries[common.HexToAddress("0xb36feAEaF76c2A33335b73bEF9aEf7a23d9af1e3")]; !existed || v == nil {
-		t.Error("wrong tracing storage statu", existed, v)
 	}
 
 }
@@ -174,6 +162,17 @@ func TestFailedCallTx(t *testing.T) {
 //notice: now only work with OP_ORDER=2
 func TestDeleteTx(t *testing.T) {
 	trace := loadStaff(t, "delete_trace.json")
+	traces, err := HandleBlockResult(trace)
+	outObj, _ := json.Marshal(traces)
+	t.Log(string(outObj))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+//notice: now only work with OP_ORDER=2
+func TestDestructTx(t *testing.T) {
+	trace := loadStaff(t, "destruct_trace.json")
 	traces, err := HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))

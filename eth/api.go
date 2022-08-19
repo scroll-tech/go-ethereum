@@ -623,5 +623,5 @@ func (api *PublicTraceAPI) GetBlockResultByHash(blockHash common.Hash) (*types.B
 	if blockResult := api.e.blockchain.GetBlockResultByHash(blockHash); blockResult != nil {
 		return blockResult, nil
 	}
-	return nil, fmt.Errorf("No block result found")
+	return nil, fmt.Errorf("no block result found")
 }

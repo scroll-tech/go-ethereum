@@ -74,7 +74,7 @@ func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash 
 }
 
 // Make trace environment for current block.
-func (api *API) makecurrent(ctx context.Context, config *TraceConfig, block *types.Block) (*environment, error) {
+func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*environment, error) {
 	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
 	if err != nil {
 		return nil, err

@@ -37,7 +37,7 @@ type environment struct {
 	executionResults []*types.ExecutionResult
 }
 
-// GetBlockResultByNumberOrHash replay the block and returns the structured blockResult by hash or number.
+// GetBlockResultByNumberOrHash replays the block and returns the structured BlockResult by hash or number.
 func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockResult, err error) {
 	var block *types.Block
 	if number, ok := blockNrOrHash.Number(); ok {

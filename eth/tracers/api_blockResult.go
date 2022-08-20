@@ -22,7 +22,7 @@ type TraceBlock interface {
 	GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockResult, err error)
 }
 
-type environment struct {
+type traceEnv struct {
 	config *TraceConfig
 
 	rMu      sync.Mutex

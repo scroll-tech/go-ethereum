@@ -307,7 +307,7 @@ func (api *API) traceTx2(env *environment, state *state.StateDB, index int, bloc
 }
 
 // Fill blockResult content after all the txs are finished running.
-func (api *API) writeBlockResult(env *environment, block *types.Block) (*types.BlockResult, error) {
+func (api *API) fillBlockResult(env *environment, block *types.Block) (*types.BlockResult, error) {
 	statedb := env.state
 	txs := block.Transactions()
 	coinbase := types.AccountWrapper{

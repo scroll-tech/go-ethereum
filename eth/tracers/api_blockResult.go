@@ -25,13 +25,18 @@ type TraceBlock interface {
 type traceEnv struct {
 	config *TraceConfig
 
+	// rMu lock is used to protect txs executed in parallel.
 	rMu      sync.Mutex
 	signer   types.Signer
 	state    *state.StateDB
 	tracer   *vm.StructLogger
 	blockCtx vm.BlockContext
 
+	// pMu lock is used to protect Proofs' read and write mutual exclusion,
+	// since txs are executed in parallel, so this lock is required.
 	pMu sync.Mutex
+	// sMu is required because of txs are executed in parallel,
+	// this lock is used to protect StorageTrace's read and write mutual exclusion.
 	sMu sync.Mutex
 	*types.StorageTrace
 	executionResults []*types.ExecutionResult
@@ -65,7 +70,7 @@ func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash 
 	}
 
 	// create current execution environment.
-	env, err := api.makecurrent(ctx, config, block)
+	env, err := api.createTraceEnv(ctx, config, block)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +79,7 @@ func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash 
 }
 
 // Make trace environment for current block.
-func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*environment, error) {
+func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*traceEnv, error) {
 	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
 	if err != nil {
 		return nil, err
@@ -88,7 +93,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 		return nil, err
 	}
 
-	env := &environment{
+	env := &traceEnv{
 		config:   config,
 		signer:   types.MakeSigner(api.backend.ChainConfig(), block.Number()),
 		state:    statedb,
@@ -124,7 +129,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 	return env, nil
 }
 
-func (api *API) getBlockResult(block *types.Block, env *environment) (*types.BlockResult, error) {
+func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockResult, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs  = block.Transactions()
@@ -141,7 +146,7 @@ func (api *API) getBlockResult(block *types.Block, env *environment) (*types.Blo
 			defer pend.Done()
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
-				if err := api.traceTx2(env, task.statedb, task.index, block); err != nil {
+				if err := api.getTxResult(env, task.statedb, task.index, block); err != nil {
 					log.Error("failed to trace tx", "txHash", txs[task.index].Hash().String())
 				}
 			}
@@ -174,10 +179,10 @@ func (api *API) getBlockResult(block *types.Block, env *environment) (*types.Blo
 		return nil, failed
 	}
 
-	return api.writeBlockResult(env, block)
+	return api.fillBlockResult(env, block)
 }
 
-func (api *API) traceTx2(env *environment, state *state.StateDB, index int, block *types.Block) error {
+func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, block *types.Block) error {
 	tx := block.Transactions()[index]
 	msg, _ := tx.AsMessage(env.signer, block.BaseFee())
 	from, _ := types.Sender(env.signer, tx)
@@ -307,7 +312,7 @@ func (api *API) traceTx2(env *environment, state *state.StateDB, index int, bloc
 }
 
 // Fill blockResult content after all the txs are finished running.
-func (api *API) fillBlockResult(env *environment, block *types.Block) (*types.BlockResult, error) {
+func (api *API) fillBlockResult(env *traceEnv, block *types.Block) (*types.BlockResult, error) {
 	statedb := env.state
 	txs := block.Transactions()
 	coinbase := types.AccountWrapper{

@@ -132,9 +132,10 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockResult, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
-		txs  = block.Transactions()
-		pend = new(sync.WaitGroup)
-		jobs = make(chan *txTraceTask, len(txs))
+		txs   = block.Transactions()
+		pend  = new(sync.WaitGroup)
+		jobs  = make(chan *txTraceTask, len(txs))
+		errCh = make(chan error, block.Transactions().Len())
 	)
 	threads := runtime.NumCPU()
 	if threads > len(txs) {
@@ -147,6 +148,7 @@ func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockR
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
 				if err := api.getTxResult(env, task.statedb, task.index, block); err != nil {
+					errCh <- err
 					log.Error("failed to trace tx", "txHash", txs[task.index].Hash().String())
 				}
 			}
@@ -175,8 +177,13 @@ func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockR
 	pend.Wait()
 
 	// If execution failed in between, abort
-	if failed != nil {
-		return nil, failed
+	select {
+	case err := <-errCh:
+		return nil, err
+	default:
+		if failed != nil {
+			return nil, failed
+		}
 	}
 
 	return api.fillBlockResult(env, block)

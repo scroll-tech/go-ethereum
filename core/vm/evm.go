@@ -30,6 +30,7 @@ import (
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
+// @todo(thegaram): update this
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
 type (
@@ -410,6 +411,7 @@ type codeAndHash struct {
 
 func (c *codeAndHash) Hash() common.Hash {
 	if c.hash == (common.Hash{}) {
+		// @todo(thegaram): this hashing is used when calculating CREATE2 address
 		c.hash = crypto.Keccak256Hash(c.code)
 	}
 	return c.hash

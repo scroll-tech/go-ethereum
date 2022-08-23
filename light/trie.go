@@ -32,6 +32,7 @@ import (
 )
 
 var (
+	// @todo(thegaram): look into this
 	sha3Nil = crypto.Keccak256Hash(nil)
 )
 

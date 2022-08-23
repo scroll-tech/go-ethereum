@@ -2694,6 +2694,7 @@ func TestInitThenFailCreateContract(t *testing.T) {
 		byte(vm.CREATE2),
 	}...)
 
+	// @todo(thegaram): try this test
 	initHash := crypto.Keccak256Hash(initCode)
 	aa := crypto.CreateAddress2(bb, [32]byte{}, initHash[:])
 	t.Logf("Destination address: %x\n", aa)

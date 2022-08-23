@@ -29,6 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/state/snapshot"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -459,7 +460,8 @@ func (s *StateDB) SetNonce(addr common.Address, nonce uint64) {
 func (s *StateDB) SetCode(addr common.Address, code []byte) {
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		stateObject.SetCode(crypto.Keccak256Hash(code), code)
+		// @todo(thegaram): this hashing is used when storing code in state
+		stateObject.SetCode(poseidon.CodeHash(code), code)
 	}
 }
 

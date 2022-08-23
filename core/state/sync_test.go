@@ -407,6 +407,7 @@ func TestIncompleteStateSync(t *testing.T) {
 	var isCode = make(map[common.Hash]struct{})
 	for _, acc := range srcAccounts {
 		if len(acc.code) > 0 {
+			// @todo(thegaram): try this test
 			isCode[crypto.Keccak256Hash(acc.code)] = struct{}{}
 		}
 	}

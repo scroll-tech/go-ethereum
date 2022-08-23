@@ -112,7 +112,7 @@ func TestCallTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	trace = loadStaff(t, "staticcall_trace.json")
+	trace = loadStaff(t, "call_trace_edge.json")
 	traces, err = HandleBlockResult(trace)
 	outObj, _ = json.Marshal(traces)
 	t.Log(string(outObj))

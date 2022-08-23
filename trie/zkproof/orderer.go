@@ -35,14 +35,22 @@ func (ops *iterateOp) next() *types.AccountWrapper {
 }
 
 type simpleOrderer struct {
-	readOnly bool
+	readOnly int
 	savedOp  []*types.AccountWrapper
 }
 
-func (od *simpleOrderer) readonly(mode bool) { od.readOnly = mode }
+func (od *simpleOrderer) readonly(mode bool) {
+	if mode {
+		od.readOnly += 1
+	} else if od.readOnly == 0 {
+		panic("unexpected readonly mode stack pop")
+	} else {
+		od.readOnly -= 1
+	}
+}
 
 func (od *simpleOrderer) absorb(st *types.AccountWrapper) {
-	if od.readOnly {
+	if od.readOnly > 0 {
 		return
 	}
 	od.savedOp = append(od.savedOp, st)
@@ -81,7 +89,7 @@ func (opss *multiOpIterator) next() *types.AccountWrapper {
 }
 
 type rwTblOrderer struct {
-	readOnly         bool
+	readOnly         int
 	readOnlySnapshot struct {
 		accounts map[string]*types.AccountWrapper
 		storages map[string]map[string]*types.StorageWrapper
@@ -135,19 +143,23 @@ func newRWTblOrderer(inited map[common.Address]*types.StateAccount) *rwTblOrdere
 
 func (od *rwTblOrderer) readonly(mode bool) {
 	if mode {
-		if !od.readOnly {
-			od.readOnly = true
+		if od.readOnly == 0 {
 			od.readOnlySnapshot.accounts = make(map[string]*types.AccountWrapper)
 			od.readOnlySnapshot.storages = make(map[string]map[string]*types.StorageWrapper)
 		}
+		od.readOnly += 1
+	} else if od.readOnly == 0 {
+		panic("unexpected readonly mode stack pop")
 	} else {
-		od.readOnly = false
-		for addrS, st := range od.readOnlySnapshot.accounts {
-			od.absorb(st)
-			if m, existed := od.readOnlySnapshot.storages[addrS]; existed {
-				for _, stg := range m {
-					st.Storage = stg
-					od.absorbStorage(st, nil)
+		od.readOnly -= 1
+		if od.readOnly == 0 {
+			for addrS, st := range od.readOnlySnapshot.accounts {
+				od.absorb(st)
+				if m, existed := od.readOnlySnapshot.storages[addrS]; existed {
+					for _, stg := range m {
+						st.Storage = stg
+						od.absorbStorage(st, nil)
+					}
 				}
 			}
 		}
@@ -174,7 +186,7 @@ func (od *rwTblOrderer) absorbStorage(st *types.AccountWrapper, before *types.St
 		keyStr := common.BytesToHash(keyBytes).String()
 
 		// trace every "touched" status for readOnly
-		if od.readOnly {
+		if od.readOnly > 0 {
 			m, existed := od.readOnlySnapshot.storages[addrStr]
 			if !existed {
 				m = make(map[string]*types.StorageWrapper)
@@ -205,7 +217,7 @@ func (od *rwTblOrderer) absorb(st *types.AccountWrapper) {
 	addrStr := st.Address.String()
 
 	// trace every "touched" status for readOnly
-	if od.readOnly {
+	if od.readOnly > 0 {
 		snapShot, existed := od.traced[addrStr]
 		if !existed {
 			snapShot = initedRef

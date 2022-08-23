@@ -568,6 +568,7 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			//update currentContract according to previous op
 			contractStack[sl] = currentContract
 			currentContract = callEnterAddress
+
 		} else if sl > sLog.Depth {
 			logStack = logStack[:sl-1]
 			currentContract = contractStack[sLog.Depth]
@@ -597,6 +598,18 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 		}
 		callEnterAddress = currentContract
 
+		//check callFailed status for current op
+		if sLog.ExtraData != nil {
+			if sLog.ExtraData.CallFailed {
+				// for a failed option, most writting would be reverted, only exceptions in CREATE
+				// (the callee's nonce would be increased)
+				switch sLog.Op {
+				case "CREATE", "CREATE2":
+				}
+				od.readonly(true)
+			}
+		}
+
 		switch sLog.Op {
 		case "SELFDESTRUCT":
 			//in SELFDESTRUCT, a call on target address is made so the balance would be updated
@@ -607,25 +620,23 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			od.absorb(&types.AccountWrapper{Address: currentContract})
 
 		case "CREATE", "CREATE2":
-			if sLog.ExtraData.CallFailed {
-				od.readonly(true)
-			}
 			state := getAccountState(sLog, posCREATE)
 			od.absorb(state)
 			//update contract to CREATE addr
 
 			callEnterAddress = state.Address
 		case "CALL", "CALLCODE":
-			if sLog.ExtraData.CallFailed {
-				od.readonly(true)
+			if sLog.ExtraData == nil {
+				panic("unexpected data form for CALL")
+			} else if len(sLog.ExtraData.StateList) < 3 {
+				// an immediate failure, i.e. it fail before stack entry (like no enough balance for a "call with value")
+				// currently we just skip it and purpose nothing happens (FIXME: it is inconsentent with mpt_table)
+			} else {
+				state := getAccountState(sLog, posCALL)
+				od.absorb(state)
+				callEnterAddress = state.Address
 			}
-			state := getAccountState(sLog, posCALL)
-			od.absorb(state)
-			callEnterAddress = state.Address
 		case "STATICCALL":
-			if sLog.ExtraData.CallFailed {
-				od.readonly(true)
-			}
 			//static call has no update on target address
 			callEnterAddress = getAccountState(sLog, posSTATICCALL).Address
 		case "DELEGATECALL":
@@ -670,7 +681,9 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 	}
 
 	handleLogs(od, toAddr, txResult.StructLogs)
-	od.readonly(false)
+	if txResult.Failed {
+		od.readonly(false)
+	}
 
 	for _, state := range txResult.AccountsAfter {
 		// special case: for suicide, the state has been captured in SELFDESTRUCT

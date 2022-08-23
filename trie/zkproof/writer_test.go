@@ -49,11 +49,11 @@ func TestWriterCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(writer.tracingAccounts) != 2 {
+	if len(writer.tracingAccounts) != 3 {
 		t.Error("unexpected tracing account data", writer.tracingAccounts)
 	}
 
-	if v, existed := writer.tracingAccounts[common.HexToAddress("0xDf1f3c8fdcE862A2E34B9295523C3fc1c675Da47")]; !existed || v != nil {
+	if v, existed := writer.tracingAccounts[common.HexToAddress("0x08c683b684d1e24cab8ce6de5c8c628d993ac140")]; !existed || v != nil {
 		t.Error("wrong tracing status for uninited address", v, existed)
 	}
 

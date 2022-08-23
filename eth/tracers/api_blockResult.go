@@ -135,7 +135,7 @@ func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockR
 		txs   = block.Transactions()
 		pend  = new(sync.WaitGroup)
 		jobs  = make(chan *txTraceTask, len(txs))
-		errCh = make(chan error, block.Transactions().Len())
+		errCh = make(chan error, 1)
 	)
 	threads := runtime.NumCPU()
 	if threads > len(txs) {

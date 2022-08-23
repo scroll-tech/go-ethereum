@@ -598,15 +598,29 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 		}
 		callEnterAddress = currentContract
 
-		//check callFailed status for current op
-		if sLog.ExtraData != nil {
-			if sLog.ExtraData.CallFailed {
-				// for a failed option, most writting would be reverted, only exceptions in CREATE
-				// (the callee's nonce would be increased)
+		//check extra status for current op if it is a call
+		if extraData := sLog.ExtraData; extraData != nil {
+			if extraData.CallFailed || len(sLog.ExtraData.Caller) < 2 {
+				// no enough caller data (2) is being capture indicate we are in an immediate failure
+				// i.e. it fail before stack entry (like no enough balance for a "call with value"),
+				// or we just not handle this calling op correctly yet
+
+				// for a failed option, now we just purpose nothing happens (FIXME: it is inconsentent with mpt_table)
+				// except for CREATE, for which the callee's nonce would be increased
 				switch sLog.Op {
 				case "CREATE", "CREATE2":
+					st := copyAccountState(extraData.Caller[0])
+					st.Nonce += 1
+					od.absorb(st)
 				}
+			}
+
+			if extraData.CallFailed {
 				od.readonly(true)
+			}
+			// now trace caller's status first
+			if caller := extraData.Caller; len(caller) >= 2 {
+				od.absorb(caller[1])
 			}
 		}
 
@@ -620,24 +634,23 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			od.absorb(&types.AccountWrapper{Address: currentContract})
 
 		case "CREATE", "CREATE2":
-			state := getAccountState(sLog, posCREATE)
-			od.absorb(state)
-			//update contract to CREATE addr
+			// notice in immediate failure we have no enough tracing in extraData
+			if len(sLog.ExtraData.StateList) >= 2 {
+				state := getAccountState(sLog, posCREATE)
+				od.absorb(state)
+				//update contract to CREATE addr
+				callEnterAddress = state.Address
+			}
 
-			callEnterAddress = state.Address
 		case "CALL", "CALLCODE":
-			if sLog.ExtraData == nil {
-				panic("unexpected data form for CALL")
-			} else if len(sLog.ExtraData.StateList) < 3 {
-				// an immediate failure, i.e. it fail before stack entry (like no enough balance for a "call with value")
-				// currently we just skip it and purpose nothing happens (FIXME: it is inconsentent with mpt_table)
-			} else {
+			// notice in immediate failure we have no enough tracing in extraData
+			if len(sLog.ExtraData.StateList) >= 3 {
 				state := getAccountState(sLog, posCALL)
 				od.absorb(state)
 				callEnterAddress = state.Address
 			}
 		case "STATICCALL":
-			//static call has no update on target address
+			//static call has no update on target address (and no immediate failure?)
 			callEnterAddress = getAccountState(sLog, posSTATICCALL).Address
 		case "DELEGATECALL":
 

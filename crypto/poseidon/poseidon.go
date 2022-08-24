@@ -1,48 +1,122 @@
+// from github.com/iden3/go-iden3-crypto/ff/poseidon
+
 package poseidon
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 
-	"github.com/iden3/go-iden3-crypto/poseidon"
-	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/iden3/go-iden3-crypto/ff"
+	"github.com/iden3/go-iden3-crypto/utils"
 )
 
-// @todo: This is just a rough first draft, optimize it once we have test vectors
-func CodeHash(code []byte) (h common.Hash) {
-	// @todo: decide how to handle nil hash
-	if code == nil {
-		return crypto.Keccak256Hash(nil)
+const NROUNDSF = 8 //nolint:golint
+
+var NROUNDSP = []int{56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68} //nolint:golint
+
+func zero() *ff.Element {
+	return ff.NewElement()
+}
+
+// exp5 performs x^5 mod p
+// https://eprint.iacr.org/2019/458.pdf page 8
+func exp5(a *ff.Element) {
+	a.Exp(*a, big.NewInt(5)) //nolint:gomnd
+}
+
+// exp5state perform exp5 for whole state
+func exp5state(state []*ff.Element) {
+	for i := 0; i < len(state); i++ {
+		exp5(state[i])
+	}
+}
+
+// ark computes Add-Round Key, from the paper https://eprint.iacr.org/2019/458.pdf
+func ark(state []*ff.Element, c []*ff.Element, it int) {
+	for i := 0; i < len(state); i++ {
+		state[i].Add(state[i], c[it+i])
+	}
+}
+
+// mix returns [[matrix]] * [vector]
+func mix(state []*ff.Element, t int, m [][]*ff.Element) []*ff.Element {
+	mul := zero()
+	newState := make([]*ff.Element, t)
+	for i := 0; i < t; i++ {
+		newState[i] = zero()
+	}
+	for i := 0; i < len(state); i++ {
+		newState[i].SetUint64(0)
+		for j := 0; j < len(state); j++ {
+			mul.Mul(m[j][i], state[j])
+			newState[i].Add(newState[i], mul)
+		}
+	}
+	return newState
+}
+
+// Hash computes the Poseidon hash for the given fixed-size inputs, select specs automatically from the size
+func HashFixed(inpBI []*big.Int) (*big.Int, error) {
+	t := len(inpBI) + 1
+	if len(inpBI) == 0 || len(inpBI) > len(NROUNDSP) {
+		return nil, fmt.Errorf("invalid inputs length %d, max %d", len(inpBI), len(NROUNDSP)) //nolint:gomnd,lll
+	}
+	if !utils.CheckBigIntArrayInField(inpBI[:]) {
+		return nil, errors.New("inputs values not inside Finite Field")
+	}
+	inp := utils.BigIntArrayToElementArray(inpBI[:])
+
+	nRoundsF := NROUNDSF
+	nRoundsP := NROUNDSP[t-2]
+	C := c.c[t-2]
+	S := c.s[t-2]
+	M := c.m[t-2]
+	P := c.p[t-2]
+
+	state := make([]*ff.Element, t)
+	state[0] = zero()
+	copy(state[1:], inp[:])
+
+	ark(state, C, 0)
+
+	for i := 0; i < nRoundsF/2-1; i++ {
+		exp5state(state)
+		ark(state, C, (i+1)*t)
+		state = mix(state, t, M)
+	}
+	exp5state(state)
+	ark(state, C, (nRoundsF/2)*t)
+	state = mix(state, t, P)
+
+	for i := 0; i < nRoundsP; i++ {
+		exp5(state[0])
+		state[0].Add(state[0], C[(nRoundsF/2+1)*t+i])
+
+		mul := zero()
+		newState0 := zero()
+		for j := 0; j < len(state); j++ {
+			mul.Mul(S[(t*2-1)*i+j], state[j])
+			newState0.Add(newState0, mul)
+		}
+
+		for k := 1; k < t; k++ {
+			mul = zero()
+			state[k] = state[k].Add(state[k], mul.Mul(state[0], S[(t*2-1)*i+t+k-1]))
+		}
+		state[0] = newState0
 	}
 
-	// Step1: pad code with 0x0 (STOP) so len(code) % 16 == 0
-	if len(code)%16 != 0 {
-		newLen := (len(code)/16 + 1) * 16
-		code = append(code, make([]byte, newLen-len(code))...)
+	for i := 0; i < nRoundsF/2-1; i++ {
+		exp5state(state)
+		ark(state, C, (nRoundsF/2+1)*t+nRoundsP+i*t)
+		state = mix(state, t, M)
 	}
+	exp5state(state)
+	state = mix(state, t, M)
 
-	// Step2: for every 16 byte, convert it into Fr, so we get a Fr array
-	Frs := make([]*big.Int, len(code)/16)
-
-	for ii := 0; ii < len(code)/16; ii++ {
-		Frs[ii] = big.NewInt(0)
-		Frs[ii].SetBytes(code[ii*16 : (ii+1)*16])
-	}
-
-	// Step3: pad Fr array with 0 to even length.
-	if len(Frs)%2 == 1 {
-		Frs = append(Frs, big.NewInt(0))
-	}
-
-	// Step4: Apply the array onto a sponge process with current poseidon scheme
-	// (3 Frs permutation and 1 Fr for output, so the throughout is 2 Frs)
-	// @todo
-	hash, _ := poseidon.Hash(Frs)
-
-	// Step5(short term, for compatibility): convert final root Fr as u256 (big-endian represent)
-	// @todo: confirm endianness
-	codeHash := common.Hash{}
-	hash.FillBytes(codeHash[:])
-
-	return codeHash
+	rE := state[0]
+	r := big.NewInt(0)
+	rE.ToBigIntRegular(r)
+	return r, nil
 }

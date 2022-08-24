@@ -4,17 +4,12 @@ import (
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/crypto"
 )
 
 const defaultPoseidonChunk = 3
 
 // @todo: This is just a rough first draft, optimize it once we have test vectors
 func CodeHash(code []byte) (h common.Hash) {
-	// @todo: decide how to handle nil hash
-	if code == nil {
-		return crypto.Keccak256Hash(nil)
-	}
 
 	cap := int64(len(code))
 

@@ -460,7 +460,6 @@ func (s *StateDB) SetNonce(addr common.Address, nonce uint64) {
 func (s *StateDB) SetCode(addr common.Address, code []byte) {
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		// @todo(thegaram): this hashing is used when storing code in state
 		stateObject.SetCode(poseidon.CodeHash(code), code)
 	}
 }

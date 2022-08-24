@@ -10,7 +10,6 @@ const defaultPoseidonChunk = 3
 
 // @todo: This is just a rough first draft, optimize it once we have test vectors
 func CodeHash(code []byte) (h common.Hash) {
-
 	cap := int64(len(code))
 
 	// Step1: pad code with 0x0 (STOP) so len(code) % 16 == 0

@@ -25,13 +25,13 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
-// @todo(thegaram): update this
-var emptyCodeHash = crypto.Keccak256Hash(nil)
+var emptyCodeHash = poseidon.EmptyCodeHash
 
 type (
 	// CanTransferFunc is the signature of a transfer guard function
@@ -411,7 +411,7 @@ type codeAndHash struct {
 
 func (c *codeAndHash) Hash() common.Hash {
 	if c.hash == (common.Hash{}) {
-		// @todo(thegaram): this hashing is used when calculating CREATE2 address
+		// when calculating CREATE2 address, we use Keccak256 not Poseidon
 		c.hash = crypto.Keccak256Hash(c.code)
 	}
 	return c.hash

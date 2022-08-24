@@ -7,6 +7,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto"
 )
 
+const defaultPoseidonChunk = 3
+
 // @todo: This is just a rough first draft, optimize it once we have test vectors
 func CodeHash(code []byte) (h common.Hash) {
 	// @todo: decide how to handle nil hash
@@ -29,14 +31,16 @@ func CodeHash(code []byte) (h common.Hash) {
 	}
 
 	// Step3: pad Fr array with 0 to even length.
-	if len(Frs)%2 == 1 {
+	// FIXME: no need, Hash would pad it with 0 automatically, and Hash
+	// need actual length as a flag
+	/*if len(Frs)%2 == 1 {
 		Frs = append(Frs, big.NewInt(0))
-	}
+	}*/
 
 	// Step4: Apply the array onto a sponge process with current poseidon scheme
 	// (3 Frs permutation and 1 Fr for output, so the throughout is 2 Frs)
 	// @todo
-	hash, _ := HashFixed(Frs)
+	hash, _ := Hash(Frs, defaultPoseidonChunk)
 
 	// Step5(short term, for compatibility): convert final root Fr as u256 (big-endian represent)
 	// @todo: confirm endianness

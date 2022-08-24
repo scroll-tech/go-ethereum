@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPoseidonHash(t *testing.T) {
+func TestPoseidonHashFixed(t *testing.T) {
 	b0 := big.NewInt(0)
 	b1 := big.NewInt(1)
 	b2 := big.NewInt(2)
@@ -125,6 +125,29 @@ func TestInputsNotInField(t *testing.T) {
 	b2 := utils.NewIntFromString("21888242871839275222246405745257275088548364400416034343698204186575808495617") //nolint:lll
 	_, err = HashFixed([]*big.Int{b2})
 	require.Error(t, err, "inputs values not inside Finite Field")
+}
+
+func TestPoseidonHash(t *testing.T) {
+	ret, err := Hash(nil, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Hash nil for width 3 equal to Hash([0, 0])
+	retRef, err := HashFixed([]*big.Int{big.NewInt(0), big.NewInt(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, ret, retRef)
+
+	// hash is different for the cap flag
+	ret1, err := Hash([]*big.Int{big.NewInt(0)}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEqual(t, ret1, retRef)
 }
 
 func BenchmarkPoseidonHash(b *testing.B) {

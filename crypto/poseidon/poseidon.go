@@ -56,16 +56,7 @@ func mix(state []*ff.Element, t int, m [][]*ff.Element) []*ff.Element {
 	return newState
 }
 
-// Hash computes the Poseidon hash for the given fixed-size inputs, select specs automatically from the size
-func HashFixed(inpBI []*big.Int) (*big.Int, error) {
-	t := len(inpBI) + 1
-	if len(inpBI) == 0 || len(inpBI) > len(NROUNDSP) {
-		return nil, fmt.Errorf("invalid inputs length %d, max %d", len(inpBI), len(NROUNDSP)) //nolint:gomnd,lll
-	}
-	if !utils.CheckBigIntArrayInField(inpBI[:]) {
-		return nil, errors.New("inputs values not inside Finite Field")
-	}
-	inp := utils.BigIntArrayToElementArray(inpBI[:])
+func permute(state []*ff.Element, t int) []*ff.Element {
 
 	nRoundsF := NROUNDSF
 	nRoundsP := NROUNDSP[t-2]
@@ -73,10 +64,6 @@ func HashFixed(inpBI []*big.Int) (*big.Int, error) {
 	S := c.s[t-2]
 	M := c.m[t-2]
 	P := c.p[t-2]
-
-	state := make([]*ff.Element, t)
-	state[0] = zero()
-	copy(state[1:], inp[:])
 
 	ark(state, C, 0)
 
@@ -113,7 +100,85 @@ func HashFixed(inpBI []*big.Int) (*big.Int, error) {
 		state = mix(state, t, M)
 	}
 	exp5state(state)
-	state = mix(state, t, M)
+	return mix(state, t, M)
+}
+
+// Hash using possible sponge specs specified by width (rate from 1 to 15), the size of input is applied as capacity
+// (notice we do not include width in the capacity )
+func Hash(inpBI []*big.Int, width int) (*big.Int, error) {
+	if width < 2 {
+		return nil, fmt.Errorf("width must be ranged from 2 to 16")
+	}
+	if width-2 > len(NROUNDSP) {
+		return nil, fmt.Errorf("invalid inputs width %d, max %d", width, len(NROUNDSP)+1) //nolint:gomnd,lll
+	}
+
+	cap := ff.NewElement().SetBigInt(big.NewInt(int64(len(inpBI))))
+
+	state := make([]*ff.Element, width)
+	state[0] = cap
+	for i := 1; i < width; i++ {
+		state[i] = zero()
+	}
+
+	rate := width - 1
+	var absorb []*ff.Element
+	for len(inpBI) > 0 {
+		// sponge for fully absorb
+		if l := len(absorb); l != 0 {
+			//sanity check
+			if l != rate {
+				panic("unexpected absorption size")
+			}
+
+			for i, elm := range absorb {
+				state[i+1].Add(state[i+1], elm)
+			}
+			state = permute(state, width)
+		}
+
+		// absorb
+		if len(inpBI) < rate {
+			// padding zero() equal to no action on state
+			absorb = utils.BigIntArrayToElementArray(inpBI)
+			inpBI = nil
+		} else {
+			absorb = utils.BigIntArrayToElementArray(inpBI[:rate])
+			inpBI = inpBI[rate:]
+		}
+
+	}
+
+	//last time sponge (padding with unabsorb items)
+	for i, elm := range absorb {
+		state[i+1].Add(state[i+1], elm)
+	}
+	state = permute(state, width)
+
+	//squeeze
+	rE := state[0]
+	r := big.NewInt(0)
+	rE.ToBigIntRegular(r)
+	return r, nil
+
+}
+
+// Hash computes the Poseidon hash for the given fixed-size inputs, select specs automatically from the size, no capacity flag is applied
+func HashFixed(inpBI []*big.Int) (*big.Int, error) {
+	t := len(inpBI) + 1
+	if len(inpBI) == 0 || len(inpBI) > len(NROUNDSP) {
+		return nil, fmt.Errorf("invalid inputs length %d, max %d", len(inpBI), len(NROUNDSP)) //nolint:gomnd,lll
+	}
+	if !utils.CheckBigIntArrayInField(inpBI[:]) {
+		return nil, errors.New("inputs values not inside Finite Field")
+	}
+	inp := utils.BigIntArrayToElementArray(inpBI[:])
+
+	state := make([]*ff.Element, t)
+	state[0] = zero()
+	copy(state[1:], inp[:])
+
+	state = permute(state, t)
 
 	rE := state[0]
 	r := big.NewInt(0)

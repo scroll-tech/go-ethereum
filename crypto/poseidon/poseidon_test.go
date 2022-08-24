@@ -148,6 +148,13 @@ func TestPoseidonHash(t *testing.T) {
 	}
 
 	assert.NotEqual(t, ret1, retRef)
+
+	ret2, err := HashWithCap([]*big.Int{big.NewInt(0)}, 3, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, ret2, retRef)
 }
 
 func BenchmarkPoseidonHash(b *testing.B) {

@@ -16,6 +16,8 @@ func CodeHash(code []byte) (h common.Hash) {
 		return crypto.Keccak256Hash(nil)
 	}
 
+	cap := int64(len(code))
+
 	// Step1: pad code with 0x0 (STOP) so len(code) % 16 == 0
 	if len(code)%16 != 0 {
 		newLen := (len(code)/16 + 1) * 16
@@ -40,7 +42,7 @@ func CodeHash(code []byte) (h common.Hash) {
 	// Step4: Apply the array onto a sponge process with current poseidon scheme
 	// (3 Frs permutation and 1 Fr for output, so the throughout is 2 Frs)
 	// @todo
-	hash, _ := Hash(Frs, defaultPoseidonChunk)
+	hash, _ := HashWithCap(Frs, defaultPoseidonChunk, cap)
 
 	// Step5(short term, for compatibility): convert final root Fr as u256 (big-endian represent)
 	// @todo: confirm endianness

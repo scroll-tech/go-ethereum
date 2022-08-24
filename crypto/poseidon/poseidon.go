@@ -103,9 +103,14 @@ func permute(state []*ff.Element, t int) []*ff.Element {
 	return mix(state, t, M)
 }
 
+// for short, use size of inpBI as cap
+func Hash(inpBI []*big.Int, width int) (*big.Int, error) {
+	return HashWithCap(inpBI, width, int64(len(inpBI)))
+}
+
 // Hash using possible sponge specs specified by width (rate from 1 to 15), the size of input is applied as capacity
 // (notice we do not include width in the capacity )
-func Hash(inpBI []*big.Int, width int) (*big.Int, error) {
+func HashWithCap(inpBI []*big.Int, width int, cap int64) (*big.Int, error) {
 	if width < 2 {
 		return nil, fmt.Errorf("width must be ranged from 2 to 16")
 	}
@@ -113,10 +118,10 @@ func Hash(inpBI []*big.Int, width int) (*big.Int, error) {
 		return nil, fmt.Errorf("invalid inputs width %d, max %d", width, len(NROUNDSP)+1) //nolint:gomnd,lll
 	}
 
-	cap := ff.NewElement().SetBigInt(big.NewInt(int64(len(inpBI))))
+	capflag := ff.NewElement().SetBigInt(big.NewInt(cap))
 
 	state := make([]*ff.Element, width)
-	state[0] = cap
+	state[0] = capflag
 	for i := 1; i < width; i++ {
 		state[i] = zero()
 	}

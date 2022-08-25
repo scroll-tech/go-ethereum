@@ -3041,6 +3041,11 @@ func TestPoseidonCodeHash(t *testing.T) {
 
 	defer blockchain.Stop()
 
+	// check empty code hash
+	state, _ := blockchain.State()
+	codeHash := state.GetCodeHash(addr1)
+	assert.Equal(t, codeHash, common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"), "code hash mismatch")
+
 	// deploy contract through transaction
 	chain, receipts := GenerateChain(params.TestChainConfig, genesis, engine, db, 1, func(i int, gen *BlockGen) {
 		tx, _ := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, gen.header.BaseFee, deployCode), signer, key1)
@@ -3055,8 +3060,8 @@ func TestPoseidonCodeHash(t *testing.T) {
 	contractAddress := receipts[0][0].ContractAddress
 	assert.Equal(t, common.HexToAddress("0x3A220f351252089D385b29beca14e27F204c296A"), contractAddress, "address mismatch")
 
-	state, _ := blockchain.State()
-	codeHash := state.GetCodeHash(contractAddress)
+	state, _ = blockchain.State()
+	codeHash = state.GetCodeHash(contractAddress)
 
 	// keccak: 0x089bfd332dfa6117cbc20756f31801ce4f5a175eb258e46bf8123317da54cd96
 	assert.Equal(t, codeHash, common.HexToHash("0x28ec09723b285e17caabc4a8d52dbd097feddf408aee115cbb57c3c9c814d2b2"), "code hash mismatch")

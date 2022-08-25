@@ -22,7 +22,7 @@ func CodeHash(code []byte) (h common.Hash) {
 	var length int
 
 	if len(code)%16 == 0 {
-		length = len(code)/16
+		length = len(code) / 16
 	} else {
 		length = len(code)/16 + 1
 	}
@@ -30,7 +30,7 @@ func CodeHash(code []byte) (h common.Hash) {
 	Frs := make([]*big.Int, length)
 	ii := 0
 
-	for ii < length - 1 {
+	for ii < length-1 {
 		Frs[ii] = big.NewInt(0)
 		Frs[ii].SetBytes(code[ii*16 : (ii+1)*16])
 		ii++
@@ -38,7 +38,7 @@ func CodeHash(code []byte) (h common.Hash) {
 
 	Frs[ii] = big.NewInt(0)
 	bytes := make([]byte, 16)
-	copy(bytes, code[ii*16 : ])
+	copy(bytes, code[ii*16:])
 	Frs[ii].SetBytes(bytes)
 
 	// Step3: pad Fr array with 0 to even length.

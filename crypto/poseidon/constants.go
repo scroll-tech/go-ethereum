@@ -7,8 +7,6 @@ import (
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/ff"
-
-	"github.com/scroll-tech/go-ethereum/common"
 )
 
 type constantsStr struct {
@@ -26,8 +24,6 @@ type constants struct {
 }
 
 var c *constants
-
-var EmptyCodeHash common.Hash
 
 func init() {
 	c = &constants{
@@ -100,8 +96,6 @@ func init() {
 		}
 		c.p[i] = cpi
 	}
-
-	EmptyCodeHash = CodeHash(nil)
 }
 
 //nolint:lll

@@ -25,13 +25,13 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
-	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
+	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
 // deployed contract addresses (relevant after the account abstraction).
-var emptyCodeHash = poseidon.EmptyCodeHash
+var emptyCodeHash = codehash.EmptyCodeHash
 
 type (
 	// CanTransferFunc is the signature of a transfer guard function

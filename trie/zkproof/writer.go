@@ -143,6 +143,10 @@ type zktrieProofWriter struct {
 	tracingAccounts     map[common.Address]*types.StateAccount
 }
 
+func (wr *zktrieProofWriter) TracingAccounts() map[common.Address]*types.StateAccount {
+	return wr.tracingAccounts
+}
+
 func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, error) {
 
 	underlayerDb := memorydb.New()
@@ -674,7 +678,7 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 	}
 }
 
-func handleTx(od opOrderer, txResult *types.ExecutionResult) {
+func HandleTx(od opOrderer, txResult *types.ExecutionResult) {
 
 	// the from state is read before tx is handled and nonce is added, we combine both
 	preTxSt := copyAccountState(txResult.From)
@@ -715,6 +719,8 @@ const defaultOrdererScheme = MPTWitnessRWTbl
 
 var usedOrdererScheme = defaultOrdererScheme
 
+func SetOrderScheme(t MPTWitnessType) { usedOrdererScheme = t }
+
 // HandleBlockResult only for backward compatibility
 func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
 	return HandleBlockResultEx(block, usedOrdererScheme)
@@ -734,13 +740,13 @@ func HandleBlockResultEx(block *types.BlockResult, ordererScheme MPTWitnessType)
 	case MPTWitnessNatural:
 		od = &simpleOrderer{}
 	case MPTWitnessRWTbl:
-		od = newRWTblOrderer(writer.tracingAccounts)
+		od = NewRWTblOrderer(writer.tracingAccounts)
 	default:
 		return nil, fmt.Errorf("unrecognized scheme %d", ordererScheme)
 	}
 
 	for _, tx := range block.ExecutionResults {
-		handleTx(od, tx)
+		HandleTx(od, tx)
 	}
 
 	// notice some coinbase addr (like all zero) is in fact not exist and should not be update

@@ -1,4 +1,4 @@
-package zkproof
+package blocktraces
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
 func init() {
@@ -16,7 +17,7 @@ func init() {
 	var orderSchemeI int
 	if orderScheme != "" {
 		if n, err := fmt.Sscanf(orderScheme, "%d", &orderSchemeI); err == nil && n == 1 {
-			usedOrdererScheme = MPTWitnessType(orderSchemeI)
+			zkproof.SetOrderScheme(zkproof.MPTWitnessType(orderSchemeI))
 		}
 	}
 }
@@ -44,20 +45,20 @@ func loadStaff(t *testing.T, fname string) *types.BlockResult {
 
 func TestWriterCreation(t *testing.T) {
 	trace := loadStaff(t, "deploy_trace.json")
-	writer, err := NewZkTrieProofWriter(trace.StorageTrace)
+	writer, err := zkproof.NewZkTrieProofWriter(trace.StorageTrace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(writer.tracingAccounts) != 3 {
-		t.Error("unexpected tracing account data", writer.tracingAccounts)
+	if len(writer.TracingAccounts()) != 3 {
+		t.Error("unexpected tracing account data", writer.TracingAccounts())
 	}
 
-	if v, existed := writer.tracingAccounts[common.HexToAddress("0x08c683b684d1e24cab8ce6de5c8c628d993ac140")]; !existed || v != nil {
+	if v, existed := writer.TracingAccounts()[common.HexToAddress("0x08c683b684d1e24cab8ce6de5c8c628d993ac140")]; !existed || v != nil {
 		t.Error("wrong tracing status for uninited address", v, existed)
 	}
 
-	if v, existed := writer.tracingAccounts[common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571")]; !existed || v == nil {
+	if v, existed := writer.TracingAccounts()[common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571")]; !existed || v == nil {
 		t.Error("wrong tracing status for establied address", v, existed)
 	}
 
@@ -65,25 +66,25 @@ func TestWriterCreation(t *testing.T) {
 
 func TestGreeterTx(t *testing.T) {
 	trace := loadStaff(t, "greeter_trace.json")
-	writer, err := NewZkTrieProofWriter(trace.StorageTrace)
+	writer, err := zkproof.NewZkTrieProofWriter(trace.StorageTrace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	od := &simpleOrderer{}
+	od := zkproof.NewSimpleOrderer()
 	theTx := trace.ExecutionResults[0]
-	handleTx(od, theTx)
+	zkproof.HandleTx(od, theTx)
 
 	t.Log(od)
 
-	for _, op := range od.savedOp {
+	for _, op := range od.SavedOp() {
 		_, err = writer.HandleNewState(op)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	t.Log("traces: ", len(traces))
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
@@ -94,7 +95,7 @@ func TestGreeterTx(t *testing.T) {
 
 func TestTokenTx(t *testing.T) {
 	trace := loadStaff(t, "token_trace.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -105,7 +106,7 @@ func TestTokenTx(t *testing.T) {
 
 func TestCallTx(t *testing.T) {
 	trace := loadStaff(t, "call_trace.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -113,7 +114,7 @@ func TestCallTx(t *testing.T) {
 	}
 
 	trace = loadStaff(t, "call_trace_edge.json")
-	traces, err = HandleBlockResult(trace)
+	traces, err = zkproof.HandleBlockResult(trace)
 	outObj, _ = json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -123,7 +124,7 @@ func TestCallTx(t *testing.T) {
 
 func TestCreateTx(t *testing.T) {
 	trace := loadStaff(t, "create_trace.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -131,7 +132,7 @@ func TestCreateTx(t *testing.T) {
 	}
 
 	trace = loadStaff(t, "deploy_trace.json")
-	traces, err = HandleBlockResult(trace)
+	traces, err = zkproof.HandleBlockResult(trace)
 	outObj, _ = json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -142,7 +143,7 @@ func TestCreateTx(t *testing.T) {
 
 func TestFailedCallTx(t *testing.T) {
 	trace := loadStaff(t, "fail_call_trace.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -150,7 +151,7 @@ func TestFailedCallTx(t *testing.T) {
 	}
 
 	trace = loadStaff(t, "fail_create_trace.json")
-	traces, err = HandleBlockResult(trace)
+	traces, err = zkproof.HandleBlockResult(trace)
 	outObj, _ = json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -162,7 +163,7 @@ func TestFailedCallTx(t *testing.T) {
 //notice: now only work with OP_ORDER=2
 func TestDeleteTx(t *testing.T) {
 	trace := loadStaff(t, "delete_trace.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -173,7 +174,7 @@ func TestDeleteTx(t *testing.T) {
 //notice: now only work with OP_ORDER=2
 func TestDestructTx(t *testing.T) {
 	trace := loadStaff(t, "destruct_trace.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {
@@ -183,7 +184,7 @@ func TestDestructTx(t *testing.T) {
 
 func TestMutipleTx(t *testing.T) {
 	trace := loadStaff(t, "multi_txs.json")
-	traces, err := HandleBlockResult(trace)
+	traces, err := zkproof.HandleBlockResult(trace)
 	outObj, _ := json.Marshal(traces)
 	t.Log(string(outObj))
 	if err != nil {

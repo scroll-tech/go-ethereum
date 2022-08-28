@@ -39,6 +39,8 @@ type simpleOrderer struct {
 	savedOp  []*types.AccountWrapper
 }
 
+func (od *simpleOrderer) SavedOp() []*types.AccountWrapper { return od.savedOp }
+
 func (od *simpleOrderer) readonly(mode bool) {
 	if mode {
 		od.readOnly += 1
@@ -106,7 +108,9 @@ type rwTblOrderer struct {
 	opStorage     map[string]map[string]*types.StorageWrapper
 }
 
-func newRWTblOrderer(inited map[common.Address]*types.StateAccount) *rwTblOrderer {
+func NewSimpleOrderer() *simpleOrderer { return &simpleOrderer{} }
+
+func NewRWTblOrderer(inited map[common.Address]*types.StateAccount) *rwTblOrderer {
 
 	initedAcc := make(map[common.Address]*types.AccountWrapper)
 	for addr, data := range inited {

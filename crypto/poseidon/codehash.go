@@ -17,8 +17,8 @@ func CodeHash(code []byte) (h common.Hash) {
 
 	cap := int64(len(code))
 
-	// Step1: pad code with 0x0 (STOP) so len(code) % 16 == 0
-	// Step2: for every 16 byte, convert it into Fr, so we get a Fr array
+	// step 1: pad code with 0x0 (STOP) so that len(code) % 16 == 0
+	// step 2: for every 16 bytes, convert to Fr, so that we get a Fr array
 	var length = (len(code) + 15) / 16
 
 	Frs := make([]*big.Int, length)
@@ -35,15 +35,11 @@ func CodeHash(code []byte) (h common.Hash) {
 	copy(bytes, code[ii*16:])
 	Frs[ii].SetBytes(bytes)
 
-	// Step3: pad Fr array with 0 to even length.
-	// FIXME: no need, Hash would pad it with 0 automatically, and Hash
-	// need actual length as a flag
-
-	// Step4: Apply the array onto a sponge process with current poseidon scheme
+	// step 3: apply the array onto a sponge process with the current poseidon scheme
 	// (3 Frs permutation and 1 Fr for output, so the throughout is 2 Frs)
+	// step 4: convert final root Fr to u256 (big-endian representation)
 	hash, _ := HashWithCap(Frs, defaultPoseidonChunk, cap)
 
-	// Step5(short term, for compatibility): convert final root Fr as u256 (big-endian represent)
 	codeHash := common.Hash{}
 	hash.FillBytes(codeHash[:])
 

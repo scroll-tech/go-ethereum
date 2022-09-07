@@ -19,13 +19,7 @@ func CodeHash(code []byte) (h common.Hash) {
 
 	// Step1: pad code with 0x0 (STOP) so len(code) % 16 == 0
 	// Step2: for every 16 byte, convert it into Fr, so we get a Fr array
-	var length int
-
-	if len(code)%16 == 0 {
-		length = len(code) / 16
-	} else {
-		length = len(code)/16 + 1
-	}
+	var length = (len(code) + 15) / 16
 
 	Frs := make([]*big.Int, length)
 	ii := 0

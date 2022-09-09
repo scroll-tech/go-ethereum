@@ -236,7 +236,8 @@ const (
 	posCREATEAfter  = 1
 	posCALL         = 2
 	posSTATICCALL   = 0
-	posSELFDESTRUCT = 2
+
+//	posSELFDESTRUCT = 2
 )
 
 func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {

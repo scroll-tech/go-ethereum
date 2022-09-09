@@ -426,6 +426,18 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 		//now accountKey must has been filled
 	}
 
+	// notice we have change that no leaf (account data) exist in either before or after,
+	// for that case we had to calculate the nodeKey here
+	if out.AccountKey == nil {
+		word := zkt.NewByte32FromBytesPaddingZero(addr.Bytes())
+		k, err := word.Hash()
+		if err != nil {
+			panic(fmt.Errorf("unexpected hash error for address: %s", err))
+		}
+		kHash := zkt.NewHashFromBigInt(k)
+		out.AccountKey = hexutil.Bytes(kHash[:])
+	}
+
 	return out, nil
 }
 
@@ -630,12 +642,14 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 
 		switch sLog.Op {
 		case "SELFDESTRUCT":
+			// NOTE: this op code has been disabled so we treat it as nothing now
+
 			//in SELFDESTRUCT, a call on target address is made so the balance would be updated
 			//in the last item
-			stateTarget := getAccountState(sLog, posSELFDESTRUCT)
-			od.absorb(stateTarget)
+			//stateTarget := getAccountState(sLog, posSELFDESTRUCT)
+			//od.absorb(stateTarget)
 			//then build an "deleted state", only address and other are default
-			od.absorb(&types.AccountWrapper{Address: currentContract})
+			//od.absorb(&types.AccountWrapper{Address: currentContract})
 
 		case "CREATE", "CREATE2":
 			// notice in immediate failure we have no enough tracing in extraData

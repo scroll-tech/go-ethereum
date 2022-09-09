@@ -219,7 +219,7 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 // CaptureState logs a new structured log message and pushes it out to the environment
 //
 // CaptureState also tracks SLOAD/SSTORE ops to track storage change.
-func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, opErr error) {
 	memory := scope.Memory
 	stack := scope.Stack
 	contract := scope.Contract
@@ -274,13 +274,13 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	if ok {
 		// execute trace func list.
 		for _, exec := range execFuncList {
-			if err = exec(l, scope, structlog.getOrInitExtraData()); err != nil {
+			if err := exec(l, scope, structlog.getOrInitExtraData()); err != nil {
 				log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 			}
 		}
 	}
 
-	structlog.RefundCounter, structlog.Err = l.env.StateDB.GetRefund(), err
+	structlog.RefundCounter, structlog.Err = l.env.StateDB.GetRefund(), opErr
 	l.logs = append(l.logs, *structlog)
 }
 

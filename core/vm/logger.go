@@ -92,9 +92,9 @@ var (
 	}
 )
 
-func NewStructlog(pc uint64, op OpCode, gas, cost uint64, depth int) *StructLog {
+func NewStructlog(pc uint64, op OpCode, gas, cost uint64, depth int, err error) *StructLog {
 	structlog := loggerPool.Get().(*StructLog)
-	structlog.Pc, structlog.Op, structlog.Gas, structlog.GasCost, structlog.Depth = pc, op, gas, cost, depth
+	structlog.Pc, structlog.Op, structlog.Gas, structlog.GasCost, structlog.Depth, structlog.Err = pc, op, gas, cost, depth, err
 
 	runtime.SetFinalizer(structlog, func(logger *StructLog) {
 		logger.clean()
@@ -109,6 +109,7 @@ func (s *StructLog) clean() {
 	s.ReturnData.Reset()
 	s.Storage = nil
 	s.ExtraData = nil
+	s.Err = nil
 }
 
 func (s *StructLog) getOrInitExtraData() *types.ExtraData {
@@ -224,7 +225,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	stack := scope.Stack
 	contract := scope.Contract
 	// create a struct log.
-	structlog := NewStructlog(pc, op, gas, cost, depth)
+	structlog := NewStructlog(pc, op, gas, cost, depth, opErr)
 
 	// check if already accumulated the specified number of logs
 	if l.cfg.Limit != 0 && l.cfg.Limit <= len(l.logs) {
@@ -280,9 +281,6 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		}
 	}
 
-	if opErr != nil {
-		structlog.Err = opErr
-	}
 	structlog.RefundCounter = l.env.StateDB.GetRefund()
 	l.logs = append(l.logs, *structlog)
 }

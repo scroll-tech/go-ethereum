@@ -73,7 +73,6 @@ type Backend interface {
 	RPCGasCap() uint64
 	ChainConfig() *params.ChainConfig
 	CacheConfig() *core.CacheConfig
-	Coinbase() common.Address
 	Engine() consensus.Engine
 	ChainDb() ethdb.Database
 	// StateAtBlock returns the state corresponding to the stateroot of the block.

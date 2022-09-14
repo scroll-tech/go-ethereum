@@ -853,7 +853,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 
 	// collect affected account after tx being applied
-	for acc := range map[common.Address]bool{from: true, (*to): true, w.coinbase: true} {
+	for _, acc := range []common.Address{from, (*to), w.coinbase} {
 		after = append(after, &types.AccountWrapper{
 			Address:  acc,
 			Nonce:    w.current.state.GetNonce(acc),

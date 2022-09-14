@@ -134,10 +134,6 @@ func (b *testBackend) CacheConfig() *core.CacheConfig {
 	return nil
 }
 
-func (b *testBackend) Coinbase() common.Address {
-	return common.Address{}
-}
-
 func (b *testBackend) Engine() consensus.Engine {
 	return b.engine
 }

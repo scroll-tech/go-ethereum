@@ -57,10 +57,6 @@ func (b *EthAPIBackend) CacheConfig() *core.CacheConfig {
 	return b.eth.blockchain.CacheConfig()
 }
 
-func (b *EthAPIBackend) Coinbase() common.Address {
-	return b.Miner().Coinbase()
-}
-
 func (b *EthAPIBackend) CurrentBlock() *types.Block {
 	return b.eth.blockchain.CurrentBlock()
 }

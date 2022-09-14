@@ -25,11 +25,12 @@ type TraceBlock interface {
 type traceEnv struct {
 	config *TraceConfig
 
+	coinbase common.Address
+
 	// rMu lock is used to protect txs executed in parallel.
 	rMu      sync.Mutex
 	signer   types.Signer
 	state    *state.StateDB
-	tracer   *vm.StructLogger
 	blockCtx vm.BlockContext
 
 	// pMu lock is used to protect Proofs' read and write mutual exclusion,
@@ -93,11 +94,17 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 		return nil, err
 	}
 
+	// get coinbase
+	coinbase, err := api.backend.Engine().Author(block.Header())
+	if err != nil {
+		return nil, err
+	}
+
 	env := &traceEnv{
 		config:   config,
+		coinbase: coinbase,
 		signer:   types.MakeSigner(api.backend.ChainConfig(), block.Number()),
 		state:    statedb,
-		tracer:   vm.NewStructLogger(config.LogConfig),
 		blockCtx: core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil),
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    parent.Root(),
@@ -108,23 +115,18 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 		executionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
 	}
 
-	for _, coinbase := range []common.Address{block.Coinbase(), api.backend.Coinbase()} {
-		if coinbase == (common.Address{}) {
-			continue
+	key := coinbase.String()
+	if _, exist := env.Proofs[key]; !exist {
+		proof, err := env.state.GetProof(coinbase)
+		if err != nil {
+			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
+			// but we still mark the proofs map with nil array
 		}
-		key := coinbase.String()
-		if _, exist := env.Proofs[key]; !exist {
-			proof, err := env.state.GetProof(coinbase)
-			if err != nil {
-				log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
-				// but we still mark the proofs map with nil array
-			}
-			wrappedProof := make([]hexutil.Bytes, len(proof))
-			for i, bt := range proof {
-				wrappedProof[i] = bt
-			}
-			env.Proofs[key] = wrappedProof
+		wrappedProof := make([]hexutil.Bytes, len(proof))
+		for i, bt := range proof {
+			wrappedProof[i] = bt
 		}
+		env.Proofs[key] = wrappedProof
 	}
 	return env, nil
 }
@@ -148,7 +150,10 @@ func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockR
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
 				if err := api.getTxResult(env, task.statedb, task.index, block); err != nil {
-					errCh <- err
+					select {
+					case errCh <- err:
+					default:
+					}
 					log.Error("failed to trace tx", "txHash", txs[task.index].Hash().String())
 				}
 			}
@@ -218,12 +223,15 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			CodeHash: state.GetCodeHash(*to),
 		}
 	}
+
+	tracer := vm.NewStructLogger(env.config.LogConfig)
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: env.tracer, NoBaseFee: true})
+	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 	// Computes the new state by applying the given message.
 	env.rMu.Lock()
 	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 	if err != nil {
+		env.rMu.Unlock()
 		return fmt.Errorf("tracing failed: %w", err)
 	}
 	env.rMu.Unlock()
@@ -233,7 +241,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		returnVal = result.Revert()
 	}
 
-	createdAcc := env.tracer.CreatedAccount()
+	createdAcc := tracer.CreatedAccount()
 	var after []*types.AccountWrapper
 	if to == nil {
 		if createdAcc == nil {
@@ -242,7 +250,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		to = &createdAcc.Address
 	}
 	// collect affected account after tx being applied
-	for _, acc := range []common.Address{from, *to, api.backend.Coinbase()} {
+	for _, acc := range []common.Address{from, *to, env.coinbase} {
 		after = append(after, &types.AccountWrapper{
 			Address:  acc,
 			Nonce:    state.GetNonce(acc),
@@ -252,7 +260,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	}
 
 	// merge required proof data
-	proofAccounts := env.tracer.UpdatedAccounts()
+	proofAccounts := tracer.UpdatedAccounts()
 	for addr := range proofAccounts {
 		addrStr := addr.String()
 
@@ -276,31 +284,35 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		env.pMu.Unlock()
 	}
 
-	proofStorages := env.tracer.UpdatedStorages()
+	proofStorages := tracer.UpdatedStorages()
 	for addr, keys := range proofStorages {
 		for key := range keys {
 			addrStr := addr.String()
+			keyStr := key.String()
+
 			env.sMu.Lock()
 			m, existed := env.StorageProofs[addrStr]
 			if !existed {
 				m = make(map[string][]hexutil.Bytes)
 				env.StorageProofs[addrStr] = m
+			} else if _, existed := m[keyStr]; existed {
+				env.sMu.Unlock()
+				continue
 			}
 			env.sMu.Unlock()
 
-			keyStr := key.String()
-			if _, existed := m[keyStr]; !existed {
-				proof, err := state.GetStorageTrieProof(addr, key)
-				if err != nil {
-					log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
-					// but we still mark the proofs map with nil array
-				}
-				wrappedProof := make([]hexutil.Bytes, len(proof))
-				for i, bt := range proof {
-					wrappedProof[i] = bt
-				}
-				m[keyStr] = wrappedProof
+			proof, err := state.GetStorageTrieProof(addr, key)
+			if err != nil {
+				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
+				// but we still mark the proofs map with nil array
 			}
+			wrappedProof := make([]hexutil.Bytes, len(proof))
+			for i, bt := range proof {
+				wrappedProof[i] = bt
+			}
+			env.sMu.Lock()
+			m[keyStr] = wrappedProof
+			env.sMu.Unlock()
 		}
 	}
 
@@ -312,7 +324,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		Gas:            result.UsedGas,
 		Failed:         result.Failed(),
 		ReturnValue:    fmt.Sprintf("%x", returnVal),
-		StructLogs:     vm.FormatLogs(env.tracer.StructLogs()),
+		StructLogs:     vm.FormatLogs(tracer.StructLogs()),
 	}
 
 	return nil
@@ -323,10 +335,10 @@ func (api *API) fillBlockResult(env *traceEnv, block *types.Block) (*types.Block
 	statedb := env.state
 	txs := block.Transactions()
 	coinbase := types.AccountWrapper{
-		Address:  block.Coinbase(),
-		Nonce:    statedb.GetNonce(block.Coinbase()),
-		Balance:  (*hexutil.Big)(statedb.GetBalance(block.Coinbase())),
-		CodeHash: statedb.GetCodeHash(block.Coinbase()),
+		Address:  env.coinbase,
+		Nonce:    statedb.GetNonce(env.coinbase),
+		Balance:  (*hexutil.Big)(statedb.GetBalance(env.coinbase)),
+		CodeHash: statedb.GetCodeHash(env.coinbase),
 	}
 	blockResult := &types.BlockResult{
 		BlockTrace:       types.NewTraceBlock(api.backend.ChainConfig(), block, &coinbase),

@@ -28,7 +28,6 @@ type traceEnv struct {
 	coinbase common.Address
 
 	// rMu lock is used to protect txs executed in parallel.
-	rMu      sync.Mutex
 	signer   types.Signer
 	state    *state.StateDB
 	blockCtx vm.BlockContext
@@ -228,13 +227,10 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 	// Computes the new state by applying the given message.
-	env.rMu.Lock()
 	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 	if err != nil {
-		env.rMu.Unlock()
 		return fmt.Errorf("tracing failed: %w", err)
 	}
-	env.rMu.Unlock()
 	// If the result contains a revert reason, return it.
 	returnVal := result.Return()
 	if len(result.Revert()) > 0 {

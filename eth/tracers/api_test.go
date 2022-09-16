@@ -131,7 +131,7 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 }
 
 func (b *testBackend) CacheConfig() *core.CacheConfig {
-	return nil
+	return b.chain.CacheConfig()
 }
 
 func (b *testBackend) Engine() consensus.Engine {

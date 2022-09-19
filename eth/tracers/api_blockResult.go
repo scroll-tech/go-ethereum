@@ -343,7 +343,7 @@ func (api *API) fillBlockResult(env *traceEnv, block *types.Block) (*types.Block
 	}
 	for i, tx := range txs {
 		evmTrace := env.executionResults[i]
-		// Contract is called
+		// probably a Contract Call
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
 			// Get tx.to address's code hash.

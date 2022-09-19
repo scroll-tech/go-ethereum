@@ -238,8 +238,3 @@ func (miner *Miner) DisablePreseal() {
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
 }
-
-// Coinbase return coinbase address.
-func (miner *Miner) Coinbase() common.Address {
-	return miner.coinbase
-}

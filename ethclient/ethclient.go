@@ -325,7 +325,7 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 	return ec.c.EthSubscribe(ctx, ch, "newHeads")
 }
 
-// GetBlockResultByHash returns the blockResult by hash.
+// GetBlockResultByHash returns the BlockResult given the block hash.
 func (ec *Client) GetBlockResultByHash(ctx context.Context, blockHash common.Hash) (*types.BlockResult, error) {
 	blockResult := &types.BlockResult{}
 	return blockResult, ec.c.CallContext(ctx, &blockResult, "scr_getBlockResultByNumberOrHash", blockHash)

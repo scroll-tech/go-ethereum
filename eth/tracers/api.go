@@ -939,7 +939,7 @@ func APIs(backend Backend) []rpc.API {
 			Public:    false,
 		},
 		{
-			Namespace: "eth",
+			Namespace: "scr",
 			Version:   "1.0",
 			Service:   TraceBlock(NewAPI(backend)),
 			Public:    true,

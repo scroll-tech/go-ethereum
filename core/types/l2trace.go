@@ -60,7 +60,7 @@ type ExecutionResult struct {
 
 	// Record all accounts' state which would be affected AFTER tx executed
 	// currently they are just `from` and `to` account
-	AccountsAfter []*AccountWrapper `json:"accountAfter,omitempty"`
+	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
 	// `CodeHash` only exists when tx is a contract call.
 	CodeHash *common.Hash `json:"codeHash,omitempty"`

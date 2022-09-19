@@ -331,7 +331,7 @@ func (ec *Client) GetBlockResultByHash(ctx context.Context, blockHash common.Has
 	return blockResult, ec.c.CallContext(ctx, &blockResult, "scr_getBlockResultByNumberOrHash", blockHash)
 }
 
-// GetBlockResultByNumber return the blockResult by number.
+// GetBlockResultByNumber returns the BlockResult given the block number.
 func (ec *Client) GetBlockResultByNumber(ctx context.Context, number *big.Int) (*types.BlockResult, error) {
 	blockResult := &types.BlockResult{}
 	return blockResult, ec.c.CallContext(ctx, &blockResult, "scr_getBlockResultByNumberOrHash", toBlockNumArg(number))

@@ -204,8 +204,6 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		TxIndex:   index,
 		TxHash:    tx.Hash(),
 	}
-	// Call Prepare to clear out the statedb access list
-	state.Prepare(txctx.TxHash, txctx.TxIndex)
 
 	sender := &types.AccountWrapper{
 		Address:  from,
@@ -226,6 +224,10 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	tracer := vm.NewStructLogger(env.config.LogConfig)
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
+
+	// Call Prepare to clear out the statedb access list
+	state.Prepare(txctx.TxHash, txctx.TxIndex)
+
 	// Computes the new state by applying the given message.
 	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 	if err != nil {

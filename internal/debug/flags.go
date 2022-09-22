@@ -56,10 +56,6 @@ var (
 		Usage: "Request a stack trace at a specific logging statement (e.g. \"block.go:271\")",
 		Value: "",
 	}
-	debugFlag = cli.BoolFlag{
-		Name:  "log.debug",
-		Usage: "Prepends log messages with call-site location (file and line number)",
-	}
 	pprofFlag = cli.BoolFlag{
 		Name:  "pprof",
 		Usage: "Enable the pprof HTTP server",
@@ -105,7 +101,6 @@ var Flags = []cli.Flag{
 	vmoduleFlag,
 	logjsonFlag,
 	backtraceAtFlag,
-	debugFlag,
 	pprofFlag,
 	pprofAddrFlag,
 	pprofPortFlag,
@@ -161,11 +156,8 @@ func Setup(ctx *cli.Context) error {
 	vmodule := ctx.GlobalString(vmoduleFlag.Name)
 	glogger.Vmodule(vmodule)
 
-	debug := ctx.GlobalBool(debugFlag.Name)
-	if ctx.GlobalIsSet(debugFlag.Name) {
-		debug = ctx.GlobalBool(debugFlag.Name)
-	}
-	log.PrintOrigins(debug)
+	// show the call file and line number
+	log.PrintOrigins(true)
 
 	backtrace := ctx.GlobalString(backtraceAtFlag.Name)
 	glogger.BacktraceAt(backtrace)

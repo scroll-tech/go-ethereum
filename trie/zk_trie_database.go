@@ -1,14 +1,14 @@
 package trie
 
 import (
-	"github.com/syndtr/goleveldb/leveldb"
+	"math/big"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
-// TODO: we should refactor codes, so ZktrieDatabase and Database become two implementation of a
-// interface later, making codes less surprising..
-// ZktrieDatabase Database adaptor
+// ZktrieDatabase Database adaptor imple zktrie.ZktrieDatbase
 type ZktrieDatabase struct {
 	db     *Database
 	prefix []byte
@@ -25,7 +25,7 @@ func NewZktrieDatabaseFromTriedb(db *Database) *ZktrieDatabase {
 }
 
 // Put saves a key:value into the Storage
-func (l *ZktrieDatabase) Put(k, v []byte) error {
+func (l *ZktrieDatabase) put(k, v []byte) error {
 	l.db.lock.Lock()
 	l.db.rawDirties.Put(Concat(l.prefix, k[:]), v)
 	l.db.lock.Unlock()
@@ -33,7 +33,7 @@ func (l *ZktrieDatabase) Put(k, v []byte) error {
 }
 
 // Get retrieves a value from a key in the Storage
-func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
+func (l *ZktrieDatabase) get(key []byte) ([]byte, error) {
 	concatKey := Concat(l.prefix, key[:])
 	l.db.lock.RLock()
 	value, ok := l.db.rawDirties.Get(concatKey)
@@ -46,6 +46,16 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 		return nil, ErrNotFound
 	}
 	return v, err
+}
+
+func (l *ZktrieDatabase) updatePreimage(preimage []byte, hashField *big.Int) {
+	db := l.db
+	if db.preimages != nil { // Ugly direct check but avoids the below write lock
+		db.lock.Lock()
+		// we must copy the input key
+		db.insertPreimage(common.BytesToHash(hashField.Bytes()), common.CopyBytes(preimage))
+		db.lock.Unlock()
+	}
 }
 
 // Iterate implements the method Iterate of the interface Storage

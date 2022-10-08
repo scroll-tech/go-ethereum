@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/types/zktrie"
+	zktrie "github.com/scroll-tech/zktrie/types"
 )
 
 func TestAccountMarshalling(t *testing.T) {

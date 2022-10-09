@@ -1,6 +1,7 @@
 package trie
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -11,16 +12,118 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	zktrie "github.com/scroll-tech/zktrie/trie"
+	zkt "github.com/scroll-tech/zktrie/types"
 )
+
+// we do not need zktrie impl anymore, only made a wrapper for adapting testing
+type zkTrieImplTestWrapper struct {
+	*zktrie.ZkTrieImpl
+}
+
+func newZkTrieImpl(storage *ZktrieDatabase, maxLevels int) (*zkTrieImplTestWrapper, error) {
+	return newZkTrieImplWithRoot(storage, &zkt.HashZero, maxLevels)
+}
+
+// NewZkTrieImplWithRoot loads a new ZkTrieImpl. If in the storage already exists one
+// will open that one, if not, will create a new one.
+func newZkTrieImplWithRoot(storage *ZktrieDatabase, root *zkt.Hash, maxLevels int) (*zkTrieImplTestWrapper, error) {
+	impl, err := zktrie.NewZkTrieImplWithRoot(storage, root, maxLevels)
+	if err != nil {
+		return nil, err
+	}
+
+	return &zkTrieImplTestWrapper{impl}, nil
+}
+
+// Get returns the value for key stored in the trie.
+// The value bytes must not be modified by the caller.
+func (mt *zkTrieImplTestWrapper) Get(key []byte) []byte {
+	res, err := mt.TryGet(key)
+	if err != nil {
+		panic(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
+	return res
+}
+
+func (mt *zkTrieImplTestWrapper) TryGet(key []byte) ([]byte, error) {
+
+	kHash, err := zkt.NewHashFromBytes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return mt.ZkTrieImpl.TryGet(kHash)
+}
+
+// AddWord
+// Deprecated: Add a Bytes32 kv to ZkTrieImpl, only for testing
+func (mt *zkTrieImplTestWrapper) AddWord(kPreimage, vPreimage *zkt.Byte32) error {
+
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return err
+	}
+
+	if mt.Get(k.Bytes()) != nil {
+		return zktrie.ErrEntryIndexAlreadyExists
+	}
+
+	return mt.TryUpdate(k.Bytes(), vPreimage.Bytes())
+}
+
+// TryUpdateAccount will abstract the write of an account to the trie
+func (mt *zkTrieImplTestWrapper) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
+	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
+	if err != nil {
+		return err
+	}
+
+	value, flag := acc.MarshalFields()
+	return mt.ZkTrieImpl.TryUpdate(kHash, flag, value)
+}
+
+// The value bytes must not be modified by the caller while they are
+// stored in the trie.
+func (mt *zkTrieImplTestWrapper) Update(key, value []byte) {
+	if err := mt.TryUpdate(key, value); err != nil {
+		panic(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
+}
+
+// NOTE: value is restricted to length of bytes32.
+func (mt *zkTrieImplTestWrapper) TryUpdate(key, value []byte) error {
+	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
+	if err != nil {
+		return err
+	}
+	vPreimage := zkt.NewByte32FromBytesPaddingZero(value)
+	return mt.ZkTrieImpl.TryUpdate(kHash, 1, []zkt.Byte32{*vPreimage})
+}
+
+// TryDelete removes any existing value for key from the trie.
+// If a node was not found in the database, a MissingNodeError is returned.
+func (mt *zkTrieImplTestWrapper) TryDelete(key []byte) error {
+	kHash, err := zkt.NewHashFromBytes(key)
+	if err != nil {
+		return err
+	}
+
+	return mt.ZkTrieImpl.TryDelete(kHash)
+}
+
+// NewHashFromHex returns a *Hash representation of the given hex string
+func NewHashFromHex(h string) (*zkt.Hash, error) {
+	return zkt.NewHashFromBytes(common.FromHex(h))
+}
 
 type Fatalable interface {
 	Fatal(args ...interface{})
 }
 
-func newTestingMerkle(f Fatalable, numLevels int) *ZkTrieImpl {
-	mt, err := NewZkTrieImpl(NewZktrieDatabase((memorydb.New())), numLevels)
+func newTestingMerkle(f Fatalable, numLevels int) *zkTrieImplTestWrapper {
+	mt, err := newZkTrieImpl(NewZktrieDatabase((memorydb.New())), numLevels)
 	if err != nil {
 		f.Fatal(err)
 		return nil
@@ -56,10 +159,10 @@ func TestHashParsers(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, b.String(), b2.BigInt().String())
 
-	h2, err := zkt.NewHashFromHex(h.Hex())
+	h2, err := NewHashFromHex(h.Hex())
 	assert.Nil(t, err)
 	assert.Equal(t, h, h2)
-	_, err = zkt.NewHashFromHex("0x12")
+	_, err = NewHashFromHex("0x12")
 	assert.NotNil(t, err)
 
 	// check limits
@@ -78,7 +181,7 @@ func testHashParsers(t *testing.T, a *big.Int) {
 	assert.Equal(t, h, hFromBytes)
 	assert.Equal(t, a, hFromBytes.BigInt())
 	assert.Equal(t, a.String(), hFromBytes.BigInt().String())
-	hFromHex, err := zkt.NewHashFromHex(h.Hex())
+	hFromHex, err := NewHashFromHex(h.Hex())
 	assert.Nil(t, err)
 	assert.Equal(t, h, hFromHex)
 
@@ -97,7 +200,7 @@ func TestMerkleTree_AddUpdateGetWord(t *testing.T) {
 	err = mt.AddWord(&zkt.Byte32{5}, &zkt.Byte32{6})
 	assert.Nil(t, err)
 	err = mt.AddWord(&zkt.Byte32{5}, &zkt.Byte32{7})
-	assert.Equal(t, ErrEntryIndexAlreadyExists, err)
+	assert.Equal(t, zktrie.ErrEntryIndexAlreadyExists, err)
 
 	node, err := mt.GetLeafNodeByWord(&zkt.Byte32{1})
 	assert.Nil(t, err)
@@ -132,7 +235,7 @@ func TestMerkleTree_AddUpdateGetWord(t *testing.T) {
 	assert.Equal(t, len(node.ValuePreimage), 1)
 	assert.Equal(t, (&zkt.Byte32{9})[:], node.ValuePreimage[0][:])
 	_, err = mt.GetLeafNodeByWord(&zkt.Byte32{100})
-	assert.Equal(t, ErrKeyNotFound, err)
+	assert.Equal(t, zktrie.ErrKeyNotFound, err)
 }
 
 func TestMerkleTree_UpdateAccount(t *testing.T) {

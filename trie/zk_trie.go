@@ -181,5 +181,44 @@ func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter)
 
 	// we put this special kv pair in db so we can distinguish the type and
 	// make suitable Proof
-	return proofDb.Put(magicHash, magicSMTBytes)
+	return proofDb.Put(magicHash, zktrie.ProofMagicBytes())
+}
+
+// VerifyProof checks merkle proofs. The given proof must contain the value for
+// key in a trie with the given root hash. VerifyProof returns an error if the
+// proof contains invalid trie nodes or the wrong value.
+func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
+
+	h, err := zkt.NewHashFromBytes(rootHash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	word := zkt.NewByte32FromBytesPaddingZero(key)
+	k, err := word.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	proof, n, err := zktrie.BuildZkTrieProof(h, k, len(key)*8, func(key *zkt.Hash) (*zktrie.Node, error) {
+		buf, _ := proofDb.Get(key[:])
+		if buf == nil {
+			return nil, zktrie.ErrKeyNotFound
+		}
+		n, err := zktrie.NewNodeFromBytes(buf)
+		return n, err
+	})
+
+	if err != nil {
+		// do not contain the key
+		return nil, err
+	} else if !proof.Existence {
+		return nil, nil
+	}
+
+	if zktrie.VerifyProofZkTrie(h, proof, n) {
+		return n.Data(), nil
+	} else {
+		return nil, fmt.Errorf("bad proof node %v", proof)
+	}
 }

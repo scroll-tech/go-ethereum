@@ -21,6 +21,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	zktrie "github.com/scroll-tech/zktrie/trie"
@@ -31,6 +32,10 @@ import (
 type ZkTrie struct {
 	*zktrie.ZkTrie
 	db *ZktrieDatabase
+}
+
+func init() {
+	zkt.InitHashScheme(poseidon.HashFixed)
 }
 
 // NewSecure creates a trie
@@ -173,7 +178,7 @@ func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter)
 				//return fmt.Errorf("key preimage not found for [%x] ref %x", n.NodeKey.Bytes(), k.Bytes())
 			}
 		}
-		return proofDb.Put(key.Bytes(), n.Value())
+		return proofDb.Put(key[:], n.Value())
 	})
 	if err != nil {
 		return err

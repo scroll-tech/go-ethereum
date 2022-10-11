@@ -25,7 +25,7 @@ func NewZktrieDatabaseFromTriedb(db *Database) *ZktrieDatabase {
 }
 
 // Put saves a key:value into the Storage
-func (l *ZktrieDatabase) put(k, v []byte) error {
+func (l *ZktrieDatabase) Put(k, v []byte) error {
 	l.db.lock.Lock()
 	l.db.rawDirties.Put(Concat(l.prefix, k[:]), v)
 	l.db.lock.Unlock()
@@ -33,7 +33,7 @@ func (l *ZktrieDatabase) put(k, v []byte) error {
 }
 
 // Get retrieves a value from a key in the Storage
-func (l *ZktrieDatabase) get(key []byte) ([]byte, error) {
+func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 	concatKey := Concat(l.prefix, key[:])
 	l.db.lock.RLock()
 	value, ok := l.db.rawDirties.Get(concatKey)
@@ -48,7 +48,7 @@ func (l *ZktrieDatabase) get(key []byte) ([]byte, error) {
 	return v, err
 }
 
-func (l *ZktrieDatabase) updatePreimage(preimage []byte, hashField *big.Int) {
+func (l *ZktrieDatabase) UpdatePreimage(preimage []byte, hashField *big.Int) {
 	db := l.db
 	if db.preimages != nil { // Ugly direct check but avoids the below write lock
 		db.lock.Lock()

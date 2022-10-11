@@ -49,7 +49,7 @@ func (mt *zkTrieImplTestWrapper) Get(key []byte) []byte {
 
 func (mt *zkTrieImplTestWrapper) TryGet(key []byte) ([]byte, error) {
 
-	kHash, err := zkt.NewHashFromBytes(key)
+	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func TestHashParsers(t *testing.T) {
 	h := zkt.NewHashFromBigInt(b)
 	assert.Equal(t, "4932297968297298434239270129193057052722409868268166443802652458940273154854", h.BigInt().String()) //nolint:lll
 	assert.Equal(t, "49322979...", h.String())
-	assert.Equal(t, "265baaf161e875c372d08e50f52abddc01d32efc93e90290bb8b3d9ceb94e70a", h.Hex())
+	assert.Equal(t, "0ae794eb9c3d8bbb9002e993fc2ed301dcbd2af5508ed072c375e861f1aa5b26", h.Hex())
 
 	b1, err := zkt.NewBigIntFromHashBytes(b.Bytes())
 	assert.Nil(t, err)

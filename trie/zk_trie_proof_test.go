@@ -25,9 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	zkt "github.com/scroll-tech/zktrie/types"
 )
 
 func init() {
@@ -36,7 +36,7 @@ func init() {
 
 // makeProvers creates Merkle trie provers based on different implementations to
 // test all variations.
-func makeSMTProvers(mt *ZkTrieImpl) []func(key []byte) *memorydb.Database {
+func makeSMTProvers(mt *ZkTrie) []func(key []byte) *memorydb.Database {
 	var provers []func(key []byte) *memorydb.Database
 
 	// Create a direct trie based Merkle prover
@@ -47,7 +47,11 @@ func makeSMTProvers(mt *ZkTrieImpl) []func(key []byte) *memorydb.Database {
 			panic(err)
 		}
 		proof := memorydb.New()
-		mt.Prove(k.Bytes(), 0, proof)
+		err = mt.Prove(common.BytesToHash(k.Bytes()).Bytes(), 0, proof)
+		if err != nil {
+			panic(err)
+		}
+
 		return proof
 	})
 	return provers
@@ -58,13 +62,14 @@ func verifyValue(proveVal []byte, vPreimage []byte) bool {
 }
 
 func TestSMTOneElementProof(t *testing.T) {
-	mt, _ := NewZkTrieImpl(NewZktrieDatabase((memorydb.New())), 64)
+	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase((memorydb.New())))
+	mt := tr.Tree()
 	err := mt.UpdateWord(
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)),
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32)),
 	)
 	assert.Nil(t, err)
-	for i, prover := range makeSMTProvers(mt) {
+	for i, prover := range makeSMTProvers(tr) {
 		keyBytes := bytes.Repeat([]byte("k"), 32)
 		proof := prover(keyBytes)
 		if proof == nil {
@@ -85,7 +90,7 @@ func TestSMTOneElementProof(t *testing.T) {
 
 func TestSMTProof(t *testing.T) {
 	mt, vals := randomZktrie(t, 500)
-	root := mt.Root()
+	root := mt.Tree().Root()
 	for i, prover := range makeSMTProvers(mt) {
 		for _, kv := range vals {
 			proof := prover(kv.k)
@@ -105,7 +110,7 @@ func TestSMTProof(t *testing.T) {
 
 func TestSMTBadProof(t *testing.T) {
 	mt, vals := randomZktrie(t, 500)
-	root := mt.Root()
+	root := mt.Tree().Root()
 	for i, prover := range makeSMTProvers(mt) {
 		for _, kv := range vals {
 			proof := prover(kv.k)
@@ -134,14 +139,15 @@ func TestSMTBadProof(t *testing.T) {
 // Tests that missing keys can also be proven. The test explicitly uses a single
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
-	mt, _ := NewZkTrieImpl(NewZktrieDatabase((memorydb.New())), 64)
+	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase((memorydb.New())))
+	mt := tr.Tree()
 	err := mt.UpdateWord(
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 20)),
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 20)),
 	)
 	assert.Nil(t, err)
 
-	prover := makeSMTProvers(mt)[0]
+	prover := makeSMTProvers(tr)[0]
 
 	for i, key := range []string{"a", "j", "l", "z"} {
 		keyBytes := bytes.Repeat([]byte(key), 32)
@@ -160,11 +166,12 @@ func TestSMTMissingKeyProof(t *testing.T) {
 	}
 }
 
-func randomZktrie(t *testing.T, n int) (*ZkTrieImpl, map[string]*kv) {
-	mt, err := NewZkTrieImpl(NewZktrieDatabase((memorydb.New())), 64)
+func randomZktrie(t *testing.T, n int) (*ZkTrie, map[string]*kv) {
+	tr, err := NewZkTrie(common.Hash{}, NewZktrieDatabase((memorydb.New())))
 	if err != nil {
 		panic(err)
 	}
+	mt := tr.Tree()
 	vals := make(map[string]*kv)
 	for i := byte(0); i < 100; i++ {
 
@@ -185,5 +192,5 @@ func randomZktrie(t *testing.T, n int) (*ZkTrieImpl, map[string]*kv) {
 		vals[string(value.k)] = value
 	}
 
-	return mt, vals
+	return tr, vals
 }

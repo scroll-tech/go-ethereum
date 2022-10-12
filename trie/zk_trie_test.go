@@ -24,9 +24,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	zkt "github.com/scroll-tech/zktrie/types"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	zkt "github.com/scroll-tech/zktrie/types"
 )
 
 func newEmptyZkTrie() *ZkTrie {

@@ -24,6 +24,8 @@ import (
 	"sort"
 	"time"
 
+	zkt "github.com/scroll-tech/zktrie/types"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state/snapshot"
@@ -34,7 +36,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/trie"
-	zkt "github.com/scroll-tech/zktrie/types"
 )
 
 type revision struct {

@@ -3,9 +3,10 @@ package trie
 import (
 	"math/big"
 
+	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // ZktrieDatabase Database adaptor imple zktrie.ZktrieDatbase

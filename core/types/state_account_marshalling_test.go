@@ -4,8 +4,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/scroll-tech/go-ethereum/common"
 	zktrie "github.com/scroll-tech/zktrie/types"
+
+	"github.com/scroll-tech/go-ethereum/common"
 )
 
 func TestAccountMarshalling(t *testing.T) {

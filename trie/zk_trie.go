@@ -28,6 +28,8 @@ import (
 	zkt "github.com/scroll-tech/zktrie/types"
 )
 
+var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
+
 // wrap zktrie for trie interface
 type ZkTrie struct {
 	*zktrie.ZkTrie
@@ -36,6 +38,12 @@ type ZkTrie struct {
 
 func init() {
 	zkt.InitHashScheme(poseidon.HashFixed)
+}
+
+func santiyCheckByte32Key(b []byte) {
+	if len(b) != 32 && len(b) != 20 {
+		panic(fmt.Errorf("do not support length except for 120bit and 256bit now. data: %v len: %v", b, len(b)))
+	}
 }
 
 // NewSecure creates a trie
@@ -52,6 +60,7 @@ func NewZkTrie(root common.Hash, db *ZktrieDatabase) (*ZkTrie, error) {
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 func (t *ZkTrie) Get(key []byte) []byte {
+	santiyCheckByte32Key(key)
 	res, err := t.TryGet(key)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
@@ -62,6 +71,7 @@ func (t *ZkTrie) Get(key []byte) []byte {
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *ZkTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
+	santiyCheckByte32Key(key)
 	value, flag := acc.MarshalFields()
 	return t.ZkTrie.TryUpdate(key, flag, value)
 }
@@ -81,11 +91,13 @@ func (t *ZkTrie) Update(key, value []byte) {
 // NOTE: value is restricted to length of bytes32.
 // we override the underlying zktrie's TryUpdate method
 func (t *ZkTrie) TryUpdate(key, value []byte) error {
+	santiyCheckByte32Key(key)
 	return t.ZkTrie.TryUpdate(key, 1, []zkt.Byte32{*zkt.NewByte32FromBytes(value)})
 }
 
 // Delete removes any existing value for key from the trie.
 func (t *ZkTrie) Delete(key []byte) {
+	santiyCheckByte32Key(key)
 	if err := t.TryDelete(key); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
@@ -125,11 +137,7 @@ func (t *ZkTrie) Hash() common.Hash {
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *ZkTrie) Copy() *ZkTrie {
-	cpy, err := zktrie.NewZkTrie(*zkt.NewByte32FromBytes(t.ZkTrie.Hash()), t.db)
-	if err != nil {
-		panic("clone trie failed")
-	}
-	return &ZkTrie{cpy, t.db}
+	return &ZkTrie{t.ZkTrie.Copy(), t.db}
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
@@ -194,13 +202,8 @@ func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter)
 // proof contains invalid trie nodes or the wrong value.
 func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
 
-	h, err := zkt.NewHashFromBytes(rootHash.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	word := zkt.NewByte32FromBytesPaddingZero(key)
-	k, err := word.Hash()
+	h := zkt.NewHashFromBytes(rootHash.Bytes())
+	k, err := zkt.ToSecureKey(key)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package trie
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -37,26 +36,6 @@ func newZkTrieImplWithRoot(storage *ZktrieDatabase, root *zkt.Hash, maxLevels in
 	return &zkTrieImplTestWrapper{impl}, nil
 }
 
-// Get returns the value for key stored in the trie.
-// The value bytes must not be modified by the caller.
-func (mt *zkTrieImplTestWrapper) Get(key []byte) []byte {
-	res, err := mt.TryGet(key)
-	if err != nil {
-		panic(fmt.Sprintf("Unhandled trie error: %v", err))
-	}
-	return res
-}
-
-func (mt *zkTrieImplTestWrapper) TryGet(key []byte) ([]byte, error) {
-
-	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	return mt.ZkTrieImpl.TryGet(kHash)
-}
-
 // AddWord
 // Deprecated: Add a Bytes32 kv to ZkTrieImpl, only for testing
 func (mt *zkTrieImplTestWrapper) AddWord(kPreimage, vPreimage *zkt.Byte32) error {
@@ -66,56 +45,55 @@ func (mt *zkTrieImplTestWrapper) AddWord(kPreimage, vPreimage *zkt.Byte32) error
 		return err
 	}
 
-	if mt.Get(k.Bytes()) != nil {
+	if v, _ := mt.TryGet(k.Bytes()); v != nil {
 		return zktrie.ErrEntryIndexAlreadyExists
 	}
 
-	return mt.TryUpdate(k.Bytes(), vPreimage.Bytes())
+	return mt.ZkTrieImpl.TryUpdate(zkt.NewHashFromBigInt(k), 1, []zkt.Byte32{*vPreimage})
+}
+
+// GetLeafNodeByWord
+// Deprecated: Get a Bytes32 kv to ZkTrieImpl, only for testing
+func (mt *zkTrieImplTestWrapper) GetLeafNodeByWord(kPreimage *zkt.Byte32) (*zktrie.Node, error) {
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return nil, err
+	}
+	return mt.ZkTrieImpl.GetLeafNode(zkt.NewHashFromBigInt(k))
+}
+
+// Deprecated: only for testing
+func (mt *zkTrieImplTestWrapper) UpdateWord(kPreimage, vPreimage *zkt.Byte32) error {
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return err
+	}
+
+	return mt.ZkTrieImpl.TryUpdate(zkt.NewHashFromBigInt(k), 1, []zkt.Byte32{*vPreimage})
+}
+
+// Deprecated: only for testing
+func (mt *zkTrieImplTestWrapper) DeleteWord(kPreimage *zkt.Byte32) error {
+	k, err := kPreimage.Hash()
+	if err != nil {
+		return err
+	}
+	return mt.ZkTrieImpl.TryDelete(zkt.NewHashFromBigInt(k))
+}
+
+func (mt *zkTrieImplTestWrapper) TryGet(key []byte) ([]byte, error) {
+	return mt.ZkTrieImpl.TryGet(zkt.NewHashFromBytes(key))
 }
 
 // TryUpdateAccount will abstract the write of an account to the trie
 func (mt *zkTrieImplTestWrapper) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
-	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
-	if err != nil {
-		return err
-	}
-
 	value, flag := acc.MarshalFields()
-	return mt.ZkTrieImpl.TryUpdate(kHash, flag, value)
-}
-
-// The value bytes must not be modified by the caller while they are
-// stored in the trie.
-func (mt *zkTrieImplTestWrapper) Update(key, value []byte) {
-	if err := mt.TryUpdate(key, value); err != nil {
-		panic(fmt.Sprintf("Unhandled trie error: %v", err))
-	}
-}
-
-// NOTE: value is restricted to length of bytes32.
-func (mt *zkTrieImplTestWrapper) TryUpdate(key, value []byte) error {
-	kHash, err := zkt.NewHashFromBytes(common.BytesToHash(key).Bytes())
-	if err != nil {
-		return err
-	}
-	vPreimage := zkt.NewByte32FromBytesPaddingZero(value)
-	return mt.ZkTrieImpl.TryUpdate(kHash, 1, []zkt.Byte32{*vPreimage})
-}
-
-// TryDelete removes any existing value for key from the trie.
-// If a node was not found in the database, a MissingNodeError is returned.
-func (mt *zkTrieImplTestWrapper) TryDelete(key []byte) error {
-	kHash, err := zkt.NewHashFromBytes(key)
-	if err != nil {
-		return err
-	}
-
-	return mt.ZkTrieImpl.TryDelete(kHash)
+	return mt.ZkTrieImpl.TryUpdate(zkt.NewHashFromBytes(key), flag, value)
 }
 
 // NewHashFromHex returns a *Hash representation of the given hex string
 func NewHashFromHex(h string) (*zkt.Hash, error) {
-	return zkt.NewHashFromBytes(common.FromHex(h))
+	return zkt.NewHashFromCheckedBytes(common.FromHex(h))
 }
 
 type Fatalable interface {
@@ -155,7 +133,7 @@ func TestHashParsers(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, new(big.Int).SetBytes(b.Bytes()).String(), b1.String())
 
-	b2, err := zkt.NewHashFromBytes(b.Bytes())
+	b2, err := zkt.NewHashFromCheckedBytes(b.Bytes())
 	assert.Nil(t, err)
 	assert.Equal(t, b.String(), b2.BigInt().String())
 
@@ -176,7 +154,7 @@ func testHashParsers(t *testing.T, a *big.Int) {
 	require.True(t, cryptoUtils.CheckBigIntInField(a))
 	h := zkt.NewHashFromBigInt(a)
 	assert.Equal(t, a, h.BigInt())
-	hFromBytes, err := zkt.NewHashFromBytes(h.Bytes())
+	hFromBytes, err := zkt.NewHashFromCheckedBytes(h.Bytes())
 	assert.Nil(t, err)
 	assert.Equal(t, h, hFromBytes)
 	assert.Equal(t, a, hFromBytes.BigInt())

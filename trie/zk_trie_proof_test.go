@@ -63,7 +63,7 @@ func verifyValue(proveVal []byte, vPreimage []byte) bool {
 
 func TestSMTOneElementProof(t *testing.T) {
 	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase((memorydb.New())))
-	mt := tr.Tree()
+	mt := &zkTrieImplTestWrapper{tr.Tree()}
 	err := mt.UpdateWord(
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)),
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32)),
@@ -140,7 +140,7 @@ func TestSMTBadProof(t *testing.T) {
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
 	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase((memorydb.New())))
-	mt := tr.Tree()
+	mt := &zkTrieImplTestWrapper{tr.Tree()}
 	err := mt.UpdateWord(
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 20)),
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 20)),
@@ -171,7 +171,7 @@ func randomZktrie(t *testing.T, n int) (*ZkTrie, map[string]*kv) {
 	if err != nil {
 		panic(err)
 	}
-	mt := tr.Tree()
+	mt := &zkTrieImplTestWrapper{tr.Tree()}
 	vals := make(map[string]*kv)
 	for i := byte(0); i < 100; i++ {
 

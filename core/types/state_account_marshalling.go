@@ -56,10 +56,7 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 		return nil, err
 	}
 
-	rootHash, err := zkt.NewHashFromBytes(s.Root.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	rootHash := zkt.NewHashFromBytes(s.Root.Bytes())
 	hash3, err := poseidon.Hash([]*big.Int{hash2, rootHash.BigInt()})
 	if err != nil {
 		return nil, err

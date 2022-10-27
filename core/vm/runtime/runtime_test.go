@@ -106,6 +106,26 @@ func TestDifficulty(t *testing.T) {
 	}
 }
 
+func TestCoinbase(t *testing.T) {
+	ret, _, err := Execute([]byte{
+		byte(vm.COINBASE),
+		byte(vm.PUSH1), 0,
+		byte(vm.MSTORE),
+		byte(vm.PUSH1), 32,
+		byte(vm.PUSH1), 0,
+		byte(vm.RETURN),
+	}, nil, &Config{Coinbase: common.HexToAddress("0x0000000000000000000000000000000000000001")})
+
+	if err != nil {
+		t.Fatal("didn't expect error", err)
+	}
+
+	addr := common.BytesToAddress(ret)
+	if addr != (common.Address{}) {
+		t.Error("Expected null address, got", addr)
+	}
+}
+
 func TestExecute(t *testing.T) {
 	ret, _, err := Execute([]byte{
 		byte(vm.PUSH1), 10,

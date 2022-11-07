@@ -64,8 +64,9 @@ func (s *Suite) dial() (*Conn, error) {
 	conn.caps = []p2p.Cap{
 		{Name: "eth", Version: 66},
 		{Name: "eth", Version: 67},
+		{Name: "eth", Version: 68},
 	}
-	conn.ourHighestProtoVersion = 67
+	conn.ourHighestProtoVersion = 68
 	return &conn, nil
 }
 
@@ -249,15 +250,6 @@ func (c *Conn) headersRequest(request *GetBlockHeaders, chain *Chain, reqID uint
 	return headers, nil
 }
 
-func (c *Conn) snapRequest(msg Message, id uint64, chain *Chain) (Message, error) {
-	defer c.SetReadDeadline(time.Time{})
-	c.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if err := c.Write(msg); err != nil {
-		return nil, fmt.Errorf("could not write to connection: %v", err)
-	}
-	return c.ReadSnap(id)
-}
-
 // headersMatch returns whether the received headers match the given request
 func headersMatch(expected []*types.Header, headers []*types.Header) bool {
 	return reflect.DeepEqual(expected, headers)
@@ -337,9 +329,15 @@ func (s *Suite) waitAnnounce(conn *Conn, blockAnnouncement *NewBlock) error {
 				return fmt.Errorf("wrong block hash in announcement: expected %v, got %v", blockAnnouncement.Block.Hash(), hashes[0].Hash)
 			}
 			return nil
-		case *NewPooledTransactionHashes:
-			// ignore tx announcements from previous tests
+
+		// ignore tx announcements from previous tests
+		case *NewPooledTransactionHashes66:
 			continue
+		case *NewPooledTransactionHashes:
+			continue
+		case *Transactions:
+			continue
+
 		default:
 			return fmt.Errorf("unexpected: %s", pretty.Sdump(msg))
 		}

@@ -19,7 +19,6 @@ package trie
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -154,15 +153,12 @@ func TestZkTrieConcurrency(t *testing.T) {
 	pend.Wait()
 }
 
-func tempDBZK() (string, *Database) {
+func tempDBZK(b *testing.B) (string, *Database) {
 	dir, err := ioutil.TempDir("", "zktrie-bench")
-	if err != nil {
-		panic(fmt.Sprintf("can't create temporary directory: %v", err))
-	}
+	assert.NoError(b, err)
+
 	diskdb, err := leveldb.New(dir, 256, 0, "", false)
-	if err != nil {
-		panic(fmt.Sprintf("can't create temporary database: %v", err))
-	}
+	assert.NoError(b, err)
 	config := &Config{Cache: 256, Preimages: true, Zktrie: true}
 	return dir, NewDatabaseWithConfig(diskdb, config)
 }
@@ -170,17 +166,20 @@ func tempDBZK() (string, *Database) {
 const benchElemCountZk = 10000
 
 func BenchmarkZkTrieGet(b *testing.B) {
-	_, tmpdb := tempDBZK()
+	_, tmpdb := tempDBZK(b)
 	zkTrie, _ := NewZkTrie(common.Hash{}, NewZktrieDatabaseFromTriedb(tmpdb))
+	defer func() {
+		ldb := zkTrie.db.db.diskdb.(*leveldb.Database)
+		ldb.Close()
+		os.RemoveAll(ldb.Path())
+	}()
+
 	k := make([]byte, 32)
 	for i := 0; i < benchElemCountZk; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
 
 		err := zkTrie.TryUpdate(k, k)
-		if err != nil {
-			b.Error("TryUpdate error")
-			b.FailNow()
-		}
+		assert.NoError(b, err)
 	}
 
 	zkTrie.db.db.Commit(common.Hash{}, true, nil)
@@ -188,30 +187,28 @@ func BenchmarkZkTrieGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
 		_, err := zkTrie.TryGet(k)
-		if err != nil {
-			b.Error("TryGet fail")
-			b.FailNow()
-		}
+		assert.NoError(b, err)
 	}
 	b.StopTimer()
-
-	ldb := zkTrie.db.db.diskdb.(*leveldb.Database)
-	ldb.Close()
-	os.RemoveAll(ldb.Path())
 }
 
 func BenchmarkZkTrieUpdate(b *testing.B) {
-	_, tmpdb := tempDBZK()
+	_, tmpdb := tempDBZK(b)
 	zkTrie, _ := NewZkTrie(common.Hash{}, NewZktrieDatabaseFromTriedb(tmpdb))
+	defer func() {
+		ldb := zkTrie.db.db.diskdb.(*leveldb.Database)
+		ldb.Close()
+		os.RemoveAll(ldb.Path())
+	}()
+
 	k := make([]byte, 32)
 	v := make([]byte, 32)
 	b.ReportAllocs()
 
 	for i := 0; i < benchElemCountZk; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
-		if err := zkTrie.TryUpdate(k, k); err != nil {
-			b.FailNow()
-		}
+		err := zkTrie.TryUpdate(k, k)
+		assert.NoError(b, err)
 	}
 	binary.LittleEndian.PutUint64(k, benchElemCountZk/2)
 
@@ -221,12 +218,8 @@ func BenchmarkZkTrieUpdate(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
 		binary.LittleEndian.PutUint64(v, 0xffffffff+uint64(i))
-		if err := zkTrie.TryUpdate(k, v); err != nil {
-			b.FailNow()
-		}
+		err := zkTrie.TryUpdate(k, v)
+		assert.NoError(b, err)
 	}
 	b.StopTimer()
-	ldb := zkTrie.db.db.diskdb.(*leveldb.Database)
-	ldb.Close()
-	os.RemoveAll(ldb.Path())
 }

@@ -42,6 +42,7 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 	if ok {
 		return value, nil
 	}
+
 	if l.db.cleans != nil {
 		if enc := l.db.cleans.Get(nil, concatKey); enc != nil {
 			memcacheCleanHitMeter.Mark(1)
@@ -49,6 +50,7 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 			return enc, nil
 		}
 	}
+
 	v, err := l.db.diskdb.Get(concatKey)
 	if err == leveldb.ErrNotFound {
 		return nil, ErrNotFound

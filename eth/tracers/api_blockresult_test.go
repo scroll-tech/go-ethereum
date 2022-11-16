@@ -131,7 +131,7 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 
 	storageProof := blockResult.StorageTrace.StorageProofs
 	for _, tx := range blockResult.BlockTrace.Transactions {
-		for _, addr := range []common.Address{tx.From, *tx.To} {
+		for _, addr := range []common.Address{tx.From, *tx.TxContent.To()} {
 			// verify proofs
 			if data2, ok := storgeTrace.Proofs[addr.String()]; ok {
 				data1, err := statedb.GetProof(addr)
@@ -154,8 +154,8 @@ func checkTxs(t *testing.T, expect []*types.Transaction, actual []*types.Transac
 	assert.Equal(t, len(expect), len(actual))
 	for i := range expect {
 		eTx, aTx := expect[i], actual[i]
-		assert.Equal(t, eTx.Hash().String(), aTx.TxHash)
-		assert.Equal(t, eTx.Gas(), aTx.Gas)
+		assert.Equal(t, eTx.Hash().String(), aTx.TxContent.Hash())
+		assert.Equal(t, eTx.Gas(), aTx.TxContent.Gas())
 	}
 }
 

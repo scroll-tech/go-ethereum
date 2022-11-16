@@ -10,6 +10,7 @@ import (
 
 type BlockTrace struct {
 	Number       *hexutil.Big        `json:"number"`
+	Header       *Header             `json:"header"`
 	Hash         common.Hash         `json:"hash"`
 	GasLimit     uint64              `json:"gasLimit"`
 	Difficulty   *hexutil.Big        `json:"difficulty"`
@@ -35,6 +36,7 @@ func NewTraceBlock(config *params.ChainConfig, block *Block, coinbase *AccountWr
 
 	return &BlockTrace{
 		Number:       (*hexutil.Big)(block.Number()),
+		Header:       block.Header(),
 		Hash:         block.Hash(),
 		GasLimit:     block.GasLimit(),
 		Difficulty:   (*hexutil.Big)(block.Difficulty()),

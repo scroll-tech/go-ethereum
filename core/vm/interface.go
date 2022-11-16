@@ -55,6 +55,9 @@ type StateDB interface {
 	GetProofByHash(addrHash common.Hash) ([][]byte, error)
 	GetStorageProof(a common.Address, key common.Hash) ([][]byte, error)
 
+	GetTransientState(addr common.Address, key common.Hash) common.Hash
+	SetTransientState(addr common.Address, key, value common.Hash)
+
 	Suicide(common.Address) bool
 	HasSuicided(common.Address) bool
 
@@ -74,6 +77,7 @@ type StateDB interface {
 	// AddSlotToAccessList adds the given (address,slot) to the access list. This operation is safe to perform
 	// even if the feature/fork is not active yet
 	AddSlotToAccessList(addr common.Address, slot common.Hash)
+	Prepare(rules params.Rules, sender common.Address, dest *common.Address, precompiles []common.Address, txAccesses types.AccessList)
 
 	RevertToSnapshot(int)
 	Snapshot() int

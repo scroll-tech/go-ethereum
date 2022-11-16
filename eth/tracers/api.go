@@ -649,7 +649,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer, block.BaseFee())
-		statedb.Prepare(tx.Hash(), i)
+		statedb.SetTxContext(tx.Hash(), i)
 		vmenv := vm.NewEVM(blockCtx, core.NewEVMTxContext(msg), statedb, api.backend.ChainConfig(), vm.Config{})
 		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 		if err != nil {

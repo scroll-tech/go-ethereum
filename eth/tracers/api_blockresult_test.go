@@ -100,7 +100,7 @@ func TestAPI_GetBlockResultByNumberOrHash(t *testing.T) {
 	checkChainAndProof(t, backend, parent, block, blockResult)
 
 	// check txs.
-	checkTxs(t, block.Transactions(), blockResult.BlockTrace.Transactions)
+	checkTxs(t, block.Transactions(), blockResult.Transactions)
 
 	txTraces, err := api.TraceBlockByNumber(context.Background(), 2, nil)
 	assert.NoError(t, err)
@@ -109,7 +109,7 @@ func TestAPI_GetBlockResultByNumberOrHash(t *testing.T) {
 	checkStructLogs(t, txTraces, blockResult.ExecutionResults)
 
 	// check coinbase
-	checkCoinbase(t, backend, blockResult.BlockTrace.Coinbase)
+	checkCoinbase(t, backend, blockResult.Coinbase)
 }
 
 func verifyProof(t *testing.T, expect [][]byte, actual []hexutil.Bytes) {
@@ -120,7 +120,7 @@ func verifyProof(t *testing.T, expect [][]byte, actual []hexutil.Bytes) {
 	}
 }
 
-func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block *types.Block, blockResult *types.BlockResult) {
+func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block *types.Block, blockResult *types.BlockTrace) {
 	assert.Equal(t, parent.Hash(), block.ParentHash())
 	storgeTrace := blockResult.StorageTrace
 	assert.Equal(t, parent.Root().String(), storgeTrace.RootBefore.String())
@@ -130,8 +130,8 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 	assert.NoError(t, err)
 
 	storageProof := blockResult.StorageTrace.StorageProofs
-	for _, tx := range blockResult.BlockTrace.Transactions {
-		for _, addr := range []common.Address{tx.From, *tx.TxContent.To()} {
+	for _, tx := range blockResult.Transactions {
+		for _, addr := range []common.Address{tx.From, *tx.To()} {
 			// verify proofs
 			if data2, ok := storgeTrace.Proofs[addr.String()]; ok {
 				data1, err := statedb.GetProof(addr)
@@ -150,12 +150,12 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 	}
 }
 
-func checkTxs(t *testing.T, expect []*types.Transaction, actual []*types.TransactionTrace) {
+func checkTxs(t *testing.T, expect []*types.Transaction, actual []*types.TransactionData) {
 	assert.Equal(t, len(expect), len(actual))
 	for i := range expect {
 		eTx, aTx := expect[i], actual[i]
-		assert.Equal(t, eTx.Hash().String(), aTx.TxContent.Hash())
-		assert.Equal(t, eTx.Gas(), aTx.TxContent.Gas())
+		assert.Equal(t, eTx.Hash().String(), aTx.Hash())
+		assert.Equal(t, eTx.Gas(), aTx.Gas())
 	}
 }
 

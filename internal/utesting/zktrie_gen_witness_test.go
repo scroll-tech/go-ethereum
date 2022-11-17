@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-func loadStaff(t *testing.T, fname string) *types.BlockResult {
+func loadStaff(t *testing.T, fname string) *types.BlockTrace {
 	f, err := os.Open(fname)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func loadStaff(t *testing.T, fname string) *types.BlockResult {
 		t.Fatal(err)
 	}
 
-	out := new(types.BlockResult)
+	out := new(types.BlockTrace)
 
 	err = json.Unmarshal(bt, out)
 	if err != nil {

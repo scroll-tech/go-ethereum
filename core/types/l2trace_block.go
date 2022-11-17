@@ -8,7 +8,6 @@ import (
 )
 
 type TransactionData struct {
-	ChainId  *big.Int       `json:"chainId"`
 	IsCreate bool           `json:"isCreate"`
 	From     common.Address `json:"from"`
 	*Transaction
@@ -20,7 +19,6 @@ func NewTraceTransaction(tx *Transaction, blockNumber uint64, config *params.Cha
 	signer := MakeSigner(config, big.NewInt(0).SetUint64(blockNumber))
 	from, _ := Sender(signer, tx)
 	return &TransactionData{
-		ChainId:     tx.ChainId(),
 		From:        from,
 		IsCreate:    tx.To() == nil,
 		Transaction: tx,

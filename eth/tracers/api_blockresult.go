@@ -19,7 +19,7 @@ import (
 )
 
 type TraceBlock interface {
-	GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
+	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
 }
 
 type traceEnv struct {
@@ -42,8 +42,8 @@ type traceEnv struct {
 	executionResults []*types.ExecutionResult
 }
 
-// GetBlockResultByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
-func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error) {
+// GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
+func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error) {
 	var block *types.Block
 	if number, ok := blockNrOrHash.Number(); ok {
 		block, err = api.blockByNumber(ctx, number)
@@ -75,7 +75,7 @@ func (api *API) GetBlockResultByNumberOrHash(ctx context.Context, blockNrOrHash 
 		return nil, err
 	}
 
-	return api.getBlockResult(block, env)
+	return api.getBlockTrace(block, env)
 }
 
 // Make trace environment for current block.
@@ -130,7 +130,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 	return env, nil
 }
 
-func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockTrace, error) {
+func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTrace, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs   = block.Transactions()
@@ -190,7 +190,7 @@ func (api *API) getBlockResult(block *types.Block, env *traceEnv) (*types.BlockT
 		}
 	}
 
-	return api.fillBlockResult(env, block)
+	return api.fillBlockTrace(env, block)
 }
 
 func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, block *types.Block) error {
@@ -328,8 +328,8 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	return nil
 }
 
-// Fill blockResult content after all the txs are finished running.
-func (api *API) fillBlockResult(env *traceEnv, block *types.Block) (*types.BlockTrace, error) {
+// Fill blockTrace content after all the txs are finished running.
+func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockTrace, error) {
 	statedb := env.state
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())
@@ -337,7 +337,7 @@ func (api *API) fillBlockResult(env *traceEnv, block *types.Block) (*types.Block
 		txs[i] = types.NewTraceTransaction(tx, block.NumberU64(), api.backend.ChainConfig())
 	}
 
-	blockResult := &types.BlockTrace{
+	blockTrace := &types.BlockTrace{
 		Coinbase: &types.AccountWrapper{
 			Address:  env.coinbase,
 			Nonce:    statedb.GetNonce(env.coinbase),
@@ -365,10 +365,10 @@ func (api *API) fillBlockResult(env *traceEnv, block *types.Block) (*types.Block
 
 	// only zktrie model has the ability to get `mptwitness`.
 	if api.backend.ChainConfig().Zktrie {
-		if err := zkproof.FillBlockResultForMPTWitness(zkproof.MPTWitnessType(api.backend.CacheConfig().MPTWitness), blockResult); err != nil {
+		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessType(api.backend.CacheConfig().MPTWitness), blockTrace); err != nil {
 			log.Error("fill mpt witness fail", "error", err)
 		}
 	}
 
-	return blockResult, nil
+	return blockTrace, nil
 }

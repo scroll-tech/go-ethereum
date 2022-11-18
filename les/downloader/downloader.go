@@ -1697,13 +1697,13 @@ func (d *Downloader) processFullSyncContent() error {
 		if d.chainInsertHook != nil {
 			d.chainInsertHook(results)
 		}
-		if err := d.importBlockTraces(results); err != nil {
+		if err := d.importBlockResults(results); err != nil {
 			return err
 		}
 	}
 }
 
-func (d *Downloader) importBlockTraces(results []*fetchResult) error {
+func (d *Downloader) importBlockResults(results []*fetchResult) error {
 	// Check for any early termination requests
 	if len(results) == 0 {
 		return nil
@@ -1856,7 +1856,7 @@ func (d *Downloader) processFastSyncContent() error {
 			}
 		}
 		// Fast sync done, pivot commit done, full import
-		if err := d.importBlockTraces(afterP); err != nil {
+		if err := d.importBlockResults(afterP); err != nil {
 			return err
 		}
 	}

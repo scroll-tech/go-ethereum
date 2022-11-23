@@ -128,7 +128,9 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 
 	storageProof := blockTrace.StorageTrace.StorageProofs
 	for _, tx := range blockTrace.Transactions {
-		for _, addr := range []common.Address{*tx.To()} { // TODO: check sender?
+		signer := types.MakeSigner(b.ChainConfig(), block.Header().Number)
+		from, _ := types.Sender(signer, tx)
+		for _, addr := range []common.Address{from, *tx.To()} {
 			// verify proofs
 			if data2, ok := storgeTrace.Proofs[addr.String()]; ok {
 				data1, err := statedb.GetProof(addr)

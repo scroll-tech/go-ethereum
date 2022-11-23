@@ -99,9 +99,6 @@ func TestAPI_GetBlockTraceByNumberOrHash(t *testing.T) {
 	// check chain status
 	checkChainAndProof(t, backend, parent, block, blockTrace)
 
-	// check txs.
-	checkTxs(t, block.Transactions(), blockTrace.Transactions)
-
 	txTraces, err := api.TraceBlockByNumber(context.Background(), 2, nil)
 	assert.NoError(t, err)
 
@@ -131,7 +128,7 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 
 	storageProof := blockTrace.StorageTrace.StorageProofs
 	for _, tx := range blockTrace.Transactions {
-		for _, addr := range []common.Address{tx.From, *tx.To()} {
+		for _, addr := range []common.Address{*tx.To()} { // TODO: check sender?
 			// verify proofs
 			if data2, ok := storgeTrace.Proofs[addr.String()]; ok {
 				data1, err := statedb.GetProof(addr)
@@ -147,15 +144,6 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 				}
 			}
 		}
-	}
-}
-
-func checkTxs(t *testing.T, expect []*types.Transaction, actual []*types.TransactionData) {
-	assert.Equal(t, len(expect), len(actual))
-	for i := range expect {
-		eTx, aTx := expect[i], actual[i]
-		assert.Equal(t, eTx.Hash().String(), aTx.Hash())
-		assert.Equal(t, eTx.Gas(), aTx.Gas())
 	}
 }
 

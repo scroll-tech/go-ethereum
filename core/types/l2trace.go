@@ -25,7 +25,7 @@ var (
 type BlockTrace struct {
 	Coinbase         *AccountWrapper    `json:"coinbase"`
 	Header           *Header            `json:"header"`
-	Transactions     []*TransactionData `json:"transactions"`
+	Transactions     []*Transaction     `json:"transactions"`
 	StorageTrace     *StorageTrace      `json:"storageTrace"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
 	MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`

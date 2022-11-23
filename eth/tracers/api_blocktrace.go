@@ -332,11 +332,6 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockTrace, error) {
 	statedb := env.state
 
-	txs := make([]*types.TransactionData, block.Transactions().Len())
-	for i, tx := range block.Transactions() {
-		txs[i] = types.NewTraceTransaction(tx, block.NumberU64(), api.backend.ChainConfig())
-	}
-
 	blockTrace := &types.BlockTrace{
 		Coinbase: &types.AccountWrapper{
 			Address:  env.coinbase,
@@ -347,7 +342,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 		Header:           block.Header(),
 		StorageTrace:     env.StorageTrace,
 		ExecutionResults: env.executionResults,
-		Transactions:     txs,
+		Transactions:     block.Transactions(),
 	}
 
 	for i, tx := range block.Transactions() {

@@ -2940,7 +2940,7 @@ func TestEIP1559Transition(t *testing.T) {
 	}
 
 	actual = state.GetBalance(*params.AllEthashProtocolChanges.FeeVaultAddress)
-	expected = new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64())
+	expected = new(big.Int).SetUint64(block.GasUsed() * block.Transactions()[0].GasTipCap().Uint64())
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}

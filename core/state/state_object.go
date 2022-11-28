@@ -32,6 +32,7 @@ import (
 )
 
 var emptyCodeHash = codehash.EmptyCodeHash.Bytes()
+var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash.Bytes()
 
 type Code []byte
 
@@ -96,6 +97,7 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
+	// note: if CodeHash is empty then KeccakCodeHash and CodeSize will also be empty
 	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash)
 }
 
@@ -106,6 +108,8 @@ func newObject(db *StateDB, address common.Address, data types.StateAccount) *st
 	}
 	if data.CodeHash == nil {
 		data.CodeHash = emptyCodeHash
+		data.KeccakCodeHash = emptyKeccakCodeHash
+		data.CodeSize = 0
 	}
 	if data.Root == (common.Hash{}) {
 		data.Root = db.db.TrieDB().EmptyRoot()
@@ -497,17 +501,7 @@ func (s *stateObject) Code(db Database) []byte {
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
 func (s *stateObject) CodeSize(db Database) int {
-	if s.code != nil {
-		return len(s.code)
-	}
-	if bytes.Equal(s.CodeHash(), emptyCodeHash) {
-		return 0
-	}
-	size, err := db.ContractCodeSize(s.addrHash, common.BytesToHash(s.CodeHash()))
-	if err != nil {
-		s.setError(fmt.Errorf("can't load code size %x: %v", s.CodeHash(), err))
-	}
-	return size
+	return int(s.data.CodeSize)
 }
 
 func (s *stateObject) SetCode(codeHash common.Hash, code []byte) {
@@ -523,6 +517,8 @@ func (s *stateObject) SetCode(codeHash common.Hash, code []byte) {
 func (s *stateObject) setCode(codeHash common.Hash, code []byte) {
 	s.code = code
 	s.data.CodeHash = codeHash[:]
+	s.data.KeccakCodeHash = codehash.KeccakCodeHash(code).Bytes()
+	s.data.CodeSize = uint64(len(code))
 	s.dirtyCode = true
 }
 
@@ -540,6 +536,10 @@ func (s *stateObject) setNonce(nonce uint64) {
 
 func (s *stateObject) CodeHash() []byte {
 	return s.data.CodeHash
+}
+
+func (s *stateObject) KeccakCodeHash() []byte {
+	return s.data.KeccakCodeHash
 }
 
 func (s *stateObject) Balance() *big.Int {

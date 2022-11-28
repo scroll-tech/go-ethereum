@@ -306,6 +306,14 @@ func (s *StateDB) GetCodeHash(addr common.Address) common.Hash {
 	return common.BytesToHash(stateObject.CodeHash())
 }
 
+func (s *StateDB) GetKeccakCodeHash(addr common.Address) common.Hash {
+	stateObject := s.getStateObject(addr)
+	if stateObject == nil {
+		return common.Hash{}
+	}
+	return common.BytesToHash(stateObject.KeccakCodeHash())
+}
+
 // GetState retrieves a value from the given account's storage trie.
 func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 	stateObject := s.getStateObject(addr)
@@ -522,7 +530,7 @@ func (s *StateDB) updateStateObject(obj *stateObject) {
 	// enough to track account updates at commit time, deletions need tracking
 	// at transaction boundary level to ensure we capture state clearing.
 	if s.snap != nil {
-		s.snapAccounts[obj.addrHash] = snapshot.SlimAccountRLP(obj.data.Nonce, obj.data.Balance, obj.data.Root, obj.data.CodeHash)
+		s.snapAccounts[obj.addrHash] = snapshot.SlimAccountRLP(obj.data.Nonce, obj.data.Balance, obj.data.Root, obj.data.CodeHash, obj.data.KeccakCodeHash, obj.data.CodeSize)
 	}
 }
 
@@ -573,13 +581,17 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				return nil
 			}
 			data = &types.StateAccount{
-				Nonce:    acc.Nonce,
-				Balance:  acc.Balance,
-				CodeHash: acc.CodeHash,
-				Root:     common.BytesToHash(acc.Root),
+				Nonce:          acc.Nonce,
+				Balance:        acc.Balance,
+				CodeHash:       acc.CodeHash,
+				Root:           common.BytesToHash(acc.Root),
+				KeccakCodeHash: acc.KeccakCodeHash,
+				CodeSize:       acc.CodeSize,
 			}
 			if len(data.CodeHash) == 0 {
 				data.CodeHash = emptyCodeHash
+				data.KeccakCodeHash = emptyKeccakCodeHash
+				data.CodeSize = 0
 			}
 			if data.Root == (common.Hash{}) {
 				data.Root = s.db.TrieDB().EmptyRoot()

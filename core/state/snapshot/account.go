@@ -29,14 +29,16 @@ import (
 // or slim-snapshot format which replaces the empty root and code hash as nil
 // byte slice.
 type Account struct {
-	Nonce    uint64
-	Balance  *big.Int
-	Root     []byte
-	CodeHash []byte
+	Nonce          uint64
+	Balance        *big.Int
+	Root           []byte
+	CodeHash       []byte
+	KeccakCodeHash []byte
+	CodeSize       uint64
 }
 
 // SlimAccount converts a state.Account content into a slim snapshot account
-func SlimAccount(nonce uint64, balance *big.Int, root common.Hash, codehash []byte) Account {
+func SlimAccount(nonce uint64, balance *big.Int, root common.Hash, codehash []byte, keccakcodehash []byte, codesize uint64) Account {
 	slim := Account{
 		Nonce:   nonce,
 		Balance: balance,
@@ -46,14 +48,16 @@ func SlimAccount(nonce uint64, balance *big.Int, root common.Hash, codehash []by
 	}
 	if !bytes.Equal(codehash, emptyCode[:]) {
 		slim.CodeHash = codehash
+		slim.KeccakCodeHash = keccakcodehash
+		slim.CodeSize = codesize
 	}
 	return slim
 }
 
 // SlimAccountRLP converts a state.Account content into a slim snapshot
 // version RLP encoded.
-func SlimAccountRLP(nonce uint64, balance *big.Int, root common.Hash, codehash []byte) []byte {
-	data, err := rlp.EncodeToBytes(SlimAccount(nonce, balance, root, codehash))
+func SlimAccountRLP(nonce uint64, balance *big.Int, root common.Hash, codehash []byte, keccakcodehash []byte, codesize uint64) []byte {
+	data, err := rlp.EncodeToBytes(SlimAccount(nonce, balance, root, codehash, keccakcodehash, codesize))
 	if err != nil {
 		panic(err)
 	}
@@ -72,6 +76,8 @@ func FullAccount(data []byte) (Account, error) {
 	}
 	if len(account.CodeHash) == 0 {
 		account.CodeHash = emptyCode[:]
+		account.KeccakCodeHash = emptyKeccakCode[:]
+		account.CodeSize = 0
 	}
 	return account, nil
 }

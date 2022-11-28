@@ -73,24 +73,31 @@ func (s *StateAccount) Hash() (*big.Int, error) {
 // MarshalFields, the bytes scheme is:
 // [0:32] Nonce uint64 big-endian in 32 byte
 // [32:64] Balance
-// [64:96] Root
-// [96:128] CodeHash
+// [64:96] CodeHash
+// [96:128] Root
+// [128:160] KeccakCodeHash
+// [160:192] CodeSize
 func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
-	fields := make([]zkt.Byte32, 4)
-	binary.BigEndian.PutUint64(fields[0][24:], s.Nonce)
+	fields := make([]zkt.Byte32, 6)
 
 	if !utils.CheckBigIntInField(s.Balance) {
 		panic("balance overflow")
 	}
-	s.Balance.FillBytes(fields[1][:])
 
+	// note: we're storing an 8-byte value in a 32-byte field
+	binary.BigEndian.PutUint64(fields[0][24:], s.Nonce)
+	s.Balance.FillBytes(fields[1][:])
 	copy(fields[2][:], s.CodeHash)
 	copy(fields[3][:], s.Root.Bytes())
-	return fields, 4
+	copy(fields[4][:], s.KeccakCodeHash)
+	binary.BigEndian.PutUint64(fields[5][24:], s.CodeSize)
+
+	// TODO(thegaram): document flag return value
+	return fields, 20
 }
 
 func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
-	if len(bytes) != 128 {
+	if len(bytes) != 192 {
 		return nil, ErrInvalidLength
 	}
 	acc := new(StateAccount)
@@ -100,6 +107,9 @@ func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
 	copy(acc.CodeHash, bytes[64:96])
 	acc.Root = common.Hash{}
 	acc.Root.SetBytes(bytes[96:128])
+	acc.KeccakCodeHash = make([]byte, 32)
+	copy(acc.KeccakCodeHash, bytes[128:160])
+	acc.CodeSize = binary.BigEndian.Uint64(bytes[(160 + 24):])
 
 	return acc, nil
 }

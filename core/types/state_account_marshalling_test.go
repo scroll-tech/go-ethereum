@@ -14,7 +14,7 @@ func TestAccountMarshalling(t *testing.T) {
 	example1 := &StateAccount{
 		Nonce:          5,
 		Balance:        big.NewInt(0).SetBytes(common.Hex2Bytes("01fffffffffffffffffffffffffffffffffffffffffffffffff9c8672c6bc7b3")),
-		CodeHash:       common.Hex2Bytes("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"),
+		CodeHash:       common.Hex2Bytes("2098f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864"),
 		KeccakCodeHash: common.Hex2Bytes("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"),
 		CodeSize:       0,
 	}

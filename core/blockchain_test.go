@@ -3046,7 +3046,7 @@ func TestPoseidonCodeHash(t *testing.T) {
 	codeHash := state.GetCodeHash(addr1)
 	keccakCodeHash := state.GetKeccakCodeHash(addr1)
 
-	assert.Equal(t, codeHash, common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"), "code hash mismatch")
+	assert.Equal(t, codeHash, common.HexToHash("0x2098f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864"), "code hash mismatch")
 	assert.Equal(t, keccakCodeHash, common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"), "code hash mismatch")
 
 	// deploy contract through transaction

@@ -93,7 +93,7 @@ func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
 	binary.BigEndian.PutUint64(fields[5][24:], s.CodeSize)
 
 	// TODO(thegaram): document flag return value
-	return fields, 20
+	return fields, 16
 }
 
 func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {

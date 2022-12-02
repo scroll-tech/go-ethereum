@@ -305,13 +305,14 @@ func verifyAccount(addr common.Address, data *types.StateAccount, leaf *SMTPathN
 			return fmt.Errorf("unmatch leaf node in address: %s", addr)
 		}
 	} else if data != nil {
-		h, err := data.Hash()
+		arr, flag := data.MarshalFields()
+		h, err := zkt.PreHandlingElems(flag, arr)
 		//log.Info("sanity check acc before", "addr", addr.String(), "key", leaf.Sibling.Text(16), "hash", h.Text(16))
 
 		if err != nil {
 			return fmt.Errorf("fail to hash account: %v", err)
 		}
-		if !bytes.Equal(zkt.NewHashFromBigInt(h)[:], leaf.Value) {
+		if !bytes.Equal(h[:], leaf.Value) {
 			return fmt.Errorf("unmatch data in leaf for address %s", addr)
 		}
 	}

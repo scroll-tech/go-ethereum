@@ -21,7 +21,6 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-iden3-crypto/utils"
 
 	zkt "github.com/scroll-tech/zktrie/types"
@@ -32,43 +31,6 @@ import (
 var (
 	ErrInvalidLength = errors.New("StateAccount: invalid input length")
 )
-
-// Hash of StateAccount
-// AccountHash = Hash(
-//	Hash(nonce, balance),
-//  Hash(
-//	  Root,
-//	  Hash(codeHashFirst16, codeHashLast16)
-//  ))
-func (s *StateAccount) Hash() (*big.Int, error) {
-	nonce := new(big.Int).SetUint64(s.Nonce)
-	if s.Balance == nil {
-		s.Balance = new(big.Int)
-	}
-	hash1, err := poseidon.Hash([]*big.Int{nonce, s.Balance})
-	if err != nil {
-		return nil, err
-	}
-
-	codeHashFirst16 := new(big.Int).SetBytes(s.CodeHash[0:16])
-	codeHashLast16 := new(big.Int).SetBytes(s.CodeHash[16:32])
-	hash2, err := poseidon.Hash([]*big.Int{codeHashFirst16, codeHashLast16})
-	if err != nil {
-		return nil, err
-	}
-
-	rootHash := zkt.NewHashFromBytes(s.Root.Bytes())
-	hash3, err := poseidon.Hash([]*big.Int{hash2, rootHash.BigInt()})
-	if err != nil {
-		return nil, err
-	}
-
-	hash4, err := poseidon.Hash([]*big.Int{hash1, hash3})
-	if err != nil {
-		return nil, err
-	}
-	return hash4, nil
-}
 
 // MarshalFields, the bytes scheme is:
 // [0:32] Nonce uint64 big-endian in 32 byte

@@ -2932,15 +2932,11 @@ func TestEIP1559Transition(t *testing.T) {
 	state, _ := chain.State()
 
 	// 3: Ensure that miner received only the tx's tip.
-	// Note: In Scroll, fees go to the FeeVaultAddress but ethash miner rewards still go to the miner.
 	actual := state.GetBalance(block.Coinbase())
-	expected := ethash.ConstantinopleBlockReward
-	if actual.Cmp(expected) != 0 {
-		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
-	}
-
-	actual = state.GetBalance(*params.AllEthashProtocolChanges.FeeVaultAddress)
-	expected = new(big.Int).SetUint64(block.GasUsed() * block.Transactions()[0].GasTipCap().Uint64())
+	expected := new(big.Int).Add(
+		new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
+		ethash.ConstantinopleBlockReward,
+	)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
@@ -2977,7 +2973,10 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 6+5: Ensure that miner received only the tx's effective tip.
 	actual = state.GetBalance(block.Coinbase())
-	expected = ethash.ConstantinopleBlockReward
+	expected = new(big.Int).Add(
+		new(big.Int).SetUint64(block.GasUsed()*effectiveTip),
+		ethash.ConstantinopleBlockReward,
+	)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}

@@ -225,7 +225,7 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 		Nonce:    1,
 		Balance:  big.NewInt(10000000),
 		Root:     common.HexToHash("22fb59aa5410ed465267023713ab42554c250f394901455a3366e223d5f7d147"),
-		CodeHash: common.HexToHash("cc0a77f6e063b4b62eb7d9ed6f427cf687d8d0071d751850cfe5d136bc60d3ab").Bytes(),
+		CodeHash: common.HexToHash("0c0a77f6e063b4b62eb7d9ed6f427cf687d8d0071d751850cfe5d136bc60d3ab").Bytes(),
 	}
 
 	err := mt.TryUpdateAccount(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes(), acc1)
@@ -235,7 +235,7 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 		Nonce:    5,
 		Balance:  big.NewInt(50000000),
 		Root:     common.HexToHash("0"),
-		CodeHash: common.HexToHash("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+		CodeHash: common.HexToHash("05d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
 	}
 	err = mt.TryUpdateAccount(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes(), acc2)
 	assert.Nil(t, err)

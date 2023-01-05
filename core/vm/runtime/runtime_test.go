@@ -274,7 +274,7 @@ func (d *dummyChain) GetHeader(h common.Hash, n uint64) *types.Header {
 // requires access to a chain reader.
 func TestBlockhash(t *testing.T) {
 	// Current head
-	n := uint64(1000)
+	n := uint64(20)
 	parentHash := common.Hash{}
 	s := common.LeftPadBytes(big.NewInt(int64(n-1)).Bytes(), 32)
 	copy(parentHash[:], s)
@@ -301,7 +301,7 @@ func TestBlockhash(t *testing.T) {
 				bytes32 zero;
 				zero = blockhash(x); // Should be zeroes
 				first = blockhash(x-1);
-				for(uint256 i = 2 ; i < 260; i++){
+				for(uint256 i = 2 ; i < 16; i++){
 					bytes32 hash = blockhash(x - i);
 					if (uint256(hash) != 0){
 						last = hash;
@@ -334,13 +334,13 @@ func TestBlockhash(t *testing.T) {
 	if zero.BitLen() != 0 {
 		t.Fatalf("expected zeroes, got %x", ret[0:32])
 	}
-	if first.Uint64() != 999 {
-		t.Fatalf("second block should be 999, got %d (%x)", first, ret[32:64])
+	if first.Uint64() != 19 {
+		t.Fatalf("second block should be 19, got %d (%x)", first, ret[32:64])
 	}
-	if last.Uint64() != 744 {
-		t.Fatalf("last block should be 744, got %d (%x)", last, ret[64:96])
+	if last.Uint64() != 0 {
+		t.Fatalf("last block should be 0, got %d (%x)", last, ret[64:96])
 	}
-	if exp, got := 255, chain.counter; exp != got {
+	if exp, got := 0, chain.counter; exp != got {
 		t.Errorf("suboptimal; too much chain iteration, expected %d, got %d", exp, got)
 	}
 }

@@ -58,10 +58,29 @@ var (
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	berlinInstructionSet           = newBerlinInstructionSet()
 	londonInstructionSet           = newLondonInstructionSet()
+	mergeInstructionSet            = newMergeInstructionSet()
+	shanghaiInstructionSet         = newShanghaiInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
 type JumpTable [256]*operation
+
+func newShanghaiInstructionSet() JumpTable {
+	instructionSet := newMergeInstructionSet()
+	enable3860(&instructionSet)
+	return instructionSet
+}
+
+func newMergeInstructionSet() JumpTable {
+	instructionSet := newLondonInstructionSet()
+	/*instructionSet[PREVRANDAO] = &operation{
+		execute:     opRandom,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 1),
+		maxStack:    maxStack(0, 1),
+	}*/
+	return instructionSet
+}
 
 // newLondonInstructionSet returns the frontier, homestead, byzantium,
 // contantinople, istanbul, petersburg, berlin and london instructions.

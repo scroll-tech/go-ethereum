@@ -407,13 +407,12 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 			return nil, fmt.Errorf("update zktrie account state fail: %s", err)
 		}
 		w.tracingAccounts[addr] = accData
-	} else {
+	} else if accDataBefore != nil {
 		if err := w.tracingZktrie.TryDelete(addr.Bytes32()); err != nil {
 			return nil, fmt.Errorf("delete zktrie account state fail: %s", err)
 		}
 		w.tracingAccounts[addr] = nil
-
-	}
+	} // notice if both before/after is nil, we do not touch zktrie
 
 	proof = proofList{}
 	if err := w.tracingZktrie.Prove(s_key.Bytes(), 0, &proof); err != nil {
@@ -460,6 +459,7 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 	storeKey := zkt.NewByte32FromBytesPaddingZero(common.BytesToHash(key).Bytes())
 	storeValueBefore := trie.Get(storeKey[:])
 	storeValue := zkt.NewByte32FromBytes(value)
+	valZero := zkt.Byte32{}
 
 	if storeValueBefore != nil && !bytes.Equal(storeValueBefore[:], common.Hash{}.Bytes()) {
 		stateUpdate[0] = &StateStorage{
@@ -504,7 +504,11 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 	out, err := w.traceAccountUpdate(addr,
 		func(acc *types.StateAccount) *types.StateAccount {
 			if acc == nil {
-				panic("unexpected")
+				// in case we read an unexist account
+				if !bytes.Equal(valZero.Bytes(), value) {
+					panic(fmt.Errorf("write to an unexist account [%s] which is not allowed", addr))
+				}
+				return nil
 			}
 
 			//sanity check
@@ -534,6 +538,11 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 		} else {
 			out.StateKey = zkt.NewHashFromBigInt(h)[:]
 		}
+		stateUpdate[1] = &StateStorage{
+			Key:   storeKey.Bytes(),
+			Value: valZero.Bytes(),
+		}
+		stateUpdate[0] = stateUpdate[1]
 	}
 
 	out.StatePath = statePath

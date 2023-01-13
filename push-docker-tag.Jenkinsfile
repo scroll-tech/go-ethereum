@@ -51,7 +51,7 @@ pipeline {
                             } 
                             // Use the Credential ID of the Docker Hub Credentials we added to Jenkins.
                             docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {                                
-                                app.push("${TAGNAME}")
+                                app.push(TAGNAME)
                                 // app.push("latest")                      
                             }
                         }                      

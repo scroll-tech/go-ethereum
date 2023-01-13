@@ -37,8 +37,7 @@ pipeline {
                                         return;
                                     }
                                     sh "docker login --username=${dockerUser} --password=${dockerPassword}"
-                                    sh "docker build -t scrolltech/l2geth:latest ."
-                                    sh "docker tag scrolltech/l2geth:latest scrolltech/l2geth:${TAGNAME}"
+                                    sh "docker build -t scrolltech/l2geth:${TAGNAME} ."
                                     sh "docker push scrolltech/l2geth:${TAGNAME}"                
                                 }
                         }

@@ -53,12 +53,6 @@ pipeline {
     post {
           success {
             slackSend(message: "l2geth tag ${TAGNAME} build dockersSuccessed")
-                catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
-                sh '''#!/bin/bash
-                      docker rm $(docker ps -a | grep "Exited" | awk '{print $1 }')
-                      docker images | grep registry.hub.docker.com/scrolltech/l2geth | awk '{print $3}' | xargs docker rmi -f
-                    '''
-            }
           }
           // triggered when red sign
           failure {

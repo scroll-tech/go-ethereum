@@ -37,24 +37,14 @@ pipeline {
                withCredentials([usernamePassword(credentialsId: "${credentialDocker}", passwordVariable: 'dockerPassword', usernameVariable: 'dockerUser')]) {
                     // Use a scripted pipeline.
                     script {
-                        def app
-                        stage('Docker Build') {
-                            if (TAGNAME == ""){
-                                    return;
-                            }
-                            sh 'ls'
-                            app = docker.build("${env.DOCKER_CREDENTIALS_USR}/l2geth")
-                        }        
                         stage('Push image') { 
-                            if (TAGNAME == ""){
+                                if (TAGNAME == ""){
                                     return;
-                            } 
-                            // Use the Credential ID of the Docker Hub Credentials we added to Jenkins.
-                            docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {                                
-                                app.push(TAGNAME)
-                                // app.push("latest")                      
-                            }
-                        }                      
+                                }
+                                sh "docker login --username=${dockerUser} --password=${dockerPassword}"
+                                sh "docker build -t scrolltech/l2geth ."
+                                sh "docker tag scrolltech/l2geth:latest scrolltech/l2geth:${TAGNAME}"
+                                sh "docker push scrolltech/l2geth:${TAGNAME}"                
                     }
                }
             }

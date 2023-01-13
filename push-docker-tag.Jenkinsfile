@@ -62,7 +62,7 @@ pipeline {
     }
     post {
           success {
-            slackSend(message: "l2geth tag build dockersSuccessed")
+            slackSend(message: "l2geth tag ${TAGNAME} build dockersSuccessed")
                 catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
                 sh '''#!/bin/bash
                       docker rm $(docker ps -a | grep "Exited" | awk '{print $1 }')
@@ -72,7 +72,7 @@ pipeline {
           }
           // triggered when red sign
           failure {
-            slackSend(message: "l2geth tag build docker failed")
+            slackSend(message: "l2geth tag ${TAGNAME} build docker failed")
           }
           always {
             cleanWs() 

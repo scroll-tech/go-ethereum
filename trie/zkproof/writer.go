@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"math/big"
 
+	zktrie "github.com/scroll-tech/zktrie/trie"
+	zkt "github.com/scroll-tech/zktrie/types"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	zkt "github.com/scroll-tech/go-ethereum/core/types/zktrie"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -39,10 +41,10 @@ func addressToKey(addr common.Address) *zkt.Hash {
 }
 
 //resume the proof bytes into db and return the leaf node
-func resumeProofs(proof []hexutil.Bytes, db *memorydb.Database) *trie.Node {
+func resumeProofs(proof []hexutil.Bytes, db *memorydb.Database) *zktrie.Node {
 	for _, buf := range proof {
 
-		n, err := trie.DecodeSMTProof(buf)
+		n, err := zktrie.DecodeSMTProof(buf)
 		if err != nil {
 			log.Warn("decode proof string fail", "error", err)
 		} else if n != nil {
@@ -53,7 +55,7 @@ func resumeProofs(proof []hexutil.Bytes, db *memorydb.Database) *trie.Node {
 				//notice: must consistent with trie/merkletree.go
 				bt := k[:]
 				db.Put(bt, buf)
-				if n.Type == trie.NodeTypeLeaf || n.Type == trie.NodeTypeEmpty {
+				if n.Type == zktrie.NodeTypeLeaf || n.Type == zktrie.NodeTypeEmpty {
 					return n
 				}
 			}
@@ -68,14 +70,14 @@ func resumeProofs(proof []hexutil.Bytes, db *memorydb.Database) *trie.Node {
 // whole path in sequence, from root to leaf
 func decodeProofForMPTPath(proof proofList, path *SMTPath) {
 
-	var lastNode *trie.Node
+	var lastNode *zktrie.Node
 	keyPath := big.NewInt(0)
 	path.KeyPathPart = (*hexutil.Big)(keyPath)
 
 	keyCounter := big.NewInt(1)
 
 	for _, buf := range proof {
-		n, err := trie.DecodeSMTProof(buf)
+		n, err := zktrie.DecodeSMTProof(buf)
 		if err != nil {
 			log.Warn("decode proof string fail", "error", err)
 		} else if n != nil {
@@ -105,9 +107,9 @@ func decodeProofForMPTPath(proof proofList, path *SMTPath) {
 				keyCounter.Mul(keyCounter, big.NewInt(2))
 			}
 			switch n.Type {
-			case trie.NodeTypeMiddle:
+			case zktrie.NodeTypeMiddle:
 				lastNode = n
-			case trie.NodeTypeLeaf:
+			case zktrie.NodeTypeLeaf:
 				vhash, _ := n.ValueKey()
 				path.Leaf = &SMTPathNode{
 					//here we just return the inner represent of hash (little endian, reversed byte order to common hash)
@@ -125,7 +127,7 @@ func decodeProofForMPTPath(proof proofList, path *SMTPath) {
 				}
 
 				return
-			case trie.NodeTypeEmpty:
+			case zktrie.NodeTypeEmpty:
 				return
 			default:
 				panic(fmt.Errorf("unknown node type %d", n.Type))
@@ -143,6 +145,10 @@ type zktrieProofWriter struct {
 	tracingAccounts     map[common.Address]*types.StateAccount
 }
 
+func (wr *zktrieProofWriter) TracingAccounts() map[common.Address]*types.StateAccount {
+	return wr.tracingAccounts
+}
+
 func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, error) {
 
 	underlayerDb := memorydb.New()
@@ -154,7 +160,7 @@ func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, erro
 	for addrs, proof := range storage.Proofs {
 		if n := resumeProofs(proof, underlayerDb); n != nil {
 			addr := common.HexToAddress(addrs)
-			if n.Type == trie.NodeTypeEmpty {
+			if n.Type == zktrie.NodeTypeEmpty {
 				accounts[addr] = nil
 			} else if acc, err := types.UnmarshalStateAccount(n.Data()); err == nil {
 				if bytes.Equal(n.NodeKey[:], addressToKey(addr)[:]) {
@@ -232,6 +238,8 @@ const (
 	posCREATEAfter  = 1
 	posCALL         = 2
 	posSTATICCALL   = 0
+
+	// posSELFDESTRUCT = 2
 )
 
 func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {
@@ -263,7 +271,16 @@ func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
 	}
 }
 
+func isDeletedAccount(state *types.AccountWrapper) bool {
+	return state.Nonce == 0 && bytes.Equal(state.CodeHash.Bytes(), common.Hash{}.Bytes())
+}
+
 func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount {
+
+	if isDeletedAccount(state) {
+		return nil
+	}
+
 	return &types.StateAccount{
 		Nonce:    state.Nonce,
 		Balance:  (*big.Int)(state.Balance),
@@ -356,7 +373,8 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 	}
 
 	var proof proofList
-	if err := w.tracingZktrie.Prove(addr.Bytes32(), 0, &proof); err != nil {
+	s_key, _ := zkt.ToSecureKeyBytes(addr.Bytes())
+	if err := w.tracingZktrie.Prove(s_key.Bytes(), 0, &proof); err != nil {
 		return nil, fmt.Errorf("prove BEFORE state for <%x> fail: %s", addr.Bytes(), err)
 	}
 
@@ -388,15 +406,15 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 			return nil, fmt.Errorf("update zktrie account state fail: %s", err)
 		}
 		w.tracingAccounts[addr] = accData
-	} else {
+	} else if accDataBefore != nil {
 		if err := w.tracingZktrie.TryDelete(addr.Bytes32()); err != nil {
 			return nil, fmt.Errorf("delete zktrie account state fail: %s", err)
 		}
-		delete(w.tracingAccounts, addr)
-	}
+		w.tracingAccounts[addr] = nil
+	} // notice if both before/after is nil, we do not touch zktrie
 
 	proof = proofList{}
-	if err := w.tracingZktrie.Prove(addr.Bytes32(), 0, &proof); err != nil {
+	if err := w.tracingZktrie.Prove(s_key.Bytes(), 0, &proof); err != nil {
 		return nil, fmt.Errorf("prove AFTER state fail: %s", err)
 	}
 
@@ -409,6 +427,18 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 			out.AccountKey = out.AccountPath[1].Leaf.Sibling[:]
 		}
 		//now accountKey must has been filled
+	}
+
+	// notice we have change that no leaf (account data) exist in either before or after,
+	// for that case we had to calculate the nodeKey here
+	if out.AccountKey == nil {
+		word := zkt.NewByte32FromBytesPaddingZero(addr.Bytes())
+		k, err := word.Hash()
+		if err != nil {
+			panic(fmt.Errorf("unexpected hash error for address: %s", err))
+		}
+		kHash := zkt.NewHashFromBigInt(k)
+		out.AccountKey = hexutil.Bytes(kHash[:])
 	}
 
 	return out, nil
@@ -428,6 +458,7 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 	storeKey := zkt.NewByte32FromBytesPaddingZero(common.BytesToHash(key).Bytes())
 	storeValueBefore := trie.Get(storeKey[:])
 	storeValue := zkt.NewByte32FromBytes(value)
+	valZero := zkt.Byte32{}
 
 	if storeValueBefore != nil && !bytes.Equal(storeValueBefore[:], common.Hash{}.Bytes()) {
 		stateUpdate[0] = &StateStorage{
@@ -437,7 +468,8 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 	}
 
 	var storageBeforeProof, storageAfterProof proofList
-	if err := trie.Prove(storeKey.Bytes(), 0, &storageBeforeProof); err != nil {
+	s_key, _ := zkt.ToSecureKeyBytes(storeKey.Bytes())
+	if err := trie.Prove(s_key.Bytes(), 0, &storageBeforeProof); err != nil {
 		return nil, fmt.Errorf("prove BEFORE storage state fail: %s", err)
 	}
 
@@ -460,7 +492,7 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 		}
 	}
 
-	if err := trie.Prove(storeKey.Bytes(), 0, &storageAfterProof); err != nil {
+	if err := trie.Prove(s_key.Bytes(), 0, &storageAfterProof); err != nil {
 		return nil, fmt.Errorf("prove AFTER storage state fail: %s", err)
 	}
 	decodeProofForMPTPath(storageAfterProof, statePath[1])
@@ -471,7 +503,11 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 	out, err := w.traceAccountUpdate(addr,
 		func(acc *types.StateAccount) *types.StateAccount {
 			if acc == nil {
-				panic("unexpected")
+				// in case we read an unexist account
+				if !bytes.Equal(valZero.Bytes(), value) {
+					panic(fmt.Errorf("write to an unexist account [%s] which is not allowed", addr))
+				}
+				return nil
 			}
 
 			//sanity check
@@ -501,6 +537,11 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 		} else {
 			out.StateKey = zkt.NewHashFromBigInt(h)[:]
 		}
+		stateUpdate[1] = &StateStorage{
+			Key:   storeKey.Bytes(),
+			Value: valZero.Bytes(),
+		}
+		stateUpdate[0] = stateUpdate[1]
 	}
 
 	out.StatePath = statePath
@@ -516,21 +557,24 @@ func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (
 		return w.traceStorageUpdate(accountState.Address, storeAddr, storeValue)
 	} else {
 
+		var stateRoot common.Hash
 		accData := getAccountDataFromLogState(accountState)
 
 		out, err := w.traceAccountUpdate(accountState.Address, func(accBefore *types.StateAccount) *types.StateAccount {
 			if accBefore != nil {
-				accData.Root = accBefore.Root
+				stateRoot = accBefore.Root
+			}
+			// we need to restore stateRoot from before
+			if accData != nil {
+				accData.Root = stateRoot
 			}
 			return accData
 		})
 		if err != nil {
 			return nil, fmt.Errorf("update account state %s fail: %s", accountState.Address, err)
 		}
-		hash, err := zkt.NewHashFromBytes(accData.Root[:])
-		if err != nil {
-			return nil, fmt.Errorf("malform of state root in account %s", accountState.Address)
-		}
+
+		hash := zkt.NewHashFromBytes(stateRoot[:])
 		out.CommonStateRoot = hash[:]
 		return out, nil
 	}
@@ -540,7 +584,6 @@ func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (
 func handleLogs(od opOrderer, currentContract common.Address, logs []*types.StructLogRes) {
 	logStack := []int{0}
 	contractStack := map[int]common.Address{}
-	skipDepth := 0
 	callEnterAddress := currentContract
 
 	// now trace every OP which could cause changes on state:
@@ -552,6 +595,7 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			//update currentContract according to previous op
 			contractStack[sl] = currentContract
 			currentContract = callEnterAddress
+
 		} else if sl > sLog.Depth {
 			logStack = logStack[:sl-1]
 			currentContract = contractStack[sLog.Depth]
@@ -559,12 +603,16 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 			calledLog := logs[resumePos]
 
 			//no need to handle fail calling
-			if !(calledLog.ExtraData != nil && calledLog.ExtraData.CallFailed) {
-				//reentry the last log which "cause" the calling, some handling may needed
-				switch calledLog.Op {
-				case "CREATE", "CREATE2":
-					//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)
-					od.absorb(getAccountState(calledLog, posCREATEAfter))
+			if calledLog.ExtraData != nil {
+				if !calledLog.ExtraData.CallFailed {
+					//reentry the last log which "cause" the calling, some handling may needed
+					switch calledLog.Op {
+					case "CREATE", "CREATE2":
+						//addr, accDataBefore := getAccountDataFromProof(calledLog, posCALLBefore)
+						od.absorb(getAccountState(calledLog, posCREATEAfter))
+					}
+				} else {
+					od.readonly(false)
 				}
 			}
 
@@ -577,73 +625,96 @@ func handleLogs(od opOrderer, currentContract common.Address, logs []*types.Stru
 		}
 		callEnterAddress = currentContract
 
-		if skipDepth != 0 {
-			if skipDepth < sLog.Depth {
-				continue
-			} else {
-				skipDepth = 0
+		//check extra status for current op if it is a call
+		if extraData := sLog.ExtraData; extraData != nil {
+			if extraData.CallFailed || len(sLog.ExtraData.Caller) < 2 {
+				// no enough caller data (2) is being capture indicate we are in an immediate failure
+				// i.e. it fail before stack entry (like no enough balance for a "call with value"),
+				// or we just not handle this calling op correctly yet
+
+				// for a failed option, now we just purpose nothing happens (FIXME: it is inconsentent with mpt_table)
+				// except for CREATE, for which the callee's nonce would be increased
+				switch sLog.Op {
+				case "CREATE", "CREATE2":
+					st := copyAccountState(extraData.Caller[0])
+					st.Nonce += 1
+					od.absorb(st)
+				}
+			}
+
+			if extraData.CallFailed {
+				od.readonly(true)
+			}
+			// now trace caller's status first
+			if caller := extraData.Caller; len(caller) >= 2 {
+				od.absorb(caller[1])
 			}
 		}
 
-		if exD := sLog.ExtraData; exD != nil && exD.CallFailed {
-			//mark current op and next ops with more depth skippable
-			skipDepth = sLog.Depth
-			continue
-		}
-
 		switch sLog.Op {
-		case "CREATE", "CREATE2":
-			state := getAccountState(sLog, posCREATE)
-			od.absorb(state)
-			//update contract to CREATE addr
+		case "SELFDESTRUCT":
+			// NOTE: this op code has been disabled so we treat it as nothing now
 
-			callEnterAddress = state.Address
+			//in SELFDESTRUCT, a call on target address is made so the balance would be updated
+			//in the last item
+			//stateTarget := getAccountState(sLog, posSELFDESTRUCT)
+			//od.absorb(stateTarget)
+			//then build an "deleted state", only address and other are default
+			//od.absorb(&types.AccountWrapper{Address: currentContract})
+
+		case "CREATE", "CREATE2":
+			// notice in immediate failure we have no enough tracing in extraData
+			if len(sLog.ExtraData.StateList) >= 2 {
+				state := getAccountState(sLog, posCREATE)
+				od.absorb(state)
+				//update contract to CREATE addr
+				callEnterAddress = state.Address
+			}
+
 		case "CALL", "CALLCODE":
-			state := getAccountState(sLog, posCALL)
-			od.absorb(state)
-			callEnterAddress = state.Address
+			// notice in immediate failure we have no enough tracing in extraData
+			if len(sLog.ExtraData.StateList) >= 3 {
+				state := getAccountState(sLog, posCALL)
+				od.absorb(state)
+				callEnterAddress = state.Address
+			}
 		case "STATICCALL":
-			//static call has no update on target address
+			//static call has no update on target address (and no immediate failure?)
 			callEnterAddress = getAccountState(sLog, posSTATICCALL).Address
+		case "DELEGATECALL":
+
 		case "SLOAD":
 			accountState := getAccountState(sLog, posSSTOREBefore)
-			od.absorb(accountState)
+			od.absorbStorage(accountState, nil)
 		case "SSTORE":
 			log.Debug("build SSTORE", "pc", sLog.Pc, "key", sLog.Stack[len(sLog.Stack)-1])
 			accountState := copyAccountState(getAccountState(sLog, posSSTOREBefore))
 			// notice the log only provide the value BEFORE store and it is not suitable for our protocol,
 			// here we change it into value AFTER update
+			before := accountState.Storage
 			accountState.Storage = &types.StorageWrapper{
 				Key:   sLog.Stack[len(sLog.Stack)-1],
 				Value: sLog.Stack[len(sLog.Stack)-2],
 			}
-			od.absorb(accountState)
+			od.absorbStorage(accountState, before)
 
 		default:
 		}
 	}
 }
 
-func handleTx(od opOrderer, txResult *types.ExecutionResult) {
+func HandleTx(od opOrderer, txResult *types.ExecutionResult) {
 
-	// handle failed tx
+	// the from state is read before tx is handled and nonce is added, we combine both
+	preTxSt := copyAccountState(txResult.From)
+	preTxSt.Nonce += 1
+	od.absorb(preTxSt)
+
 	if txResult.Failed {
-		handled := false
-		for _, state := range txResult.AccountsAfter {
-			if state.Address != txResult.From.Address {
-				continue
-			}
-			od.absorb(state)
-			handled = true
-		}
-		if !handled {
-			panic(fmt.Errorf("no caller account in postTx status"))
-		}
-		return
+		od.readonly(true)
 	}
 
 	var toAddr common.Address
-
 	if state := txResult.AccountCreated; state != nil {
 		od.absorb(state)
 		toAddr = state.Address
@@ -652,8 +723,18 @@ func handleTx(od opOrderer, txResult *types.ExecutionResult) {
 	}
 
 	handleLogs(od, toAddr, txResult.StructLogs)
+	if txResult.Failed {
+		od.readonly(false)
+	}
 
 	for _, state := range txResult.AccountsAfter {
+		// special case: for suicide, the state has been captured in SELFDESTRUCT
+		// and we skip it here
+		if isDeletedAccount(state) {
+			log.Debug("skip suicide address", "address", state.Address)
+			continue
+		}
+
 		od.absorb(state)
 	}
 
@@ -663,12 +744,14 @@ const defaultOrdererScheme = MPTWitnessRWTbl
 
 var usedOrdererScheme = defaultOrdererScheme
 
-// HandleBlockResult only for backward compatibility
-func HandleBlockResult(block *types.BlockResult) ([]*StorageTrace, error) {
-	return HandleBlockResultEx(block, usedOrdererScheme)
+func SetOrderScheme(t MPTWitnessType) { usedOrdererScheme = t }
+
+// HandleBlockTrace only for backward compatibility
+func HandleBlockTrace(block *types.BlockTrace) ([]*StorageTrace, error) {
+	return HandleBlockTraceEx(block, usedOrdererScheme)
 }
 
-func HandleBlockResultEx(block *types.BlockResult, ordererScheme MPTWitnessType) ([]*StorageTrace, error) {
+func HandleBlockTraceEx(block *types.BlockTrace, ordererScheme MPTWitnessType) ([]*StorageTrace, error) {
 
 	writer, err := NewZkTrieProofWriter(block.StorageTrace)
 	if err != nil {
@@ -682,19 +765,19 @@ func HandleBlockResultEx(block *types.BlockResult, ordererScheme MPTWitnessType)
 	case MPTWitnessNatural:
 		od = &simpleOrderer{}
 	case MPTWitnessRWTbl:
-		od = newRWTblOrderer(writer.tracingAccounts)
+		od = NewRWTblOrderer(writer.tracingAccounts)
 	default:
 		return nil, fmt.Errorf("unrecognized scheme %d", ordererScheme)
 	}
 
 	for _, tx := range block.ExecutionResults {
-		handleTx(od, tx)
+		HandleTx(od, tx)
 	}
 
 	// notice some coinbase addr (like all zero) is in fact not exist and should not be update
 	// TODO: not a good solution, just for patch ...
-	if coinbaseData := writer.tracingAccounts[block.BlockTrace.Coinbase.Address]; coinbaseData != nil {
-		od.absorb(block.BlockTrace.Coinbase)
+	if coinbaseData := writer.tracingAccounts[block.Coinbase.Address]; coinbaseData != nil {
+		od.absorb(block.Coinbase)
 	}
 
 	opDisp := od.end_absorb()
@@ -717,13 +800,13 @@ func HandleBlockResultEx(block *types.BlockResult, ordererScheme MPTWitnessType)
 
 }
 
-func FillBlockResultForMPTWitness(order MPTWitnessType, block *types.BlockResult) error {
+func FillBlockTraceForMPTWitness(order MPTWitnessType, block *types.BlockTrace) error {
 
 	if order == MPTWitnessNothing {
 		return nil
 	}
 
-	trace, err := HandleBlockResultEx(block, order)
+	trace, err := HandleBlockTraceEx(block, order)
 	if err != nil {
 		return err
 	}

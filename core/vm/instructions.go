@@ -454,7 +454,7 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 }
 
 func opCoinbase(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	scope.Stack.push(new(uint256.Int).SetBytes(interpreter.evm.Context.Coinbase.Bytes()))
+	scope.Stack.push(new(uint256.Int).SetBytes(interpreter.evm.FeeRecipient().Bytes()))
 	return nil, nil
 }
 
@@ -471,7 +471,7 @@ func opNumber(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 }
 
 func opDifficulty(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	v, _ := uint256.FromBig(interpreter.evm.Context.Difficulty)
+	v := uint256.NewInt(0)
 	scope.Stack.push(v)
 	return nil, nil
 }

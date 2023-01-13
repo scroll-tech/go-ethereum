@@ -32,23 +32,23 @@ pipeline {
                 // (NOTE 2: You can't print credentials in the pipeline for security reasons.)
                 DOCKER_CREDENTIALS = credentials('dockerhub')
             }
-           steps {
-               
-               withCredentials([usernamePassword(credentialsId: "${credentialDocker}", passwordVariable: 'dockerPassword', usernameVariable: 'dockerUser')]) {
-                    // Use a scripted pipeline.
-                    script {
-                        stage('Push image') { 
-                                if (TAGNAME == ""){
-                                    return;
+           steps {         
+                withCredentials([usernamePassword(credentialsId: "${credentialDocker}", passwordVariable: 'dockerPassword', usernameVariable: 'dockerUser')]) {
+                        // Use a scripted pipeline.
+                        script {
+                            stage('Push image') { 
+                                    if (TAGNAME == ""){
+                                        return;
+                                    }
+                                    sh "docker login --username=${dockerUser} --password=${dockerPassword}"
+                                    sh "docker build -t scrolltech/l2geth ."
+                                    sh "docker tag scrolltech/l2geth:latest scrolltech/l2geth:${TAGNAME}"
+                                    sh "docker push scrolltech/l2geth:${TAGNAME}"                
                                 }
-                                sh "docker login --username=${dockerUser} --password=${dockerPassword}"
-                                sh "docker build -t scrolltech/l2geth ."
-                                sh "docker tag scrolltech/l2geth:latest scrolltech/l2geth:${TAGNAME}"
-                                sh "docker push scrolltech/l2geth:${TAGNAME}"                
+                        }
                     }
-               }
+                }
             }
-        }
     }
     post {
           success {

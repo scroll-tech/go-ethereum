@@ -1333,7 +1333,7 @@ func getCodeHash(i uint64) []byte {
 
 // getCodeByHash convenience function to lookup the code from the code hash
 func getCodeByHash(hash common.Hash) []byte {
-	if hash == emptyCode {
+	if hash == emptyPoseidonCodeHash {
 		return nil
 	}
 	for i, h := range codehashes {
@@ -1351,10 +1351,10 @@ func makeAccountTrieNoStorage(n int) (*trie.Trie, entrySlice) {
 	var entries entrySlice
 	for i := uint64(1); i <= uint64(n); i++ {
 		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:    i,
-			Balance:  big.NewInt(int64(i)),
-			Root:     emptyRoot,
-			CodeHash: getCodeHash(i),
+			Nonce:            i,
+			Balance:          big.NewInt(int64(i)),
+			Root:             emptyRoot,
+			PoseidonCodeHash: getCodeHash(i),
 		})
 		key := key32(i)
 		elem := &kv{key, value}
@@ -1396,10 +1396,10 @@ func makeBoundaryAccountTrie(n int) (*trie.Trie, entrySlice) {
 	// Fill boundary accounts
 	for i := 0; i < len(boundaries); i++ {
 		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:    uint64(0),
-			Balance:  big.NewInt(int64(i)),
-			Root:     emptyRoot,
-			CodeHash: getCodeHash(uint64(i)),
+			Nonce:            uint64(0),
+			Balance:          big.NewInt(int64(i)),
+			Root:             emptyRoot,
+			PoseidonCodeHash: getCodeHash(uint64(i)),
 		})
 		elem := &kv{boundaries[i].Bytes(), value}
 		trie.Update(elem.k, elem.v)
@@ -1408,10 +1408,10 @@ func makeBoundaryAccountTrie(n int) (*trie.Trie, entrySlice) {
 	// Fill other accounts if required
 	for i := uint64(1); i <= uint64(n); i++ {
 		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:    i,
-			Balance:  big.NewInt(int64(i)),
-			Root:     emptyRoot,
-			CodeHash: getCodeHash(i),
+			Nonce:            i,
+			Balance:          big.NewInt(int64(i)),
+			Root:             emptyRoot,
+			PoseidonCodeHash: getCodeHash(i),
 		})
 		elem := &kv{key32(i), value}
 		trie.Update(elem.k, elem.v)
@@ -1435,7 +1435,7 @@ func makeAccountTrieWithStorageWithUniqueStorage(accounts, slots int, code bool)
 	// Create n accounts in the trie
 	for i := uint64(1); i <= uint64(accounts); i++ {
 		key := key32(i)
-		codehash := emptyCode[:]
+		codehash := emptyPoseidonCodeHash[:]
 		if code {
 			codehash = getCodeHash(i)
 		}
@@ -1444,10 +1444,10 @@ func makeAccountTrieWithStorageWithUniqueStorage(accounts, slots int, code bool)
 		stRoot := stTrie.Hash()
 		stTrie.Commit(nil)
 		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:    i,
-			Balance:  big.NewInt(int64(i)),
-			Root:     stRoot,
-			CodeHash: codehash,
+			Nonce:            i,
+			Balance:          big.NewInt(int64(i)),
+			Root:             stRoot,
+			PoseidonCodeHash: codehash,
 		})
 		elem := &kv{key, value}
 		accTrie.Update(elem.k, elem.v)
@@ -1486,15 +1486,15 @@ func makeAccountTrieWithStorage(accounts, slots int, code, boundary bool) (*trie
 	// Create n accounts in the trie
 	for i := uint64(1); i <= uint64(accounts); i++ {
 		key := key32(i)
-		codehash := emptyCode[:]
+		codehash := emptyPoseidonCodeHash[:]
 		if code {
 			codehash = getCodeHash(i)
 		}
 		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:    i,
-			Balance:  big.NewInt(int64(i)),
-			Root:     stRoot,
-			CodeHash: codehash,
+			Nonce:            i,
+			Balance:          big.NewInt(int64(i)),
+			Root:             stRoot,
+			PoseidonCodeHash: codehash,
 		})
 		elem := &kv{key, value}
 		accTrie.Update(elem.k, elem.v)

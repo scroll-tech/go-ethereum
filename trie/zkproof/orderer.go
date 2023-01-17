@@ -129,7 +129,7 @@ func NewRWTblOrderer(inited map[common.Address]*types.StateAccount) *rwTblOrdere
 				Address:  addr,
 				Nonce:    data.Nonce,
 				Balance:  (*hexutil.Big)(bl),
-				CodeHash: common.BytesToHash(data.CodeHash),
+				CodeHash: common.BytesToHash(data.PoseidonCodeHash),
 			}
 		}
 

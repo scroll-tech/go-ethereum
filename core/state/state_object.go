@@ -31,7 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-var emptyCodeHash = codehash.EmptyCodeHash.Bytes()
+var emptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash.Bytes()
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash.Bytes()
 
 type Code []byte
@@ -97,8 +97,8 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	// note: if CodeHash is empty then KeccakCodeHash and CodeSize will also be empty
-	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash)
+	// note: if PoseidonCodeHash is empty then KeccakCodeHash and CodeSize will also be empty
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.PoseidonCodeHash, emptyPoseidonCodeHash)
 }
 
 // newObject creates a state object.
@@ -106,9 +106,9 @@ func newObject(db *StateDB, address common.Address, data types.StateAccount) *st
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
-	if data.CodeHash == nil {
-		data.CodeHash = emptyCodeHash
+	if data.PoseidonCodeHash == nil {
 		data.KeccakCodeHash = emptyKeccakCodeHash
+		data.PoseidonCodeHash = emptyPoseidonCodeHash
 		data.CodeSize = 0
 	}
 	if data.Root == (common.Hash{}) {
@@ -486,12 +486,12 @@ func (s *stateObject) Code(db Database) []byte {
 	if s.code != nil {
 		return s.code
 	}
-	if bytes.Equal(s.CodeHash(), emptyCodeHash) {
+	if bytes.Equal(s.PoseidonCodeHash(), emptyPoseidonCodeHash) {
 		return nil
 	}
-	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.CodeHash()))
+	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.PoseidonCodeHash()))
 	if err != nil {
-		s.setError(fmt.Errorf("can't load code hash %x: %v", s.CodeHash(), err))
+		s.setError(fmt.Errorf("can't load code hash %x: %v", s.PoseidonCodeHash(), err))
 	}
 	s.code = code
 	return code
@@ -504,20 +504,20 @@ func (s *stateObject) CodeSize(db Database) int {
 	return int(s.data.CodeSize)
 }
 
-func (s *stateObject) SetCode(codeHash common.Hash, code []byte) {
+func (s *stateObject) SetCode(code []byte) {
 	prevcode := s.Code(s.db.db)
 	s.db.journal.append(codeChange{
 		account:  &s.address,
-		prevhash: s.CodeHash(),
+		prevhash: s.PoseidonCodeHash(),
 		prevcode: prevcode,
 	})
-	s.setCode(codeHash, code)
+	s.setCode(code)
 }
 
-func (s *stateObject) setCode(codeHash common.Hash, code []byte) {
+func (s *stateObject) setCode(code []byte) {
 	s.code = code
-	s.data.CodeHash = codeHash[:]
 	s.data.KeccakCodeHash = codehash.KeccakCodeHash(code).Bytes()
+	s.data.PoseidonCodeHash = codehash.PoseidonCodeHash(code).Bytes()
 	s.data.CodeSize = uint64(len(code))
 	s.dirtyCode = true
 }
@@ -534,8 +534,8 @@ func (s *stateObject) setNonce(nonce uint64) {
 	s.data.Nonce = nonce
 }
 
-func (s *stateObject) CodeHash() []byte {
-	return s.data.CodeHash
+func (s *stateObject) PoseidonCodeHash() []byte {
+	return s.data.PoseidonCodeHash
 }
 
 func (s *stateObject) KeccakCodeHash() []byte {

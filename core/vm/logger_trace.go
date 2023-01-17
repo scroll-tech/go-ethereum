@@ -107,7 +107,7 @@ func getWrappedAccountForAddr(l *StructLogger, address common.Address) *types.Ac
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),
 		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		CodeHash: l.env.StateDB.GetCodeHash(address),
+		CodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
 	}
 }
 
@@ -116,7 +116,7 @@ func getWrappedAccountForStorage(l *StructLogger, address common.Address, key co
 		Address:  address,
 		Nonce:    l.env.StateDB.GetNonce(address),
 		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		CodeHash: l.env.StateDB.GetCodeHash(address),
+		CodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
 		Storage: &types.StorageWrapper{
 			Key:   key.String(),
 			Value: l.env.StateDB.GetState(address, key).String(),

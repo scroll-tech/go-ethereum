@@ -282,9 +282,9 @@ func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount
 	}
 
 	return &types.StateAccount{
-		Nonce:    state.Nonce,
-		Balance:  (*big.Int)(state.Balance),
-		CodeHash: state.CodeHash.Bytes(),
+		Nonce:            state.Nonce,
+		Balance:          (*big.Int)(state.Balance),
+		PoseidonCodeHash: state.CodeHash.Bytes(),
 	}
 }
 
@@ -389,7 +389,7 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 		out.AccountUpdate[0] = &StateAccount{
 			Nonce:    int(accDataBefore.Nonce),
 			Balance:  (*hexutil.Big)(big.NewInt(0).Set(accDataBefore.Balance)),
-			CodeHash: accDataBefore.CodeHash,
+			CodeHash: accDataBefore.PoseidonCodeHash,
 		}
 	}
 
@@ -398,7 +398,7 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 		out.AccountUpdate[1] = &StateAccount{
 			Nonce:    int(accData.Nonce),
 			Balance:  (*hexutil.Big)(big.NewInt(0).Set(accData.Balance)),
-			CodeHash: accData.CodeHash,
+			CodeHash: accData.PoseidonCodeHash,
 		}
 	}
 
@@ -516,10 +516,11 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 				panic(fmt.Errorf("unexpected storage root before: [%s] vs [%x]", acc.Root, accRootFromState))
 			}
 			return &types.StateAccount{
-				Nonce:    acc.Nonce,
-				Balance:  acc.Balance,
-				CodeHash: acc.CodeHash,
-				Root:     common.BytesToHash(zkt.ReverseByteOrder(statePath[1].Root)),
+				Nonce:            acc.Nonce,
+				Balance:          acc.Balance,
+				KeccakCodeHash:   acc.KeccakCodeHash,
+				PoseidonCodeHash: acc.PoseidonCodeHash,
+				Root:             common.BytesToHash(zkt.ReverseByteOrder(statePath[1].Root)),
 			}
 		})
 	if err != nil {

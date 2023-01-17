@@ -35,27 +35,34 @@ var (
 // MarshalFields, the bytes scheme is:
 // [0:32] Nonce uint64 big-endian in 32 byte
 // [32:64] Balance
-// [64:96] CodeHash
+// [64:96] KeccakCodeHash
 // [96:128] Root
-// [128:160] KeccakCodeHash
+// [128:160] PoseidonCodeHash
 // [160:192] CodeSize
 func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
 	fields := make([]zkt.Byte32, 6)
 
 	if !utils.CheckBigIntInField(s.Balance) {
-		panic("balance overflow")
+		panic("StateAccount balance overflow")
 	}
 
-	// note: we're storing an 8-byte value in a 32-byte field
-	binary.BigEndian.PutUint64(fields[0][24:], s.Nonce)
+	binary.BigEndian.PutUint64(fields[0][24:], s.Nonce) // 8-byte value in a 32-byte field
 	s.Balance.FillBytes(fields[1][:])
-	copy(fields[2][:], s.CodeHash)
+	copy(fields[2][:], s.KeccakCodeHash)
 	copy(fields[3][:], s.Root.Bytes())
-	copy(fields[4][:], s.KeccakCodeHash)
-	binary.BigEndian.PutUint64(fields[5][24:], s.CodeSize)
+	copy(fields[4][:], s.PoseidonCodeHash)
+	binary.BigEndian.PutUint64(fields[5][24:], s.CodeSize) // 8-byte value in a 32-byte field
 
-	// TODO(thegaram): document flag return value
-	return fields, 16
+	// The returned flag shows which items cannot be encoded as a field elements.
+	//
+	// +-------+---------+--------+--------+----------+----------+
+	// | nonce | balance | keccak |  root  | poseidon | codesize |
+	// +-------+---------+--------+--------+----------+----------+
+	//     0        0        1        0         0          0
+
+	flag := uint32(4)
+
+	return fields, flag
 }
 
 func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
@@ -65,12 +72,12 @@ func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
 	acc := new(StateAccount)
 	acc.Nonce = binary.BigEndian.Uint64(bytes[24:])
 	acc.Balance = new(big.Int).SetBytes(bytes[32:64])
-	acc.CodeHash = make([]byte, 32)
-	copy(acc.CodeHash, bytes[64:96])
+	acc.KeccakCodeHash = make([]byte, 32)
+	copy(acc.KeccakCodeHash, bytes[64:96])
 	acc.Root = common.Hash{}
 	acc.Root.SetBytes(bytes[96:128])
-	acc.KeccakCodeHash = make([]byte, 32)
-	copy(acc.KeccakCodeHash, bytes[128:160])
+	acc.PoseidonCodeHash = make([]byte, 32)
+	copy(acc.PoseidonCodeHash, bytes[128:160])
 	acc.CodeSize = binary.BigEndian.Uint64(bytes[(160 + 24):])
 
 	return acc, nil

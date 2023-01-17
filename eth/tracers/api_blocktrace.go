@@ -209,7 +209,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		Address:  from,
 		Nonce:    state.GetNonce(from),
 		Balance:  (*hexutil.Big)(state.GetBalance(from)),
-		CodeHash: state.GetCodeHash(from),
+		CodeHash: state.GetPoseidonCodeHash(from),
 	}
 	var receiver *types.AccountWrapper
 	if to != nil {
@@ -217,7 +217,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			Address:  *to,
 			Nonce:    state.GetNonce(*to),
 			Balance:  (*hexutil.Big)(state.GetBalance(*to)),
-			CodeHash: state.GetCodeHash(*to),
+			CodeHash: state.GetPoseidonCodeHash(*to),
 		}
 	}
 
@@ -253,7 +253,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			Address:  acc,
 			Nonce:    state.GetNonce(acc),
 			Balance:  (*hexutil.Big)(state.GetBalance(acc)),
-			CodeHash: state.GetCodeHash(acc),
+			CodeHash: state.GetPoseidonCodeHash(acc),
 		})
 	}
 
@@ -342,7 +342,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 			Address:  env.coinbase,
 			Nonce:    statedb.GetNonce(env.coinbase),
 			Balance:  (*hexutil.Big)(statedb.GetBalance(env.coinbase)),
-			CodeHash: statedb.GetCodeHash(env.coinbase),
+			CodeHash: statedb.GetPoseidonCodeHash(env.coinbase),
 		},
 		Header:           block.Header(),
 		StorageTrace:     env.StorageTrace,
@@ -356,7 +356,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
 			// Get tx.to address's code hash.
-			codeHash := statedb.GetCodeHash(*tx.To())
+			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
 			evmTrace.CodeHash = &codeHash
 		} else if tx.To() == nil { // Contract is created.
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())

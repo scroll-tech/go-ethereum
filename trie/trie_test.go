@@ -593,15 +593,15 @@ func TestTinyTrie(t *testing.T) {
 	_, accounts := makeAccounts(5)
 	trie := newEmpty()
 	trie.Update(common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000001337"), accounts[3])
-	if exp, root := common.HexToHash("5e71724cc8ad7d658c7b0d998ac2facd17f8d7fcd1e5b05ee0f008ff4fe44af3"), trie.Hash(); exp != root {
+	if exp, root := common.HexToHash("1bcb63f59109ffeb73c2e94c8ca51c7031c8cedbf85749d9b1e4c3909be6d606"), trie.Hash(); exp != root {
 		t.Errorf("1: got %x, exp %x", root, exp)
 	}
 	trie.Update(common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000001338"), accounts[4])
-	if exp, root := common.HexToHash("26bedfdb71d1dca815d31b677afbbce86a500de220b808d5a57965ad066dc837"), trie.Hash(); exp != root {
+	if exp, root := common.HexToHash("01c5d526f2fca75ea7d6b67776eb1016eed1e697af4ef2628a811bcfb8a3f4c4"), trie.Hash(); exp != root {
 		t.Errorf("2: got %x, exp %x", root, exp)
 	}
 	trie.Update(common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000001339"), accounts[4])
-	if exp, root := common.HexToHash("7208ff7432479617b6b2f4c0b21b2b17502de6bf1d9a273355550fc9bbf3dd6c"), trie.Hash(); exp != root {
+	if exp, root := common.HexToHash("36cbb9c7758725196060b988052a9ae4f1f36aa27898b8fe8b5ac916d6d53e2b"), trie.Hash(); exp != root {
 		t.Errorf("3: got %x, exp %x", root, exp)
 	}
 	checktr, _ := New(common.Hash{}, trie.db)
@@ -625,7 +625,7 @@ func TestCommitAfterHash(t *testing.T) {
 	trie.Hash()
 	trie.Commit(nil)
 	root := trie.Hash()
-	exp := common.HexToHash("6f5e7d03eb5d609fc019cf84d31d3cb75f1eb2f9f09cdd10e064399ac40db3c3")
+	exp := common.HexToHash("64baa328d107087283180e06bc7ed124a0a7711ebfd2ce385684555b731ca5f2")
 	if exp != root {
 		t.Errorf("got %x, exp %x", root, exp)
 	}
@@ -650,7 +650,7 @@ func makeAccounts(size int) (addresses [][20]byte, accounts [][]byte) {
 		var (
 			nonce = uint64(random.Int63())
 			root  = emptyRoot
-			code  = codehash.EmptyCodeHash.Bytes()
+			code  = codehash.EmptyPoseidonCodeHash.Bytes()
 		)
 		// The big.Rand function is not deterministic with regards to 64 vs 32 bit systems,
 		// and will consume different amount of data from the rand source.
@@ -660,7 +660,7 @@ func makeAccounts(size int) (addresses [][20]byte, accounts [][]byte) {
 		balanceBytes := make([]byte, numBytes)
 		random.Read(balanceBytes)
 		balance := new(big.Int).SetBytes(balanceBytes)
-		data, _ := rlp.EncodeToBytes(&types.StateAccount{Nonce: nonce, Balance: balance, Root: root, CodeHash: code})
+		data, _ := rlp.EncodeToBytes(&types.StateAccount{Nonce: nonce, Balance: balance, Root: root, PoseidonCodeHash: code})
 		accounts[i] = data
 	}
 	return addresses, accounts
@@ -717,12 +717,12 @@ func TestCommitSequence(t *testing.T) {
 		expWriteSeqHash    []byte
 		expCallbackSeqHash []byte
 	}{
-		{20, common.FromHex("09d61c80d9c544c6121e9c012f1f490321a5df556f55befdd4e92dd2ec7ef44c"),
-			common.FromHex("938952d1fc21eb5be032d88fd420a212cfbf2f7461be8c90eeba8cd412d18242")},
-		{200, common.FromHex("357c1408c03845b56e48b19dec97c3f2374d48d80895ea81e3727f11720be069"),
-			common.FromHex("bbb6eb291e36cbe7ede4377ff1e9fcaacf689384c5805448305cc623928970cc")},
-		{2000, common.FromHex("6f2f0464d29b08fef9af14edbb5a2cc4a336be61f8087b4280ff2790e8c5cf9c"),
-			common.FromHex("cde32ba1a750f49cfda206e2c6a294f566b8be0b6c45e551641ff65a82c564ee")},
+		{20, common.FromHex("856078bf234c5827d8d56ad62e647bc81848527f7e58a4abb66aa8046d92f094"),
+			common.FromHex("f08e7bf9d30586a31574420be56f6a07cca14757648754870466d6a6c4d5422e")},
+		{200, common.FromHex("23734941df03eba59db0bc6544be1e9b1084f8aa29165e2f1866b43b51a832c4"),
+			common.FromHex("ff7974d8721c97aba39a1fbd376b3614ef412d7b76cfc490da2503c43c648c60")},
+		{2000, common.FromHex("0086b64101592a833495a67e49dc800e2d8ad6eab6889554a44794a4522e58d3"),
+			common.FromHex("b32f1af631832db5b2811cc329d934945fa4a0ef22b1ee9606e1ab060bc9b6b1")},
 	} {
 		addresses, accounts := makeAccounts(tc.count)
 		// This spongeDb is used to check the sequence of disk-db-writes

@@ -41,7 +41,7 @@ func TestInvalidCliqueConfig(t *testing.T) {
 
 func TestSetupGenesis(t *testing.T) {
 	var (
-		customghash = common.HexToHash("0x6c4d29340f0143fce9a32e1b2decf1964d8f931206a0de763b230251ad4cc958")
+		customghash = common.HexToHash("0x700380ab70d789c462c4e8f0db082842095321f390d0a3f25f400f0746db32bc")
 		customg     = Genesis{
 			Config: &params.ChainConfig{HomesteadBlock: big.NewInt(3)},
 			Alloc: GenesisAlloc{

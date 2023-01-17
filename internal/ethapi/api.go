@@ -665,7 +665,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 	if !zktrie {
 		storageHash = types.EmptyRootHash
 	}
-	codeHash := state.GetCodeHash(address)
+	codeHash := state.GetPoseidonCodeHash(address)
 	storageProof := make([]StorageResult, len(storageKeys))
 
 	// if we have a storageTrie, (which means the account exists), we can update the storagehash
@@ -673,7 +673,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		storageHash = storageTrie.Hash()
 	} else {
 		// no storageTrie means the account does not exist, so the codeHash is the hash of an empty bytearray.
-		codeHash = codehash.EmptyCodeHash
+		codeHash = codehash.EmptyPoseidonCodeHash
 	}
 
 	// create the proof for the storageKeys

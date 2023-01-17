@@ -43,9 +43,9 @@ var (
 	// emptyRoot is the known root hash of an empty trie.
 	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
-	// emptyCode is the known hash of the empty EVM bytecode.
-	emptyCode       = codehash.EmptyCodeHash
-	emptyKeccakCode = codehash.EmptyKeccakCodeHash
+	// emptyPoseidonCode is the known hash of the empty EVM bytecode.
+	emptyPoseidonCode = codehash.EmptyPoseidonCodeHash
+	emptyKeccakCode   = codehash.EmptyKeccakCodeHash
 
 	// accountCheckRange is the upper limit of the number of accounts involved in
 	// each range check. This is a value estimated based on experience. If this
@@ -614,12 +614,12 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		}
 		// Retrieve the current account and flatten it into the internal format
 		var acc struct {
-			Nonce          uint64
-			Balance        *big.Int
-			Root           common.Hash
-			CodeHash       []byte
-			KeccakCodeHash []byte
-			CodeSize       uint64
+			Nonce            uint64
+			Balance          *big.Int
+			Root             common.Hash
+			KeccakCodeHash   []byte
+			PoseidonCodeHash []byte
+			CodeSize         uint64
 		}
 		if err := rlp.DecodeBytes(val, &acc); err != nil {
 			log.Crit("Invalid account encountered during snapshot creation", "err", err)
@@ -628,7 +628,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		if accMarker == nil || !bytes.Equal(accountHash[:], accMarker) {
 			dataLen := len(val) // Approximate size, saves us a round of RLP-encoding
 			if !write {
-				if bytes.Equal(acc.CodeHash, emptyCode[:]) {
+				if bytes.Equal(acc.PoseidonCodeHash, emptyPoseidonCode[:]) {
 					dataLen -= 32
 				}
 				if acc.Root == emptyRoot {
@@ -636,7 +636,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 				}
 				snapRecoveredAccountMeter.Mark(1)
 			} else {
-				data := SlimAccountRLP(acc.Nonce, acc.Balance, acc.Root, acc.CodeHash, acc.KeccakCodeHash, acc.CodeSize)
+				data := SlimAccountRLP(acc.Nonce, acc.Balance, acc.Root, acc.KeccakCodeHash, acc.PoseidonCodeHash, acc.CodeSize)
 				dataLen = len(data)
 				rawdb.WriteAccountSnapshot(batch, accountHash, data)
 				snapGeneratedAccountMeter.Mark(1)

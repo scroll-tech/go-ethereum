@@ -263,13 +263,13 @@ func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
 	}
 
 	return &types.AccountWrapper{
-		Nonce:    st.Nonce,
-		Balance:  (*hexutil.Big)(big.NewInt(0).Set(st.Balance.ToInt())),
-		KeccakCodeHash: st.KeccakCodeHash,
+		Nonce:            st.Nonce,
+		Balance:          (*hexutil.Big)(big.NewInt(0).Set(st.Balance.ToInt())),
+		KeccakCodeHash:   st.KeccakCodeHash,
 		PoseidonCodeHash: st.PoseidonCodeHash,
-		CodeSize: st.CodeSize,
-		Address:  st.Address,
-		Storage:  stg,
+		CodeSize:         st.CodeSize,
+		Address:          st.Address,
+		Storage:          stg,
 	}
 }
 

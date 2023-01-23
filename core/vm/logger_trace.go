@@ -121,7 +121,7 @@ func getWrappedAccountForStorage(l *StructLogger, address common.Address, key co
 		KeccakCodeHash:   l.env.StateDB.GetKeccakCodeHash(address),
 		PoseidonCodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
 		CodeSize:         l.env.StateDB.GetCodeSize(address),
-		Storage:          &types.StorageWrapper{
+		Storage: &types.StorageWrapper{
 			Key:   key.String(),
 			Value: l.env.StateDB.GetState(address, key).String(),
 		},

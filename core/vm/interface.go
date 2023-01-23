@@ -38,7 +38,7 @@ type StateDB interface {
 	GetKeccakCodeHash(common.Address) common.Hash
 	GetCode(common.Address) []byte
 	SetCode(common.Address, []byte)
-	GetCodeSize(common.Address) int
+	GetCodeSize(common.Address) uint64
 
 	AddRefund(uint64)
 	SubRefund(uint64)

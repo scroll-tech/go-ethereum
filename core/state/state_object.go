@@ -500,8 +500,8 @@ func (s *stateObject) Code(db Database) []byte {
 // CodeSize returns the size of the contract code associated with this object,
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
-func (s *stateObject) CodeSize(db Database) int {
-	return int(s.data.CodeSize)
+func (s *stateObject) CodeSize(db Database) uint64 {
+	return s.data.CodeSize
 }
 
 func (s *stateObject) SetCode(code []byte) {

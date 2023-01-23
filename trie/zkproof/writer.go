@@ -265,14 +265,16 @@ func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
 	return &types.AccountWrapper{
 		Nonce:    st.Nonce,
 		Balance:  (*hexutil.Big)(big.NewInt(0).Set(st.Balance.ToInt())),
-		CodeHash: st.CodeHash,
+		KeccakCodeHash: st.KeccakCodeHash,
+		PoseidonCodeHash: st.PoseidonCodeHash,
+		CodeSize: st.CodeSize,
 		Address:  st.Address,
 		Storage:  stg,
 	}
 }
 
 func isDeletedAccount(state *types.AccountWrapper) bool {
-	return state.Nonce == 0 && bytes.Equal(state.CodeHash.Bytes(), common.Hash{}.Bytes())
+	return state.Nonce == 0 && bytes.Equal(state.PoseidonCodeHash.Bytes(), common.Hash{}.Bytes())
 }
 
 func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount {
@@ -284,7 +286,9 @@ func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount
 	return &types.StateAccount{
 		Nonce:            state.Nonce,
 		Balance:          (*big.Int)(state.Balance),
-		PoseidonCodeHash: state.CodeHash.Bytes(),
+		KeccakCodeHash:   state.KeccakCodeHash.Bytes(),
+		PoseidonCodeHash: state.PoseidonCodeHash.Bytes(),
+		CodeSize:         state.CodeSize,
 	}
 }
 
@@ -387,18 +391,22 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 		// we have ensured the nBefore has a key corresponding to the query one
 		out.AccountKey = out.AccountPath[0].Leaf.Sibling
 		out.AccountUpdate[0] = &StateAccount{
-			Nonce:    int(accDataBefore.Nonce),
-			Balance:  (*hexutil.Big)(big.NewInt(0).Set(accDataBefore.Balance)),
-			CodeHash: accDataBefore.PoseidonCodeHash,
+			Nonce:            int(accDataBefore.Nonce),
+			Balance:          (*hexutil.Big)(big.NewInt(0).Set(accDataBefore.Balance)),
+			KeccakCodeHash:   accDataBefore.KeccakCodeHash,
+			PoseidonCodeHash: accDataBefore.PoseidonCodeHash,
+			CodeSize:         accDataBefore.CodeSize,
 		}
 	}
 
 	accData := updateAccData(accDataBefore)
 	if accData != nil {
 		out.AccountUpdate[1] = &StateAccount{
-			Nonce:    int(accData.Nonce),
-			Balance:  (*hexutil.Big)(big.NewInt(0).Set(accData.Balance)),
-			CodeHash: accData.PoseidonCodeHash,
+			Nonce:            int(accData.Nonce),
+			Balance:          (*hexutil.Big)(big.NewInt(0).Set(accData.Balance)),
+			KeccakCodeHash:   accData.KeccakCodeHash,
+			PoseidonCodeHash: accData.PoseidonCodeHash,
+			CodeSize:         accData.CodeSize,
 		}
 	}
 

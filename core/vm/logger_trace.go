@@ -104,20 +104,24 @@ func traceLastNAddressAccount(n int) traceFunc {
 // StorageWrapper will be empty
 func getWrappedAccountForAddr(l *StructLogger, address common.Address) *types.AccountWrapper {
 	return &types.AccountWrapper{
-		Address:  address,
-		Nonce:    l.env.StateDB.GetNonce(address),
-		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		CodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
+		Address:          address,
+		Nonce:            l.env.StateDB.GetNonce(address),
+		Balance:          (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
+		KeccakCodeHash:   l.env.StateDB.GetKeccakCodeHash(address),
+		PoseidonCodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
+		CodeSize:         l.env.StateDB.GetCodeSize(address),
 	}
 }
 
 func getWrappedAccountForStorage(l *StructLogger, address common.Address, key common.Hash) *types.AccountWrapper {
 	return &types.AccountWrapper{
-		Address:  address,
-		Nonce:    l.env.StateDB.GetNonce(address),
-		Balance:  (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
-		CodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
-		Storage: &types.StorageWrapper{
+		Address:          address,
+		Nonce:            l.env.StateDB.GetNonce(address),
+		Balance:          (*hexutil.Big)(l.env.StateDB.GetBalance(address)),
+		KeccakCodeHash:   l.env.StateDB.GetKeccakCodeHash(address),
+		PoseidonCodeHash: l.env.StateDB.GetPoseidonCodeHash(address),
+		CodeSize:         l.env.StateDB.GetCodeSize(address),
+		Storage:          &types.StorageWrapper{
 			Key:   key.String(),
 			Value: l.env.StateDB.GetState(address, key).String(),
 		},

@@ -134,11 +134,13 @@ type ExtraData struct {
 }
 
 type AccountWrapper struct {
-	Address  common.Address  `json:"address"`
-	Nonce    uint64          `json:"nonce"`
-	Balance  *hexutil.Big    `json:"balance"`
-	CodeHash common.Hash     `json:"codeHash,omitempty"`
-	Storage  *StorageWrapper `json:"storage,omitempty"` // StorageWrapper can be empty if irrelated to storage operation
+	Address          common.Address  `json:"address"`
+	Nonce            uint64          `json:"nonce"`
+	Balance          *hexutil.Big    `json:"balance"`
+	KeccakCodeHash   common.Hash     `json:"keccakCodeHash,omitempty"`
+	PoseidonCodeHash common.Hash     `json:"poseidonCodeHash,omitempty"`
+	CodeSize         uint64          `json:"codeSize"`
+	Storage          *StorageWrapper `json:"storage,omitempty"` // StorageWrapper can be empty if irrelated to storage operation
 }
 
 // while key & value can also be retrieved from StructLogRes.Storage,

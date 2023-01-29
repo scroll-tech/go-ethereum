@@ -18,21 +18,14 @@ package state
 
 import (
 	"bytes"
+	"github.com/scroll-tech/go-ethereum/trie"
 	"math/big"
 	"testing"
 
-<<<<<<< HEAD
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-=======
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/trie"
->>>>>>> 9d76a9b94 (core, trie, eth, cmd: rework preimage store (#25287))
 )
 
 type stateTest struct {

@@ -25,19 +25,12 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-<<<<<<< HEAD
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/crypto"
-=======
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/trie"
->>>>>>> 9d76a9b94 (core, trie, eth, cmd: rework preimage store (#25287))
+	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 var dumper = spew.ConfigState{Indent: "    "}

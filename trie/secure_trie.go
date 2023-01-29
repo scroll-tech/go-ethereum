@@ -189,16 +189,8 @@ func (t *SecureTrie) Hash() common.Hash {
 
 // Copy returns a copy of SecureTrie.
 func (t *SecureTrie) Copy() *SecureTrie {
-<<<<<<< HEAD
 	cpy := *t
 	return &cpy
-=======
-	return &SecureTrie{
-		trie:        *t.trie.Copy(),
-		preimages:   t.preimages,
-		secKeyCache: t.secKeyCache,
-	}
->>>>>>> 9d76a9b94 (core, trie, eth, cmd: rework preimage store (#25287))
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration

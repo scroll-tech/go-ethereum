@@ -313,14 +313,8 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 		dirties: map[common.Hash]*cachedNode{{}: {
 			children: make(map[common.Hash]uint16),
 		}},
-<<<<<<< HEAD
 		rawDirties: make(KvMap),
-	}
-	if config == nil || config.Preimages { // TODO(karalabe): Flip to default off in the future
-		db.preimages = make(map[common.Hash][]byte)
-=======
-		preimages: preimage,
->>>>>>> 9d76a9b94 (core, trie, eth, cmd: rework preimage store (#25287))
+		preimages:  preimage,
 	}
 	return db
 }

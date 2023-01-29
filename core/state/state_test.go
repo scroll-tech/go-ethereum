@@ -18,7 +18,6 @@ package state
 
 import (
 	"bytes"
-	"github.com/scroll-tech/go-ethereum/trie"
 	"math/big"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 type stateTest struct {

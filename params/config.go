@@ -363,10 +363,10 @@ type ChainConfig struct {
 	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
 
 	// Scroll genesis extension: enable EIP-2718 in tx pool.
-	IsEIP2718Enabled bool `json:"isEIP2718Enabled"`
+	IsEIP2718Enabled bool `json:"isEIP2718Enabled,omitempty"`
 
-	// Scroll genesis extension: enable EIP-1559 in tx pool.
-	IsEIP1559Enabled bool `json:"isEIP1559Enabled"`
+	// Scroll genesis extension: enable EIP-1559 in tx pool, IsEIP2718Enabled should also set to true.
+	IsEIP1559Enabled bool `json:"isEIP1559Enabled,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

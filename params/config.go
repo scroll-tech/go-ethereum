@@ -362,11 +362,11 @@ type ChainConfig struct {
 	// Scroll genesis extension: Transaction fee vault address [optional]
 	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
 
-	// Scroll genesis extension: disable EIP-2718 in tx pool.
-	DisableEIP2718 bool `json:"disableEIP2718,omitempty"`
+	// Scroll genesis extension: enable EIP-2718 in tx pool.
+	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
 
-	// Scroll genesis extension: disable EIP-1559 in tx pool.
-	DisableEIP1559 bool `json:"disableEIP1559,omitempty"`
+	// Scroll genesis extension: enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
+	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

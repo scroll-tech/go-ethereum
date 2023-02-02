@@ -1320,8 +1320,8 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// Update all fork indicator by next pending block number.
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
 	pool.istanbul = pool.chainconfig.IsIstanbul(next)
-	pool.eip2718 = pool.chainconfig.IsEIP2718Enabled && pool.chainconfig.IsBerlin(next)
-	pool.eip1559 = pool.chainconfig.IsEIP1559Enabled && pool.chainconfig.IsLondon(next)
+	pool.eip2718 = !pool.chainconfig.DisableEIP2718 && pool.chainconfig.IsBerlin(next)
+	pool.eip1559 = !pool.chainconfig.DisableEIP1559 && pool.chainconfig.IsLondon(next)
 }
 
 // promoteExecutables moves transactions that have become processable from the

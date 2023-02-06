@@ -27,6 +27,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
@@ -60,6 +62,9 @@ type StateTransition struct {
 	data       []byte
 	state      vm.StateDB
 	evm        *vm.EVM
+
+	// l1 rollup fee
+	l1Fee *big.Int
 }
 
 // Message represents a message sent to a contract.
@@ -157,6 +162,11 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
+	l1Fee := new(big.Int)
+	if rcfg.L2GasPriceOracleAddress != nil {
+		l1Fee, _ = fees.CalculateL1MsgFee(msg, evm.StateDB)
+	}
+
 	return &StateTransition{
 		gp:        gp,
 		evm:       evm,
@@ -167,6 +177,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		value:     msg.Value(),
 		data:      msg.Data(),
 		state:     evm.StateDB,
+		l1Fee:     l1Fee,
 	}
 }
 

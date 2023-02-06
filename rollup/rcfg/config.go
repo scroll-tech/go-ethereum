@@ -1,0 +1,22 @@
+package rcfg
+
+import (
+	"math/big"
+
+	"github.com/scroll-tech/go-ethereum/common"
+)
+
+func init() {
+	// TODO:
+	l2GasPriceOracleAddr := common.HexToAddress("0x420000000000000000000000000000000000000F")
+	L2GasPriceOracleAddress = &l2GasPriceOracleAddr
+}
+
+var (
+	// L2GasPriceOracleAddress is the address of the L2GasPriceOracle
+	// predeploy
+	L2GasPriceOracleAddress *common.Address
+
+	OverheadSlot = common.BigToHash(big.NewInt(1))
+	ScalarSlot   = common.BigToHash(big.NewInt(2))
+)

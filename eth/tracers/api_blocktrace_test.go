@@ -111,9 +111,6 @@ func TestAPI_GetBlockTraceByNumberOrHash(t *testing.T) {
 
 	// check coinbase
 	checkCoinbase(t, backend, blockTrace.Coinbase)
-
-	// check feeVault
-	checkFeeVault(t, backend, blockTrace.FeeVault)
 }
 
 func verifyProof(t *testing.T, expect [][]byte, actual []hexutil.Bytes) {
@@ -184,16 +181,16 @@ func checkStructLogs(t *testing.T, expect []*txTraceResult, actual []*types.Exec
 }
 
 func checkCoinbase(t *testing.T, b *testBackend, wrapper *types.AccountWrapper) {
-	header, err := b.HeaderByNumber(context.Background(), 1)
-	assert.NoError(t, err)
-	coinbase, err := b.engine.Author(header)
-	assert.NoError(t, err)
+	var coinbase common.Address
+	if b.chainConfig.FeeVaultAddress != nil {
+		coinbase = *b.chainConfig.FeeVaultAddress
+	} else {
+		header, err := b.HeaderByNumber(context.Background(), 1)
+		assert.NoError(t, err)
+		coinbase, err = b.engine.Author(header)
+		assert.NoError(t, err)
+	}
 	assert.Equal(t, true, coinbase.String() == wrapper.Address.String())
-}
-
-func checkFeeVault(t *testing.T, b *testBackend, wrapper *types.AccountWrapper) {
-	feeVault := *b.chainConfig.FeeVaultAddress
-	assert.Equal(t, true, feeVault.String() == wrapper.Address.String())
 }
 
 func createAccounts(n int) (auths []*bind.TransactOpts) {

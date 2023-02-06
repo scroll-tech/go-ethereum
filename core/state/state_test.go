@@ -58,7 +58,7 @@ func TestDump(t *testing.T) {
 	// check that DumpToCollector contains the state objects that are in trie
 	got := string(s.state.Dump(nil))
 	want := `{
-    "root": "e088733e0d2505ceb4acb52bede9d6389f093cfc5519d9376cef8943ec421c08",
+    "root": "789955993afb9d2a04b957a91be5d7b139aabb60fb7af63df6405021211c13c4",
     "accounts": {
         "0x0000000000000000000000000000000000000001": {
             "balance": "22",
@@ -83,7 +83,7 @@ func TestDump(t *testing.T) {
             "nonce": 0,
             "root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             "keccakCodeHash": "0x87874902497a5bb968da31a2998d8f22e949d1ef6214bcdedd8bae24cca4b9e3",
-            "poseidonCodeHash": "0x2263940ad476ca23bf01a9b033d65cd6b8bf9b7224a7ef2a4f10b61a2c039083",
+            "poseidonCodeHash": "0x1f090de833dd6dee7af5ee49f94fd64d1079aee3df47795eaaf2775d6921458c",
             "codeSize": 7,
             "code": "0x03030303030303",
             "key": "0xa17eacbc25cda025e81db9c5c62868822c73ce097cee2a63e33a2e41268358a1"

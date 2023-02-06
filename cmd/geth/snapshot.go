@@ -42,8 +42,8 @@ var (
 	// emptyRoot is the known root hash of an empty trie.
 	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
-	// emptyPoseidonCodeHash is the known hash of the empty EVM bytecode.
-	emptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash.Bytes()
+	// emptyKeccakCodeHash is the known hash of the empty EVM bytecode.
+	emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash.Bytes()
 )
 
 var (
@@ -314,10 +314,10 @@ func traverseState(ctx *cli.Context) error {
 				return storageIter.Err
 			}
 		}
-		if !bytes.Equal(acc.PoseidonCodeHash, emptyPoseidonCodeHash) {
-			code := rawdb.ReadCode(chaindb, common.BytesToHash(acc.PoseidonCodeHash))
+		if !bytes.Equal(acc.KeccakCodeHash, emptyKeccakCodeHash) {
+			code := rawdb.ReadCode(chaindb, common.BytesToHash(acc.KeccakCodeHash))
 			if len(code) == 0 {
-				log.Error("Code is missing", "hash", common.BytesToHash(acc.PoseidonCodeHash))
+				log.Error("Code is missing", "hash", common.BytesToHash(acc.KeccakCodeHash))
 				return errors.New("missing code")
 			}
 			codes += 1
@@ -435,8 +435,8 @@ func traverseRawState(ctx *cli.Context) error {
 					return storageIter.Error()
 				}
 			}
-			if !bytes.Equal(acc.PoseidonCodeHash, emptyPoseidonCodeHash) {
-				code := rawdb.ReadCode(chaindb, common.BytesToHash(acc.PoseidonCodeHash))
+			if !bytes.Equal(acc.KeccakCodeHash, emptyKeccakCodeHash) {
+				code := rawdb.ReadCode(chaindb, common.BytesToHash(acc.KeccakCodeHash))
 				if len(code) == 0 {
 					log.Error("Code is missing", "account", common.BytesToHash(accIter.LeafKey()))
 					return errors.New("missing code")
@@ -507,8 +507,8 @@ func dumpState(ctx *cli.Context) error {
 			CodeSize:         account.CodeSize,
 			SecureKey:        accIt.Hash().Bytes(),
 		}
-		if !conf.SkipCode && !bytes.Equal(account.PoseidonCodeHash, emptyPoseidonCodeHash) {
-			da.Code = rawdb.ReadCode(db, common.BytesToHash(account.PoseidonCodeHash))
+		if !conf.SkipCode && !bytes.Equal(account.KeccakCodeHash, emptyKeccakCodeHash) {
+			da.Code = rawdb.ReadCode(db, common.BytesToHash(account.KeccakCodeHash))
 		}
 		if !conf.SkipStorage {
 			da.Storage = make(map[common.Hash]string)

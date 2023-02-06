@@ -74,7 +74,7 @@ func FullAccount(data []byte) (Account, error) {
 	if len(account.Root) == 0 {
 		account.Root = emptyRoot[:]
 	}
-	if len(account.PoseidonCodeHash) == 0 {
+	if len(account.KeccakCodeHash) == 0 {
 		account.KeccakCodeHash = emptyKeccakCode[:]
 		account.PoseidonCodeHash = emptyPoseidonCode[:]
 		account.CodeSize = 0

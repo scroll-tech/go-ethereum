@@ -364,7 +364,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 		if len(tx.Data()) != 0 && tx.To() != nil {
 			evmTrace.ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
 			// Get tx.to address's code hash.
-			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
+			codeHash := statedb.GetKeccakCodeHash(*tx.To())
 			evmTrace.CodeHash = &codeHash
 		} else if tx.To() == nil { // Contract is created.
 			evmTrace.ByteCode = hexutil.Encode(tx.Data())

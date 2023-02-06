@@ -316,7 +316,7 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 					return stop(err)
 				}
 				go func(hash common.Hash) {
-					subroot, err := leafCallback(db, hash, common.BytesToHash(account.PoseidonCodeHash), stats)
+					subroot, err := leafCallback(db, hash, common.BytesToHash(account.KeccakCodeHash), stats)
 					if err != nil {
 						results <- err
 						return

@@ -29,7 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
-var emptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash
+var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
 
 /*
 The State Transitioning Model
@@ -227,7 +227,7 @@ func (st *StateTransition) preCheck() error {
 				st.msg.From().Hex(), stNonce)
 		}
 		// Make sure the sender is an EOA
-		if codeHash := st.state.GetPoseidonCodeHash(st.msg.From()); codeHash != emptyPoseidonCodeHash && codeHash != (common.Hash{}) {
+		if codeHash := st.state.GetKeccakCodeHash(st.msg.From()); codeHash != emptyKeccakCodeHash && codeHash != (common.Hash{}) {
 			return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
 				st.msg.From().Hex(), codeHash)
 		}

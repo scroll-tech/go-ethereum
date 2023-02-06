@@ -292,7 +292,7 @@ func (s *StateDB) GetCode(addr common.Address) []byte {
 func (s *StateDB) GetCodeSize(addr common.Address) uint64 {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
-		return stateObject.CodeSize(s.db)
+		return stateObject.CodeSize()
 	}
 	return 0
 }
@@ -587,7 +587,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				PoseidonCodeHash: acc.PoseidonCodeHash,
 				CodeSize:         acc.CodeSize,
 			}
-			if len(data.PoseidonCodeHash) == 0 {
+			if len(data.KeccakCodeHash) == 0 {
 				data.KeccakCodeHash = emptyKeccakCodeHash
 				data.PoseidonCodeHash = emptyPoseidonCodeHash
 				data.CodeSize = 0
@@ -980,7 +980,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		if obj := s.stateObjects[addr]; !obj.deleted {
 			// Write any contract code associated with the state object
 			if obj.code != nil && obj.dirtyCode {
-				rawdb.WriteCode(codeWriter, common.BytesToHash(obj.PoseidonCodeHash()), obj.code)
+				rawdb.WriteCode(codeWriter, common.BytesToHash(obj.KeccakCodeHash()), obj.code)
 				obj.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie

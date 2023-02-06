@@ -274,7 +274,7 @@ func copyAccountState(st *types.AccountWrapper) *types.AccountWrapper {
 }
 
 func isDeletedAccount(state *types.AccountWrapper) bool {
-	return state.Nonce == 0 && bytes.Equal(state.PoseidonCodeHash.Bytes(), common.Hash{}.Bytes())
+	return state.Nonce == 0 && bytes.Equal(state.KeccakCodeHash.Bytes(), common.Hash{}.Bytes())
 }
 
 func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount {
@@ -526,9 +526,10 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 			return &types.StateAccount{
 				Nonce:            acc.Nonce,
 				Balance:          acc.Balance,
+				Root:             common.BytesToHash(zkt.ReverseByteOrder(statePath[1].Root)),
 				KeccakCodeHash:   acc.KeccakCodeHash,
 				PoseidonCodeHash: acc.PoseidonCodeHash,
-				Root:             common.BytesToHash(zkt.ReverseByteOrder(statePath[1].Root)),
+				CodeSize:         acc.CodeSize,
 			}
 		})
 	if err != nil {

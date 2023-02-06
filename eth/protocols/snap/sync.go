@@ -50,7 +50,10 @@ var (
 	// emptyRoot is the known root hash of an empty trie.
 	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
-	// emptyPoseidonCodeHash is the known hash of the empty EVM bytecode.
+	// emptyKeccakCodeHash is the known keccak hash of the empty EVM bytecode.
+	emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
+
+	// emptyPoseidonCodeHash is the known poseidon hash of the empty EVM bytecode.
 	emptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash
 )
 
@@ -1754,9 +1757,9 @@ func (s *Syncer) processAccountResponse(res *accountResponse) {
 	res.task.pend = 0
 	for i, account := range res.accounts {
 		// Check if the account is a contract with an unknown code
-		if !bytes.Equal(account.PoseidonCodeHash, emptyPoseidonCodeHash[:]) {
-			if code := rawdb.ReadCodeWithPrefix(s.db, common.BytesToHash(account.PoseidonCodeHash)); code == nil {
-				res.task.codeTasks[common.BytesToHash(account.PoseidonCodeHash)] = struct{}{}
+		if !bytes.Equal(account.KeccakCodeHash, emptyKeccakCodeHash[:]) {
+			if code := rawdb.ReadCodeWithPrefix(s.db, common.BytesToHash(account.KeccakCodeHash)); code == nil {
+				res.task.codeTasks[common.BytesToHash(account.KeccakCodeHash)] = struct{}{}
 				res.task.needCode[i] = true
 				res.task.pend++
 			}
@@ -1820,7 +1823,7 @@ func (s *Syncer) processBytecodeResponse(res *bytecodeResponse) {
 		}
 		// Code was delivered, mark it not needed any more
 		for j, account := range res.task.res.accounts {
-			if res.task.needCode[j] && hash == common.BytesToHash(account.PoseidonCodeHash) {
+			if res.task.needCode[j] && hash == common.BytesToHash(account.KeccakCodeHash) {
 				res.task.needCode[j] = false
 				res.task.pend--
 			}

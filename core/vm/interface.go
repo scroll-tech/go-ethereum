@@ -34,10 +34,10 @@ type StateDB interface {
 	GetNonce(common.Address) uint64
 	SetNonce(common.Address, uint64)
 
-	GetPoseidonCodeHash(common.Address) common.Hash
 	GetKeccakCodeHash(common.Address) common.Hash
 	GetCode(common.Address) []byte
 	SetCode(common.Address, []byte)
+	GetPoseidonCodeHash(common.Address) common.Hash
 	GetCodeSize(common.Address) uint64
 
 	AddRefund(uint64)

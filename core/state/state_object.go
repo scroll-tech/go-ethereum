@@ -97,8 +97,8 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	// note: if PoseidonCodeHash is empty then KeccakCodeHash and CodeSize will also be empty
-	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.PoseidonCodeHash, emptyPoseidonCodeHash)
+	// note: if KeccakCodeHash is empty then PoseidonCodeHash and CodeSize will also be empty
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.KeccakCodeHash, emptyKeccakCodeHash)
 }
 
 // newObject creates a state object.
@@ -106,7 +106,7 @@ func newObject(db *StateDB, address common.Address, data types.StateAccount) *st
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
-	if data.PoseidonCodeHash == nil {
+	if data.KeccakCodeHash == nil {
 		data.KeccakCodeHash = emptyKeccakCodeHash
 		data.PoseidonCodeHash = emptyPoseidonCodeHash
 		data.CodeSize = 0
@@ -486,12 +486,12 @@ func (s *stateObject) Code(db Database) []byte {
 	if s.code != nil {
 		return s.code
 	}
-	if bytes.Equal(s.PoseidonCodeHash(), emptyPoseidonCodeHash) {
+	if bytes.Equal(s.KeccakCodeHash(), emptyKeccakCodeHash) {
 		return nil
 	}
-	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.PoseidonCodeHash()))
+	code, err := db.ContractCode(s.addrHash, common.BytesToHash(s.KeccakCodeHash()))
 	if err != nil {
-		s.setError(fmt.Errorf("can't load code hash %x: %v", s.PoseidonCodeHash(), err))
+		s.setError(fmt.Errorf("can't load code hash %x: %v", s.KeccakCodeHash(), err))
 	}
 	s.code = code
 	return code
@@ -500,7 +500,7 @@ func (s *stateObject) Code(db Database) []byte {
 // CodeSize returns the size of the contract code associated with this object,
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
-func (s *stateObject) CodeSize(db Database) uint64 {
+func (s *stateObject) CodeSize() uint64 {
 	return s.data.CodeSize
 }
 
@@ -508,7 +508,7 @@ func (s *stateObject) SetCode(code []byte) {
 	prevcode := s.Code(s.db.db)
 	s.db.journal.append(codeChange{
 		account:  &s.address,
-		prevhash: s.PoseidonCodeHash(),
+		prevhash: s.KeccakCodeHash(),
 		prevcode: prevcode,
 	})
 	s.setCode(code)

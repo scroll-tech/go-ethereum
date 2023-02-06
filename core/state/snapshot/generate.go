@@ -628,7 +628,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		if accMarker == nil || !bytes.Equal(accountHash[:], accMarker) {
 			dataLen := len(val) // Approximate size, saves us a round of RLP-encoding
 			if !write {
-				if bytes.Equal(acc.PoseidonCodeHash, emptyPoseidonCode[:]) {
+				if bytes.Equal(acc.KeccakCodeHash, emptyKeccakCode[:]) {
 					dataLen -= 32
 				}
 				if acc.Root == emptyRoot {

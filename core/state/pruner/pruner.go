@@ -59,8 +59,8 @@ var (
 	// emptyRoot is the known root hash of an empty trie.
 	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
-	// emptyPoseidonCodeHash is the known hash of the empty EVM bytecode.
-	emptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash.Bytes()
+	// emptyKeccakCodeHash is the known hash of the empty EVM bytecode.
+	emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash.Bytes()
 )
 
 // Pruner is an offline tool to prune the stale state with the
@@ -445,8 +445,8 @@ func extractGenesis(db ethdb.Database, stateBloom *stateBloom) error {
 					return storageIter.Error()
 				}
 			}
-			if !bytes.Equal(acc.PoseidonCodeHash, emptyPoseidonCodeHash) {
-				stateBloom.Put(acc.PoseidonCodeHash, nil)
+			if !bytes.Equal(acc.KeccakCodeHash, emptyKeccakCodeHash) {
+				stateBloom.Put(acc.KeccakCodeHash, nil)
 			}
 		}
 	}

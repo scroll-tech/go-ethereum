@@ -629,7 +629,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			dataLen := len(val) // Approximate size, saves us a round of RLP-encoding
 			if !write {
 				if bytes.Equal(acc.KeccakCodeHash, emptyKeccakCode[:]) {
-					dataLen -= 32
+					// account for keccakCodeHash, poseidonCodeHash, and CodeSize
+					dataLen = dataLen - 32 - 32 - 8
 				}
 				if acc.Root == emptyRoot {
 					dataLen -= 32

@@ -289,6 +289,7 @@ func getAccountDataFromLogState(state *types.AccountWrapper) *types.StateAccount
 		KeccakCodeHash:   state.KeccakCodeHash.Bytes(),
 		PoseidonCodeHash: state.PoseidonCodeHash.Bytes(),
 		CodeSize:         state.CodeSize,
+		// Root omitted intentionally
 	}
 }
 

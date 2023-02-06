@@ -35,6 +35,9 @@ func CodeHash(code []byte) (h common.Hash) {
 	// step 3: apply the array onto a sponge process with the current poseidon scheme
 	// (3 Frs permutation and 1 Fr for output, so the throughout is 2 Frs)
 	// step 4: convert final root Fr to u256 (big-endian representation)
-	hash, _ := HashWithCap(Frs, defaultPoseidonChunk, nBytes)
+	hash, err := HashWithCap(Frs, defaultPoseidonChunk, nBytes)
+	if err != nil {
+		return common.Hash{}
+	}
 	return common.BigToHash(hash)
 }

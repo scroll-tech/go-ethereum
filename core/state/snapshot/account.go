@@ -46,7 +46,7 @@ func SlimAccount(nonce uint64, balance *big.Int, root common.Hash, keccakcodehas
 	if root != emptyRoot {
 		slim.Root = root[:]
 	}
-	if !bytes.Equal(poseidoncodehash, emptyPoseidonCode[:]) {
+	if !bytes.Equal(keccakcodehash, emptyKeccakCode[:]) {
 		slim.KeccakCodeHash = keccakcodehash
 		slim.PoseidonCodeHash = poseidoncodehash
 		slim.CodeSize = codesize

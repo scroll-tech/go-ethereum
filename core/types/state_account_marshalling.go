@@ -59,10 +59,10 @@ func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
 	// The returned flag shows which items cannot be encoded as field elements.
 	// KeccakCodeHash can be larger than the field size so we set the 3rd (LSB) bit to 1.
 	//
-	// +---+---+---+---+---+---+
-	// | 0 | 1 | 2 | 3 | 4 | 5 |
-	// +---+---+---+---+---+---+
-	//   0   0   0   1   0   0
+	// +---+---+---+---+---+
+	// | 0 | 1 | 2 | 3 | 4 |
+	// +---+---+---+---+---+
+	//   0   0   0   1   0
 
 	flag := uint32(8)
 

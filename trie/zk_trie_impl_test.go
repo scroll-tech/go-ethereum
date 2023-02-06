@@ -225,7 +225,7 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 		Nonce:            1,
 		Balance:          big.NewInt(10000000),
 		Root:             common.HexToHash("22fb59aa5410ed465267023713ab42554c250f394901455a3366e223d5f7d147"),
-		KeccakCodeHash:   common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+		KeccakCodeHash:   common.HexToHash("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
 		PoseidonCodeHash: common.HexToHash("0c0a77f6e063b4b62eb7d9ed6f427cf687d8d0071d751850cfe5d136bc60d3ab").Bytes(),
 		CodeSize:         0,
 	}
@@ -237,7 +237,7 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 		Nonce:            5,
 		Balance:          big.NewInt(50000000),
 		Root:             common.HexToHash("0"),
-		KeccakCodeHash:   common.HexToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+		KeccakCodeHash:   common.HexToHash("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
 		PoseidonCodeHash: common.HexToHash("05d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
 		CodeSize:         5,
 	}

@@ -66,8 +66,8 @@ type ExecutionResult struct {
 	// currently they are just `from` and `to` account
 	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
-	// `CodeHash` only exists when tx is a contract call.
-	CodeHash *common.Hash `json:"codeHash,omitempty"`
+	// `PoseidonCodeHash` only exists when tx is a contract call.
+	PoseidonCodeHash *common.Hash `json:"poseidonCodeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
 	ByteCode   string          `json:"byteCode,omitempty"`
 	StructLogs []*StructLogRes `json:"structLogs"`

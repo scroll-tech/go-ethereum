@@ -1626,10 +1626,12 @@ func verifyTrie(db ethdb.KeyValueStore, root common.Hash, t *testing.T) {
 	accIt := trie.NewIterator(accTrie.NodeIterator(nil))
 	for accIt.Next() {
 		var acc struct {
-			Nonce    uint64
-			Balance  *big.Int
-			Root     common.Hash
-			CodeHash []byte
+			Nonce            uint64
+			Balance          *big.Int
+			Root             common.Hash
+			KeccakCodeHash   []byte
+			PoseidonCodeHash []byte
+			CodeSize         uint64
 		}
 		if err := rlp.DecodeBytes(accIt.Value, &acc); err != nil {
 			log.Crit("Invalid account encountered during snapshot creation", "err", err)

@@ -43,10 +43,7 @@ var (
 // [128:160] PoseidonCodehash
 // (total 160 bytes)
 func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
-	// fields := make([]zkt.Byte32, 5)
-
-	// temp workaround
-	fields := make([]zkt.Byte32, 6)
+	fields := make([]zkt.Byte32, 5)
 
 	if !utils.CheckBigIntInField(s.Balance) {
 		panic("StateAccount balance overflow")
@@ -73,12 +70,7 @@ func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
 }
 
 func UnmarshalStateAccount(bytes []byte) (*StateAccount, error) {
-	// if len(bytes) != 160 {
-	// 	return nil, ErrInvalidLength
-	// }
-
-	// temp workaround
-	if len(bytes) != 192 {
+	if len(bytes) != 160 {
 		return nil, ErrInvalidLength
 	}
 

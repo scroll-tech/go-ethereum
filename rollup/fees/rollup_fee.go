@@ -4,12 +4,12 @@ import (
 	"bytes"
 	// "context"
 	"errors"
-	// "math"
+	"math"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	// "github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
@@ -114,11 +114,45 @@ func ScalePrecision(scalar, precision *big.Int) *big.Float {
 	return new(big.Float).Quo(fscalar, fdivisor)
 }
 
-// TODO:
 // CalculateL1Fee computes the L1 fee
 func CalculateL1Fee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Float) *big.Int {
-	// l1GasUsed := CalculateL1GasUsed(data, overhead)
-	// l1Fee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
-	// return mulByFloat(l1Fee, scalar)
-	return nil
+	l1GasUsed := CalculateL1GasUsed(data, overhead)
+	l1Fee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
+	return mulByFloat(l1Fee, scalar)
+}
+
+// CalculateL1GasUsed computes the L1 gas used based on the calldata and
+// constant sized overhead. The overhead can be decreased as the cost of the
+// batch submission goes down via contract optimizations. This will not overflow
+// under standard network conditions.
+func CalculateL1GasUsed(data []byte, overhead *big.Int) *big.Int {
+	zeroes, ones := zeroesAndOnes(data)
+	zeroesGas := zeroes * params.TxDataZeroGas
+	onesGas := (ones + 68) * params.TxDataNonZeroGasEIP2028
+	l1Gas := new(big.Int).SetUint64(zeroesGas + onesGas)
+	return new(big.Int).Add(l1Gas, overhead)
+}
+
+// zeroesAndOnes counts the number of 0 bytes and non 0 bytes in a byte slice
+func zeroesAndOnes(data []byte) (uint64, uint64) {
+	var zeroes uint64
+	var ones uint64
+	for _, byt := range data {
+		if byt == 0 {
+			zeroes++
+		} else {
+			ones++
+		}
+	}
+	return zeroes, ones
+}
+
+// mulByFloat multiplies a big.Int by a float and returns the
+// big.Int rounded upwards
+func mulByFloat(num *big.Int, float *big.Float) *big.Int {
+	n := new(big.Float).SetUint64(num.Uint64())
+	product := n.Mul(n, float)
+	pfloat, _ := product.Float64()
+	rounded := math.Ceil(pfloat)
+	return new(big.Int).SetUint64(uint64(rounded))
 }

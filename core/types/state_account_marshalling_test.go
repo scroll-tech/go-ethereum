@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	"github.com/iden3/go-iden3-crypto/constants"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
-	"github.com/stretchr/testify/assert"
 )
 
 func assertAccountsEqual(t *testing.T, expected *StateAccount, actual *StateAccount) {

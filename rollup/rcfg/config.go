@@ -17,6 +17,8 @@ var (
 	// predeploy
 	L2GasPriceOracleAddress *common.Address
 
+	Precision = new(big.Int).SetUint64(1e9)
+
 	OverheadSlot = common.BigToHash(big.NewInt(1))
 	ScalarSlot   = common.BigToHash(big.NewInt(2))
 )

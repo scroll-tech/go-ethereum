@@ -4,7 +4,6 @@ import (
 	"bytes"
 	// "context"
 	"errors"
-	"fmt"
 	// "math"
 	"math/big"
 
@@ -49,15 +48,15 @@ func CalculateL1MsgFee(msg Message, state StateDB) (*big.Int, error) {
 		return nil, err
 	}
 
-	gpo := &rcfg.L2GasPriceOracleAddress
-	fmt.Println(raw)
-	fmt.Println(gpo)
+	gpo := rcfg.L2GasPriceOracleAddress
+	overhead, scalar := readGPOStorageSlots(*gpo, state)
+	l1Fee := CalculateL1Fee(
+		raw,
+		overhead,
+		nil, // TODO: l1GasPrice,
+		scalar)
 
-	// l1GasPrice, overhead, scalar := readGPOStorageSlots(*gpo, state)
-	// l1Fee := CalculateL1Fee(raw, overhead, l1GasPrice, scalar)
-	// return l1Fee, nil
-
-	return nil, nil
+	return l1Fee, nil
 }
 
 // asTransaction turns a Message into a types.Transaction
@@ -98,4 +97,28 @@ func rlpEncode(tx *types.Transaction) ([]byte, error) {
 	// Slice off the 0 bytes representing the signature
 	b := raw.Bytes()
 	return b[:len(b)-3], nil
+}
+
+func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Float) {
+	overhead := state.GetState(addr, rcfg.OverheadSlot)
+	scalar := state.GetState(addr, rcfg.ScalarSlot)
+	scaled := ScalePrecision(scalar.Big(), rcfg.Precision)
+	return overhead.Big(), scaled
+}
+
+// ScalePrecision will scale a value by precision
+func ScalePrecision(scalar, precision *big.Int) *big.Float {
+	fscalar := new(big.Float).SetInt(scalar)
+	fdivisor := new(big.Float).SetInt(precision)
+	// fscalar / fdivisor
+	return new(big.Float).Quo(fscalar, fdivisor)
+}
+
+// TODO:
+// CalculateL1Fee computes the L1 fee
+func CalculateL1Fee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Float) *big.Int {
+	// l1GasUsed := CalculateL1GasUsed(data, overhead)
+	// l1Fee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
+	// return mulByFloat(l1Fee, scalar)
+	return nil
 }

@@ -45,8 +45,20 @@ var (
 func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
 	fields := make([]zkt.Byte32, 5)
 
+	if s.Balance == nil {
+		panic("StateAccount balance nil")
+	}
+
 	if !utils.CheckBigIntInField(s.Balance) {
 		panic("StateAccount balance overflow")
+	}
+
+	if !utils.CheckBigIntInField(s.Root.Big()) {
+		panic("StateAccount root overflow")
+	}
+
+	if !utils.CheckBigIntInField(new(big.Int).SetBytes(s.PoseidonCodeHash)) {
+		panic("StateAccount poseidonCodeHash overflow")
 	}
 
 	binary.BigEndian.PutUint64(fields[0][16:], s.CodeSize)

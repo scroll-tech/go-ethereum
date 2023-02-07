@@ -508,7 +508,6 @@ func (s *stateObject) SetCode(code []byte) {
 	prevcode := s.Code(s.db.db)
 	s.db.journal.append(codeChange{
 		account:  &s.address,
-		prevhash: s.KeccakCodeHash(),
 		prevcode: prevcode,
 	})
 	s.setCode(code)

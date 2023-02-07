@@ -113,8 +113,8 @@ type (
 		key, prevalue common.Hash
 	}
 	codeChange struct {
-		account            *common.Address
-		prevcode, prevhash []byte
+		account  *common.Address
+		prevcode []byte
 	}
 
 	// Changes to other state values.

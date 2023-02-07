@@ -163,7 +163,7 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
 	l1Fee := new(big.Int)
-	if rcfg.L2GasPriceOracleAddress != nil {
+	if rcfg.UsingSVM {
 		l1Fee, _ = fees.CalculateL1MsgFee(msg, evm.StateDB)
 	}
 

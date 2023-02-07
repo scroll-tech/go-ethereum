@@ -2,10 +2,11 @@ package fees
 
 import (
 	"bytes"
-	// "context"
 	"errors"
 	"math"
 	"math/big"
+
+	"golang.org/x/crypto/sha3"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -48,14 +49,9 @@ func CalculateL1MsgFee(msg Message, state StateDB) (*big.Int, error) {
 		return nil, err
 	}
 
-	gpo := rcfg.L2GasPriceOracleAddress
-	overhead, scalar := readGPOStorageSlots(*gpo, state)
-	l1Fee := CalculateL1Fee(
-		raw,
-		overhead,
-		nil, // TODO: l1GasPrice,
-		scalar)
-
+	l1GasPrice := readBCStorageSlots(rcfg.L1BlockContainerAddress, state)
+	overhead, scalar := readGPOStorageSlots(rcfg.L2GasPriceOracleAddress, state)
+	l1Fee := CalculateL1Fee(raw, overhead, l1GasPrice, scalar)
 	return l1Fee, nil
 }
 
@@ -155,4 +151,14 @@ func mulByFloat(num *big.Int, float *big.Float) *big.Int {
 	pfloat, _ := product.Float64()
 	rounded := math.Ceil(pfloat)
 	return new(big.Int).SetUint64(uint64(rounded))
+}
+
+func readBCStorageSlots(addr common.Address, state StateDB) *big.Int {
+	latestBlockHash := state.GetState(addr, rcfg.LatestBlockHashSlot)
+	sha := sha3.NewLegacyKeccak256()
+	sha.Write(latestBlockHash.Bytes())
+	sha.Write(rcfg.MetadataSlot.Bytes())
+	hash := sha.Sum(nil)
+	key := new(big.Int).Add(common.BytesToHash(hash).Big(), rcfg.BaseFeeMetadataIndex)
+	return state.GetState(addr, common.BigToHash(key)).Big()
 }

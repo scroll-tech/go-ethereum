@@ -50,12 +50,12 @@ var wsBufferPool = new(sync.Pool)
 // To allow connections with any origin, pass "*".
 func (s *Server) WebsocketHandler(allowedOrigins []string) http.Handler {
 	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  wsReadBuffer,
-		WriteBufferSize: wsWriteBuffer,
-		WriteBufferPool: wsBufferPool,
-		CheckOrigin:     wsHandshakeValidator(allowedOrigins),
+		EnableCompression: true,
+		ReadBufferSize:    wsReadBuffer,
+		WriteBufferSize:   wsWriteBuffer,
+		WriteBufferPool:   wsBufferPool,
+		CheckOrigin:       wsHandshakeValidator(allowedOrigins),
 	}
-	upgrader.EnableCompression = true
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {

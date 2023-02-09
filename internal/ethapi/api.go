@@ -636,13 +636,15 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 
 // Result structs for GetProof
 type AccountResult struct {
-	Address      common.Address  `json:"address"`
-	AccountProof []string        `json:"accountProof"`
-	Balance      *hexutil.Big    `json:"balance"`
-	CodeHash     common.Hash     `json:"codeHash"`
-	Nonce        hexutil.Uint64  `json:"nonce"`
-	StorageHash  common.Hash     `json:"storageHash"`
-	StorageProof []StorageResult `json:"storageProof"`
+	Address          common.Address  `json:"address"`
+	AccountProof     []string        `json:"accountProof"`
+	Balance          *hexutil.Big    `json:"balance"`
+	PoseidonCodeHash common.Hash     `json:"poseidonCodeHash"`
+	KeccakCodeHash   common.Hash     `json:"keccakCodeHash"`
+	CodeSize         hexutil.Uint64  `json:"codeSize"`
+	Nonce            hexutil.Uint64  `json:"nonce"`
+	StorageHash      common.Hash     `json:"storageHash"`
+	StorageProof     []StorageResult `json:"storageProof"`
 }
 
 type StorageResult struct {
@@ -665,7 +667,8 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 	if !zktrie {
 		storageHash = types.EmptyRootHash
 	}
-	codeHash := state.GetCodeHash(address)
+	keccakCodeHash := state.GetKeccakCodeHash(address)
+	poseidonCodeHash := state.GetPoseidonCodeHash(address)
 	storageProof := make([]StorageResult, len(storageKeys))
 
 	// if we have a storageTrie, (which means the account exists), we can update the storagehash
@@ -673,7 +676,8 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		storageHash = storageTrie.Hash()
 	} else {
 		// no storageTrie means the account does not exist, so the codeHash is the hash of an empty bytearray.
-		codeHash = codehash.EmptyCodeHash
+		keccakCodeHash = codehash.EmptyKeccakCodeHash
+		poseidonCodeHash = codehash.EmptyPoseidonCodeHash
 	}
 
 	// create the proof for the storageKeys
@@ -696,13 +700,15 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 	}
 
 	return &AccountResult{
-		Address:      address,
-		AccountProof: toHexSlice(accountProof),
-		Balance:      (*hexutil.Big)(state.GetBalance(address)),
-		CodeHash:     codeHash,
-		Nonce:        hexutil.Uint64(state.GetNonce(address)),
-		StorageHash:  storageHash,
-		StorageProof: storageProof,
+		Address:          address,
+		AccountProof:     toHexSlice(accountProof),
+		Balance:          (*hexutil.Big)(state.GetBalance(address)),
+		KeccakCodeHash:   keccakCodeHash,
+		PoseidonCodeHash: poseidonCodeHash,
+		CodeSize:         hexutil.Uint64(state.GetCodeSize(address)),
+		Nonce:            hexutil.Uint64(state.GetNonce(address)),
+		StorageHash:      storageHash,
+		StorageProof:     storageProof,
 	}, state.Error()
 }
 
@@ -1121,7 +1127,7 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args TransactionA
 }
 
 // RPCMarshalHeader converts the given header to the RPC output .
-func RPCMarshalHeader(head *types.Header) map[string]interface{} {
+func RPCMarshalHeader(head *types.Header, enableBaseFee bool) map[string]interface{} {
 	result := map[string]interface{}{
 		"number":           (*hexutil.Big)(head.Number),
 		"hash":             head.Hash(),
@@ -1142,7 +1148,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"receiptsRoot":     head.ReceiptHash,
 	}
 
-	if head.BaseFee != nil {
+	if enableBaseFee && head.BaseFee != nil {
 		result["baseFeePerGas"] = (*hexutil.Big)(head.BaseFee)
 	}
 
@@ -1153,7 +1159,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
 func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *params.ChainConfig) (map[string]interface{}, error) {
-	fields := RPCMarshalHeader(block.Header())
+	fields := RPCMarshalHeader(block.Header(), config.EnableEIP2718 && config.EnableEIP1559)
 	fields["size"] = hexutil.Uint64(block.Size())
 
 	if inclTx {
@@ -1188,7 +1194,7 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *param
 // rpcMarshalHeader uses the generalized output filler, then adds the total difficulty field, which requires
 // a `PublicBlockchainAPI`.
 func (s *PublicBlockChainAPI) rpcMarshalHeader(ctx context.Context, header *types.Header) map[string]interface{} {
-	fields := RPCMarshalHeader(header)
+	fields := RPCMarshalHeader(header, s.b.ChainConfig().EnableEIP2718 && s.b.ChainConfig().EnableEIP1559)
 	fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, header.Hash()))
 	return fields
 }

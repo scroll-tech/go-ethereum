@@ -50,8 +50,9 @@ var wsBufferPool = new(sync.Pool)
 // allowedOrigins should be a comma-separated list of allowed origin URLs.
 // To allow connections with any origin, pass "*".
 func (s *Server) WebsocketHandler(allowedOrigins []string) http.Handler {
+	enableCompression := s.compressionLevel != flate.NoCompression
 	var upgrader = websocket.Upgrader{
-		EnableCompression: true,
+		EnableCompression: enableCompression,
 		ReadBufferSize:    wsReadBuffer,
 		WriteBufferSize:   wsWriteBuffer,
 		WriteBufferPool:   wsBufferPool,
@@ -62,6 +63,9 @@ func (s *Server) WebsocketHandler(allowedOrigins []string) http.Handler {
 		if err != nil {
 			log.Debug("WebSocket upgrade failed", "err", err)
 			return
+		}
+		if enableCompression {
+			_ = conn.SetCompressionLevel(s.compressionLevel)
 		}
 		codec := newWebsocketCodec(conn)
 		s.ServeCodec(codec, 0)
@@ -249,7 +253,6 @@ func newWebsocketCodec(conn *websocket.Conn) ServerCodec {
 		conn.SetReadDeadline(time.Time{})
 		return nil
 	})
-	_ = conn.SetCompressionLevel(flate.BestCompression)
 	wc := &websocketCodec{
 		jsonCodec: NewFuncCodec(conn, conn.WriteJSON, conn.ReadJSON).(*jsonCodec),
 		conn:      conn,

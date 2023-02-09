@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"compress/flate"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -248,6 +249,7 @@ func newWebsocketCodec(conn *websocket.Conn) ServerCodec {
 		conn.SetReadDeadline(time.Time{})
 		return nil
 	})
+	_ = conn.SetCompressionLevel(flate.BestCompression)
 	wc := &websocketCodec{
 		jsonCodec: NewFuncCodec(conn, conn.WriteJSON, conn.ReadJSON).(*jsonCodec),
 		conn:      conn,

@@ -440,7 +440,7 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	}
 	var upper, lower uint64
 	upper = interpreter.evm.Context.BlockNumber.Uint64()
-	if upper < 1 {
+	if upper < 2 {
 		lower = 0
 	} else {
 		lower = upper - 1

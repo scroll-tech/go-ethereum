@@ -94,7 +94,6 @@ func TestAPI_GetBlockTraceByNumberOrHash(t *testing.T) {
 	blockTrace, err := api.GetBlockTraceByNumberOrHash(context.Background(), rpc.BlockNumberOrHash{
 		BlockHash: &hash,
 	}, nil)
-	// fmt.Println(blockTrace.FeeVaultAddress.Address)
 	assert.NoError(t, err)
 
 	// check chain status

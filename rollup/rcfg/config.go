@@ -6,8 +6,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 )
 
-// UsingSVM is used to enable or disable functionality necessary for the SVM.
-var UsingSVM bool
+// UsingScroll is used to enable or disable functionality necessary for the SVM.
+var UsingScroll bool
 
 // TODO:
 // 1. use config

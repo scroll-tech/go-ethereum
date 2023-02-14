@@ -3217,7 +3217,7 @@ func TestTransactionCountLimit(t *testing.T) {
 		t.Fatalf("failed to insert chain: %v", err)
 	}
 
-	// Insert block with 1 transaction each
+	// Insert block with 1 transaction
 	block2, _ := GenerateChain(config, genesis, ethash.NewFaker(), db, 1, func(i int, b *BlockGen) {
 		addTx(b)
 	})
@@ -3226,7 +3226,7 @@ func TestTransactionCountLimit(t *testing.T) {
 		t.Fatalf("failed to insert chain: %v", err)
 	}
 
-	// Insert block with 2 transaction each
+	// Insert block with 2 transactions
 	block3, _ := GenerateChain(config, genesis, ethash.NewFaker(), db, 1, func(i int, b *BlockGen) {
 		addTx(b)
 		addTx(b)

@@ -11,6 +11,8 @@ type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 }
 
+// ReadWTRSlot reads WithdrawTrieRoot slot in L2MessageQueue predeploy, i.e., `messageRoot`
+// in scroll-tech/scroll/contracts/src/libraries/common/AppendOnlyMerkleTree.sol
 func ReadWTRSlot(addr common.Address, state StateDB) common.Hash {
 	return state.GetState(addr, rcfg.WithdrawTrieRootSlot)
 }

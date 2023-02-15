@@ -386,7 +386,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 		}
 	}
 
-	if rcfg.UsingScroll {
+	if api.backend.ChainConfig().UsingScroll {
 		blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.state)
 	}
 

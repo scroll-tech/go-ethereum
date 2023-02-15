@@ -6,9 +6,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 )
 
-// UsingScroll is used to enable or disable functionality necessary for scroll rollup.
-var UsingScroll bool
-
 // TODO:
 // 1. use config
 // 2. allow different networks / hardforks

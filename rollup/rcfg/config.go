@@ -17,5 +17,5 @@ var (
 	// predeploy
 	// see scroll-tech/scroll/contracts/src/L2/predeploys/L2MessageQueue.sol
 	L2MessageQueueAddress = common.HexToAddress("0x5300000000000000000000000000000000000002")
-	WithdraTrieRootSlot   = common.BigToHash(big.NewInt(0))
+	WithdrawTrieRootSlot  = common.BigToHash(big.NewInt(0))
 )

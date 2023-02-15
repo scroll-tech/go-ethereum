@@ -2,6 +2,7 @@ package withdrawtrie
 
 import (
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 // StateDB represents the StateDB interface
@@ -11,5 +12,5 @@ type StateDB interface {
 }
 
 func ReadWTRSlot(addr common.Address, state StateDB) common.Hash {
-	return common.Hash{}
+	return state.GetState(addr, rcfg.WithdrawTrieRootSlot)
 }

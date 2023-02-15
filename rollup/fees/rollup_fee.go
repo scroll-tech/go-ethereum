@@ -6,8 +6,6 @@ import (
 	"math"
 	"math/big"
 
-	"golang.org/x/crypto/sha3"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
@@ -49,9 +47,8 @@ func CalculateL1MsgFee(msg Message, state StateDB) (*big.Int, error) {
 		return nil, err
 	}
 
-	l1GasPrice := readBCStorageSlots(rcfg.L1BlockContainerAddress, state)
-	overhead, scalar := readGPOStorageSlots(rcfg.L2GasPriceOracleAddress, state)
-	l1Fee := CalculateL1Fee(raw, overhead, l1GasPrice, scalar)
+	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+	l1Fee := CalculateL1Fee(raw, overhead, l1BaseFee, scalar)
 	return l1Fee, nil
 }
 
@@ -95,11 +92,12 @@ func rlpEncode(tx *types.Transaction) ([]byte, error) {
 	return b[:len(b)-3], nil
 }
 
-func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Float) {
+func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int, *big.Float) {
+	l1BaseFee := state.GetState(addr, rcfg.L1BaseFeeSlot)
 	overhead := state.GetState(addr, rcfg.OverheadSlot)
 	scalar := state.GetState(addr, rcfg.ScalarSlot)
 	scaled := ScalePrecision(scalar.Big(), rcfg.Precision)
-	return overhead.Big(), scaled
+	return l1BaseFee.Big(), overhead.Big(), scaled
 }
 
 // ScalePrecision will scale a value by precision
@@ -151,14 +149,4 @@ func mulByFloat(num *big.Int, float *big.Float) *big.Int {
 	pfloat, _ := product.Float64()
 	rounded := math.Ceil(pfloat)
 	return new(big.Int).SetUint64(uint64(rounded))
-}
-
-func readBCStorageSlots(addr common.Address, state StateDB) *big.Int {
-	latestBlockHash := state.GetState(addr, rcfg.LatestBlockHashSlot)
-	sha := sha3.NewLegacyKeccak256()
-	sha.Write(latestBlockHash.Bytes())
-	sha.Write(rcfg.MetadataSlot.Bytes())
-	hash := sha.Sum(nil)
-	key := new(big.Int).Add(common.BytesToHash(hash).Big(), rcfg.BaseFeeMetadataIndex)
-	return state.GetState(addr, common.BigToHash(key)).Big()
 }

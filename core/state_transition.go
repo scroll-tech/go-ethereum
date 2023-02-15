@@ -28,7 +28,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
-	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
@@ -163,7 +162,7 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
 	l1Fee := new(big.Int)
-	if rcfg.UsingScroll {
+	if evm.ChainConfig().UsingScroll {
 		l1Fee, _ = fees.CalculateL1MsgFee(msg, evm.StateDB)
 	}
 

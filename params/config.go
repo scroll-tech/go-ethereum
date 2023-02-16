@@ -372,7 +372,7 @@ type ChainConfig struct {
 	MaxTxPerBlock *int `json:"maxTxPerBlock,omitempty"`
 
 	// Scroll genesis extension: enable scroll rollup-related traces & state transition
-	// TODO: merge these config: Zktrie, FeeVaultAddress, EnableEIP2718, EnableEIP1559 & MaxTxPerBlock
+	// TODO: merge with these config: Zktrie, FeeVaultAddress, EnableEIP2718, EnableEIP1559 & MaxTxPerBlock
 	UsingScroll bool `json:"usingScroll,omitempty"`
 }
 

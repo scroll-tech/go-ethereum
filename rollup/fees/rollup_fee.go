@@ -40,6 +40,7 @@ type StateDB interface {
 
 // CalculateL1MsgFee computes the L1 portion of the fee given
 // a Message and a StateDB
+// Reference: https://github.com/ethereum-optimism/optimism/blob/develop/l2geth/rollup/fees/rollup_fee.go
 func CalculateL1MsgFee(msg Message, state StateDB) (*big.Int, error) {
 	tx := asTransaction(msg)
 	raw, err := rlpEncode(tx)

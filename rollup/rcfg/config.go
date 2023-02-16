@@ -7,7 +7,7 @@ import (
 )
 
 // TODO:
-// vefify in consensus layer when decentralizing sequencer
+// verify in consensus layer when decentralizing sequencer
 
 var (
 	// L2MessageQueueAddress is the address of the L2MessageQueue

@@ -203,10 +203,10 @@ func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).SetUint64(st.msg.Gas())
 	mgval = mgval.Mul(mgval, st.gasPrice)
 
-	// Always add l1fee, because all tx are L2-to-L1 ATM.
-	// No need to check `evm.ChainConfig().UsingScroll`, because it's already checked
-	// in `NewStateTransition`
-	mgval = mgval.Add(mgval, st.l1Fee)
+	if st.evm.ChainConfig().UsingScroll {
+		// always add l1fee, because all tx are L2-to-L1 ATM
+		mgval = mgval.Add(mgval, st.l1Fee)
+	}
 
 	balanceCheck := mgval
 	if st.gasFeeCap != nil {

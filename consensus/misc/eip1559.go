@@ -42,7 +42,7 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 	if header.BaseFee == nil && (config.EnableEIP2718 && config.EnableEIP1559) {
 		return fmt.Errorf("header is missing baseFee")
 	}
-	// Now BaseFee can be nil, becuase !(config.EnableEIP2718 && config.EnableEIP1559)
+	// Now BaseFee can be nil, because !(config.EnableEIP2718 && config.EnableEIP1559)
 	if header.BaseFee == nil {
 		return nil
 	}

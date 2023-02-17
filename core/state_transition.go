@@ -202,6 +202,12 @@ func (st *StateTransition) to() common.Address {
 func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).SetUint64(st.msg.Gas())
 	mgval = mgval.Mul(mgval, st.gasPrice)
+
+	// Always add l1fee, because all tx are L2-to-L1 ATM.
+	// No need to check `evm.ChainConfig().UsingScroll`, because it's already checked
+	// in `NewStateTransition`
+	mgval = mgval.Add(mgval, st.l1Fee)
+
 	balanceCheck := mgval
 	if st.gasFeeCap != nil {
 		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
@@ -346,7 +352,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if london {
 		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
 	}
-	st.state.AddBalance(st.evm.FeeRecipient(), new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+
+	if st.evm.ChainConfig().UsingScroll {
+		// The L2 Fee is the same as the fee that is charged in the normal geth
+		// codepath. Add the L1 fee to the L2 fee for the total fee that is sent
+		// to the sequencer.
+		l2Fee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip)
+		fee := new(big.Int).Add(st.l1Fee, l2Fee)
+		st.state.AddBalance(st.evm.FeeRecipient(), fee)
+	} else {
+		st.state.AddBalance(st.evm.FeeRecipient(), new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+	}
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

@@ -76,7 +76,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header) *big.Int {
 		parentGasTargetBig       = new(big.Int).SetUint64(parentGasTarget)
 		baseFeeChangeDenominator = new(big.Int).SetUint64(params.BaseFeeChangeDenominator)
 	)
-	if !(config.EnableEIP2718 && config.EnableEIP1559) {
+	if !config.EnableEIP2718 || !config.EnableEIP1559 {
 		return nil
 	}
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.

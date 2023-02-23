@@ -192,7 +192,10 @@ type extblock struct {
 func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher TrieHasher) *Block {
 	b := &Block{header: CopyHeader(header), td: new(big.Int)}
 
-	// TODO: panic if len(txs) != len(receipts)
+	if len(txs) != len(receipts){
+		panic("length of transaction is not the same as length of receipts.")
+	}
+	
 	if len(txs) == 0 {
 		b.header.TxHash = EmptyRootHash
 	} else {

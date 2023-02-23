@@ -26,7 +26,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
-	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
@@ -206,22 +205,18 @@ func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).SetUint64(st.msg.Gas())
 	mgval = mgval.Mul(mgval, st.gasPrice)
 
-	if st.evm.ChainConfig().UsingScroll {
-		// always add l1fee, because all tx are L2-to-L1 ATM
-		log.Debug("Adding L1 fee", "l1_fee", st.l1Fee)
-		mgval = mgval.Add(mgval, st.l1Fee)
-	}
-
 	balanceCheck := mgval
 	if st.gasFeeCap != nil {
 		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
 		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
 		balanceCheck.Add(balanceCheck, st.value)
-		if st.evm.ChainConfig().UsingScroll {
-			// always add l1fee, because all tx are L2-to-L1 ATM
-			balanceCheck.Add(balanceCheck, st.l1Fee)
-		}
 	}
+
+	if st.evm.ChainConfig().UsingScroll {
+		// always add l1fee, because all tx are L2-to-L1 ATM
+		balanceCheck.Add(balanceCheck, st.l1Fee)
+	}
+
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 	}

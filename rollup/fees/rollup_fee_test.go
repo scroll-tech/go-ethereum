@@ -12,9 +12,9 @@ func TestCalculateL1Fee(t *testing.T) {
 
 	data := []byte{0, 10, 1, 0}
 	overhead := new(big.Int).SetUint64(100)
-	scalar := new(big.Int).SetUint64(1e8)
+	scalar := new(big.Int).SetUint64(10)
 
-	expected := new(big.Int).SetUint64(1842000000)
+	expected := new(big.Int).SetUint64(184) // 184.2
 	actual := CalculateL1Fee(data, overhead, l1BaseFee, scalar)
 	assert.Equal(t, expected, actual)
 }

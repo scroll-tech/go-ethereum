@@ -26,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
@@ -88,6 +89,7 @@ type Message interface {
 // ExecutionResult includes all output after executing given evm
 // message no matter the execution itself is successful or not.
 type ExecutionResult struct {
+	L1Fee      *big.Int
 	UsedGas    uint64 // Total used gas but include the refunded gas
 	Err        error  // Any error encountered during the execution(listed in core/vm/errors.go)
 	ReturnData []byte // Returned data from evm(function result or data supplied with revert opcode)
@@ -207,6 +209,7 @@ func (st *StateTransition) buyGas() error {
 
 	if st.evm.ChainConfig().UsingScroll {
 		// always add l1fee, because all tx are L2-to-L1 ATM
+		log.Debug("Adding L1 fee", "l1_fee", st.l1Fee)
 		mgval = mgval.Add(mgval, st.l1Fee)
 	}
 
@@ -215,6 +218,10 @@ func (st *StateTransition) buyGas() error {
 		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
 		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
 		balanceCheck.Add(balanceCheck, st.value)
+		if st.evm.ChainConfig().UsingScroll {
+			// always add l1fee, because all tx are L2-to-L1 ATM
+			balanceCheck.Add(balanceCheck, st.l1Fee)
+		}
 	}
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
@@ -375,6 +382,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	return &ExecutionResult{
+		L1Fee:      st.l1Fee,
 		UsedGas:    st.gasUsed(),
 		Err:        vmerr,
 		ReturnData: ret,

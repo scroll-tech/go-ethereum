@@ -362,7 +362,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 
 	blockTrace := &types.BlockTrace{
 		ChainID: api.backend.ChainConfig().ChainID.Uint64(),
-		Version: params.Version,
+		Version: fmt.Sprintf("%s-%s", params.VersionWithMeta, params.CommitHash[:8]),
 		Coinbase: &types.AccountWrapper{
 			Address:          env.coinbase,
 			Nonce:            statedb.GetNonce(env.coinbase),

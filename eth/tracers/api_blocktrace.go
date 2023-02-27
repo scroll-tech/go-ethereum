@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"runtime"
 	"sync"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -331,17 +329,16 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		}
 	}
 
-	l1Fee := big.NewInt(0)
-	if vmenv.ChainConfig().UsingScroll {
-		l1Fee, _ = fees.CalculateL1MsgFee(msg, vmenv.StateDB)
+	var l1Fee uint64
+	if result.L1Fee != nil {
+		l1Fee = result.L1Fee.Uint64()
 	}
-
 	env.executionResults[index] = &types.ExecutionResult{
 		From:           sender,
 		To:             receiver,
 		AccountCreated: createdAcc,
 		AccountsAfter:  after,
-		L1Fee:          l1Fee.Uint64(),
+		L1Fee:          l1Fee,
 		Gas:            result.UsedGas,
 		Failed:         result.Failed(),
 		ReturnValue:    fmt.Sprintf("%x", returnVal),

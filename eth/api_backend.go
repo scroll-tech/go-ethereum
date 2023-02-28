@@ -37,7 +37,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/miner"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -241,13 +240,7 @@ func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscri
 }
 
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	if b.ChainConfig().UsingScroll {
-		if err := fees.VerifyFee(signedTx); err != nil {
-			return err
-		}
-	}
-
-	// will `validateTx` in txPool.AddLocal
+	// will `VerifyFee` & `validateTx` in txPool.AddLocal
 	return b.eth.txPool.AddLocal(signedTx)
 }
 

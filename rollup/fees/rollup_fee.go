@@ -138,3 +138,7 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	z := new(big.Int).Mul(x, y)
 	return new(big.Int).Quo(z, precision)
 }
+
+func VerifyFee(tx *types.Transaction) error {
+	return nil
+}

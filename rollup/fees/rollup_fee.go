@@ -194,7 +194,7 @@ func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error 
 		return errors.New("invalid transaction: insufficient funds for gas * price + value")
 	}
 
-	// TODO: check GasPrice
+	// TODO: check GasPrice is in an expected range
 
 	return nil
 }

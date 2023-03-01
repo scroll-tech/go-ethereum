@@ -184,13 +184,8 @@ func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error 
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	// Prevent transactions without enough balance from
-	// being accepted by the chain but allow through 0
-	// gas price transactions
 	cost := tx.Value()
-	if tx.GasPrice().Cmp(common.Big0) != 0 {
-		cost = cost.Add(cost, fee)
-	}
+	cost = cost.Add(cost, fee)
 	from, err := types.Sender(signer, tx)
 	if err != nil {
 		return errors.New("invalid transaction: invalid sender")

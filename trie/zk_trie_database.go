@@ -7,6 +7,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	zktrie "github.com/scroll-tech/zktrie/trie"
 )
 
 // ZktrieDatabase Database adaptor imple zktrie.ZktrieDatbase
@@ -53,7 +54,7 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 
 	v, err := l.db.diskdb.Get(concatKey)
 	if err == leveldb.ErrNotFound {
-		return nil, ErrNotFound
+		return nil, zktrie.ErrKeyNotFound
 	}
 	if l.db.cleans != nil {
 		l.db.cleans.Set(concatKey[:], v)

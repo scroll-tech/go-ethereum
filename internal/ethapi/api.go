@@ -46,8 +46,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rpc"
+
 )
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
@@ -1565,6 +1567,17 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	bigblock := new(big.Int).SetUint64(blockNumber)
 	signer := types.MakeSigner(s.b.ChainConfig(), bigblock)
 	from, _ := types.Sender(signer, tx)
+	
+	// find l1 fee
+	message := types.NewMessage(from, tx.To(), tx.Nonce(), tx.Value(), tx.Gas(), tx.GasPrice(), tx.GasFeeCap(), tx.GasTipCap(), tx.Data(), tx.AccessList(), false)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	l1Fee := new(big.Int)
+	if s.b.ChainConfig().UsingScroll {
+		l1Fee, _ = fees.CalculateL1MsgFee(message, state)
+	}
 
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
@@ -1579,6 +1592,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 		"type":              hexutil.Uint(tx.Type()),
+		"l1Fee": 		   	 hexutil.Uint64(l1Fee.Uint64()),
 	}
 	// Assign the effective gas price paid
 	if !s.b.ChainConfig().IsLondon(bigblock) {

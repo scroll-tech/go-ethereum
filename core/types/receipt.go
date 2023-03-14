@@ -101,6 +101,7 @@ type storedReceiptRLP struct {
 	PostStateOrStatus []byte
 	CumulativeGasUsed uint64
 	Logs              []*LogForStorage
+	L1Fee             *big.Int
 }
 
 // v4StoredReceiptRLP is the storage encoding of a receipt used in database version 4.

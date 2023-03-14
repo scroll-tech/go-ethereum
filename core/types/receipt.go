@@ -73,6 +73,9 @@ type Receipt struct {
 
 	// The value of evm execution result.
 	ReturnValue []byte `json:"returnValue,omitempty"`
+	
+	// Scroll rollup
+	L1Fee      *big.Int   `json:"l1Fee" gencodec:"required"`
 }
 
 type receiptMarshaling struct {

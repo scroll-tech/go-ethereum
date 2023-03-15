@@ -379,6 +379,31 @@ func (s *StateDB) GetStorageTrieProof(a common.Address, key common.Hash) ([][]by
 	return proof, err
 }
 
+// GetStorageProofFull returns the Merkle proof for given storage slot, in zktrie mode
+// it also provide required data for predict the deletion, else it just fallback to GetStorageProof
+func (s *StateDB) GetStorageProofFull(a common.Address, key common.Hash) ([][]byte, []byte, error) {
+	if !s.IsZktrie() {
+		proof, err := s.GetStorageProof(a, key)
+		return proof, nil, err
+	}
+
+	var proof proofList
+	trieS := s.StorageTrie(a)
+	if trieS == nil {
+		return proof, nil, errors.New("storage trie for requested address does not exist")
+	}
+	zkTrie := trieS.(*trie.ZkTrie)
+	if zkTrie == nil {
+		panic("unexpected trie type for zktrie")
+	}
+	var err error
+	var sibling []byte
+	key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
+	sibling, err = zkTrie.ProveWithDeletion(key_s.Bytes(), 0, &proof)
+
+	return proof, sibling, err
+}
+
 // GetStorageProof returns the Merkle proof for given storage slot.
 func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
 	var proof proofList

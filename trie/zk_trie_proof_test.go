@@ -219,7 +219,7 @@ func TestProofWithDeletion(t *testing.T) {
 	s_key1, err := zkt.ToSecureKeyBytes(key1)
 	assert.NoError(t, err)
 
-	sibling1, err := tr.ProveForDeletion(s_key1.Bytes(), 0, proof)
+	sibling1, err := tr.ProveWithDeletion(s_key1.Bytes(), 0, proof)
 	assert.NoError(t, err)
 	nd, err := tr.TryGet(key2)
 	assert.NoError(t, err)
@@ -229,7 +229,7 @@ func TestProofWithDeletion(t *testing.T) {
 	s_key2, err := zkt.ToSecureKeyBytes(bytes.Repeat([]byte("x"), 32))
 	assert.NoError(t, err)
 
-	sibling2, err := tr.ProveForDeletion(s_key2.Bytes(), 0, proof)
+	sibling2, err := tr.ProveWithDeletion(s_key2.Bytes(), 0, proof)
 	assert.NoError(t, err)
 	assert.Nil(t, sibling2)
 

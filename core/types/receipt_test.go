@@ -179,7 +179,7 @@ func encodeAsStoredReceiptRLP(want *Receipt) ([]byte, error) {
 		PostStateOrStatus: want.statusEncoding(),
 		CumulativeGasUsed: want.CumulativeGasUsed,
 		Logs:              make([]*LogForStorage, len(want.Logs)),
-		L1Fee: 		   	   want.L1Fee,
+		L1Fee:             want.L1Fee,
 	}
 	for i, log := range want.Logs {
 		stored.Logs[i] = (*LogForStorage)(log)

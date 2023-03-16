@@ -174,11 +174,12 @@ func (t *ZkTrie) NodeIterator(start []byte) NodeIterator {
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
 func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+	// omit sibling, which is not required for proving only
 	_, err := t.ProveWithDeletion(key, fromLevel, proofDb)
 	return err
 }
 
-// ProveForDeletion is the implement of Prove, it also return possible sibling node
+// ProveWithDeletion is the implement of Prove, it also return possible sibling node
 // (if there is, i.e. the node of key exist and is not the only node in trie)
 // so witness generator can predict the final state root after deletion of this key
 // the returned sibling node has no key along with it for witness generator must decode

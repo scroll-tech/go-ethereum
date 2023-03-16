@@ -222,6 +222,8 @@ func TestProofWithDeletion(t *testing.T) {
 	nd, err := tr.TryGet(key2)
 	assert.NoError(t, err)
 	l := len(sibling1)
+	// a hacking to grep the value part directly from the encoded leaf node,
+	// notice the sibling of key `k*32`` is just the leaf of key `m*32`
 	assert.Equal(t, sibling1[l-33:l-1], nd)
 
 	s_key2, err := zkt.ToSecureKeyBytes(bytes.Repeat([]byte("x"), 32))

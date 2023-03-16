@@ -213,9 +213,7 @@ func TestProofWithDeletion(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	var proof *memorydb.Database
-
-	proof = memorydb.New()
+	proof := memorydb.New()
 	s_key1, err := zkt.ToSecureKeyBytes(key1)
 	assert.NoError(t, err)
 

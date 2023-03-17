@@ -326,7 +326,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			env.sMu.Lock()
 			m[keyStr] = wrappedProof
 			if sibling != nil {
-				env.DeletionProofs = append(env.DeletionProofs, hexutil.Bytes(sibling))
+				env.DeletionProofs = append(env.DeletionProofs, sibling)
 			}
 			env.sMu.Unlock()
 		}

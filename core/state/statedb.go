@@ -351,56 +351,37 @@ func (s *StateDB) GetRootHash() common.Hash {
 }
 
 // StorageTrieProof is not in Db interface and used explictily for reading proof in storage trie (not the dirty value)
-func (s *StateDB) GetStorageTrieProof(a common.Address, key common.Hash) ([][]byte, error) {
+// For zktrie it also provide required data for predict the deletion, else it just fallback to GetStorageProof
+func (s *StateDB) GetStorageTrieProof(a common.Address, key common.Hash) ([][]byte, []byte, error) {
 
 	// try the trie in stateObject first, else we would create one
 	stateObject := s.getStateObject(a)
 	if stateObject == nil {
-		return nil, errors.New("storage trie for requested address does not exist")
+		return nil, nil, errors.New("storage trie for requested address does not exist")
 	}
 
-	trie := stateObject.trie
+	trieS := stateObject.trie
 	var err error
-	if trie == nil {
+	if trieS == nil {
 		// use a new, temporary trie
-		trie, err = s.db.OpenStorageTrie(stateObject.addrHash, stateObject.data.Root)
+		trieS, err = s.db.OpenStorageTrie(stateObject.addrHash, stateObject.data.Root)
 		if err != nil {
-			return nil, fmt.Errorf("can't create storage trie on root %s: %v ", stateObject.data.Root, err)
+			return nil, nil, fmt.Errorf("can't create storage trie on root %s: %v ", stateObject.data.Root, err)
 		}
 	}
 
 	var proof proofList
-	if s.IsZktrie() {
-		key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
-		err = trie.Prove(key_s.Bytes(), 0, &proof)
-	} else {
-		err = trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
-	}
-	return proof, err
-}
-
-// GetStorageProofFull returns the Merkle proof for given storage slot, in zktrie mode
-// it also provide required data for predict the deletion, else it just fallback to GetStorageProof
-func (s *StateDB) GetStorageProofFull(a common.Address, key common.Hash) ([][]byte, []byte, error) {
-	if !s.IsZktrie() {
-		proof, err := s.GetStorageProof(a, key)
-		return proof, nil, err
-	}
-
-	var proof proofList
-	trieS := s.StorageTrie(a)
-	if trieS == nil {
-		return proof, nil, errors.New("storage trie for requested address does not exist")
-	}
-	zkTrie := trieS.(*trie.ZkTrie)
-	if zkTrie == nil {
-		panic("unexpected trie type for zktrie")
-	}
-	var err error
 	var sibling []byte
-	key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
-	sibling, err = zkTrie.ProveWithDeletion(key_s.Bytes(), 0, &proof)
-
+	if s.IsZktrie() {
+		zkTrie := trieS.(*trie.ZkTrie)
+		if zkTrie == nil {
+			panic("unexpected trie type for zktrie")
+		}
+		key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
+		sibling, err = zkTrie.ProveWithDeletion(key_s.Bytes(), 0, &proof)
+	} else {
+		err = trieS.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
+	}
 	return proof, sibling, err
 }
 

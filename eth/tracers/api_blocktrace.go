@@ -314,7 +314,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			}
 			env.sMu.Unlock()
 
-			proof, sibling, err := state.GetStorageProofFull(addr, key)
+			proof, sibling, err := state.GetStorageTrieProof(addr, key)
 			if err != nil {
 				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 				// but we still mark the proofs map with nil array

@@ -203,7 +203,8 @@ func (t *ZkTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.Key
 			return proofDb.Put(nodeHash[:], n.Value())
 		},
 		func(_ *zktrie.Node, n *zktrie.Node) {
-			if n != nil {
+			// the sibling for each leaf should be unique except for EmptyNode
+			if n != nil && n.Type != zktrie.NodeTypeEmpty {
 				sibling = n.Value()
 			}
 		},

@@ -98,14 +98,6 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
 
-	// Compute the fee related information that is to be included
-	// on the receipt. This must happen before the state transition
-	// to ensure that the correct information is used.
-	l1Fee, _, _, err := fees.CalculateFees(tx, statedb)
-	if err != nil {
-		return nil, err
-	}
-
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
@@ -148,7 +140,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	receipt.BlockHash = blockHash
 	receipt.BlockNumber = blockNumber
 	receipt.TransactionIndex = uint(statedb.TxIndex())
-	receipt.L1Fee = l1Fee
+	receipt.L1Fee = result.L1Fee
 	return receipt, err
 }
 

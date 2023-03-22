@@ -75,7 +75,7 @@ type Receipt struct {
 	ReturnValue []byte `json:"returnValue,omitempty"`
 
 	// Scroll rollup
-	L1Fee *big.Int `json:"l1Fee" gencodec:"required"`
+	L1Fee *big.Int `json:"l1Fee,omitempty" gencodec:"required"`
 }
 
 type receiptMarshaling struct {

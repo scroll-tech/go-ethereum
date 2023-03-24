@@ -47,6 +47,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -893,6 +894,54 @@ func (diff *StateOverride) Apply(state *state.StateDB) error {
 	return nil
 }
 
+func newRPCBalance(balance *big.Int) **hexutil.Big {
+	rpcBalance := (*hexutil.Big)(balance)
+	return &rpcBalance
+}
+
+func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
+	if !config.UsingScroll {
+		return big.NewInt(0), nil
+	}
+
+	state, header, err := b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	if err := overrides.Apply(state); err != nil {
+		return nil, err
+	}
+	// Setup context so it may be cancelled the call has completed
+	// or, in case of unmetered gas, setup a context with a timeout.
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	// Make sure the context is cancelled when the call has completed
+	// this makes sure resources are cleaned up.
+	defer cancel()
+
+	// Get a new instance of the EVM.
+	msg, err := args.ToMessage(globalGasCap, header.BaseFee)
+	if err != nil {
+		return nil, err
+	}
+	evm, _, err := b.GetEVM(ctx, msg, state, header, &vm.Config{NoBaseFee: true})
+	if err != nil {
+		return nil, err
+	}
+	// Wait for the context to be done and cancel the evm. Even if the
+	// EVM has finished, cancelling may be done (repeatedly)
+	go func() {
+		<-ctx.Done()
+		evm.Cancel()
+	}()
+
+	return fees.CalculateL1MsgFee(msg, evm.StateDB)
+}
+
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
@@ -930,7 +979,6 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 		<-ctx.Done()
 		evm.Cancel()
 	}()
-
 	// Execute the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 	result, err := core.ApplyMessage(evm, msg, gp)
@@ -985,6 +1033,20 @@ func (e *revertError) ErrorData() interface{} {
 // Note, this function doesn't make and changes in the state/blockchain and is
 // useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride) (hexutil.Bytes, error) {
+	// If gasPrice is 0 and no state override is set, make sure
+	// that the account has sufficient balance to cover `l1Fee`.
+	_, ok := (*overrides)[args.from()]
+	if !ok && args.GasPrice.ToInt().Cmp(big.NewInt(0)) == 0 {
+		l1Fee, err := CalculateL1MsgFee(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap(), s.b.ChainConfig())
+		if err != nil {
+			return nil, err
+		}
+
+		(*overrides)[args.from()] = OverrideAccount{
+			Balance: newRPCBalance(l1Fee),
+		}
+	}
+
 	result, err := DoCall(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap())
 	if err != nil {
 		return nil, err
@@ -996,7 +1058,7 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 	return result.Return(), result.Err
 }
 
-func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap uint64) (hexutil.Uint64, error) {
+func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap uint64, config *params.ChainConfig) (hexutil.Uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
@@ -1040,12 +1102,25 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		}
 		balance := state.GetBalance(*args.From) // from can't be nil
 		available := new(big.Int).Set(balance)
+
+		// account for tx value
 		if args.Value != nil {
 			if args.Value.ToInt().Cmp(available) >= 0 {
 				return 0, errors.New("insufficient funds for transfer")
 			}
 			available.Sub(available, args.Value.ToInt())
 		}
+
+		// account for l1 fee
+		l1Fee, err := CalculateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, config)
+		if err != nil {
+			return 0, err
+		}
+		if l1Fee.Cmp(available) >= 0 {
+			return 0, errors.New("insufficient funds for l1 fee")
+		}
+		available.Sub(available, l1Fee)
+
 		allowance := new(big.Int).Div(available, feeCap)
 
 		// If the allowance is larger than maximum uint64, skip checking
@@ -1123,7 +1198,7 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args TransactionA
 	if blockNrOrHash != nil {
 		bNrOrHash = *blockNrOrHash
 	}
-	return DoEstimateGas(ctx, s.b, args, bNrOrHash, s.b.RPCGasCap())
+	return DoEstimateGas(ctx, s.b, args, bNrOrHash, s.b.RPCGasCap(), s.b.ChainConfig())
 }
 
 // RPCMarshalHeader converts the given header to the RPC output .

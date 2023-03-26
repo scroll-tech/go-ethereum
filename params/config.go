@@ -381,7 +381,7 @@ type ChainConfig struct {
 	L1Config *L1Config `json:"l1Config,omitempty"`
 }
 
-// L1Config is l1 parameteres needed to include l1 messages in Sequencer
+// L1Config is l1 parameters needed to include l1 messages in Sequencer
 type L1Config struct {
 	L1ChainId             uint64          `json:"l1ChainId,omitempty"`
 	L1MessageQueueAddress *common.Address `json:"l1MessageQueueAddress,omitempty"`

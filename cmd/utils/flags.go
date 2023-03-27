@@ -798,13 +798,13 @@ var (
 		Name:  "l1.addr",
 		Usage: "Endpoint of L1 HTTP-RPC server",
 	}
-	L1ConfirmationsFlag = cli.StringFlag{
+	L1ConfirmationsFlag = cli.IntFlag{
 		Name:  "l1.confirmations",
-		Usage: "Number of confirmations on L1 needed for finalization, or `safe` or `finalized`",
+		Usage: "Number of confirmations on L1 needed for finalization",
 	}
-	L1DeploymentBlockFlag = cli.Int64Flag{
+	L1DeploymentBlockFlag = cli.StringFlag{
 		Name:  "l1.deployment.block",
-		Usage: "L1 bridge deployment block number",
+		Usage: "Hash od block where bridge contract is deployed on L1",
 	}
 )
 
@@ -1259,35 +1259,15 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	}
 }
 
-func unmarshalBlockNumber(input string) rpc.BlockNumber {
-	switch input {
-	case "finalized":
-		return rpc.FinalizedBlockNumber
-	case "safe":
-		return rpc.SafeBlockNumber
-	}
-	blockNum, err := hexutil.DecodeUint64(input)
-	if err == nil && blockNum <= math.MaxInt64 {
-		return rpc.BlockNumber(blockNum)
-	}
-	blockNum, err = strconv.ParseUint(input, 10, 64)
-	if err == nil && blockNum <= math.MaxInt64 {
-		return rpc.BlockNumber(blockNum)
-	}
-
-	// return finalized as default, because it's safest
-	return rpc.FinalizedBlockNumber
-}
-
 func setL1(ctx *cli.Context, cfg *node.Config) {
 	if ctx.GlobalIsSet(L1EndpointFlag.Name) {
 		cfg.L1Endpoint = ctx.GlobalString(L1EndpointFlag.Name)
 	}
 	if ctx.GlobalIsSet(L1ConfirmationsFlag.Name) {
-		cfg.L1Confirmations = unmarshalBlockNumber(ctx.GlobalString(L1ConfirmationsFlag.Name))
+		cfg.L1Confirmations = ctx.GlobalInt(L1ConfirmationsFlag.Name)
 	}
 	if ctx.GlobalIsSet(L1DeploymentBlockFlag.Name) {
-		cfg.L1DeploymentBlock = big.NewInt(ctx.GlobalInt64(L1DeploymentBlockFlag.Name))
+		cfg.L1DeploymentBlock = ctx.GlobalString(L1DeploymentBlockFlag.Name)
 	}
 }
 

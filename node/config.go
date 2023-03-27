@@ -195,9 +195,9 @@ type Config struct {
 	// Endpoint of L1 HTTP-RPC server
 	L1Endpoint string `toml:",omitempty"`
 	// Number of confirmations on L1 needed for finalization
-	L1Confirmations rpc.BlockNumber `toml:",omitempty"`
-	// L1 bridge deployment block number
-	L1DeploymentBlock *big.Int `toml:",omitempty"`
+	L1Confirmations int `toml:",omitempty"`
+	// Hash od block where bridge contract is deployed on L1
+	L1DeploymentBlock string `toml:",omitempty"`
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

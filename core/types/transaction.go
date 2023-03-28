@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"container/heap"
 	"errors"
-	"go/types"
 	"io"
 	"math/big"
 	"sync/atomic"
@@ -291,6 +290,7 @@ func (tx *Transaction) Nonce() uint64 { return tx.inner.nonce() }
 func (tx *Transaction) To() *common.Address {
 	return copyAddressPtr(tx.inner.to())
 }
+
 // IsDepositTx returns true if the transaction is a deposit tx type.
 func (tx *Transaction) IsL1MessageTx() bool {
 	return tx.Type() == L1MessageTxType

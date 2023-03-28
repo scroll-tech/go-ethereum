@@ -10,22 +10,22 @@ const L1MessageTxType = 0x7E
 
 // payload, RLP encoded
 type L1MessageTx struct {
-	Nonce uint64
-	Gas uint64 // gas limit
-	To *common.Address `rlp:"nil"` // nil means contract creation
-	Value *big.Int
-	Data []byte
+	Nonce  uint64
+	Gas    uint64          // gas limit
+	To     *common.Address `rlp:"nil"` // nil means contract creation
+	Value  *big.Int
+	Data   []byte
 	Sender *common.Address
 }
 
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *L1MessageTx) copy() TxData {
 	cpy := &L1MessageTx{
-		Nonce: tx.Nonce,
-		Gas: tx.Gas,
-		To: copyAddressPtr(tx.To),
-		Value: new(big.Int),
-		Data: common.CopyBytes(tx.Data),
+		Nonce:  tx.Nonce,
+		Gas:    tx.Gas,
+		To:     copyAddressPtr(tx.To),
+		Value:  new(big.Int),
+		Data:   common.CopyBytes(tx.Data),
 		Sender: copyAddressPtr(tx.Sender),
 	}
 	return cpy

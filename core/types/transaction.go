@@ -291,7 +291,7 @@ func (tx *Transaction) To() *common.Address {
 	return copyAddressPtr(tx.inner.to())
 }
 
-// IsDepositTx returns true if the transaction is a deposit tx type.
+// IsL1MessageTx returns true if the transaction is an L1 cross-domain tx.
 func (tx *Transaction) IsL1MessageTx() bool {
 	return tx.Type() == L1MessageTxType
 }

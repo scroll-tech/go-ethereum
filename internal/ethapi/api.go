@@ -1045,6 +1045,10 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 	// If gasPrice is 0 and no state override is set, make sure
 	// that the account has sufficient balance to cover `l1Fee`.
 	isGasPriceZero := args.GasPrice == nil || args.GasPrice.ToInt().Cmp(big.NewInt(0)) == 0
+
+	if overrides == nil {
+		overrides = &StateOverride{}
+	}
 	_, isOverrideSet := (*overrides)[args.from()]
 
 	if isGasPriceZero && !isOverrideSet {

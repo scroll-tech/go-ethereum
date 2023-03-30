@@ -1073,7 +1073,7 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 	return result.Return(), result.Err
 }
 
-func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap uint64, config *params.ChainConfig) (hexutil.Uint64, error) {
+func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap uint64) (hexutil.Uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
@@ -1127,7 +1127,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		}
 
 		// account for l1 fee
-		l1Fee, err := CalculateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, config)
+		l1Fee, err := CalculateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, b.ChainConfig())
 		if err != nil {
 			return 0, err
 		}
@@ -1213,7 +1213,7 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args TransactionA
 	if blockNrOrHash != nil {
 		bNrOrHash = *blockNrOrHash
 	}
-	return DoEstimateGas(ctx, s.b, args, bNrOrHash, s.b.RPCGasCap(), s.b.ChainConfig())
+	return DoEstimateGas(ctx, s.b, args, bNrOrHash, s.b.RPCGasCap())
 }
 
 // RPCMarshalHeader converts the given header to the RPC output .

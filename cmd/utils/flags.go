@@ -804,7 +804,7 @@ var (
 	}
 	L1DeploymentBlockFlag = cli.Int64Flag{
 		Name:  "l1.deployment.block",
-		Usage: "Number of block where bridge contract is deployed on L1",
+		Usage: "L1 bridge deployment block number",
 	}
 )
 
@@ -1266,13 +1266,13 @@ func unmarshalBlockNumber(input string) rpc.BlockNumber {
 	case "safe":
 		return rpc.SafeBlockNumber
 	}
-	blckNum, err := hexutil.DecodeUint64(input)
-	if err == nil && blckNum <= math.MaxInt64 {
-		return rpc.BlockNumber(blckNum)
+	blockNum, err := hexutil.DecodeUint64(input)
+	if err == nil && blockNum <= math.MaxInt64 {
+		return rpc.BlockNumber(blockNum)
 	}
-	blckNum, err = strconv.ParseUint(input, 10, 64)
-	if err == nil && blckNum <= math.MaxInt64 {
-		return rpc.BlockNumber(blckNum)
+	blockNum, err = strconv.ParseUint(input, 10, 64)
+	if err == nil && blockNum <= math.MaxInt64 {
+		return rpc.BlockNumber(blockNum)
 	}
 
 	// return finalized as default, because it's safest

@@ -164,7 +164,3 @@ func ReadL1MessagesInBlock(db ethdb.Reader, hash common.Hash) *L1MessagesInBlock
 	}
 	return &entry
 }
-
-// write messages
-// new block received
-// set block index: block number => { first_enqueue_index, last_enqueue_index }

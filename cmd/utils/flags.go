@@ -802,9 +802,9 @@ var (
 		Name:  "l1.confirmations",
 		Usage: "Number of confirmations on L1 needed for finalization",
 	}
-	L1DeploymentBlockFlag = cli.StringFlag{
+	L1DeploymentBlockFlag = cli.Int64Flag{
 		Name:  "l1.deployment.block",
-		Usage: "Hash od block where bridge contract is deployed on L1",
+		Usage: "Number of block where bridge contract is deployed on L1",
 	}
 )
 
@@ -1267,7 +1267,7 @@ func setL1(ctx *cli.Context, cfg *node.Config) {
 		cfg.L1Confirmations = ctx.GlobalInt(L1ConfirmationsFlag.Name)
 	}
 	if ctx.GlobalIsSet(L1DeploymentBlockFlag.Name) {
-		cfg.L1DeploymentBlock = ctx.GlobalString(L1DeploymentBlockFlag.Name)
+		cfg.L1DeploymentBlock = big.NewInt(ctx.GlobalInt64(L1DeploymentBlockFlag.Name))
 	}
 }
 

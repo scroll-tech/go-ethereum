@@ -197,7 +197,7 @@ type Config struct {
 	// Number of confirmations on L1 needed for finalization
 	L1Confirmations int `toml:",omitempty"`
 	// Hash od block where bridge contract is deployed on L1
-	L1DeploymentBlock string `toml:",omitempty"`
+	L1DeploymentBlock *big.Int `toml:",omitempty"`
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

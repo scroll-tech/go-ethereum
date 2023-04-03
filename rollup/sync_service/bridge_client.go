@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum"
+	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethclient"
@@ -49,6 +50,8 @@ func newBridgeClient(ctx context.Context, l1Endpoint string, l1ChainId uint64, c
 }
 
 func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, error) {
+	log.Trace("Sync service fetchMessagesInRange", "fromBlock", from, "toBlock", to)
+
 	query := ethereum.FilterQuery{
 		FromBlock: big.NewInt(0).SetUint64(from),
 		ToBlock:   big.NewInt(0).SetUint64(to),
@@ -62,21 +65,21 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 
 	logs, err := c.client.FilterLogs(ctx, query)
 	if err != nil {
-		log.Warn("eth_getLogs failed", "err", err)
-		return nil, err
+		log.Trace("eth_getLogs failed", "query", query, "err", err)
+		return nil, fmt.Errorf("eth_getLogs failed: %w", err)
 	}
 
 	if len(logs) == 0 {
 		return nil, nil
 	}
 
-	log.Info("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(logs))
-
 	msgs, err := c.parseLogs(logs)
 	if err != nil {
-		log.Error("Failed to parse emitted events logs", "err", err)
-		return nil, err
+		log.Trace("failed to parse emitted event logs", "logs", logs, "err", err)
+		return nil, fmt.Errorf("failed to parse emitted event logs: %w", err)
 	}
+
+	log.Trace("Received new L1 events", "fromBlock", from, "toBlock", to, "msgs", msgs)
 
 	return msgs, nil
 }
@@ -86,12 +89,12 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 
 	for _, vLog := range logs {
 		event := L1QueueTransactionEvent{}
-		err := UnpackLog(L1MessageQueueABI, &event, "QueueTransaction", vLog)
+		err := unpackLog(L1MessageQueueABI, &event, "QueueTransaction", vLog)
 		if err != nil {
-			log.Warn("Failed to unpack L1 QueueTransaction event", "err", err)
-			return msgs, err
+			return msgs, fmt.Errorf("failed to unpack L1 QueueTransaction event: %w", err)
 		}
 
+		// TODO: check bigInt conversion
 		msgs = append(msgs, types.L1MessageTx{
 			Nonce:  event.QueueIndex.Uint64(),
 			Gas:    event.GasLimit.Uint64(),
@@ -105,7 +108,6 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 	return msgs, nil
 }
 
-// getLatestConfirmedBlockNumber get confirmed block number by rpc.BlockNumber type.
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {
 	if c.confirmations == rpc.SafeBlockNumber || c.confirmations == rpc.FinalizedBlockNumber {
 		var tag *big.Int
@@ -129,18 +131,36 @@ func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint6
 			return 0, err
 		}
 		return number, nil
-	} else if c.confirmations.Int64() >= 0 { // If it's positive integer, consider it as a certain confirm value.
+	} else if c.confirmations.Int64() >= 0 {
 		number, err := c.client.BlockNumber(ctx)
 		if err != nil {
 			return 0, err
 		}
-		cfmNum := uint64(c.confirmations.Int64())
+		confirmations := uint64(c.confirmations.Int64())
 
-		if number >= cfmNum {
-			return number - cfmNum, nil
+		if number >= confirmations {
+			return number - confirmations, nil
 		}
 		return 0, nil
 	} else {
 		return 0, fmt.Errorf("unknown confirmation type: %v", c.confirmations)
 	}
+}
+
+func unpackLog(c *abi.ABI, out interface{}, event string, log types.Log) error {
+	if log.Topics[0] != c.Events[event].ID {
+		return fmt.Errorf("event signature mismatch")
+	}
+	if len(log.Data) > 0 {
+		if err := c.UnpackIntoInterface(out, event, log.Data); err != nil {
+			return err
+		}
+	}
+	var indexed abi.Arguments
+	for _, arg := range c.Events[event].Inputs {
+		if arg.Indexed {
+			indexed = append(indexed, arg)
+		}
+	}
+	return abi.ParseTopics(out, indexed, log.Topics[1:])
 }

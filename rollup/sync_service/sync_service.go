@@ -17,12 +17,12 @@ const DefaultFetchBlockRange = uint64(20)
 const DefaultPollInterval = time.Second * 15
 
 type SyncService struct {
+	ctx                  context.Context
 	cancel               context.CancelFunc
 	client               *BridgeClient
-	ctx                  context.Context
 	db                   ethdb.Database
-	latestProcessedBlock uint64
 	pollInterval         time.Duration
+	latestProcessedBlock uint64
 }
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database) (*SyncService, error) {
@@ -44,18 +44,20 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 	ctx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
+		ctx:                  ctx,
 		cancel:               cancel,
 		client:               client,
-		ctx:                  ctx,
 		db:                   db,
-		latestProcessedBlock: latestProcessedBlock,
 		pollInterval:         DefaultPollInterval,
+		latestProcessedBlock: latestProcessedBlock,
 	}
 
 	return &service, nil
 }
 
 func (s *SyncService) Start() {
+	log.Info("Starting sync service", "latestProcessedBlock", s.latestProcessedBlock)
+
 	t := time.NewTicker(s.pollInterval)
 	defer t.Stop()
 
@@ -84,6 +86,8 @@ func (s *SyncService) fetchMessages() {
 		return
 	}
 
+	log.Trace("Sync service fetchMessages", "latestProcessedBlock", s.latestProcessedBlock, "latestConfirmed", latestConfirmed)
+
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		select {
@@ -102,6 +106,10 @@ func (s *SyncService) fetchMessages() {
 		if err != nil {
 			log.Warn("failed to fetch messages in range", "err", err)
 			return
+		}
+
+		if len(msgs) > 0 {
+			log.Info("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
 		}
 
 		s.StoreMessages(msgs)

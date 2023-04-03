@@ -35,7 +35,7 @@ func newBridgeClient(ctx context.Context, l1Endpoint string, l1ChainId uint64, c
 	if err != nil {
 		return nil, err
 	}
-	if got.Uint64() != l1ChainId { // TODO
+	if got.Cmp(big.NewInt(0).SetUint64(l1ChainId)) != 0 {
 		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", l1ChainId, got)
 	}
 

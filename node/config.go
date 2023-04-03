@@ -20,7 +20,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -197,7 +196,7 @@ type Config struct {
 	// Number of confirmations on L1 needed for finalization
 	L1Confirmations rpc.BlockNumber `toml:",omitempty"`
 	// L1 bridge deployment block number
-	L1DeploymentBlock *big.Int `toml:",omitempty"`
+	L1DeploymentBlock uint64 `toml:",omitempty"`
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

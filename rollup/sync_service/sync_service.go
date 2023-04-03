@@ -3,7 +3,6 @@ package sync_service
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -33,9 +32,13 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 	}
 
 	// restart from latest synced block number
-	latestProcessedBlock := rawdb.ReadSyncedL1BlockNumber(db)
-	if latestProcessedBlock == nil {
-		latestProcessedBlock = big.NewInt(0).Sub(nodeConfig.L1DeploymentBlock, big.NewInt(1))
+	latestProcessedBlock := uint64(0)
+	block := rawdb.ReadSyncedL1BlockNumber(db)
+	if block != nil {
+		latestProcessedBlock = *block
+	} else {
+		// assume deployment block has 0 messages
+		latestProcessedBlock = nodeConfig.L1DeploymentBlock
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -45,7 +48,7 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		client:               client,
 		ctx:                  ctx,
 		db:                   db,
-		latestProcessedBlock: latestProcessedBlock.Uint64(), // TODO
+		latestProcessedBlock: latestProcessedBlock,
 		pollInterval:         PollInterval,
 	}
 
@@ -109,7 +112,7 @@ func (s *SyncService) fetchMessages() {
 }
 
 func (s *SyncService) SetLatestSyncedL1BlockNumber(number uint64) {
-	rawdb.WriteSyncedL1BlockNumber(s.db, big.NewInt(0).SetUint64(number))
+	rawdb.WriteSyncedL1BlockNumber(s.db, number)
 }
 
 func (s *SyncService) StoreMessages(msgs []types.L1MessageTx) {

@@ -13,10 +13,10 @@ import (
 )
 
 //
-func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, blockNumber *big.Int) {
-	value := []byte{0}
-	if blockNumber != nil {
-		value = blockNumber.Bytes()
+func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, blockNumber uint64) {
+	value := new(big.Int).SetUint64(blockNumber).Bytes()
+	if blockNumber == 0 {
+		value = []byte{0}
 	}
 	if err := db.Put(syncedL1BlockNumberKey, value); err != nil {
 		log.Crit("Failed to synced L1 block number", "err", err)
@@ -24,12 +24,13 @@ func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, blockNumber *big.Int) {
 }
 
 //
-func ReadSyncedL1BlockNumber(db ethdb.Reader) *big.Int {
+func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 	data, _ := db.Get(syncedL1BlockNumberKey)
 	if len(data) == 0 {
 		return nil
 	}
-	return new(big.Int).SetBytes(data)
+	ret := new(big.Int).SetBytes(data).Uint64()
+	return &ret
 }
 
 //

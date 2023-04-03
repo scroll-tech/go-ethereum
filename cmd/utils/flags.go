@@ -1287,7 +1287,7 @@ func setL1(ctx *cli.Context, cfg *node.Config) {
 		cfg.L1Confirmations = unmarshalBlockNumber(ctx.GlobalString(L1ConfirmationsFlag.Name))
 	}
 	if ctx.GlobalIsSet(L1DeploymentBlockFlag.Name) {
-		cfg.L1DeploymentBlock = big.NewInt(ctx.GlobalInt64(L1DeploymentBlockFlag.Name))
+		cfg.L1DeploymentBlock = ctx.GlobalUint64(L1DeploymentBlockFlag.Name)
 	}
 }
 

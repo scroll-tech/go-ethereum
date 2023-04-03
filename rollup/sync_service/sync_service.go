@@ -3,6 +3,7 @@ package sync_service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -14,22 +15,24 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethclient"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/params"
 )
 
 const FetchLimit = uint64(20)
 const PollInterval = time.Second * 15
 
 type SyncService struct {
-	bc                   *core.BlockChain
-	cancel               context.CancelFunc
-	client               *ethclient.Client
-	ctx                  context.Context
-	db                   ethdb.Database
-	latestProcessedBlock uint64
-	pollInterval         time.Duration
+	bc                    *core.BlockChain
+	cancel                context.CancelFunc
+	client                *ethclient.Client
+	ctx                   context.Context
+	db                    ethdb.Database
+	latestProcessedBlock  uint64
+	pollInterval          time.Duration
+	L1MessageQueueAddress *common.Address
 }
 
-func NewSyncService(ctx context.Context, bc *core.BlockChain, db ethdb.Database) (*SyncService, error) {
+func NewSyncService(ctx context.Context, config *params.ChainConfig, bc *core.BlockChain, db ethdb.Database) (*SyncService, error) {
 	if bc == nil {
 		return nil, errors.New("must pass BlockChain to SyncService")
 	}
@@ -39,17 +42,27 @@ func NewSyncService(ctx context.Context, bc *core.BlockChain, db ethdb.Database)
 		return nil, err
 	}
 
+	// sanity check: compare chain IDs
+	chainId, err := client.ChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if chainId.Uint64() != config.L1Config.L1ChainId {
+		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", config.L1Config.L1ChainId, chainId)
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	latestProcessedBlock := rawdb.ReadSyncedL1BlockNumber(db).Uint64() // TODO
 
 	service := SyncService{
-		bc:                   bc,
-		cancel:               cancel,
-		client:               client,
-		ctx:                  ctx,
-		db:                   db,
-		latestProcessedBlock: latestProcessedBlock,
-		pollInterval:         PollInterval,
+		bc:                    bc,
+		cancel:                cancel,
+		client:                client,
+		ctx:                   ctx,
+		db:                    db,
+		latestProcessedBlock:  latestProcessedBlock,
+		pollInterval:          PollInterval,
+		L1MessageQueueAddress: config.L1Config.L1MessageQueueAddress,
 	}
 
 	return &service, nil
@@ -118,7 +131,9 @@ func (s *SyncService) fetchMessagesInRange(from, to uint64) ([]types.L1MessageTx
 	query := ethereum.FilterQuery{
 		FromBlock: big.NewInt(0).SetUint64(from),
 		ToBlock:   big.NewInt(0).SetUint64(to),
-		// Addresses: ,
+		Addresses: []common.Address{
+			*s.L1MessageQueueAddress,
+		},
 		Topics: [][]common.Hash{
 			{L1QueueTransactionEventSignature},
 		},

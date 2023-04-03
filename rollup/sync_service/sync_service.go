@@ -15,6 +15,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethclient"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
@@ -32,12 +33,12 @@ type SyncService struct {
 	L1MessageQueueAddress *common.Address
 }
 
-func NewSyncService(ctx context.Context, config *params.ChainConfig, bc *core.BlockChain, db ethdb.Database) (*SyncService, error) {
+func NewSyncService(ctx context.Context, config *params.ChainConfig, nodeConfig *node.Config, bc *core.BlockChain, db ethdb.Database) (*SyncService, error) {
 	if bc == nil {
 		return nil, errors.New("must pass BlockChain to SyncService")
 	}
 
-	client, err := ethclient.Dial("") // cfg.L1Config.Endpoint
+	client, err := ethclient.Dial(nodeConfig.L1Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +52,13 @@ func NewSyncService(ctx context.Context, config *params.ChainConfig, bc *core.Bl
 		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", config.L1Config.L1ChainId, chainId)
 	}
 
+	// restart from latest synced block number
+	latestProcessedBlock := rawdb.ReadSyncedL1BlockNumber(db)
+	if latestProcessedBlock == nil {
+		latestProcessedBlock = big.NewInt(0).Sub(nodeConfig.L1DeploymentBlock, big.NewInt(1))
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
-	latestProcessedBlock := rawdb.ReadSyncedL1BlockNumber(db).Uint64() // TODO
 
 	service := SyncService{
 		bc:                    bc,
@@ -60,7 +66,7 @@ func NewSyncService(ctx context.Context, config *params.ChainConfig, bc *core.Bl
 		client:                client,
 		ctx:                   ctx,
 		db:                    db,
-		latestProcessedBlock:  latestProcessedBlock,
+		latestProcessedBlock:  latestProcessedBlock.Uint64(), // TODO
 		pollInterval:          PollInterval,
 		L1MessageQueueAddress: config.L1Config.L1MessageQueueAddress,
 	}

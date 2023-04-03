@@ -17,6 +17,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 const FetchLimit = uint64(20)
@@ -26,11 +27,12 @@ type SyncService struct {
 	bc                    *core.BlockChain
 	cancel                context.CancelFunc
 	client                *ethclient.Client
+	confirmations         rpc.BlockNumber
 	ctx                   context.Context
 	db                    ethdb.Database
+	l1MessageQueueAddress *common.Address
 	latestProcessedBlock  uint64
 	pollInterval          time.Duration
-	L1MessageQueueAddress *common.Address
 }
 
 func NewSyncService(ctx context.Context, config *params.ChainConfig, nodeConfig *node.Config, bc *core.BlockChain, db ethdb.Database) (*SyncService, error) {
@@ -64,11 +66,12 @@ func NewSyncService(ctx context.Context, config *params.ChainConfig, nodeConfig 
 		bc:                    bc,
 		cancel:                cancel,
 		client:                client,
+		confirmations:         nodeConfig.L1Confirmations,
 		ctx:                   ctx,
 		db:                    db,
+		l1MessageQueueAddress: config.L1Config.L1MessageQueueAddress,
 		latestProcessedBlock:  latestProcessedBlock.Uint64(), // TODO
 		pollInterval:          PollInterval,
-		L1MessageQueueAddress: config.L1Config.L1MessageQueueAddress,
 	}
 
 	return &service, nil
@@ -88,28 +91,26 @@ func (s *SyncService) Start() {
 	}
 }
 
-func (s *SyncService) Stop() error {
+func (s *SyncService) Stop() {
 	log.Info("Stopping sync service")
 
 	if s.cancel != nil {
 		defer s.cancel()
 	}
-	return nil
 }
 
-func (s *SyncService) fetchMessages() error {
-	// TODO
-	latestConfirmed, err := s.client.BlockNumber(s.ctx)
+func (s *SyncService) fetchMessages() {
+	latestConfirmed, err := GetLatestConfirmedBlockNumber(s.ctx, s.client, s.confirmations)
 	if err != nil {
-		log.Warn("eth_blockNumber failed", "err", err)
-		return nil
+		log.Warn("failed to get latest confirmed block number", "err", err)
+		return
 	}
 
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += FetchLimit {
 		select {
 		case <-s.ctx.Done():
-			return nil
+			return
 		default:
 		}
 
@@ -121,7 +122,8 @@ func (s *SyncService) fetchMessages() error {
 
 		msgs, err := s.fetchMessagesInRange(from, to)
 		if err != nil {
-			return err
+			log.Warn("failed to fetch messages in range", "err", err)
+			return
 		}
 
 		s.StoreMessages(msgs)
@@ -129,8 +131,6 @@ func (s *SyncService) fetchMessages() error {
 		s.latestProcessedBlock = to
 		s.SetLatestSyncedL1BlockNumber(to)
 	}
-
-	return nil
 }
 
 func (s *SyncService) fetchMessagesInRange(from, to uint64) ([]types.L1MessageTx, error) {
@@ -138,7 +138,7 @@ func (s *SyncService) fetchMessagesInRange(from, to uint64) ([]types.L1MessageTx
 		FromBlock: big.NewInt(0).SetUint64(from),
 		ToBlock:   big.NewInt(0).SetUint64(to),
 		Addresses: []common.Address{
-			*s.L1MessageQueueAddress,
+			*s.l1MessageQueueAddress,
 		},
 		Topics: [][]common.Hash{
 			{L1QueueTransactionEventSignature},

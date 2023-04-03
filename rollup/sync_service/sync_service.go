@@ -2,56 +2,34 @@ package sync_service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/scroll-tech/go-ethereum"
-	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/ethclient"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 const FetchLimit = uint64(20)
 const PollInterval = time.Second * 15
 
 type SyncService struct {
-	bc                    *core.BlockChain
-	cancel                context.CancelFunc
-	client                *ethclient.Client
-	confirmations         rpc.BlockNumber
-	ctx                   context.Context
-	db                    ethdb.Database
-	l1MessageQueueAddress *common.Address
-	latestProcessedBlock  uint64
-	pollInterval          time.Duration
+	cancel               context.CancelFunc
+	client               *BridgeClient
+	ctx                  context.Context
+	db                   ethdb.Database
+	latestProcessedBlock uint64
+	pollInterval         time.Duration
 }
 
-func NewSyncService(ctx context.Context, config *params.ChainConfig, nodeConfig *node.Config, bc *core.BlockChain, db ethdb.Database) (*SyncService, error) {
-	if bc == nil {
-		return nil, errors.New("must pass BlockChain to SyncService")
-	}
-
-	client, err := ethclient.Dial(nodeConfig.L1Endpoint)
+func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database) (*SyncService, error) {
+	client, err := newBridgeClient(ctx, nodeConfig.L1Endpoint, genesisConfig.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.L1Config.L1MessageQueueAddress)
 	if err != nil {
-		return nil, err
-	}
-
-	// sanity check: compare chain IDs
-	chainId, err := client.ChainID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if chainId.Uint64() != config.L1Config.L1ChainId {
-		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", config.L1Config.L1ChainId, chainId)
+		return nil, fmt.Errorf("failed to initialize bridge client: %w", err)
 	}
 
 	// restart from latest synced block number
@@ -63,15 +41,12 @@ func NewSyncService(ctx context.Context, config *params.ChainConfig, nodeConfig 
 	ctx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
-		bc:                    bc,
-		cancel:                cancel,
-		client:                client,
-		confirmations:         nodeConfig.L1Confirmations,
-		ctx:                   ctx,
-		db:                    db,
-		l1MessageQueueAddress: config.L1Config.L1MessageQueueAddress,
-		latestProcessedBlock:  latestProcessedBlock.Uint64(), // TODO
-		pollInterval:          PollInterval,
+		cancel:               cancel,
+		client:               client,
+		ctx:                  ctx,
+		db:                   db,
+		latestProcessedBlock: latestProcessedBlock.Uint64(), // TODO
+		pollInterval:         PollInterval,
 	}
 
 	return &service, nil
@@ -100,7 +75,7 @@ func (s *SyncService) Stop() {
 }
 
 func (s *SyncService) fetchMessages() {
-	latestConfirmed, err := GetLatestConfirmedBlockNumber(s.ctx, s.client, s.confirmations)
+	latestConfirmed, err := s.client.getLatestConfirmedBlockNumber(s.ctx)
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)
 		return
@@ -120,7 +95,7 @@ func (s *SyncService) fetchMessages() {
 			to = latestConfirmed
 		}
 
-		msgs, err := s.fetchMessagesInRange(from, to)
+		msgs, err := s.client.fetchMessagesInRange(s.ctx, from, to)
 		if err != nil {
 			log.Warn("failed to fetch messages in range", "err", err)
 			return
@@ -131,63 +106,6 @@ func (s *SyncService) fetchMessages() {
 		s.latestProcessedBlock = to
 		s.SetLatestSyncedL1BlockNumber(to)
 	}
-}
-
-func (s *SyncService) fetchMessagesInRange(from, to uint64) ([]types.L1MessageTx, error) {
-	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(0).SetUint64(from),
-		ToBlock:   big.NewInt(0).SetUint64(to),
-		Addresses: []common.Address{
-			*s.l1MessageQueueAddress,
-		},
-		Topics: [][]common.Hash{
-			{L1QueueTransactionEventSignature},
-		},
-	}
-
-	logs, err := s.client.FilterLogs(s.ctx, query)
-	if err != nil {
-		log.Warn("eth_getLogs failed", "err", err)
-		return nil, err
-	}
-
-	if len(logs) == 0 {
-		return nil, nil
-	}
-
-	log.Info("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(logs))
-
-	msgs, err := s.parseLogs(logs)
-	if err != nil {
-		log.Error("Failed to parse emitted events logs", "err", err)
-		return nil, err
-	}
-
-	return msgs, nil
-}
-
-func (s *SyncService) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) {
-	var msgs []types.L1MessageTx
-
-	for _, vLog := range logs {
-		event := L1QueueTransactionEvent{}
-		err := UnpackLog(L1MessageQueueABI, &event, "QueueTransaction", vLog)
-		if err != nil {
-			log.Warn("Failed to unpack L1 QueueTransaction event", "err", err)
-			return msgs, err
-		}
-
-		msgs = append(msgs, types.L1MessageTx{
-			Nonce:  event.QueueIndex.Uint64(),
-			Gas:    event.GasLimit.Uint64(),
-			To:     &event.Target,
-			Value:  event.Value,
-			Data:   event.Data,
-			Sender: &event.Sender,
-		})
-	}
-
-	return msgs, nil
 }
 
 func (s *SyncService) SetLatestSyncedL1BlockNumber(number uint64) {

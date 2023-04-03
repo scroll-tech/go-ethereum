@@ -209,7 +209,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
-	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.blockchain, eth.chainDb)
+	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize sync service: %w", err)
 	}

@@ -13,8 +13,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
-const FetchLimit = uint64(20)
-const PollInterval = time.Second * 15
+const DefaultFetchBlockRange = uint64(20)
+const DefaultPollInterval = time.Second * 15
 
 type SyncService struct {
 	cancel               context.CancelFunc
@@ -49,7 +49,7 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		ctx:                  ctx,
 		db:                   db,
 		latestProcessedBlock: latestProcessedBlock,
-		pollInterval:         PollInterval,
+		pollInterval:         DefaultPollInterval,
 	}
 
 	return &service, nil
@@ -85,14 +85,14 @@ func (s *SyncService) fetchMessages() {
 	}
 
 	// query in batches
-	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += FetchLimit {
+	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		select {
 		case <-s.ctx.Done():
 			return
 		default:
 		}
 
-		to := from + FetchLimit - 1
+		to := from + DefaultFetchBlockRange - 1
 
 		if to > latestConfirmed {
 			to = latestConfirmed

@@ -1288,6 +1288,8 @@ func setL1(ctx *cli.Context, cfg *node.Config) {
 		if err != nil {
 			panic(fmt.Sprintf("invalid value for flag %s: %s", L1ConfirmationsFlag.Name, ctx.GlobalString(L1ConfirmationsFlag.Name)))
 		}
+	} else {
+		cfg.L1Confirmations = rpc.FinalizedBlockNumber
 	}
 	if ctx.GlobalIsSet(L1DeploymentBlockFlag.Name) {
 		cfg.L1DeploymentBlock = big.NewInt(ctx.GlobalInt64(L1DeploymentBlockFlag.Name))

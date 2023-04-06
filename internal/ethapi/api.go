@@ -908,7 +908,7 @@ func newRPCBalance(balance *big.Int) **hexutil.Big {
 }
 
 func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
-	if !config.UsingScroll {
+	if config.Scroll == nil || config.Scroll.FeeVaultAddress == nil {
 		return big.NewInt(0), nil
 	}
 

@@ -258,19 +258,19 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, false, nil, true, true, nil, true}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, &ScrollConfig{}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, false, nil, true, true, nil, true}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, &ScrollConfig{}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, false, &common.Address{123}, true, true, nil, true}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, &ScrollConfig{}}
 	TestRules       = TestChainConfig.Rules(new(big.Int))
 
-	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, false, &common.Address{123}, true, true, nil, false}
+	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
 )
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and
@@ -358,24 +358,25 @@ type ChainConfig struct {
 	Ethash *EthashConfig `json:"ethash,omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty"`
 
-	// Scroll genesis extension: Use zktrie
-	Zktrie bool `json:"zktrie,omitempty"`
+	// Scroll genesis extension: enable scroll rollup-related traces & state transition
+	Scroll *ScrollConfig `json:"scroll,omitempty"`
+}
 
-	// Scroll genesis extension: Transaction fee vault address [optional]
-	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
+type ScrollConfig struct {
+	// Use zktrie
+	UseZktrie bool `json:"useZktrie,omitempty"`
 
-	// Scroll genesis extension: enable EIP-2718 in tx pool.
-	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
-
-	// Scroll genesis extension: enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
-	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
-
-	// Scroll genesis extension: Maximum number of transactions per block [optional]
+	// Maximum number of transactions per block [optional]
 	MaxTxPerBlock *int `json:"maxTxPerBlock,omitempty"`
 
-	// Scroll genesis extension: enable scroll rollup-related traces & state transition
-	// TODO: merge with these config: Zktrie, FeeVaultAddress, EnableEIP2718, EnableEIP1559 & MaxTxPerBlock
-	UsingScroll bool `json:"usingScroll,omitempty"`
+	// Transaction fee vault address [optional]
+	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
+
+	// enable EIP-2718 in tx pool.
+	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
+
+	// enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
+	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -505,7 +506,7 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 
 // IsValidTxCount returns whether the given block's transaction count is below the limit.
 func (c *ChainConfig) IsValidTxCount(count int) bool {
-	return c.MaxTxPerBlock == nil || count <= *c.MaxTxPerBlock
+	return c.Scroll == nil || c.Scroll.MaxTxPerBlock == nil || count <= *c.Scroll.MaxTxPerBlock
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported

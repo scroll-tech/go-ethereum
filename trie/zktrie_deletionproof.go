@@ -27,23 +27,35 @@ func (t *ZkTrie) TryGetNode(nodeHash *zkt.Hash) (*zktrie.Node, error) {
 type deletionProofTracer struct {
 	*ZkTrie
 	deletionTracer map[zkt.Hash]struct{}
+	proofs         map[zkt.Hash][]byte
 }
 
+// NewDeletionTracer create a deletion tracer object
 func (t *ZkTrie) NewDeletionTracer() *deletionProofTracer {
 	return &deletionProofTracer{
 		ZkTrie:         t,
 		deletionTracer: map[zkt.Hash]struct{}{zkt.HashZero: {}},
+		proofs:         make(map[zkt.Hash][]byte),
 	}
 }
 
-// ProveWithDeletion is the implement of Prove, it also return possible sibling node
-// (if there is, i.e. the node of key exist and is not the only node in trie)
-// so witness generator can predict the final state root after deletion of this key
-// the returned sibling node has no key along with it for witness generator must decode
-// the node for its purpose
-func (t *deletionProofTracer) ProveWithDeletion(key []byte, proofDb ethdb.KeyValueWriter) (siblings [][]byte, err error) {
+// GetProofs collect the proofs
+func (t *deletionProofTracer) GetProofs() (ret [][]byte) {
+	for _, bt := range t.proofs {
+		ret = append(ret, bt)
+	}
+	return
+}
+
+// ProveWithDeletion act the same as Prove, while also trace the possible sibling node
+// from a series deletion records, the collected deletion proofs being collect
+// enabling witness generator to predict the final state root after executing any deletion
+// in the traced series, no matter of the deletion occurs in any position of the mpt ops
+// Note the collected sibling node has no key along with it since witness generator would
+// always decode the node for its purpose
+func (t *deletionProofTracer) ProveWithDeletion(key []byte, proofDb ethdb.KeyValueWriter) error {
 	var mptPath []*zktrie.Node
-	err = t.ZkTrie.ProveWithDeletion(key, 0,
+	err := t.ZkTrie.ProveWithDeletion(key, 0,
 		func(n *zktrie.Node) error {
 			nodeHash, err := n.NodeHash()
 			if err != nil {
@@ -65,15 +77,22 @@ func (t *deletionProofTracer) ProveWithDeletion(key []byte, proofDb ethdb.KeyVal
 		func(delNode *zktrie.Node, n *zktrie.Node) {
 			nodeHash, _ := delNode.NodeHash()
 			t.deletionTracer[*nodeHash] = struct{}{}
-
 			// the sibling for each leaf should be unique except for EmptyNode
 			if n != nil && n.Type != zktrie.NodeTypeEmpty {
-				siblings = append(siblings, n.Value())
+				nodeHash, _ := n.NodeHash()
+				t.proofs[*nodeHash] = n.Value()
 			}
+
 		},
 	)
 	if err != nil {
-		return
+		return err
+	}
+	// we put this special kv pair in db so we can distinguish the type and
+	// make suitable Proof
+	err = proofDb.Put(magicHash, zktrie.ProofMagicBytes())
+	if err != nil {
+		return err
 	}
 
 	// now handle mptpath reversively
@@ -84,26 +103,27 @@ func (t *deletionProofTracer) ProveWithDeletion(key []byte, proofDb ethdb.KeyVal
 		if deletedL && deletedR {
 			nodeHash, _ := n.NodeHash()
 			t.deletionTracer[*nodeHash] = struct{}{}
-		} else if i != len(mptPath) {
-			var siblingHash *zkt.Hash
-			if deletedL {
-				siblingHash = n.ChildR
-			} else if deletedR {
-				siblingHash = n.ChildL
-			}
-			if siblingHash != nil {
-				var sibling *zktrie.Node
-				sibling, err = t.TryGetNode(siblingHash)
-				if err != nil {
-					return
+		} else {
+			if i != len(mptPath) {
+				var siblingHash *zkt.Hash
+				if deletedL {
+					siblingHash = n.ChildR
+				} else if deletedR {
+					siblingHash = n.ChildL
 				}
-				siblings = append(siblings, sibling.Value())
+				if siblingHash != nil {
+					sibling, err := t.TryGetNode(siblingHash)
+					if err != nil {
+						return err
+					}
+					if sibling.Type != zktrie.NodeTypeEmpty {
+						t.proofs[*siblingHash] = sibling.Value()
+					}
+				}
 			}
+			return nil
 		}
 	}
 
-	// we put this special kv pair in db so we can distinguish the type and
-	// make suitable Proof
-	err = proofDb.Put(magicHash, zktrie.ProofMagicBytes())
-	return
+	return nil
 }

@@ -219,20 +219,22 @@ func TestProofWithDeletion(t *testing.T) {
 
 	delTracer := tr.NewDeletionTracer()
 
-	sibling1, err := delTracer.ProveWithDeletion(s_key1.Bytes(), proof)
+	err = delTracer.ProveWithDeletion(s_key1.Bytes(), proof)
 	assert.NoError(t, err)
 	nd, err := tr.TryGet(key2)
 	assert.NoError(t, err)
+	sibling1 := delTracer.GetProofs()
+	assert.Equal(t, 1, len(sibling1))
 	l := len(sibling1[0])
 	// a hacking to grep the value part directly from the encoded leaf node,
 	// notice the sibling of key `k*32`` is just the leaf of key `m*32`
-	assert.Equal(t, sibling1[l-33:l-1], nd)
+	assert.Equal(t, sibling1[0][l-33:l-1], nd)
 
 	s_key2, err := zkt.ToSecureKeyBytes(bytes.Repeat([]byte("x"), 32))
 	assert.NoError(t, err)
 
-	sibling2, err := delTracer.ProveWithDeletion(s_key2.Bytes(), proof)
+	err = delTracer.ProveWithDeletion(s_key2.Bytes(), proof)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(sibling2))
+	assert.Equal(t, len(sibling1), len(delTracer.GetProofs()))
 
 }

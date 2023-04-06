@@ -661,7 +661,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		return nil, err
 	}
 
-	zktrie := s.b.ChainConfig().Zktrie
+	zktrie := s.b.ChainConfig().Scroll != nil && s.b.ChainConfig().Scroll.UseZktrie
 
 	storageTrie := state.StorageTrie(address)
 	var storageHash common.Hash
@@ -1249,7 +1249,7 @@ func RPCMarshalHeader(head *types.Header, enableBaseFee bool) map[string]interfa
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
 func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *params.ChainConfig) (map[string]interface{}, error) {
-	fields := RPCMarshalHeader(block.Header(), config.EnableEIP2718 && config.EnableEIP1559)
+	fields := RPCMarshalHeader(block.Header(), config.Scroll != nil && config.Scroll.EnableEIP2718 && config.Scroll.EnableEIP1559)
 	fields["size"] = hexutil.Uint64(block.Size())
 
 	if inclTx {
@@ -1284,7 +1284,7 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *param
 // rpcMarshalHeader uses the generalized output filler, then adds the total difficulty field, which requires
 // a `PublicBlockchainAPI`.
 func (s *PublicBlockChainAPI) rpcMarshalHeader(ctx context.Context, header *types.Header) map[string]interface{} {
-	fields := RPCMarshalHeader(header, s.b.ChainConfig().EnableEIP2718 && s.b.ChainConfig().EnableEIP1559)
+	fields := RPCMarshalHeader(header, s.b.ChainConfig().Scroll != nil && s.b.ChainConfig().Scroll.EnableEIP2718 && s.b.ChainConfig().Scroll.EnableEIP1559)
 	fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, header.Hash()))
 	return fields
 }

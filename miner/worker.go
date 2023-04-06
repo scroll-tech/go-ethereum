@@ -820,7 +820,9 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		}
 		// If we have collected enough transactions then we're done
 		if !w.chainConfig.IsValidTxCount(w.current.tcount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.MaxTxPerBlock)
+			if w.chainConfig.Scroll != nil && w.chainConfig.Scroll.MaxTxPerBlock != nil {
+				log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+			}
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done
@@ -929,7 +931,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if w.chainConfig.IsLondon(header.Number) {
-		if w.chainConfig.EnableEIP2718 && w.chainConfig.EnableEIP1559 {
+		if w.chainConfig.Scroll != nil && w.chainConfig.Scroll.EnableEIP2718 && w.chainConfig.Scroll.EnableEIP1559 {
 			header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
 		} else {
 			// When disabling EIP-2718 or EIP-1559, we do not set baseFeePerGas in RPC response.

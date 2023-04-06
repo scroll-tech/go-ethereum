@@ -98,7 +98,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 
 	// get coinbase
 	var coinbase common.Address
-	if api.backend.ChainConfig().Scroll != nil && api.backend.ChainConfig().Scroll.FeeVaultAddress != nil {
+	if api.backend.ChainConfig().Scroll.L1FeeEnabled() {
 		coinbase = *api.backend.ChainConfig().Scroll.FeeVaultAddress
 	} else {
 		coinbase, err = api.backend.Engine().Author(block.Header())

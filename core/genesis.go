@@ -315,7 +315,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if g.Config != nil && g.Config.IsLondon(common.Big0) {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
-		} else if g.Config.Scroll != nil && g.Config.Scroll.EnableEIP2718 && g.Config.Scroll.EnableEIP1559 {
+		} else if g.Config.Scroll.BaseFeeEnabled() {
 			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
 		} else {
 			head.BaseFee = nil

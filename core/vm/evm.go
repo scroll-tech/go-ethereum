@@ -535,7 +535,7 @@ func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
 // FeeRecipient returns the environment's transaction fee recipient address.
 func (evm *EVM) FeeRecipient() common.Address {
-	if evm.ChainConfig().Scroll != nil && evm.ChainConfig().Scroll.FeeVaultAddress != nil {
+	if evm.ChainConfig().Scroll.L1FeeEnabled() {
 		return *evm.chainConfig.Scroll.FeeVaultAddress
 	} else {
 		return evm.Context.Coinbase

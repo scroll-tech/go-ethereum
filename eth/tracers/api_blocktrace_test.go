@@ -181,7 +181,7 @@ func checkStructLogs(t *testing.T, expect []*txTraceResult, actual []*types.Exec
 
 func checkCoinbase(t *testing.T, b *testBackend, wrapper *types.AccountWrapper) {
 	var coinbase common.Address
-	if b.chainConfig.FeeVaultAddress != nil {
+	if b.chainConfig.Scroll.L1FeeEnabled() {
 		coinbase = *b.chainConfig.FeeVaultAddress
 	} else {
 		header, err := b.HeaderByNumber(context.Background(), 1)

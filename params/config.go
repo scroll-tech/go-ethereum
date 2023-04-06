@@ -379,6 +379,22 @@ type ScrollConfig struct {
 	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
 }
 
+func (s *ScrollConfig) BaseFeeEnabled() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.EnableEIP2718 && s.EnableEIP1559
+}
+
+func (s *ScrollConfig) L1FeeEnabled() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.FeeVaultAddress != nil
+}
+
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
 type EthashConfig struct{}
 

@@ -236,7 +236,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		cacheConfig.SnapshotLimit = 0
 	}
 
-	if chainConfig.Scroll != nil && chainConfig.Scroll.FeeVaultAddress != nil {
+	if chainConfig.Scroll.L1FeeEnabled() {
 		log.Warn("Using fee vault address", "FeeVaultAddress", *chainConfig.Scroll.FeeVaultAddress)
 	}
 

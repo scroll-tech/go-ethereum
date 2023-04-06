@@ -931,7 +931,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if w.chainConfig.IsLondon(header.Number) {
-		if w.chainConfig.Scroll != nil && w.chainConfig.Scroll.EnableEIP2718 && w.chainConfig.Scroll.EnableEIP1559 {
+		if w.chainConfig.Scroll.BaseFeeEnabled() {
 			header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
 		} else {
 			// When disabling EIP-2718 or EIP-1559, we do not set baseFeePerGas in RPC response.

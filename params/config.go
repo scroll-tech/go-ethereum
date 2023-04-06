@@ -395,6 +395,14 @@ func (s *ScrollConfig) L1FeeEnabled() bool {
 	return s.FeeVaultAddress != nil
 }
 
+func (s *ScrollConfig) ZktrieEnabled() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.UseZktrie
+}
+
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
 type EthashConfig struct{}
 

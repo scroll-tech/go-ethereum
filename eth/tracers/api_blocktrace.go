@@ -391,7 +391,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 	}
 
 	// only zktrie model has the ability to get `mptwitness`.
-	if api.backend.ChainConfig().Scroll != nil && api.backend.ChainConfig().Scroll.UseZktrie {
+	if api.backend.ChainConfig().Scroll.ZktrieEnabled() {
 		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessType(api.backend.CacheConfig().MPTWitness), blockTrace); err != nil {
 			log.Error("fill mpt witness fail", "error", err)
 		}

@@ -231,7 +231,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	futureBlocks, _ := lru.New(maxFutureBlocks)
 	// override snapshot setting
-	if chainConfig.Scroll != nil && chainConfig.Scroll.UseZktrie && cacheConfig.SnapshotLimit > 0 {
+	if chainConfig.Scroll.ZktrieEnabled() && cacheConfig.SnapshotLimit > 0 {
 		log.Warn("Snapshot has been disabled by zktrie")
 		cacheConfig.SnapshotLimit = 0
 	}
@@ -249,8 +249,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 			Cache:     cacheConfig.TrieCleanLimit,
 			Journal:   cacheConfig.TrieCleanJournal,
 			Preimages: cacheConfig.Preimages,
-			// TODO:
-			// Zktrie:    chainConfig.Zktrie,
+			Zktrie:    chainConfig.Scroll.ZktrieEnabled(),
 		}),
 		quit:           make(chan struct{}),
 		chainmu:        syncx.NewClosableMutex(),

@@ -661,7 +661,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		return nil, err
 	}
 
-	zktrie := s.b.ChainConfig().Scroll != nil && s.b.ChainConfig().Scroll.UseZktrie
+	zktrie := s.b.ChainConfig().Scroll.ZktrieEnabled()
 
 	storageTrie := state.StorageTrie(address)
 	var storageHash common.Hash

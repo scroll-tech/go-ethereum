@@ -187,11 +187,11 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, override
 		storedcfg := rawdb.ReadChainConfig(db, stored)
 		if storedcfg == nil {
 			log.Warn("Found genesis block without chain config")
-		} else if storedcfg.Scroll != nil {
-			trieCfg = &trie.Config{Zktrie: storedcfg.Scroll.UseZktrie}
+		} else {
+			trieCfg = &trie.Config{Zktrie: storedcfg.Scroll.ZktrieEnabled()}
 		}
-	} else if genesis.Config.Scroll != nil {
-		trieCfg = &trie.Config{Zktrie: genesis.Config.Scroll.UseZktrie}
+	} else {
+		trieCfg = &trie.Config{Zktrie: genesis.Config.Scroll.ZktrieEnabled()}
 	}
 
 	if _, err := state.New(header.Root, state.NewDatabaseWithConfig(db, trieCfg), nil); err != nil {
@@ -276,8 +276,8 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		db = rawdb.NewMemoryDatabase()
 	}
 	var trieCfg *trie.Config
-	if g.Config != nil && g.Config.Scroll != nil {
-		trieCfg = &trie.Config{Zktrie: g.Config.Scroll.UseZktrie}
+	if g.Config != nil {
+		trieCfg = &trie.Config{Zktrie: g.Config.Scroll.ZktrieEnabled()}
 	}
 	statedb, err := state.New(common.Hash{}, state.NewDatabaseWithConfig(db, trieCfg), nil)
 	if err != nil {

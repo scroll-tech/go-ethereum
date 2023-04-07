@@ -24,15 +24,15 @@ func (t *ZkTrie) TryGetNode(nodeHash *zkt.Hash) (*zktrie.Node, error) {
 	return zktrie.NewNodeFromBytes(nBytes)
 }
 
-type proofTracer struct {
+type ProofTracer struct {
 	*ZkTrie
 	deletionTracer map[zkt.Hash]struct{}
 	rawPaths       map[string][]*zktrie.Node
 }
 
 // NewProofTracer create a proof tracer object
-func (t *ZkTrie) NewProofTracer() *proofTracer {
-	return &proofTracer{
+func (t *ZkTrie) NewProofTracer() *ProofTracer {
+	return &ProofTracer{
 		ZkTrie: t,
 		// always consider 0 is "deleted"
 		deletionTracer: map[zkt.Hash]struct{}{zkt.HashZero: {}},
@@ -41,7 +41,7 @@ func (t *ZkTrie) NewProofTracer() *proofTracer {
 }
 
 // Merge merge the input tracer into current and return current tracer
-func (t *proofTracer) Merge(another *proofTracer) *proofTracer {
+func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 
 	// sanity checking
 	if !bytes.Equal(t.Hash().Bytes(), another.Hash().Bytes()) {
@@ -65,7 +65,7 @@ func (t *proofTracer) Merge(another *proofTracer) *proofTracer {
 // along any of the rawpath, no matter of the deletion occurs in any position of the mpt ops
 // Note the collected sibling node has no key along with it since witness generator would
 // always decode the node for its purpose
-func (t *proofTracer) GetDeletionProofs() ([][]byte, error) {
+func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 
 	var ret [][]byte
 
@@ -107,7 +107,7 @@ func (t *proofTracer) GetDeletionProofs() ([][]byte, error) {
 }
 
 // MarkDeletion mark a key has been involved into deletion
-func (t *proofTracer) MarkDeletion(key []byte) {
+func (t *ProofTracer) MarkDeletion(key []byte) {
 	if path, existed := t.rawPaths[string(key)]; existed {
 		// sanity check
 		leafNode := path[len(path)-1]
@@ -122,7 +122,7 @@ func (t *proofTracer) MarkDeletion(key []byte) {
 
 // Prove act the same as zktrie.Prove, while also collect the raw path
 // for collecting deletion proofs in a post-work
-func (t *proofTracer) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+func (t *ProofTracer) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
 	var mptPath []*zktrie.Node
 	err := t.ZkTrie.ProveWithDeletion(key, fromLevel,
 		func(n *zktrie.Node) error {

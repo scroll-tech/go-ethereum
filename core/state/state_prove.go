@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	zktrie "github.com/scroll-tech/go-ethereum/trie"
 	zkt "github.com/scroll-tech/zktrie/types"
+
+	zktrie "github.com/scroll-tech/go-ethereum/trie"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
@@ -31,7 +32,7 @@ func (t ZktrieProofTracer) Merge(another ZktrieProofTracer) {
 	t.ProofTracer.Merge(another.ProofTracer)
 }
 
-func (t ZktrieProofTracer) Avaliable() bool {
+func (t ZktrieProofTracer) Available() bool {
 	return t.ProofTracer != nil
 }
 

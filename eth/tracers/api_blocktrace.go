@@ -336,12 +336,12 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			if !existed {
 				m = make(map[string][]hexutil.Bytes)
 				env.StorageProofs[addrStr] = m
-				if zktrieTracer.Avaliable() {
+				if zktrieTracer.Available() {
 					env.zkTrieTracer[addrStr] = zktrieTracer
 				}
 			} else if _, existed := m[keyStr]; existed {
 				// still need to touch tracer for deletion
-				if isDelete && zktrieTracer.Avaliable() {
+				if isDelete && zktrieTracer.Available() {
 					env.zkTrieTracer[addrStr].MarkDeletion(key)
 				}
 				env.sMu.Unlock()
@@ -351,7 +351,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 
 			var proof [][]byte
 			var err error
-			if zktrieTracer.Avaliable() {
+			if zktrieTracer.Available() {
 				proof, err = state.GetSecureTrieProof(zktrieTracer, key)
 			} else {
 				proof, err = state.GetSecureTrieProof(trie, key)
@@ -366,7 +366,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			}
 			env.sMu.Lock()
 			m[keyStr] = wrappedProof
-			if zktrieTracer.Avaliable() {
+			if zktrieTracer.Available() {
 				env.zkTrieTracer[addrStr].Merge(zktrieTracer)
 			}
 			env.sMu.Unlock()

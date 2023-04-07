@@ -255,6 +255,7 @@ func TestProofWithDeletion(t *testing.T) {
 		zkt.NewByte32FromBytesPaddingZero(key3),
 		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("z"), 32)),
 	)
+	assert.NoError(t, err)
 
 	proofTracer = tr.NewProofTracer()
 	err = proofTracer.Prove(s_key1.Bytes(), 0, proof)

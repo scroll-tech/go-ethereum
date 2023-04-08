@@ -43,7 +43,7 @@ func TestReadWriteL1Message(t *testing.T) {
 	enqueueIndex := uint64(123)
 	msg := newL1MessageTx(enqueueIndex)
 	db := NewMemoryDatabase()
-	WriteL1Message(db, &msg)
+	WriteL1Messages(db, []types.L1MessageTx{msg})
 
 	got := ReadL1Message(db, enqueueIndex)
 	if got == nil || got.Nonce != msg.Nonce {

@@ -117,7 +117,7 @@ func TestReadWriteL1MessagesInBlock(t *testing.T) {
 	hash := common.Hash{1}
 	db := NewMemoryDatabase()
 
-	WriteL1MessagesInBlock(db, hash, L1MessagesInBlock{
+	WriteL1MessagesInBlock(db, hash, L1MessagesInL2Block{
 		FirstEnqueueIndex: 1,
 		LastEnqueueIndex:  9,
 	})

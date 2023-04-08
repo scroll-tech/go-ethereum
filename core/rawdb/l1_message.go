@@ -13,13 +13,13 @@ import (
 )
 
 //
-func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, blockNumber *big.Int) {
+func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber *big.Int) {
 	value := []byte{0}
-	if blockNumber != nil {
-		value = blockNumber.Bytes()
+	if L1BlockNumber != nil {
+		value = L1BlockNumber.Bytes()
 	}
 	if err := db.Put(syncedL1BlockNumberKey, value); err != nil {
-		log.Crit("Failed to synced L1 block number", "err", err)
+		log.Crit("Failed to update synced L1 block number", "err", err)
 	}
 }
 
@@ -33,12 +33,12 @@ func ReadSyncedL1BlockNumber(db ethdb.Reader) *big.Int {
 }
 
 //
-func WriteL1Message(db ethdb.KeyValueWriter, msg *types.L1MessageTx) {
-	bytes, err := rlp.EncodeToBytes(msg)
+func WriteL1Message(db ethdb.KeyValueWriter, l1Msg *types.L1MessageTx) {
+	bytes, err := rlp.EncodeToBytes(l1Msg)
 	if err != nil {
 		log.Crit("Failed to RLP encode L1 message", "err", err)
 	}
-	enqueueIndex := msg.Nonce
+	enqueueIndex := l1Msg.Nonce
 	if err := db.Put(L1MessageKey(enqueueIndex), bytes); err != nil {
 		log.Crit("Failed to store L1 message", "err", err)
 	}
@@ -46,8 +46,8 @@ func WriteL1Message(db ethdb.KeyValueWriter, msg *types.L1MessageTx) {
 
 //
 // TODO: consider writing messages in batches
-func WriteL1Messages(db ethdb.KeyValueWriter, msgs []types.L1MessageTx) {
-	for _, msg := range msgs {
+func WriteL1Messages(db ethdb.KeyValueWriter, l1Msgs []types.L1MessageTx) {
+	for _, msg := range l1Msgs {
 		WriteL1Message(db, &msg)
 	}
 }
@@ -79,8 +79,8 @@ type L1MessageIterator struct {
 	keyLength int
 }
 
-func IterateL1MessagesFrom(db ethdb.Iteratee, from uint64) L1MessageIterator {
-	start := encodeEnqueueIndex(from)
+func IterateL1MessagesFrom(db ethdb.Iteratee, fromEnqueueIndex uint64) L1MessageIterator {
+	start := encodeEnqueueIndex(fromEnqueueIndex)
 	it := db.NewIterator(L1MessagePrefix, start)
 	keyLength := len(L1MessagePrefix) + 8
 
@@ -108,11 +108,11 @@ func (it *L1MessageIterator) EnqueueIndex() uint64 {
 
 func (it *L1MessageIterator) L1Message() types.L1MessageTx {
 	data := it.inner.Value()
-	msg := types.L1MessageTx{}
-	if err := rlp.DecodeBytes(data, &msg); err != nil {
+	l1Msg := types.L1MessageTx{}
+	if err := rlp.DecodeBytes(data, &l1Msg); err != nil {
 		log.Crit("Invalid L1 message RLP", "err", err)
 	}
-	return msg
+	return l1Msg
 }
 
 func (it *L1MessageIterator) Release() {
@@ -120,13 +120,13 @@ func (it *L1MessageIterator) Release() {
 }
 
 //
-func ReadLMessagesInRange(db ethdb.Iteratee, first, last uint64) []types.L1MessageTx {
-	msgs := make([]types.L1MessageTx, 0, last-first+1)
-	it := IterateL1MessagesFrom(db, first)
+func ReadLMessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueIndex uint64) []types.L1MessageTx {
+	msgs := make([]types.L1MessageTx, 0, lastEnqueueIndex-firstEnqueueIndex+1)
+	it := IterateL1MessagesFrom(db, firstEnqueueIndex)
 	defer it.Release()
 
 	for it.Next() {
-		if it.EnqueueIndex() > last {
+		if it.EnqueueIndex() > lastEnqueueIndex {
 			break
 		}
 		msgs = append(msgs, it.L1Message())
@@ -135,31 +135,31 @@ func ReadLMessagesInRange(db ethdb.Iteratee, first, last uint64) []types.L1Messa
 	return msgs
 }
 
-type L1MessagesInBlock struct {
+type L1MessagesInL2Block struct {
 	FirstEnqueueIndex uint64
 	LastEnqueueIndex  uint64
 }
 
 //
-func WriteL1MessagesInBlock(db ethdb.KeyValueWriter, hash common.Hash, entry L1MessagesInBlock) {
+func WriteL1MessagesInBlock(db ethdb.KeyValueWriter, l2BlockHash common.Hash, entry L1MessagesInL2Block) {
 	bytes, err := rlp.EncodeToBytes(entry)
 	if err != nil {
 		log.Crit("Failed to RLP encode L1 messages in block", "err", err)
 	}
-	if err := db.Put(L1MessagesInBlockKey(hash), bytes); err != nil {
-		log.Crit("Failed to store L1 messages in block", "hash", hash, "err", err)
+	if err := db.Put(L1MessagesInBlockKey(l2BlockHash), bytes); err != nil {
+		log.Crit("Failed to store L1 messages in block", "hash", l2BlockHash, "err", err)
 	}
 }
 
 //
-func ReadL1MessagesInBlock(db ethdb.Reader, hash common.Hash) *L1MessagesInBlock {
-	data, _ := db.Get(L1MessagesInBlockKey(hash))
+func ReadL1MessagesInBlock(db ethdb.Reader, l2BlockHash common.Hash) *L1MessagesInL2Block {
+	data, _ := db.Get(L1MessagesInBlockKey(l2BlockHash))
 	if len(data) == 0 {
 		return nil
 	}
-	var entry L1MessagesInBlock
+	var entry L1MessagesInL2Block
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
-		log.Error("Invalid L1 messages in block RLP", "hash", hash, "blob", data, "err", err)
+		log.Error("Invalid L1 messages in block RLP", "hash", l2BlockHash, "blob", data, "err", err)
 		return nil
 	}
 	return &entry

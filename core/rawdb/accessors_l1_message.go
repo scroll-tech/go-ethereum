@@ -23,7 +23,10 @@ func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
 
 // ReadSyncedL1BlockNumber retrieves the highest synced L1 block number.
 func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
-	data, _ := db.Get(syncedL1BlockNumberKey)
+	data, err := db.Get(syncedL1BlockNumberKey)
+	if err != nil {
+		log.Crit("Failed to read synced L1 block number from DB", "err", err)
+	}
 	if len(data) == 0 {
 		return nil
 	}
@@ -191,7 +194,10 @@ func WriteL1MessageRangeInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Ha
 
 // ReadL1MessageRangeInL2Block retrieves the range of L1 messages included in an L2 block.
 func ReadL1MessageRangeInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *L1MessageRangeInL2Block {
-	data, _ := db.Get(L1MessageRangeInL2BlockKey(l2BlockHash))
+	data, err := db.Get(L1MessageRangeInL2BlockKey(l2BlockHash))
+	if err != nil {
+		log.Crit("Failed to read L1MessageRangeInL2Block from DB", "err", err)
+	}
 	if len(data) == 0 {
 		return nil
 	}

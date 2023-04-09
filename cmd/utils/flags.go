@@ -19,6 +19,7 @@ package utils
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -41,6 +42,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/accounts/keystore"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/fdlimit"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/clique"
 	"github.com/scroll-tech/go-ethereum/consensus/ethash"
@@ -70,6 +72,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/nat"
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 func init() {
@@ -790,6 +793,20 @@ var (
 		Name:  "catalyst",
 		Usage: "Catalyst mode (eth2 integration testing)",
 	}
+
+	// L1Settings
+	L1EndpointFlag = cli.StringFlag{
+		Name:  "l1.addr",
+		Usage: "Endpoint of L1 HTTP-RPC server",
+	}
+	L1ConfirmationsFlag = cli.StringFlag{
+		Name:  "l1.confirmations",
+		Usage: "Number of confirmations on L1 needed for finalization, or \"safe\" or \"finalized\"",
+	}
+	L1DeploymentBlockFlag = cli.Int64Flag{
+		Name:  "l1.deployment.block",
+		Usage: "L1 bridge deployment block number",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1217,6 +1234,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setNodeUserIdent(ctx, cfg)
 	setDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
+	setL1(ctx, cfg)
 
 	if ctx.GlobalIsSet(ExternalSignerFlag.Name) {
 		cfg.ExternalSigner = ctx.GlobalString(ExternalSignerFlag.Name)
@@ -1239,6 +1257,42 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	}
 	if ctx.GlobalIsSet(InsecureUnlockAllowedFlag.Name) {
 		cfg.InsecureUnlockAllowed = ctx.GlobalBool(InsecureUnlockAllowedFlag.Name)
+	}
+}
+
+func unmarshalBlockNumber(input string) (rpc.BlockNumber, error) {
+	switch input {
+	case "finalized":
+		return rpc.FinalizedBlockNumber, nil
+	case "safe":
+		return rpc.SafeBlockNumber, nil
+	}
+	blockNum, err := hexutil.DecodeUint64(input)
+	if err == nil && blockNum <= math.MaxInt64 {
+		return rpc.BlockNumber(blockNum), nil
+	}
+	blockNum, err = strconv.ParseUint(input, 10, 64)
+	if err == nil && blockNum <= math.MaxInt64 {
+		return rpc.BlockNumber(blockNum), nil
+	}
+	return 0, errors.New("incorrect value")
+}
+
+func setL1(ctx *cli.Context, cfg *node.Config) {
+	var err error
+	if ctx.GlobalIsSet(L1EndpointFlag.Name) {
+		cfg.L1Endpoint = ctx.GlobalString(L1EndpointFlag.Name)
+	}
+	if ctx.GlobalIsSet(L1ConfirmationsFlag.Name) {
+		cfg.L1Confirmations, err = unmarshalBlockNumber(ctx.GlobalString(L1ConfirmationsFlag.Name))
+		if err != nil {
+			panic(fmt.Sprintf("invalid value for flag %s: %s", L1ConfirmationsFlag.Name, ctx.GlobalString(L1ConfirmationsFlag.Name)))
+		}
+	} else {
+		cfg.L1Confirmations = rpc.FinalizedBlockNumber
+	}
+	if ctx.GlobalIsSet(L1DeploymentBlockFlag.Name) {
+		cfg.L1DeploymentBlock = big.NewInt(ctx.GlobalInt64(L1DeploymentBlockFlag.Name))
 	}
 }
 

@@ -9,12 +9,12 @@ import (
 )
 
 func TestReadWriteSyncedL1BlockNumber(t *testing.T) {
-	blockNumbers := []*big.Int{
-		big.NewInt(0).SetUint64(1),
-		big.NewInt(0).SetUint64(1 << 2),
-		big.NewInt(0).SetUint64(1 << 8),
-		big.NewInt(0).SetUint64(1 << 16),
-		big.NewInt(0).SetUint64(1 << 32),
+	blockNumbers := []uint64{
+		1,
+		1 << 2,
+		1 << 8,
+		1 << 16,
+		1 << 32,
 	}
 
 	db := NewMemoryDatabase()
@@ -22,7 +22,7 @@ func TestReadWriteSyncedL1BlockNumber(t *testing.T) {
 		WriteSyncedL1BlockNumber(db, num)
 		got := ReadSyncedL1BlockNumber(db)
 
-		if num.Cmp(got) != 0 {
+		if got == nil || *got != num {
 			t.Fatal("Block number mismatch")
 		}
 	}
@@ -102,7 +102,7 @@ func TestReadL1MessageTxRange(t *testing.T) {
 	db := NewMemoryDatabase()
 	WriteL1Messages(db, msgs)
 
-	got := ReadLMessagesInRange(db, 100, 199)
+	got := ReadL1MessagesInRange(db, 100, 199, false)
 
 	if len(got) != 3 {
 		t.Fatal("Invalid length", "length", len(got))
@@ -117,12 +117,12 @@ func TestReadWriteL1MessagesInBlock(t *testing.T) {
 	hash := common.Hash{1}
 	db := NewMemoryDatabase()
 
-	WriteL1MessagesInBlock(db, hash, L1MessagesInL2Block{
+	WriteL1MessageRangeInL2Block(db, hash, L1MessageRangeInL2Block{
 		FirstEnqueueIndex: 1,
 		LastEnqueueIndex:  9,
 	})
 
-	got := ReadL1MessagesInBlock(db, hash)
+	got := ReadL1MessageRangeInL2Block(db, hash)
 
 	if got == nil || got.FirstEnqueueIndex != 1 || got.LastEnqueueIndex != 9 {
 		t.Fatal("Incorrect result", "got", got)

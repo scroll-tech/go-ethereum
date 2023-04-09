@@ -37,23 +37,31 @@ func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 	return &value
 }
 
-// WriteL1Messages writes an array of L1 messages to the database.
-func WriteL1Messages(db ethdb.Batcher, l1Msgs []types.L1MessageTx) {
-	batch := db.NewBatch()
-
-	for _, msg := range l1Msgs {
-		bytes, err := rlp.EncodeToBytes(msg)
-		if err != nil {
-			log.Crit("Failed to RLP encode L1 message", "msg", msg, "err", err)
-		}
-		enqueueIndex := msg.Nonce
-		if err := batch.Put(L1MessageKey(enqueueIndex), bytes); err != nil {
-			log.Crit("Failed to store (Put) L1 message", "err", err)
-		}
+// WriteL1Message writes an L1 message to the database.
+func WriteL1Message(db ethdb.KeyValueWriter, l1Msg types.L1MessageTx) {
+	bytes, err := rlp.EncodeToBytes(l1Msg)
+	if err != nil {
+		log.Crit("Failed to RLP encode L1 message", "err", err)
 	}
+	enqueueIndex := l1Msg.Nonce
+	if err := db.Put(L1MessageKey(enqueueIndex), bytes); err != nil {
+		log.Crit("Failed to store L1 message", "err", err)
+	}
+}
 
+// WriteL1Messages writes an array of L1 messages to the database.
+func WriteL1Messages(db ethdb.KeyValueWriter, l1Msgs []types.L1MessageTx) {
+	for _, msg := range l1Msgs {
+		WriteL1Message(db, msg)
+	}
+}
+
+// WriteL1MessagesBatch writes an array of L1 messages to the database in a single batch.
+func WriteL1MessagesBatch(db ethdb.Batcher, l1Msgs []types.L1MessageTx) {
+	batch := db.NewBatch()
+	WriteL1Messages(batch, l1Msgs)
 	if err := batch.Write(); err != nil {
-		log.Crit("Failed to store (Write) L1 message", "err", err)
+		log.Crit("Failed to store L1 message batch", "err", err)
 	}
 }
 

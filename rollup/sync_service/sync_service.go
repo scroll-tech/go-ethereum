@@ -26,6 +26,10 @@ type SyncService struct {
 }
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database) (*SyncService, error) {
+	if genesisConfig.L1Config == nil {
+		return nil, fmt.Errorf("missing L1 config in genesis")
+	}
+
 	client, err := newBridgeClient(ctx, nodeConfig.L1Endpoint, genesisConfig.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.L1Config.L1MessageQueueAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bridge client: %w", err)

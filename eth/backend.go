@@ -211,7 +211,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 
 	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb)
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize sync service: %w", err)
+		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
 
 	// Permit the downloader to use the trie cache allowance during fast sync

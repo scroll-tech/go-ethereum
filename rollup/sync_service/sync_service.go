@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/node"
@@ -15,6 +14,8 @@ import (
 
 const DefaultFetchBlockRange = uint64(20)
 const DefaultPollInterval = time.Second * 15
+const DbWriteThresholdBytes = 10 * 1024
+const DbWriteThresholdBlocks = 100
 
 type SyncService struct {
 	ctx                  context.Context
@@ -92,6 +93,27 @@ func (s *SyncService) fetchMessages() {
 
 	log.Trace("Sync service fetchMessages", "latestProcessedBlock", s.latestProcessedBlock, "latestConfirmed", latestConfirmed)
 
+	batchWriter := s.db.NewBatch()
+	blocksProcessed := uint64(0)
+
+	// helper function to flush DB writes cached in memory
+	flush := func(lastBlock uint64) {
+		err := batchWriter.Write()
+		if err != nil {
+			// crash on DB error, no risk of inconsistency here
+			log.Crit("failed to write L1 messages to database", "err", err)
+		}
+
+		// write synced block number after writing the messages.
+		// if we crash before this line, we will need to reindex
+		// some messages but DB will remain consistent.
+		rawdb.WriteSyncedL1BlockNumber(s.db, lastBlock)
+
+		s.latestProcessedBlock = lastBlock
+		batchWriter.Reset()
+		blocksProcessed = 0
+	}
+
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		select {
@@ -108,27 +130,23 @@ func (s *SyncService) fetchMessages() {
 
 		msgs, err := s.client.fetchMessagesInRange(s.ctx, from, to)
 		if err != nil {
+			flush(to)
 			log.Warn("failed to fetch messages in range", "err", err)
 			return
 		}
 
 		if len(msgs) > 0 {
 			log.Info("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
+
+			// collect messages in memory
+			rawdb.WriteL1Messages(batchWriter, msgs)
 		}
 
-		s.StoreMessages(msgs)
+		blocksProcessed += to - from
 
-		s.latestProcessedBlock = to
-		s.SetLatestSyncedL1BlockNumber(to)
-	}
-}
-
-func (s *SyncService) SetLatestSyncedL1BlockNumber(number uint64) {
-	rawdb.WriteSyncedL1BlockNumber(s.db, number)
-}
-
-func (s *SyncService) StoreMessages(msgs []types.L1MessageTx) {
-	if len(msgs) > 0 {
-		rawdb.WriteL1Messages(s.db, msgs)
+		// flush to DB periodically
+		if to == latestConfirmed || batchWriter.ValueSize() > DbWriteThresholdBytes || blocksProcessed > DbWriteThresholdBlocks {
+			flush(to)
+		}
 	}
 }

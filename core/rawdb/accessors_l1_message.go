@@ -40,6 +40,34 @@ func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 	return &value
 }
 
+// WriteSyncedL1BlockNumber writes the highest synced L1 block number to the database.
+func WriteIncludedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
+	value := big.NewInt(0).SetUint64(L1BlockNumber).Bytes()
+
+	if err := db.Put(includedL1BlockNumberKey, value); err != nil {
+		log.Crit("Failed to update included L1 block number", "err", err)
+	}
+}
+
+// ReadSyncedL1BlockNumber retrieves the highest synced L1 block number.
+func ReadIncludedL1BlockNumber(db ethdb.Reader) *uint64 {
+	data, err := db.Get(includedL1BlockNumberKey)
+	if err != nil {
+		log.Crit("Failed to read included L1 block number from DB", "err", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+	number := new(big.Int).SetBytes(data)
+	if !number.IsUint64() {
+		log.Crit("Unexpected included L1 block number in DB", "number", number)
+	}
+
+	value := number.Uint64()
+	return &value
+}
+
 // WriteL1Message writes an L1 message to the database.
 func WriteL1Message(db ethdb.KeyValueWriter, l1Msg types.L1MessageTx) {
 	bytes, err := rlp.EncodeToBytes(l1Msg)

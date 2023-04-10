@@ -29,20 +29,23 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/eth/downloader"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 type mockBackend struct {
-	bc     *core.BlockChain
-	txPool *core.TxPool
+	bc      *core.BlockChain
+	txPool  *core.TxPool
+	chainDb ethdb.Database
 }
 
-func NewMockBackend(bc *core.BlockChain, txPool *core.TxPool) *mockBackend {
+func NewMockBackend(bc *core.BlockChain, txPool *core.TxPool, chainDb ethdb.Database) *mockBackend {
 	return &mockBackend{
 		bc:     bc,
 		txPool: txPool,
+		chainDb: chainDb,
 	}
 }
 
@@ -52,6 +55,10 @@ func (m *mockBackend) BlockChain() *core.BlockChain {
 
 func (m *mockBackend) TxPool() *core.TxPool {
 	return m.txPool
+}
+
+func (m *mockBackend) ChainDb() ethdb.Database {
+	return m.chainDb
 }
 
 type testBlockChain struct {
@@ -253,7 +260,7 @@ func createMiner(t *testing.T) (*Miner, *event.TypeMux) {
 	blockchain := &testBlockChain{statedb, 10000000, new(event.Feed)}
 
 	pool := core.NewTxPool(testTxPoolConfig, chainConfig, blockchain)
-	backend := NewMockBackend(bc, pool)
+	backend := NewMockBackend(bc, pool, chainDB)
 	// Create event Mux
 	mux := new(event.TypeMux)
 	// Create Miner

@@ -101,6 +101,7 @@ var (
 
 	// Scroll L1 message store
 	syncedL1BlockNumberKey        = []byte("LastSyncedL1BlockNumber")
+	includedL1BlockNumberKey      = []byte("LastIncludedL1BlockNumber")
 	L1MessagePrefix               = []byte("l1")  // L1MessageTxPrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
 	L1MessageRangeInL2BlockPrefix = []byte("l1b") // L1MessageRangeInL2BlockPrefix + block hash -> L1MessageRangeInL2Block
 )

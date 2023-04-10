@@ -468,23 +468,23 @@ func TestTransactionCoding(t *testing.T) {
 				GasPrice:   big.NewInt(10),
 				AccessList: accesses,
 			}
-		case 5: 
+		case 5:
 			// L1MessageTx
 			isL1MessageTx = true
 			txdata = &L1MessageTx{
-				Nonce: i,
-				Gas: 123457,
-				To: &recipient,
-				Value: big.NewInt(10),
-				Data: []byte("abcdef"),
+				Nonce:  i,
+				Gas:    123457,
+				To:     &recipient,
+				Value:  big.NewInt(10),
+				Data:   []byte("abcdef"),
 				Sender: addr,
 			}
 		}
 		var tx *Transaction
 		//  dont sign L1MessageTx
-		if isL1MessageTx{
+		if isL1MessageTx {
 			tx = NewTx(txdata)
-			} else {
+		} else {
 			tx, err = SignNewTx(key, signer, txdata)
 			if err != nil {
 				t.Fatalf("could not sign transaction: %v", err)
@@ -514,11 +514,11 @@ func TestMessageHashMatch(t *testing.T) {
 	tx := NewTx(
 		&L1MessageTx{
 			Sender: sender,
-			Nonce: 1,
-			Value: big.NewInt(2),
-			Gas: 3,
-			To: &to, 
-			Data: []byte{1, 2, 3, 4},
+			Nonce:  1,
+			Value:  big.NewInt(2),
+			Gas:    3,
+			To:     &to,
+			Data:   []byte{1, 2, 3, 4},
 		},
 	)
 

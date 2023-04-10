@@ -67,7 +67,7 @@ func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 // always decode the node for its purpose
 func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 
-	var ret [][]byte
+	retMap := map[zkt.Hash][]byte{}
 
 	// check each path: reversively, skip the final leaf node
 	for _, path := range t.rawPaths {
@@ -93,13 +93,17 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 						return nil, err
 					}
 					if sibling.Type != zktrie.NodeTypeEmpty {
-						ret = append(ret, sibling.Value())
+						retMap[*siblingHash] = sibling.Value()
 					}
 				}
 				break
 			}
 		}
+	}
 
+	var ret [][]byte
+	for _, bt := range retMap {
+		ret = append(ret, bt)
 	}
 
 	return ret, nil

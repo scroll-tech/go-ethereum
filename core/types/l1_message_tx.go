@@ -12,7 +12,7 @@ const L1MessageTxType = 0x7E
 type L1MessageTx struct {
 	Nonce  uint64
 	Gas    uint64          // gas limit
-	To     *common.Address `rlp:"nil"` // nil means contract creation
+	To     *common.Address // can not be nil, we do not allow contract creation from L1
 	Value  *big.Int
 	Data   []byte
 	Sender common.Address

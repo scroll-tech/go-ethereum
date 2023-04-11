@@ -587,7 +587,7 @@ type Message struct {
 	accessList AccessList
 	isFake     bool
 
-	IsL1MessageTx bool
+	isL1MessageTx bool
 }
 
 // IsL1MessageTx set to false
@@ -620,7 +620,7 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 		data:          tx.Data(),
 		accessList:    tx.AccessList(),
 		isFake:        false,
-		IsL1MessageTx: tx.IsL1MessageTx(),
+		isL1MessageTx: tx.IsL1MessageTx(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -642,6 +642,7 @@ func (m Message) Nonce() uint64          { return m.nonce }
 func (m Message) Data() []byte           { return m.data }
 func (m Message) AccessList() AccessList { return m.accessList }
 func (m Message) IsFake() bool           { return m.isFake }
+func (m Message) IsL1MessageTx() bool    { return m.isL1MessageTx }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

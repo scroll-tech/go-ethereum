@@ -112,7 +112,7 @@ func IterateL1MessagesFrom(db ethdb.Iteratee, fromEnqueueIndex uint64) L1Message
 }
 
 // Next moves the iterator to the next key/value pair.
-// It returns whether the iterator is exhausted.
+// It returns false when the iterator is exhausted.
 func (it *L1MessageIterator) Next() bool {
 	for it.inner.Next() {
 		key := it.inner.Key()

@@ -94,24 +94,24 @@ func (s *SyncService) fetchMessages() {
 	log.Trace("Sync service fetchMessages", "latestProcessedBlock", s.latestProcessedBlock, "latestConfirmed", latestConfirmed)
 
 	batchWriter := s.db.NewBatch()
-	blocksProcessed := uint64(0)
+	numBlocksPendingDbWrite := uint64(0)
 
-	// helper function to flush DB writes cached in memory
+	// helper function to flush database writes cached in memory
 	flush := func(lastBlock uint64) {
 		err := batchWriter.Write()
 		if err != nil {
-			// crash on DB error, no risk of inconsistency here
+			// crash on database error, no risk of inconsistency here
 			log.Crit("failed to write L1 messages to database", "err", err)
 		}
 
 		// write synced block number after writing the messages.
 		// if we crash before this line, we will need to reindex
-		// some messages but DB will remain consistent.
+		// some messages but database will remain consistent.
 		rawdb.WriteSyncedL1BlockNumber(s.db, lastBlock)
 
 		s.latestProcessedBlock = lastBlock
 		batchWriter.Reset()
-		blocksProcessed = 0
+		numBlocksPendingDbWrite = 0
 	}
 
 	// query in batches
@@ -130,22 +130,20 @@ func (s *SyncService) fetchMessages() {
 
 		msgs, err := s.client.fetchMessagesInRange(s.ctx, from, to)
 		if err != nil {
-			flush(to)
+			flush(from - 1)
 			log.Warn("failed to fetch messages in range", "err", err)
 			return
 		}
 
 		if len(msgs) > 0 {
 			log.Info("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
-
-			// collect messages in memory
-			rawdb.WriteL1Messages(batchWriter, msgs)
+			rawdb.WriteL1Messages(batchWriter, msgs) // collect messages in memory
 		}
 
-		blocksProcessed += to - from
+		numBlocksPendingDbWrite += to - from
 
-		// flush to DB periodically
-		if to == latestConfirmed || batchWriter.ValueSize() > DbWriteThresholdBytes || blocksProcessed > DbWriteThresholdBlocks {
+		// flush new messages to database periodically
+		if to == latestConfirmed || batchWriter.ValueSize() >= DbWriteThresholdBytes || numBlocksPendingDbWrite >= DbWriteThresholdBlocks {
 			flush(to)
 		}
 	}

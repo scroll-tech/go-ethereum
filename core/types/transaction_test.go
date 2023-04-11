@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -504,6 +505,7 @@ func TestTransactionCoding(t *testing.T) {
 		assertEqual(parsedTx, tx)
 	}
 }
+
 // TODO: get this to pass
 // go test -v -run TestMessageHashMatch
 // func TestMessageHashMatch(t *testing.T) {
@@ -527,16 +529,16 @@ func TestTransactionCoding(t *testing.T) {
 // 	}
 // 	fmt.Println("encoded", encoded)
 
-	// hash := tx.Hash()
+// hash := tx.Hash()
 
-	// common.Keccak256Hash
-	// expectedHash := common.HexToHash("1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be")
-	// fmt.Println(hash.Hex())
-	// fmt.Println(expectedHash.Hex())
+// common.Keccak256Hash
+// expectedHash := common.HexToHash("1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be")
+// fmt.Println(hash.Hex())
+// fmt.Println(expectedHash.Hex())
 
-	// if hash != expectedHash {
-	// 	t.Fatal("hashes are not equal")
-	// }
+// if hash != expectedHash {
+// 	t.Fatal("hashes are not equal")
+// }
 
 // }
 

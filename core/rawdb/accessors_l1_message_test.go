@@ -32,10 +32,10 @@ func newL1MessageTx(enqueueIndex uint64) types.L1MessageTx {
 	return types.L1MessageTx{
 		Nonce:  enqueueIndex,
 		Gas:    0,
-		To:     nil,
+		To:     &common.Address{},
 		Value:  big.NewInt(0),
 		Data:   nil,
-		Sender: &common.Address{},
+		Sender: common.Address{},
 	}
 }
 

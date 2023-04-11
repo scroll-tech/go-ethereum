@@ -101,8 +101,8 @@ var (
 
 	// Scroll L1 message store
 	syncedL1BlockNumberKey        = []byte("LastSyncedL1BlockNumber")
-	L1MessagePrefix               = []byte("l1")  // L1MessageTxPrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
-	L1MessageRangeInL2BlockPrefix = []byte("l1b") // L1MessageRangeInL2BlockPrefix + block hash -> L1MessageRangeInL2Block
+	L1MessagePrefix               = []byte("l1")  // L1MessagePrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
+	L1MessageRangeInL2BlockPrefix = []byte("l1b") // L1MessageRangeInL2BlockPrefix + L2 block hash -> L1MessageRangeInL2Block
 )
 
 const (
@@ -248,7 +248,7 @@ func L1MessageKey(enqueueIndex uint64) []byte {
 	return append(L1MessagePrefix, encodeEnqueueIndex(enqueueIndex)...)
 }
 
-// L1MessageRangeInL2BlockKey = L1MessageRangeInL2BlockPrefix + hash
+// L1MessageRangeInL2BlockKey = L1MessageRangeInL2BlockPrefix + L2 block hash
 func L1MessageRangeInL2BlockKey(hash common.Hash) []byte {
 	return append(L1MessageRangeInL2BlockPrefix, hash.Bytes()...)
 }

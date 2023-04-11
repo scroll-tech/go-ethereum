@@ -176,38 +176,26 @@ func ReadL1MessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueInde
 	return msgs
 }
 
-// L1MessageRangeInL2Block stores the range of L1 messages included
-// in some L2 block. The sync layer is expected to verify that the
-// L2 block includes these L1 messages contiguously.
-type L1MessageRangeInL2Block struct {
-	FirstEnqueueIndex uint64
-	LastEnqueueIndex  uint64
-}
-
-// WriteL1MessageRangeInL2Block writes the L1 message range included in an
-// L2 block into the database. The L2 block is identified by its block hash.
-func WriteL1MessageRangeInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, msgRange L1MessageRangeInL2Block) {
-	bytes, err := rlp.EncodeToBytes(msgRange)
-	if err != nil {
-		log.Crit("Failed to RLP encode L1MessageRangeInL2Block", "range", msgRange, "err", err)
-	}
-	if err := db.Put(L1MessageRangeInL2BlockKey(l2BlockHash), bytes); err != nil {
-		log.Crit("Failed to store L1MessageRangeInL2Block", "hash", l2BlockHash, "err", err)
+// WriteLastL1MessageInL2Block writes the enqueue index of the last message included in the
+// ledger up to and including the provided L2 block. The L2 block is identified by its block
+// hash. If the L2 block contains zero L1 messages, this value MUST equal its parent's value.
+func WriteLastL1MessageInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, enqueueIndex uint64) {
+	if err := db.Put(LastL1MessageInL2BlockKey(l2BlockHash), encodeEnqueueIndex(enqueueIndex)); err != nil {
+		log.Crit("Failed to store last L1 message in L2 block", "l2BlockHash", l2BlockHash, "err", err)
 	}
 }
 
-// ReadL1MessageRangeInL2Block retrieves the range of L1 messages included in an L2 block.
-func ReadL1MessageRangeInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *L1MessageRangeInL2Block {
-	data, err := db.Get(L1MessageRangeInL2BlockKey(l2BlockHash))
+// ReadLastL1MessageInL2Block retrieves the enqueue index of the last message
+// included in the ledger up to and including the provided L2 block.
+// The caller must add special handling for the L2 genesis block.
+func ReadLastL1MessageInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
+	data, err := db.Get(LastL1MessageInL2BlockKey(l2BlockHash))
 	if err != nil {
-		log.Crit("Failed to read L1MessageRangeInL2Block from database", "err", err)
+		log.Crit("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
 	}
 	if len(data) == 0 {
 		return nil
 	}
-	var msgRange L1MessageRangeInL2Block
-	if err := rlp.DecodeBytes(data, &msgRange); err != nil {
-		log.Crit("Invalid L1MessageRangeInL2Block RLP", "hash", l2BlockHash, "data", data, "err", err)
-	}
-	return &msgRange
+	enqueueIndex := binary.BigEndian.Uint64(data)
+	return &enqueueIndex
 }

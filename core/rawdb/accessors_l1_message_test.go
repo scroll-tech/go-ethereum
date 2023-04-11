@@ -106,20 +106,23 @@ func TestReadL1MessageTxRange(t *testing.T) {
 	}
 }
 
-func TestReadWriteL1MessageRangeInL2Block(t *testing.T) {
-	hash := common.Hash{1}
-	db := NewMemoryDatabase()
-
-	msgRange := L1MessageRangeInL2Block{
-		FirstEnqueueIndex: 1,
-		LastEnqueueIndex:  9,
+func TestReadWriteLastL1MessageInL2Block(t *testing.T) {
+	inputs := []uint64{
+		1,
+		1 << 2,
+		1 << 8,
+		1 << 16,
+		1 << 32,
 	}
 
-	WriteL1MessageRangeInL2Block(db, hash, msgRange)
+	db := NewMemoryDatabase()
+	for _, num := range inputs {
+		l2BlockHash := common.Hash{byte(num)}
+		WriteLastL1MessageInL2Block(db, l2BlockHash, num)
+		got := ReadLastL1MessageInL2Block(db, l2BlockHash)
 
-	got := ReadL1MessageRangeInL2Block(db, hash)
-
-	if got == nil || got.FirstEnqueueIndex != 1 || got.LastEnqueueIndex != 9 {
-		t.Fatal("Incorrect result", "expected", msgRange, "got", got)
+		if got == nil || *got != num {
+			t.Fatal("Enqueue index mismatch", "expected", num, "got", got)
+		}
 	}
 }

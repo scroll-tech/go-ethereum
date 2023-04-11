@@ -25,7 +25,7 @@ func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
 func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 	data, err := db.Get(syncedL1BlockNumberKey)
 	if err != nil {
-		log.Crit("Failed to read synced L1 block number from DB", "err", err)
+		log.Crit("Failed to read synced L1 block number from database", "err", err)
 	}
 	if len(data) == 0 {
 		return nil
@@ -33,7 +33,7 @@ func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 
 	number := new(big.Int).SetBytes(data)
 	if !number.IsUint64() {
-		log.Crit("Unexpected synced L1 block number in DB", "number", number)
+		log.Crit("Unexpected synced L1 block number in database", "number", number)
 	}
 
 	value := number.Uint64()
@@ -98,8 +98,8 @@ type L1MessageIterator struct {
 	keyLength int
 }
 
-// IterateL1MessagesFrom creates an L1MessageIterator that iterates
-// over all L1 message in DB starting at the provided enqueue index.
+// IterateL1MessagesFrom creates an L1MessageIterator that iterates over
+// all L1 message in the database starting at the provided enqueue index.
 func IterateL1MessagesFrom(db ethdb.Iteratee, fromEnqueueIndex uint64) L1MessageIterator {
 	start := encodeEnqueueIndex(fromEnqueueIndex)
 	it := db.NewIterator(L1MessagePrefix, start)
@@ -200,7 +200,7 @@ func WriteL1MessageRangeInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Ha
 func ReadL1MessageRangeInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *L1MessageRangeInL2Block {
 	data, err := db.Get(L1MessageRangeInL2BlockKey(l2BlockHash))
 	if err != nil {
-		log.Crit("Failed to read L1MessageRangeInL2Block from DB", "err", err)
+		log.Crit("Failed to read L1MessageRangeInL2Block from database", "err", err)
 	}
 	if len(data) == 0 {
 		return nil

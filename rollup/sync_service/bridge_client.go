@@ -101,7 +101,7 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 			To:     &event.Target,
 			Value:  event.Value,
 			Data:   event.Data,
-			Sender: &event.Sender,
+			Sender: event.Sender,
 		})
 	}
 

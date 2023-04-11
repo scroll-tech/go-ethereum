@@ -102,7 +102,7 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		enc.To = t.To()
 		enc.Value = (*hexutil.Big)(tx.Value)
 		enc.Data = (*hexutil.Bytes)(&tx.Data)
-		enc.Sender = *tx.Sender
+		enc.Sender = tx.Sender
 	}
 	return json.Marshal(&enc)
 }
@@ -293,10 +293,7 @@ func (t *Transaction) UnmarshalJSON(input []byte) error {
 			return errors.New("missing required field 'input' in transaction")
 		}
 		itx.Data = *dec.Data
-		if itx.Sender == nil {
-			return errors.New("missing required field 'sender' in transaction")
-		}
-		itx.Sender = &dec.Sender
+		itx.Sender = dec.Sender
 
 	default:
 		return ErrTxTypeNotSupported

@@ -84,6 +84,7 @@ type Message interface {
 	IsFake() bool
 	Data() []byte
 	AccessList() types.AccessList
+	IsL1MessageTx() bool
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -237,6 +238,14 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
+	if st.msg.IsL1MessageTx() {
+		// No fee fields to check, no nonce to check, and no need to check if EOA (L1 already verified it for us)
+		// Gas is free, but no refunds!
+		st.gas += st.msg.Gas()
+		st.initialGas = st.msg.Gas()
+		return st.gp.SubGas(st.msg.Gas()) // gas used by deposits may not be used by other txs
+	}
+
 	// Only check transactions that are not fake
 	if !st.msg.IsFake() {
 		// Make sure this transaction's nonce is correct.
@@ -349,9 +358,21 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if contractCreation {
 		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
 	} else {
-		// Increment the nonce for the next transaction
-		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		// dont increment nonce for l1 messages
+		if !st.msg.IsL1MessageTx() {
+			// Increment the nonce for the next transaction
+			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		}
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+	}
+
+	// no refunds for l1 messages
+	if st.msg.IsL1MessageTx() {
+		return &ExecutionResult{
+			UsedGas:    st.gasUsed(),
+			Err:        vmerr,
+			ReturnData: ret,
+		}, nil
 	}
 
 	if !london {

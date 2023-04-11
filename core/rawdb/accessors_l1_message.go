@@ -149,6 +149,10 @@ func (it *L1MessageIterator) Release() {
 // ReadL1MessagesInRange retrieves all L1 messages between two enqueue indices (inclusive).
 // The resulting array is ordered by the L1 message enqueue index.
 func ReadL1MessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueIndex uint64, checkRange bool) []types.L1MessageTx {
+	if firstEnqueueIndex > lastEnqueueIndex {
+		return nil
+	}
+
 	expectedCount := lastEnqueueIndex - firstEnqueueIndex + 1
 	msgs := make([]types.L1MessageTx, 0, expectedCount)
 	it := IterateL1MessagesFrom(db, firstEnqueueIndex)

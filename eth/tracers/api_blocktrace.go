@@ -367,6 +367,9 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 			env.sMu.Lock()
 			m[keyStr] = wrappedProof
 			if zktrieTracer.Available() {
+				if isDelete {
+					zktrieTracer.MarkDeletion(key)
+				}
 				env.zkTrieTracer[addrStr].Merge(zktrieTracer)
 			}
 			env.sMu.Unlock()

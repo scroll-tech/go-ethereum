@@ -85,6 +85,7 @@ Remove blockchain and state databases`,
 			utils.SepoliaFlag,
 			utils.RinkebyFlag,
 			utils.GoerliFlag,
+			// TODO
 		},
 		Usage:       "Inspect the storage size for each type of data in the database",
 		Description: `This commands iterates the entire database. If the optional 'prefix' and 'start' arguments are provided, then the iteration is limited to the given subset of data.`,

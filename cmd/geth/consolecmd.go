@@ -138,6 +138,7 @@ func remoteConsole(ctx *cli.Context) error {
 			} else if ctx.GlobalBool(utils.SepoliaFlag.Name) {
 				path = filepath.Join(path, "sepolia")
 			}
+			// TODO
 		}
 		endpoint = fmt.Sprintf("%s/geth.ipc", path)
 	}

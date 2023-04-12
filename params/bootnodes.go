@@ -78,7 +78,9 @@ var GoerliBootnodes = []string{
 
 // ScrollAlphaBootnodes are the enode URLs of the P2P bootstrap nodes running on the Scroll Alpha test network.
 var ScrollAlphaBootnodes = []string{
-	// TODO
+	"enode://996a655365e731321ca35636f5a62fdf37c0b75dc56a8832c472d077da5af47effe45874196268f6083b8f65e1a9589ed25015f68f47598c7bcc93ac8ea29e8a@35.85.116.190:30303",
+	"enode://a4e90d8108bbcd8b13066567c786f800812a9b6b3eeb92947e64edd19ac9231bf371da1a86796af2ccd7b7e781218ebbe2d04130d63f7b3f25d6372a706fc022@44.224.134.190:30303",
+	"enode://cf85bfa5828239b1f6b21758579ee8aaaba2a1fb4c658d6967c5f7ed4f040d95dee5b5cef0c77d656a191f6b0875dd03f05b30a3b2b3e15bfcf18b500d8f634c@35.155.117.77:30303",
 }
 
 // ScrollStagingBootnodes are the enode URLs of the P2P bootstrap nodes running on the Scroll Staging test network.

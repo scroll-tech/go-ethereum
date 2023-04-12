@@ -397,9 +397,7 @@ func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockT
 		}
 	}
 
-	if api.backend.ChainConfig().Scroll != nil {
-		blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.state)
-	}
+	blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.state)
 
 	return blockTrace, nil
 }

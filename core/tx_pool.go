@@ -1330,13 +1330,8 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
 	pool.istanbul = pool.chainconfig.IsIstanbul(next)
 
-	if pool.chainconfig.Scroll != nil {
-		pool.eip2718 = pool.chainconfig.Scroll.EnableEIP2718 && pool.chainconfig.IsBerlin(next)
-		pool.eip1559 = pool.chainconfig.Scroll.EnableEIP1559 && pool.chainconfig.IsLondon(next)
-	} else {
-		pool.eip2718 = pool.chainconfig.IsBerlin(next)
-		pool.eip1559 = pool.chainconfig.IsLondon(next)
-	}
+	pool.eip2718 = pool.chainconfig.Scroll.EnableEIP2718 && pool.chainconfig.IsBerlin(next)
+	pool.eip1559 = pool.chainconfig.Scroll.EnableEIP1559 && pool.chainconfig.IsLondon(next)
 }
 
 // promoteExecutables moves transactions that have become processable from the

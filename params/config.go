@@ -259,7 +259,7 @@ var (
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
-		&ScrollConfig{
+		ScrollConfig{
 			UseZktrie:       false,
 			FeeVaultAddress: nil,
 			EnableEIP2718:   true,
@@ -273,7 +273,7 @@ var (
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000},
-		&ScrollConfig{
+		ScrollConfig{
 			UseZktrie:       false,
 			FeeVaultAddress: nil,
 			EnableEIP2718:   true,
@@ -282,7 +282,7 @@ var (
 		}}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
-		&ScrollConfig{
+		ScrollConfig{
 			UseZktrie:       false,
 			FeeVaultAddress: &common.Address{123},
 			EnableEIP2718:   true,
@@ -292,7 +292,7 @@ var (
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
 	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
-		&ScrollConfig{
+		ScrollConfig{
 			UseZktrie:       false,
 			FeeVaultAddress: nil,
 			EnableEIP2718:   true,
@@ -387,11 +387,11 @@ type ChainConfig struct {
 	Clique *CliqueConfig `json:"clique,omitempty"`
 
 	// Scroll genesis extension: enable scroll rollup-related traces & state transition
-	Scroll *ScrollConfig `json:"scroll,omitempty"`
+	Scroll ScrollConfig `json:"scroll,omitempty"`
 }
 
 type ScrollConfig struct {
-	// Use zktrie
+	// Use zktrie [optional]
 	UseZktrie bool `json:"useZktrie,omitempty"`
 
 	// Maximum number of transactions per block [optional]
@@ -400,44 +400,28 @@ type ScrollConfig struct {
 	// Transaction fee vault address [optional]
 	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
 
-	// Enable EIP-2718 in tx pool.
+	// Enable EIP-2718 in tx pool [optional]
 	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
 
-	// Enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
+	// Enable EIP-1559 in tx pool, EnableEIP2718 should be true too [optional]
 	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
 }
 
-func (s *ScrollConfig) BaseFeeEnabled() bool {
-	if s == nil {
-		return false
-	}
-
+func (s ScrollConfig) BaseFeeEnabled() bool {
 	return s.EnableEIP2718 && s.EnableEIP1559
 }
 
-func (s *ScrollConfig) L1FeeEnabled() bool {
-	if s == nil {
-		return false
-	}
-
+func (s ScrollConfig) L1FeeEnabled() bool {
 	return s.FeeVaultAddress != nil
 }
 
-func (s *ScrollConfig) ZktrieEnabled() bool {
-	if s == nil {
-		return false
-	}
-
+func (s ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
 }
 
 // IsValidTxCount returns whether the given block's transaction count is below the limit.
-func (s *ScrollConfig) IsValidTxCount(count int) bool {
-	if s == nil || s.MaxTxPerBlock == nil {
-		return true
-	}
-
-	return count <= *s.MaxTxPerBlock
+func (s ScrollConfig) IsValidTxCount(count int) bool {
+	return s.MaxTxPerBlock == nil || count <= *s.MaxTxPerBlock
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

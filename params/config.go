@@ -431,6 +431,15 @@ func (s *ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
 }
 
+// IsValidTxCount returns whether the given block's transaction count is below the limit.
+func (s *ScrollConfig) IsValidTxCount(count int) bool {
+	if s == nil || s.MaxTxPerBlock == nil {
+		return true
+	}
+
+	return count <= *s.MaxTxPerBlock
+}
+
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
 type EthashConfig struct{}
 
@@ -554,11 +563,6 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 		return false
 	}
 	return parentTotalDiff.Cmp(c.TerminalTotalDifficulty) < 0 && totalDiff.Cmp(c.TerminalTotalDifficulty) >= 0
-}
-
-// IsValidTxCount returns whether the given block's transaction count is below the limit.
-func (c *ChainConfig) IsValidTxCount(count int) bool {
-	return c.Scroll == nil || c.Scroll.MaxTxPerBlock == nil || count <= *c.Scroll.MaxTxPerBlock
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported

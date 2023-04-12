@@ -400,10 +400,10 @@ type ScrollConfig struct {
 	// Transaction fee vault address [optional]
 	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
 
-	// enable EIP-2718 in tx pool.
+	// Enable EIP-2718 in tx pool.
 	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
 
-	// enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
+	// Enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
 	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
 }
 

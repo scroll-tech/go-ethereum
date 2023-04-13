@@ -1648,8 +1648,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		SetDNSDiscoveryDefaults(cfg, params.GoerliGenesisHash)
 	case ctx.GlobalBool(ScrollAlphaFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
-			cfg.NetworkId = 534353 // TODO: do not hardcode this here
+			cfg.NetworkId = 534353
 		}
+		cfg.Genesis = core.DefaultScrollAlphaGenesisBlock()
+		// SetDNSDiscoveryDefaults(cfg, params.RinkebyGenesisHash)
 	case ctx.GlobalBool(ScrollStagingFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 222222
@@ -1876,6 +1878,8 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 		genesis = core.DefaultRinkebyGenesisBlock()
 	case ctx.GlobalBool(GoerliFlag.Name):
 		genesis = core.DefaultGoerliGenesisBlock()
+	case ctx.GlobalBool(ScrollAlphaFlag.Name):
+		genesis = core.DefaultScrollAlphaGenesisBlock()
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		Fatalf("Developer chains are ephemeral")
 	}

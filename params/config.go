@@ -253,6 +253,40 @@ var (
 		Threshold: 2,
 	}
 
+	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
+	AlphaFeeVaultAddress = common.HexToAddress("0x5300000000000000000000000000000000000005")
+	AlphaMaxTxPerBlock = 44
+
+	ScrollAlphaChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(534353),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   nil,
+		Clique: &CliqueConfig{
+			Period: 3,
+			Epoch:  30000,
+		},
+		Zktrie: true,
+		FeeVaultAddress: &AlphaFeeVaultAddress,
+		EnableEIP2718: false,
+		EnableEIP1559: false,
+		MaxTxPerBlock: &AlphaMaxTxPerBlock,
+		UsingScroll: true,
+	}
+
+	// TODO
+
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
 	//

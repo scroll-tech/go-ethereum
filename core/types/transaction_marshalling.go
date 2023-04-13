@@ -49,7 +49,8 @@ type txJSON struct {
 	// Only used for encoding:
 	Hash common.Hash `json:"hash"`
 
-	Sender common.Address `json:"sender,omitempty"`
+	Sender     common.Address  `json:"sender,omitempty"`
+	QueueIndex *hexutil.Uint64 `json:"queueIndex,omitempty"`
 }
 
 // MarshalJSON marshals as JSON with a hash.
@@ -97,7 +98,7 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		enc.R = (*hexutil.Big)(tx.R)
 		enc.S = (*hexutil.Big)(tx.S)
 	case *L1MessageTx:
-		enc.Nonce = (*hexutil.Uint64)(&tx.Nonce)
+		enc.QueueIndex = (*hexutil.Uint64)(&tx.QueueIndex)
 		enc.Gas = (*hexutil.Uint64)(&tx.Gas)
 		enc.To = t.To()
 		enc.Value = (*hexutil.Big)(tx.Value)
@@ -277,7 +278,7 @@ func (t *Transaction) UnmarshalJSON(input []byte) error {
 		if dec.Nonce == nil {
 			return errors.New("missing required field 'nonce' in transaction")
 		}
-		itx.Nonce = uint64(*dec.Nonce)
+		itx.QueueIndex = uint64(*dec.QueueIndex)
 		if dec.Gas == nil {
 			return errors.New("missing required field 'gas' in transaction")
 		}

@@ -100,9 +100,9 @@ var (
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 
 	// Scroll L1 message store
-	syncedL1BlockNumberKey        = []byte("LastSyncedL1BlockNumber")
-	L1MessagePrefix               = []byte("l1")  // L1MessagePrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
-	L1MessageRangeInL2BlockPrefix = []byte("l1b") // L1MessageRangeInL2BlockPrefix + L2 block hash -> L1MessageRangeInL2Block
+	syncedL1BlockNumberKey       = []byte("LastSyncedL1BlockNumber")
+	L1MessagePrefix              = []byte("l1")  // L1MessagePrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
+	LastL1MessageInL2BlockPrefix = []byte("l1b") // LastL1MessageInL2BlockPrefix + L2 block hash -> enqueue index
 )
 
 const (
@@ -248,7 +248,7 @@ func L1MessageKey(enqueueIndex uint64) []byte {
 	return append(L1MessagePrefix, encodeEnqueueIndex(enqueueIndex)...)
 }
 
-// L1MessageRangeInL2BlockKey = L1MessageRangeInL2BlockPrefix + L2 block hash
-func L1MessageRangeInL2BlockKey(hash common.Hash) []byte {
-	return append(L1MessageRangeInL2BlockPrefix, hash.Bytes()...)
+// LastL1MessageInL2BlockKey = LastL1MessageInL2BlockPrefix + L2 block hash
+func LastL1MessageInL2BlockKey(l2BlockHash common.Hash) []byte {
+	return append(LastL1MessageInL2BlockPrefix, l2BlockHash.Bytes()...)
 }

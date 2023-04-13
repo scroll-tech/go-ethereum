@@ -14,6 +14,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
+// BridgeClient is a wrapper around EthClient that adds
+// methods for conveniently collecting L1 messages.
 type BridgeClient struct {
 	client                EthClient
 	confirmations         rpc.BlockNumber
@@ -21,14 +23,14 @@ type BridgeClient struct {
 }
 
 func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress *common.Address) (*BridgeClient, error) {
-	if l1MessageQueueAddress == nil {
+	if l1MessageQueueAddress == nil || (*l1MessageQueueAddress == common.Address{}) {
 		return nil, errors.New("must pass l1MessageQueueAddress to BridgeClient")
 	}
 
 	// sanity check: compare chain IDs
 	got, err := l1Client.ChainID(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query L1 chain ID, err = %w", err)
 	}
 	if got.Cmp(big.NewInt(0).SetUint64(l1ChainId)) != 0 {
 		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", l1ChainId, got)
@@ -43,6 +45,8 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 	return &client, nil
 }
 
+// fetchMessagesInRange retrieves and parses all L1 messages between the
+// provided from and to L1 block numbers (inclusive).
 func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, error) {
 	log.Trace("Sync service fetchMessagesInRange", "fromBlock", from, "toBlock", to)
 
@@ -88,7 +92,10 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 			return msgs, fmt.Errorf("failed to unpack L1 QueueTransaction event: %w", err)
 		}
 
-		// TODO: check bigInt conversion
+		if !event.QueueIndex.IsUint64() || !event.GasLimit.IsUint64() {
+			return nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
+		}
+
 		msgs = append(msgs, types.L1MessageTx{
 			Nonce:  event.QueueIndex.Uint64(),
 			Gas:    event.GasLimit.Uint64(),
@@ -102,7 +109,29 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 	return msgs, nil
 }
 
+func unpackLog(c *abi.ABI, out interface{}, event string, log types.Log) error {
+	if log.Topics[0] != c.Events[event].ID {
+		return fmt.Errorf("event signature mismatch")
+	}
+
+	if len(log.Data) > 0 {
+		if err := c.UnpackIntoInterface(out, event, log.Data); err != nil {
+			return err
+		}
+	}
+
+	var indexed abi.Arguments
+	for _, arg := range c.Events[event].Inputs {
+		if arg.Indexed {
+			indexed = append(indexed, arg)
+		}
+	}
+
+	return abi.ParseTopics(out, indexed, log.Topics[1:])
+}
+
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {
+	// confirmation based on "safe" or "finalized" block tag
 	if c.confirmations == rpc.SafeBlockNumber || c.confirmations == rpc.FinalizedBlockNumber {
 		var tag *big.Int
 		if c.confirmations == rpc.FinalizedBlockNumber {
@@ -119,42 +148,29 @@ func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint6
 			return 0, fmt.Errorf("received invalid block confirm: %v", header.Number)
 		}
 		return header.Number.Uint64(), nil
-	} else if c.confirmations == rpc.LatestBlockNumber {
+	}
+
+	// confirmation based on latest block number
+	if c.confirmations == rpc.LatestBlockNumber {
 		number, err := c.client.BlockNumber(ctx)
 		if err != nil {
 			return 0, err
 		}
 		return number, nil
-	} else if c.confirmations.Int64() >= 0 {
+	}
+
+	// confirmation based on a certain number of blocks
+	if c.confirmations.Int64() >= 0 {
 		number, err := c.client.BlockNumber(ctx)
 		if err != nil {
 			return 0, err
 		}
 		confirmations := uint64(c.confirmations.Int64())
-
 		if number >= confirmations {
 			return number - confirmations, nil
 		}
 		return 0, nil
-	} else {
-		return 0, fmt.Errorf("unknown confirmation type: %v", c.confirmations)
 	}
-}
 
-func unpackLog(c *abi.ABI, out interface{}, event string, log types.Log) error {
-	if log.Topics[0] != c.Events[event].ID {
-		return fmt.Errorf("event signature mismatch")
-	}
-	if len(log.Data) > 0 {
-		if err := c.UnpackIntoInterface(out, event, log.Data); err != nil {
-			return err
-		}
-	}
-	var indexed abi.Arguments
-	for _, arg := range c.Events[event].Inputs {
-		if arg.Indexed {
-			indexed = append(indexed, arg)
-		}
-	}
-	return abi.ParseTopics(out, indexed, log.Topics[1:])
+	return 0, fmt.Errorf("unknown confirmation type: %v", c.confirmations)
 }

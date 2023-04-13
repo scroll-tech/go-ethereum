@@ -12,11 +12,22 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
+// DefaultFetchBlockRange is the number of blocks that we collect in a single eth_getLogs query.
 const DefaultFetchBlockRange = uint64(20)
+
+// DefaultPollInterval is the frequency at which we query for new L1 messages.
 const DefaultPollInterval = time.Second * 15
+
+// DbWriteThresholdBytes is the size of batched database writes in bytes.
 const DbWriteThresholdBytes = 10 * 1024
+
+// DbWriteThresholdBlocks is the number of blocks scanned after which we write to the database
+// even if we have not collected DbWriteThresholdBytes bytes of data yet. This way, if there is
+// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
+// this secion.
 const DbWriteThresholdBlocks = 100
 
+// SyncService collects all L1 messages and stores them in a local database.
 type SyncService struct {
 	ctx                  context.Context
 	cancel               context.CancelFunc
@@ -27,6 +38,7 @@ type SyncService struct {
 }
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
+	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil {
 		log.Warn("No L1 client provided, L1 sync service will not run")
 		return nil, nil
@@ -111,16 +123,15 @@ func (s *SyncService) fetchMessages() {
 
 	// helper function to flush database writes cached in memory
 	flush := func(lastBlock uint64) {
+		// update sync progress
+		rawdb.WriteSyncedL1BlockNumber(batchWriter, lastBlock)
+
+		// write batch in a single transaction
 		err := batchWriter.Write()
 		if err != nil {
 			// crash on database error, no risk of inconsistency here
 			log.Crit("failed to write L1 messages to database", "err", err)
 		}
-
-		// write synced block number after writing the messages.
-		// if we crash before this line, we will need to reindex
-		// some messages but database will remain consistent.
-		rawdb.WriteSyncedL1BlockNumber(s.db, lastBlock)
 
 		s.latestProcessedBlock = lastBlock
 		batchWriter.Reset()
@@ -143,8 +154,12 @@ func (s *SyncService) fetchMessages() {
 
 		msgs, err := s.client.fetchMessagesInRange(s.ctx, from, to)
 		if err != nil {
-			flush(from - 1)
-			log.Warn("failed to fetch messages in range", "err", err)
+			// flush pending writes to database
+			if from > 0 {
+				flush(from - 1)
+			}
+
+			log.Warn("failed to fetch L1 messages in range", "fromBlock", from, "toBlock", to, "err", err)
 			return
 		}
 

@@ -55,6 +55,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/eth/ethconfig"
 	"github.com/scroll-tech/go-ethereum/eth/gasprice"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
+	"github.com/scroll-tech/go-ethereum/ethclient"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethstats"
 	"github.com/scroll-tech/go-ethereum/graphql"
@@ -1769,7 +1770,24 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend))
 		return backend.ApiBackend, nil
 	}
-	backend, err := eth.New(stack, cfg, nil)
+
+	// initialize L1 client for sync service
+	// note: we need to do this here to avoid circular dependency
+	l1EndpointUrl := stack.Config().L1Endpoint
+	var l1Client *ethclient.Client = nil
+
+	if l1EndpointUrl != "" {
+		var err error
+		l1Client, err = ethclient.Dial(l1EndpointUrl)
+
+		if err != nil {
+			Fatalf("Unable to connect to L1 endpoint at %v: %v", l1EndpointUrl, err)
+		}
+
+		log.Info("Initialized L1 client", "endpoint", l1EndpointUrl)
+	}
+
+	backend, err := eth.New(stack, cfg, l1Client)
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
 	}

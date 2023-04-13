@@ -26,12 +26,17 @@ type SyncService struct {
 	latestProcessedBlock uint64
 }
 
-func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database) (*SyncService, error) {
+func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
+	if l1Client == nil {
+		log.Warn("No L1 client provided, L1 sync service will not run")
+		return nil, nil
+	}
+
 	if genesisConfig.L1Config == nil {
 		return nil, fmt.Errorf("missing L1 config in genesis")
 	}
 
-	client, err := newBridgeClient(ctx, nodeConfig.L1Endpoint, genesisConfig.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.L1Config.L1MessageQueueAddress)
+	client, err := newBridgeClient(ctx, l1Client, genesisConfig.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.L1Config.L1MessageQueueAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bridge client: %w", err)
 	}
@@ -61,6 +66,10 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 }
 
 func (s *SyncService) Start() {
+	if s == nil {
+		return
+	}
+
 	log.Info("Starting sync service", "latestProcessedBlock", s.latestProcessedBlock)
 
 	t := time.NewTicker(s.pollInterval)
@@ -77,6 +86,10 @@ func (s *SyncService) Start() {
 }
 
 func (s *SyncService) Stop() {
+	if s == nil {
+		return
+	}
+
 	log.Info("Stopping sync service")
 
 	if s.cancel != nil {

@@ -10,29 +10,23 @@ import (
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/ethclient"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 type BridgeClient struct {
-	client                *ethclient.Client
+	client                EthClient
 	confirmations         rpc.BlockNumber
 	l1MessageQueueAddress common.Address
 }
 
-func newBridgeClient(ctx context.Context, l1Endpoint string, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress *common.Address) (*BridgeClient, error) {
+func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress *common.Address) (*BridgeClient, error) {
 	if l1MessageQueueAddress == nil {
 		return nil, errors.New("must pass l1MessageQueueAddress to BridgeClient")
 	}
 
-	ethClient, err := ethclient.Dial(l1Endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial L1 endpoint: %w", err)
-	}
-
 	// sanity check: compare chain IDs
-	got, err := ethClient.ChainID(ctx)
+	got, err := l1Client.ChainID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +35,7 @@ func newBridgeClient(ctx context.Context, l1Endpoint string, l1ChainId uint64, c
 	}
 
 	client := BridgeClient{
-		client:                ethClient,
+		client:                l1Client,
 		confirmations:         confirmations,
 		l1MessageQueueAddress: *l1MessageQueueAddress,
 	}

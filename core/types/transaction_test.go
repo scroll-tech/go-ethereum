@@ -506,42 +506,27 @@ func TestTransactionCoding(t *testing.T) {
 	}
 }
 
-// TODO: get this to pass
-// go test -v -run TestMessageHashMatch
-// func TestMessageHashMatch(t *testing.T) {
-// 	// test fails: TODO Fix
-// 	sender := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
-// 	to := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
-// 	tx := NewTx(
-// 		&L1MessageTx{
-// 			Sender: sender,
-// 			Nonce:  1,
-// 			Value:  big.NewInt(2),
-// 			Gas:    3,
-// 			To:     &to,
-// 			Data:   []byte{1, 2, 3, 4},
-// 		},
-// 	)
+// make sure that the transaction hash is same as bridge contract
+// go test -v -run TestBridgeTxHash
+func TestBridgeTxHash(t *testing.T) {
+	sender := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+	to := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
+	tx := NewTx(
+		&L1MessageTx{
+			Sender: sender,
+			Nonce:  1,
+			Value:  big.NewInt(2),
+			Gas:    3,
+			To:     &to,
+			Data:   []byte{1, 2, 3, 4},
+		},
+	)
+	// assert equal
+	if tx.Hash() != common.HexToHash("0x1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be") {
+		t.Errorf("hash does not match bridge contract")
+	}
 
-// 	encoded, err := rlp.EncodeToBytes(tx)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	fmt.Println("encoded", encoded)
-
-// hash := tx.Hash()
-
-// common.Keccak256Hash
-// expectedHash := common.HexToHash("1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be")
-// fmt.Println(hash.Hex())
-// fmt.Println(expectedHash.Hex())
-
-// if hash != expectedHash {
-// 	t.Fatal("hashes are not equal")
-// }
-
-// }
-
+}
 func encodeDecodeJSON(tx *Transaction) (*Transaction, error) {
 	data, err := json.Marshal(tx)
 	if err != nil {

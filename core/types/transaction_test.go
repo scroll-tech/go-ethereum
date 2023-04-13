@@ -508,26 +508,26 @@ func TestTransactionCoding(t *testing.T) {
 
 // make sure that the transaction hash is same as bridge contract
 // go test -v -run TestBridgeTxHash
-	func TestBridgeTxHash(t *testing.T) {
-		sender := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
-		to := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
-		tx := NewTx(
-			&L1MessageTx{
-				Sender: sender,
-				Nonce:  1,
-				Value:  big.NewInt(2),
-				Gas:    3,
-				To:     &to,
-				Data:   []byte{1, 2, 3, 4},
-			},
-		)
-		// assert equal
-		if tx.Hash() != common.HexToHash("0x1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be") {
-			t.Errorf("hash does not match bridge contract")
-		}
-
+func TestBridgeTxHash(t *testing.T) {
+	sender := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+	to := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
+	tx := NewTx(
+		&L1MessageTx{
+			Sender: sender,
+			Nonce:  1,
+			Value:  big.NewInt(2),
+			Gas:    3,
+			To:     &to,
+			Data:   []byte{1, 2, 3, 4},
+		},
+	)
+	// assert equal
+	if tx.Hash() != common.HexToHash("0x1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be") {
+		t.Errorf("hash does not match bridge contract")
 	}
-	func encodeDecodeJSON(tx *Transaction) (*Transaction, error) {
+
+}
+func encodeDecodeJSON(tx *Transaction) (*Transaction, error) {
 	data, err := json.Marshal(tx)
 	if err != nil {
 		return nil, fmt.Errorf("json encoding failed: %v", err)
@@ -566,9 +566,3 @@ func assertEqual(orig *Transaction, cpy *Transaction) error {
 	}
 	return nil
 }
-<<<<<<< HEAD
-=======
-
-// [180,126,242,1,3,148,112,153,121,112,197,24,18,220,58,1,12,125,1,181,14,13,23,220,121,200,128,132,1,2,3,4,148,243,159,214,229,26,173,136,246,244,206,106,184,130,114,121,207,255,185,34,102]
-// [180,126,242,1,3,148,112,153,121,112,197,24,18,220,58,1,12,125,1,181,14,13,23,220,121,200,  2,132,1,2,3,4,148,243,159,214,229,26,173,136,246, 244, 206, 106, 184, 130, 114, 121, 207, 255,185,  34, 102]
->>>>>>> acdd6ac01 (deep copy value field, add tx hash test)

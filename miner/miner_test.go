@@ -43,8 +43,8 @@ type mockBackend struct {
 
 func NewMockBackend(bc *core.BlockChain, txPool *core.TxPool, chainDb ethdb.Database) *mockBackend {
 	return &mockBackend{
-		bc:     bc,
-		txPool: txPool,
+		bc:      bc,
+		txPool:  txPool,
 		chainDb: chainDb,
 	}
 }

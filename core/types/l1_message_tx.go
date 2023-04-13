@@ -28,6 +28,9 @@ func (tx *L1MessageTx) copy() TxData {
 		Data:   common.CopyBytes(tx.Data),
 		Sender: tx.Sender,
 	}
+	if tx.Value != nil {
+		cpy.Value.Set(tx.Value)
+	}
 	return cpy
 }
 

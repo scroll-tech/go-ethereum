@@ -3,6 +3,7 @@ package sync_service
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -39,7 +40,7 @@ type SyncService struct {
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
-	if l1Client == nil {
+	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 sync service will not run")
 		return nil, nil
 	}

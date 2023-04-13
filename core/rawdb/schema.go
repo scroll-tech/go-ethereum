@@ -98,6 +98,11 @@ var (
 
 	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
+
+	// Scroll L1 message store
+	syncedL1BlockNumberKey       = []byte("LastSyncedL1BlockNumber")
+	L1MessagePrefix              = []byte("l1")  // L1MessagePrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
+	LastL1MessageInL2BlockPrefix = []byte("l1b") // LastL1MessageInL2BlockPrefix + L2 block hash -> enqueue index
 )
 
 const (
@@ -229,4 +234,21 @@ func IsCodeKey(key []byte) (bool, []byte) {
 // configKey = configPrefix + hash
 func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
+}
+
+// encodeBlockNumber encodes an L1 enqueue index as big endian uint64
+func encodeEnqueueIndex(index uint64) []byte {
+	enc := make([]byte, 8)
+	binary.BigEndian.PutUint64(enc, index)
+	return enc
+}
+
+// L1MessageKey = L1MessagePrefix + enqueueIndex (uint64 big endian)
+func L1MessageKey(enqueueIndex uint64) []byte {
+	return append(L1MessagePrefix, encodeEnqueueIndex(enqueueIndex)...)
+}
+
+// LastL1MessageInL2BlockKey = LastL1MessageInL2BlockPrefix + L2 block hash
+func LastL1MessageInL2BlockKey(l2BlockHash common.Hash) []byte {
+	return append(LastL1MessageInL2BlockPrefix, l2BlockHash.Bytes()...)
 }

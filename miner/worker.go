@@ -910,7 +910,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 }
 
 // todo: commitL1Messages
-/*
+
 func (w *worker) commitL1Messages(l1Messages []types.L1MessageTx, coinbase common.Address, interrupt *int32) int64 {
 	// Short circuit if current is nil
 	if w.current == nil {
@@ -923,6 +923,7 @@ func (w *worker) commitL1Messages(l1Messages []types.L1MessageTx, coinbase commo
 	}
 
 	var coalescedLogs []*types.Log
+	var cntL1Messages int64 = 0
 
 	for _, l1Message := range l1Messages {
 		// In the following three cases, we will interrupt the execution of the transaction.
@@ -943,7 +944,11 @@ func (w *worker) commitL1Messages(l1Messages []types.L1MessageTx, coinbase commo
 					inc:   true,
 				}
 			}
-			return -1
+			if atomic.LoadInt32(interrupt) == commitInterruptNewHead {
+				return -1
+			} else {
+				return cntL1Messages
+			}
 		}
 		// todo: exclude l1Message txs from limit
 		// If we have collected enough transactions then we're done
@@ -958,21 +963,19 @@ func (w *worker) commitL1Messages(l1Messages []types.L1MessageTx, coinbase commo
 		}
 		// Retrieve the next transaction and abort if all done
 		tx := types.NewTx(&l1Message)
-		// Error may be ignored here. The error has already been checked
-		// during transaction acceptance is the transaction pool.
-		//
-		// We use the eip155 signer regardless of the current hf.
-		from, _ := types.Sender(w.current.signer, tx)
 
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
-		logs, err := w.commitTransaction(tx, coinbase)
-		switch {
+		logs, _ := w.commitTransaction(tx, coinbase)
+		cntL1Messages++
+		coalescedLogs = append(coalescedLogs, logs...)
+		w.current.tcount++
+		/*switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
 			log.Trace("Gas limit exceeded for current block", "sender", from)
-			txs.Pop()
+			continue
 
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
@@ -1000,7 +1003,7 @@ func (w *worker) commitL1Messages(l1Messages []types.L1MessageTx, coinbase commo
 			// nonce-too-high clause will prevent us from executing in vain).
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
 			txs.Shift()
-		}
+		}*/
 	}
 
 	if !w.isRunning() && len(coalescedLogs) > 0 {
@@ -1023,11 +1026,11 @@ func (w *worker) commitL1Messages(l1Messages []types.L1MessageTx, coinbase commo
 	if interrupt != nil {
 		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 	}
-	return false
-}*/
+	return cntL1Messages
+}
 
 func (w *worker) fetchPendingL1Messages() []types.L1MessageTx {
-	includedL1BlockNumber := rawdb.ReadIncludedL1BlockNumber(w.eth.ChainDb())
+	includedL1BlockNumber := rawdb.ReadLastL1MessageInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
 	syncedL1BlockNumber := rawdb.ReadSyncedL1BlockNumber(w.eth.ChainDb())
 	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), *includedL1BlockNumber+1, *syncedL1BlockNumber, true)
 }
@@ -1151,8 +1154,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
+	var cnt int64
 	if len(l1messages) > 0 {
-		w.commitL1Messages(l1messages, w.coinbase, interrupt)
+		cnt = w.commitL1Messages(l1messages, w.coinbase, interrupt)
+		if cnt == -1 {
+			return
+		}
 	}
 	if len(localTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)

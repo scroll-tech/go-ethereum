@@ -37,4 +37,10 @@ var (
 
 	// ErrInvalidTxCount is returned if a block contains too many transactions.
 	ErrInvalidTxCount = errors.New("invalid transaction count")
+
+	// TODO
+	ErrInvalidL1MessageOrder = errors.New("TODO")
+
+	// TODO
+	ErrUnknownL1Message = errors.New("TODO")
 )

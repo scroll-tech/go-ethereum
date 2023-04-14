@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
@@ -74,6 +75,64 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
+
+	return v.ValidateL1Messages(block)
+}
+
+// ValidateL1Messages
+// check conditions:
+// - block contains correct L1 messages in correct order
+// - L1 messages are in a contiguous block at the front
+func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
+	previousEnqueueIndex := rawdb.ReadLastL1MessageInL2Block(v.bc.db, block.ParentHash())
+	if previousEnqueueIndex == nil {
+		// TODO: handle case where we don't have this after snapshot sync
+		return consensus.ErrUnknownAncestor
+	}
+
+	enqueueIndex := *previousEnqueueIndex
+	numL1Txs := uint64(0)
+	L1SectionOver := false
+	it := rawdb.IterateL1MessagesFrom(v.bc.db, enqueueIndex)
+
+	// count and check contiguous
+	for _, tx := range block.Transactions() {
+		if !tx.IsL1MessageTx() {
+			L1SectionOver = true
+			continue
+		}
+
+		numL1Txs += 1
+		enqueueIndex += 1
+
+		if L1SectionOver {
+			return consensus.ErrInvalidL1MessageOrder
+		}
+
+		// wrong nonce
+		if tx.Nonce() != enqueueIndex {
+			return consensus.ErrInvalidL1MessageOrder
+		}
+
+		if exists := it.Next(); !exists {
+			// TODO
+		}
+
+		// sanity check
+		if it.EnqueueIndex() != enqueueIndex {
+			// TODO
+		}
+
+		msg := it.L1Message()
+
+		if tx.Hash() != types.NewTx(&msg).Hash() {
+			return consensus.ErrUnknownL1Message
+		}
+	}
+
+	// write to db
+	rawdb.WriteLastL1MessageInL2Block(v.bc.db, block.Hash(), enqueueIndex)
+
 	return nil
 }
 

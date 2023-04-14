@@ -1774,12 +1774,11 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 	// initialize L1 client for sync service
 	// note: we need to do this here to avoid circular dependency
 	l1EndpointUrl := stack.Config().L1Endpoint
-	var l1Client *ethclient.Client = nil
+	var l1Client *ethclient.Client
 
 	if l1EndpointUrl != "" {
 		var err error
 		l1Client, err = ethclient.Dial(l1EndpointUrl)
-
 		if err != nil {
 			Fatalf("Unable to connect to L1 endpoint at %v: %v", l1EndpointUrl, err)
 		}

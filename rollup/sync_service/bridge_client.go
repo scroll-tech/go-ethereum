@@ -23,7 +23,7 @@ type BridgeClient struct {
 }
 
 func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress *common.Address) (*BridgeClient, error) {
-	if l1MessageQueueAddress == nil || (*l1MessageQueueAddress == common.Address{}) {
+	if l1MessageQueueAddress == nil {
 		return nil, errors.New("must pass l1MessageQueueAddress to BridgeClient")
 	}
 
@@ -110,7 +110,7 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 }
 
 func unpackLog(c *abi.ABI, out interface{}, event string, log types.Log) error {
-	if log.Topics[0] != c.Events[event].ID {
+	if event, ok := c.Events[event]; !ok || log.Topics[0] != event.ID {
 		return fmt.Errorf("event signature mismatch")
 	}
 

@@ -13,20 +13,22 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
-// DefaultFetchBlockRange is the number of blocks that we collect in a single eth_getLogs query.
-const DefaultFetchBlockRange = uint64(20)
+const (
+	// DefaultFetchBlockRange is the number of blocks that we collect in a single eth_getLogs query.
+	DefaultFetchBlockRange = uint64(20)
 
-// DefaultPollInterval is the frequency at which we query for new L1 messages.
-const DefaultPollInterval = time.Second * 15
+	// DefaultPollInterval is the frequency at which we query for new L1 messages.
+	DefaultPollInterval = time.Second * 15
 
-// DbWriteThresholdBytes is the size of batched database writes in bytes.
-const DbWriteThresholdBytes = 10 * 1024
+	// DbWriteThresholdBytes is the size of batched database writes in bytes.
+	DbWriteThresholdBytes = 10 * 1024
 
-// DbWriteThresholdBlocks is the number of blocks scanned after which we write to the database
-// even if we have not collected DbWriteThresholdBytes bytes of data yet. This way, if there is
-// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
-// this secion.
-const DbWriteThresholdBlocks = 100
+	// DbWriteThresholdBlocks is the number of blocks scanned after which we write to the database
+	// even if we have not collected DbWriteThresholdBytes bytes of data yet. This way, if there is
+	// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
+	// this secion.
+	DbWriteThresholdBlocks = 100
+)
 
 // SyncService collects all L1 messages and stores them in a local database.
 type SyncService struct {
@@ -106,7 +108,7 @@ func (s *SyncService) Stop() {
 	log.Info("Stopping sync service")
 
 	if s.cancel != nil {
-		defer s.cancel()
+		s.cancel()
 	}
 }
 

@@ -447,6 +447,18 @@ func DefaultScrollAlphaGenesisBlock() *Genesis {
 	}
 }
 
+// DefaultScrollStagingGenesisBlock returns the Scroll staging network genesis block.
+func DefaultScrollStagingGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollStagingChainConfig,
+		Timestamp:  0x641489a2,
+		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000ED0D8d10F5F217fd4cB56543A16F5DBBfB865e320000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   8000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollStagingAllocData),
+	}
+}
+
 // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
 func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
@@ -479,7 +491,40 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 	}
 }
 
+// decodePrealloc does not support code and storage in prealloc config,
+// so we provide an alternative implementation here.
+func decodePreallocScroll(data string) (GenesisAlloc, error) {
+	var p []struct {
+		Addr, Balance *big.Int
+		Code          []byte
+		Storage       []struct{ Key, Value *big.Int }
+	}
+
+	if err := rlp.NewStream(strings.NewReader(data), 0).Decode(&p); err != nil {
+		return nil, err
+	}
+	ga := make(GenesisAlloc, len(p))
+
+	for _, account := range p {
+		s := make(map[common.Hash]common.Hash)
+		for _, entry := range account.Storage {
+			s[common.BigToHash(entry.Key)] = common.BigToHash(entry.Value)
+		}
+
+		ga[common.BigToAddress(account.Addr)] = GenesisAccount{
+			Balance: account.Balance,
+			Code:    account.Code,
+			Storage: s,
+		}
+	}
+
+	return ga, nil
+}
+
 func decodePrealloc(data string) GenesisAlloc {
+	if ga, err := decodePreallocScroll(data); err == nil {
+		return ga
+	}
 	var p []struct{ Addr, Balance *big.Int }
 	if err := rlp.NewStream(strings.NewReader(data), 0).Decode(&p); err != nil {
 		panic(err)

@@ -38,9 +38,13 @@ var (
 	// ErrInvalidTxCount is returned if a block contains too many transactions.
 	ErrInvalidTxCount = errors.New("invalid transaction count")
 
-	// TODO
-	ErrInvalidL1MessageOrder = errors.New("TODO")
+	// ErrInvalidL1MessageOrder is returned if a block contains L1 messages in the wrong
+	// order. Possible scenarios are: (1) L1 messages do not follow their QueueIndex order,
+	// (2) the block skipped once or more L1 message, (3) L1 messages are not included in
+	// a contiguous block at the front of the block.
+	ErrInvalidL1MessageOrder = errors.New("invalid L1 message order")
 
-	// TODO
-	ErrUnknownL1Message = errors.New("TODO")
+	// ErrUnknownL1Message is returned if a block contains an L1 message that does not
+	// match the corresponding message in the node's local database.
+	ErrUnknownL1Message = errors.New("unknown L1 message")
 )

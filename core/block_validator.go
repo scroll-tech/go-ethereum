@@ -75,63 +75,71 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
-
 	return v.ValidateL1Messages(block)
 }
 
-// ValidateL1Messages
-// check conditions:
-// - block contains correct L1 messages in correct order
-// - L1 messages are in a contiguous block at the front
+// ValidateL1Messages validates L1 messages contained in a block.
+// We check the following conditions:
+// - L1 messages are in a contiguous block at the front of the block.
+// - The first L1 message's QueueIndex is right after the last L1 message included in the chain.
+// - L1 messages follow the QueueIndex order. No L1 message is skipped.
+// - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
-	previousEnqueueIndex := rawdb.ReadLastL1MessageInL2Block(v.bc.db, block.ParentHash())
-	if previousEnqueueIndex == nil {
+	var queueIndex uint64
+
+	if block.NumberU64() != 1 {
+		queueIndex = 0
+	} else {
+		// all blocks should have previousQueueIndex in the database except for genesis
 		// TODO: handle case where we don't have this after snapshot sync
-		return consensus.ErrUnknownAncestor
+		previousQueueIndex := rawdb.ReadLastL1MessageInL2Block(v.bc.db, block.ParentHash())
+		if previousQueueIndex == nil {
+			// TODO: make sure we correctly re-process block after ErrUnknownAncestor
+			return consensus.ErrUnknownAncestor
+		} else {
+			queueIndex = *previousQueueIndex
+		}
 	}
 
-	enqueueIndex := *previousEnqueueIndex
-	numL1Txs := uint64(0)
 	L1SectionOver := false
-	it := rawdb.IterateL1MessagesFrom(v.bc.db, enqueueIndex)
+	it := rawdb.IterateL1MessagesFrom(v.bc.db, queueIndex)
 
-	// count and check contiguous
 	for _, tx := range block.Transactions() {
 		if !tx.IsL1MessageTx() {
 			L1SectionOver = true
 			continue
 		}
 
-		numL1Txs += 1
-		enqueueIndex += 1
-
+		// check that L1 messages are before L2 transactions
 		if L1SectionOver {
 			return consensus.ErrInvalidL1MessageOrder
 		}
 
-		// wrong nonce
-		if tx.Nonce() != enqueueIndex {
+		queueIndex += 1
+
+		// check queue index
+		if tx.AsL1MessageTx().QueueIndex != queueIndex {
 			return consensus.ErrInvalidL1MessageOrder
 		}
 
 		if exists := it.Next(); !exists {
-			// TODO
+			// TODO: make sure we correctly re-process block after ErrUnknownAncestor
+			return consensus.ErrUnknownAncestor
 		}
 
-		// sanity check
-		if it.EnqueueIndex() != enqueueIndex {
-			// TODO
-		}
-
+		// check that the L1 message in the block is the same that we collected from L1
 		msg := it.L1Message()
+		expectedHash := types.NewTx(&msg).Hash()
 
-		if tx.Hash() != types.NewTx(&msg).Hash() {
+		if tx.Hash() != expectedHash {
 			return consensus.ErrUnknownL1Message
 		}
 	}
 
 	// write to db
-	rawdb.WriteLastL1MessageInL2Block(v.bc.db, block.Hash(), enqueueIndex)
+	// TODO: ValidateL1Messages should not have side effects, consider
+	// moving this elsewhere.
+	rawdb.WriteLastL1MessageInL2Block(v.bc.db, block.Hash(), queueIndex)
 
 	return nil
 }

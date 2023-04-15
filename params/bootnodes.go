@@ -85,7 +85,7 @@ var ScrollAlphaBootnodes = []string{
 
 // ScrollStagingBootnodes are the enode URLs of the P2P bootstrap nodes running on the Scroll Staging test network.
 var ScrollStagingBootnodes = []string{
-	// TODO
+	// empty
 }
 
 var V5Bootnodes = []string{

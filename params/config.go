@@ -255,10 +255,10 @@ var (
 		Threshold: 2,
 	}
 
-	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
-	AlphaFeeVaultAddress = common.HexToAddress("0x5300000000000000000000000000000000000005")
-	AlphaMaxTxPerBlock   = 44
+	ScrollFeeVaultAddress = common.HexToAddress("0x5300000000000000000000000000000000000005")
+	ScrollMaxTxPerBlock   = 44
 
+	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
 	ScrollAlphaChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(534353),
 		HomesteadBlock:      big.NewInt(0),
@@ -280,13 +280,14 @@ var (
 			Epoch:  30000,
 		},
 		Zktrie:          true,
-		FeeVaultAddress: &AlphaFeeVaultAddress,
+		FeeVaultAddress: &ScrollFeeVaultAddress,
 		EnableEIP2718:   false,
 		EnableEIP1559:   false,
-		MaxTxPerBlock:   &AlphaMaxTxPerBlock,
+		MaxTxPerBlock:   &ScrollMaxTxPerBlock,
 		UsingScroll:     true,
 	}
 
+	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll staging test network.
 	ScrollStagingChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(5343532222),
 		HomesteadBlock:      big.NewInt(0),
@@ -308,14 +309,12 @@ var (
 			Epoch:  30000,
 		},
 		Zktrie:          true,
-		FeeVaultAddress: &AlphaFeeVaultAddress,
+		FeeVaultAddress: &ScrollFeeVaultAddress,
 		EnableEIP2718:   false,
 		EnableEIP1559:   false,
-		MaxTxPerBlock:   &AlphaMaxTxPerBlock,
+		MaxTxPerBlock:   &ScrollMaxTxPerBlock,
 		UsingScroll:     true,
 	}
-
-	// TODO
 
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.

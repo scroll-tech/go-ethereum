@@ -819,7 +819,12 @@ func MakeDataDir(ctx *cli.Context) string {
 		if ctx.GlobalBool(SepoliaFlag.Name) {
 			return filepath.Join(path, "sepolia")
 		}
-		// TODO
+		if ctx.GlobalBool(ScrollAlphaFlag.Name) {
+			return filepath.Join(path, "scroll-alpha")
+		}
+		if ctx.GlobalBool(ScrollStagingFlag.Name) {
+			return filepath.Join(path, "scroll-staging")
+		}
 		return path
 	}
 	Fatalf("Cannot determine default data directory, please set manually (--datadir)")
@@ -1299,6 +1304,10 @@ func setDataDir(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "goerli")
 	case ctx.GlobalBool(SepoliaFlag.Name) && cfg.DataDir == node.DefaultDataDir():
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "sepolia")
+	case ctx.GlobalBool(ScrollAlphaFlag.Name) && cfg.DataDir == node.DefaultDataDir():
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "scroll-alpha")
+	case ctx.GlobalBool(ScrollStagingFlag.Name) && cfg.DataDir == node.DefaultDataDir():
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "scroll-staging")
 	}
 }
 
@@ -1651,13 +1660,13 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			cfg.NetworkId = 534353
 		}
 		cfg.Genesis = core.DefaultScrollAlphaGenesisBlock()
-		// SetDNSDiscoveryDefaults(cfg, params.RinkebyGenesisHash)
+		// SetDNSDiscoveryDefaults(cfg, params.ScrollAlphaGenesisHash)
 	case ctx.GlobalBool(ScrollStagingFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 222222
 		}
 		cfg.Genesis = core.DefaultScrollStagingGenesisBlock()
-		// SetDNSDiscoveryDefaults(cfg, params.RinkebyGenesisHash)
+		// SetDNSDiscoveryDefaults(cfg, params.ScrollStagingGenesisHash)
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337

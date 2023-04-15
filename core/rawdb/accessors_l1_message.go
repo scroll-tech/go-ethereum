@@ -46,7 +46,7 @@ func WriteL1Message(db ethdb.KeyValueWriter, l1Msg types.L1MessageTx) {
 	if err != nil {
 		log.Crit("Failed to RLP encode L1 message", "err", err)
 	}
-	enqueueIndex := l1Msg.Nonce
+	enqueueIndex := l1Msg.QueueIndex
 	if err := db.Put(L1MessageKey(enqueueIndex), bytes); err != nil {
 		log.Crit("Failed to store L1 message", "err", err)
 	}

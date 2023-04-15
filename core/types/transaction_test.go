@@ -472,12 +472,12 @@ func TestTransactionCoding(t *testing.T) {
 			// L1MessageTx
 			isL1MessageTx = true
 			txdata = &L1MessageTx{
-				Nonce:  i,
-				Gas:    123457,
-				To:     &recipient,
-				Value:  big.NewInt(10),
-				Data:   []byte("abcdef"),
-				Sender: addr,
+				QueueIndex: i,
+				Gas:        123457,
+				To:         &recipient,
+				Value:      big.NewInt(10),
+				Data:       []byte("abcdef"),
+				Sender:     addr,
 			}
 		}
 		var tx *Transaction
@@ -513,20 +513,20 @@ func TestBridgeTxHash(t *testing.T) {
 	to := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
 	tx := NewTx(
 		&L1MessageTx{
-			Sender: sender,
-			Nonce:  1,
-			Value:  big.NewInt(2),
-			Gas:    3,
-			To:     &to,
-			Data:   []byte{1, 2, 3, 4},
+			Sender:     sender,
+			QueueIndex: 1,
+			Value:      big.NewInt(2),
+			Gas:        3,
+			To:         &to,
+			Data:       []byte{1, 2, 3, 4},
 		},
 	)
 	// assert equal
 	if tx.Hash() != common.HexToHash("0x1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be") {
 		t.Errorf("hash does not match bridge contract")
 	}
-
 }
+
 func encodeDecodeJSON(tx *Transaction) (*Transaction, error) {
 	data, err := json.Marshal(tx)
 	if err != nil {

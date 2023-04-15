@@ -358,11 +358,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if contractCreation {
 		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
 	} else {
-		// dont increment nonce for l1 messages
-		if !st.msg.IsL1MessageTx() {
-			// Increment the nonce for the next transaction
-			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		}
+		// Increment the nonce for the next transaction
+		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 

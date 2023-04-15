@@ -97,12 +97,12 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 		}
 
 		msgs = append(msgs, types.L1MessageTx{
-			Nonce:  event.QueueIndex.Uint64(),
-			Gas:    event.GasLimit.Uint64(),
-			To:     &event.Target,
-			Value:  event.Value,
-			Data:   event.Data,
-			Sender: event.Sender,
+			QueueIndex: event.QueueIndex.Uint64(),
+			Gas:        event.GasLimit.Uint64(),
+			To:         &event.Target,
+			Value:      event.Value,
+			Data:       event.Data,
+			Sender:     event.Sender,
 		})
 	}
 

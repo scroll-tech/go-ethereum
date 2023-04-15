@@ -20,6 +20,9 @@ const (
 	// DefaultPollInterval is the frequency at which we query for new L1 messages.
 	DefaultPollInterval = time.Second * 15
 
+	// LogProgressInterval is the frequency at which we log progress.
+	LogProgressInterval = time.Second * 10
+
 	// DbWriteThresholdBytes is the size of batched database writes in bytes.
 	DbWriteThresholdBytes = 10 * 1024
 
@@ -91,11 +94,14 @@ func (s *SyncService) Start() {
 	defer t.Stop()
 
 	for {
+		// don't wait for ticker during startup
+		s.fetchMessages()
+
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-t.C:
-			s.fetchMessages()
+			continue
 		}
 	}
 }
@@ -141,11 +147,17 @@ func (s *SyncService) fetchMessages() {
 		numBlocksPendingDbWrite = 0
 	}
 
+	// ticker for logging progress
+	t := time.NewTicker(LogProgressInterval)
+
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		select {
 		case <-s.ctx.Done():
 			return
+		case <-t.C:
+			progress := 100 * float64(s.latestProcessedBlock) / float64(latestConfirmed)
+			log.Info("Syncing L1 messages", "processed", s.latestProcessedBlock, "confirmed", latestConfirmed, "progress(%)", progress)
 		default:
 		}
 
@@ -167,7 +179,7 @@ func (s *SyncService) fetchMessages() {
 		}
 
 		if len(msgs) > 0 {
-			log.Info("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
+			log.Debug("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
 			rawdb.WriteL1Messages(batchWriter, msgs) // collect messages in memory
 		}
 

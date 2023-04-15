@@ -139,8 +139,6 @@ func remoteConsole(ctx *cli.Context) error {
 				path = filepath.Join(path, "sepolia")
 			} else if ctx.GlobalBool(utils.ScrollAlphaFlag.Name) {
 				path = filepath.Join(path, "scroll-alpha")
-			} else if ctx.GlobalBool(utils.ScrollStagingFlag.Name) {
-				path = filepath.Join(path, "scroll-staging")
 			}
 		}
 		endpoint = fmt.Sprintf("%s/geth.ipc", path)

@@ -447,18 +447,6 @@ func DefaultScrollAlphaGenesisBlock() *Genesis {
 	}
 }
 
-// DefaultScrollStagingGenesisBlock returns the Scroll staging network genesis block.
-func DefaultScrollStagingGenesisBlock() *Genesis {
-	return &Genesis{
-		Config:     params.ScrollStagingChainConfig,
-		Timestamp:  0x641489a2,
-		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000ED0D8d10F5F217fd4cB56543A16F5DBBfB865e320000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		GasLimit:   8000000,
-		Difficulty: big.NewInt(1),
-		Alloc:      decodePrealloc(scrollStagingAllocData),
-	}
-}
-
 // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
 func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one

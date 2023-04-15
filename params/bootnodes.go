@@ -83,11 +83,6 @@ var ScrollAlphaBootnodes = []string{
 	"enode://cf85bfa5828239b1f6b21758579ee8aaaba2a1fb4c658d6967c5f7ed4f040d95dee5b5cef0c77d656a191f6b0875dd03f05b30a3b2b3e15bfcf18b500d8f634c@35.155.117.77:30303",
 }
 
-// ScrollStagingBootnodes are the enode URLs of the P2P bootstrap nodes running on the Scroll Staging test network.
-var ScrollStagingBootnodes = []string{
-	// empty
-}
-
 var V5Bootnodes = []string{
 	// Teku team's bootnode
 	"enr:-KG4QOtcP9X1FbIMOe17QNMKqDxCpm14jcX5tiOE4_TyMrFqbmhPZHK_ZPG2Gxb1GE2xdtodOfx9-cgvNtxnRyHEmC0ghGV0aDKQ9aX9QgAAAAD__________4JpZIJ2NIJpcIQDE8KdiXNlY3AyNTZrMaEDhpehBDbZjM_L9ek699Y7vhUJ-eAdMyQW_Fil522Y0fODdGNwgiMog3VkcIIjKA",

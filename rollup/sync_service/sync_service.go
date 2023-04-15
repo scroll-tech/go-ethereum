@@ -15,7 +15,7 @@ import (
 
 const (
 	// DefaultFetchBlockRange is the number of blocks that we collect in a single eth_getLogs query.
-	DefaultFetchBlockRange = uint64(20)
+	DefaultFetchBlockRange = uint64(100)
 
 	// DefaultPollInterval is the frequency at which we query for new L1 messages.
 	DefaultPollInterval = time.Second * 15
@@ -30,7 +30,7 @@ const (
 	// even if we have not collected DbWriteThresholdBytes bytes of data yet. This way, if there is
 	// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
 	// this secion.
-	DbWriteThresholdBlocks = 100
+	DbWriteThresholdBlocks = 1000
 )
 
 // SyncService collects all L1 messages and stores them in a local database.
@@ -88,22 +88,33 @@ func (s *SyncService) Start() {
 		return
 	}
 
-	log.Info("Starting sync service", "latestProcessedBlock", s.latestProcessedBlock)
+	// wait for initial sync before starting node
+	log.Info("Starting L1 message sync service", "latestProcessedBlock", s.latestProcessedBlock)
 
-	t := time.NewTicker(s.pollInterval)
-	defer t.Stop()
-
-	for {
-		// don't wait for ticker during startup
+	// block node startup during initial sync and print some helpful logs
+	latestConfirmed, err := s.client.getLatestConfirmedBlockNumber(s.ctx)
+	if err == nil && latestConfirmed > s.latestProcessedBlock+1000 {
+		log.Warn("Running initial sync of L1 messages before starting l2geth, this might take a while...")
 		s.fetchMessages()
-
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-t.C:
-			continue
-		}
+		log.Info("L1 message initial sync completed", "latestProcessedBlock", s.latestProcessedBlock)
 	}
+
+	go func() {
+		t := time.NewTicker(s.pollInterval)
+		defer t.Stop()
+
+		for {
+			// don't wait for ticker during startup
+			s.fetchMessages()
+
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-t.C:
+				continue
+			}
+		}
+	}()
 }
 
 func (s *SyncService) Stop() {
@@ -149,6 +160,7 @@ func (s *SyncService) fetchMessages() {
 
 	// ticker for logging progress
 	t := time.NewTicker(LogProgressInterval)
+	numMsgsCollected := 0
 
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
@@ -157,7 +169,7 @@ func (s *SyncService) fetchMessages() {
 			return
 		case <-t.C:
 			progress := 100 * float64(s.latestProcessedBlock) / float64(latestConfirmed)
-			log.Info("Syncing L1 messages", "processed", s.latestProcessedBlock, "confirmed", latestConfirmed, "progress(%)", progress)
+			log.Info("Syncing L1 messages", "processed", s.latestProcessedBlock, "confirmed", latestConfirmed, "collected", numMsgsCollected, "progress(%)", progress)
 		default:
 		}
 
@@ -181,6 +193,7 @@ func (s *SyncService) fetchMessages() {
 		if len(msgs) > 0 {
 			log.Debug("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
 			rawdb.WriteL1Messages(batchWriter, msgs) // collect messages in memory
+			numMsgsCollected += len(msgs)
 		}
 
 		numBlocksPendingDbWrite += to - from

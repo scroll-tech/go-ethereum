@@ -133,13 +133,7 @@ func unpackLog(c *abi.ABI, out interface{}, event string, log types.Log) error {
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {
 	// confirmation based on "safe" or "finalized" block tag
 	if c.confirmations == rpc.SafeBlockNumber || c.confirmations == rpc.FinalizedBlockNumber {
-		var tag *big.Int
-		if c.confirmations == rpc.FinalizedBlockNumber {
-			tag = big.NewInt(int64(rpc.FinalizedBlockNumber))
-		} else {
-			tag = big.NewInt(int64(rpc.SafeBlockNumber))
-		}
-
+		tag := big.NewInt(int64(c.confirmations))
 		header, err := c.client.HeaderByNumber(ctx, tag)
 		if err != nil {
 			return 0, err

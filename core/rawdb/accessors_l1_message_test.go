@@ -30,21 +30,12 @@ func TestReadWriteSyncedL1BlockNumber(t *testing.T) {
 
 func newL1MessageTx(enqueueIndex uint64) types.L1MessageTx {
 	return types.L1MessageTx{
-<<<<<<< HEAD
-		Nonce:  enqueueIndex,
-		Gas:    0,
-		To:     &common.Address{},
-		Value:  big.NewInt(0),
-		Data:   nil,
-		Sender: common.Address{},
-=======
 		QueueIndex: enqueueIndex,
 		Gas:        0,
 		To:         &common.Address{},
 		Value:      big.NewInt(0),
 		Data:       nil,
 		Sender:     common.Address{},
->>>>>>> 6e5bedd1ee96836ee692678b022520eabd515ce3
 	}
 }
 
@@ -54,11 +45,7 @@ func TestReadWriteL1Message(t *testing.T) {
 	db := NewMemoryDatabase()
 	WriteL1Messages(db, []types.L1MessageTx{msg})
 	got := ReadL1Message(db, enqueueIndex)
-<<<<<<< HEAD
-	if got == nil || got.Nonce != enqueueIndex {
-=======
 	if got == nil || got.QueueIndex != enqueueIndex {
->>>>>>> 6e5bedd1ee96836ee692678b022520eabd515ce3
 		t.Fatal("L1 message mismatch", "expected", enqueueIndex, "got", got)
 	}
 }
@@ -85,13 +72,8 @@ func TestIterateL1Message(t *testing.T) {
 		}
 
 		got := it.L1Message()
-<<<<<<< HEAD
-		if got.Nonce != msgs[ii].Nonce {
-			t.Fatal("Invalid result", "expected", msgs[ii].Nonce, "got", got.Nonce)
-=======
 		if got.QueueIndex != msgs[ii].QueueIndex {
 			t.Fatal("Invalid result", "expected", msgs[ii].QueueIndex, "got", got.QueueIndex)
->>>>>>> 6e5bedd1ee96836ee692678b022520eabd515ce3
 		}
 	}
 

@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"unicode"
 
+	"github.com/naoina/toml"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/naoina/toml"

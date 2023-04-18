@@ -278,12 +278,13 @@ var (
 			Period: 3,
 			Epoch:  30000,
 		},
-		Zktrie:          true,
-		FeeVaultAddress: &ScrollFeeVaultAddress,
-		EnableEIP2718:   false,
-		EnableEIP1559:   false,
-		MaxTxPerBlock:   &ScrollMaxTxPerBlock,
-		UsingScroll:     true,
+		Scroll: ScrollConfig{
+			UseZktrie:       true,
+			MaxTxPerBlock:   &ScrollMaxTxPerBlock,
+			FeeVaultAddress: &ScrollFeeVaultAddress,
+			EnableEIP2718:   false,
+			EnableEIP1559:   false,
+		},
 	}
 
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced

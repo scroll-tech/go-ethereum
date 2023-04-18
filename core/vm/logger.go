@@ -23,7 +23,6 @@ import (
 	"io"
 	"math/big"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/holiman/uint256"
@@ -151,9 +150,8 @@ type EVMLogger interface {
 // a track record of modified storage which is used in reporting snapshots of the
 // contract their storage.
 type StructLogger struct {
-	cfg           LogConfig
-	env           *EVM
-	structLogPool sync.Pool
+	cfg LogConfig
+	env *EVM
 
 	statesAffected map[common.Address]struct{}
 	storage        map[common.Address]Storage
@@ -173,13 +171,6 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 	}
 	if cfg != nil {
 		logger.cfg = *cfg
-	}
-
-	logger.structLogPool.New = func() any {
-		return &StructLog{
-			// init arrays here; other types are inited with default values
-			Stack: make([]uint256.Int, 0),
-		}
 	}
 
 	return logger

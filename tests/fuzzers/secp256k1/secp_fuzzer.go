@@ -23,6 +23,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	fuzz "github.com/google/gofuzz"
+
 	"github.com/scroll-tech/go-ethereum/crypto/secp256k1"
 )
 

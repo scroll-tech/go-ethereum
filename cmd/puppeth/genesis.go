@@ -196,7 +196,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 			StartingBlock: (*hexutil.Big)(genesis.Config.IstanbulBlock),
 		})
 	}
-	
 	return spec, nil
 }
 

@@ -94,6 +94,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 
 var PrecompiledContractsPlaceholder = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
+	common.BytesToAddress([]byte{4}): &dataCopy{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum

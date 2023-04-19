@@ -46,6 +46,7 @@ type alethGenesisSpec struct {
 		ConstantinopleForkBlock    *hexutil.Big           `json:"constantinopleForkBlock,omitempty"`
 		ConstantinopleFixForkBlock *hexutil.Big           `json:"constantinopleFixForkBlock,omitempty"`
 		IstanbulForkBlock          *hexutil.Big           `json:"istanbulForkBlock,omitempty"`
+		PlaceholderForkBlock       *hexutil.Big           `json:"placeholderForkBlock,omitempty"`
 		MinGasLimit                hexutil.Uint64         `json:"minGasLimit"`
 		MaxGasLimit                hexutil.Uint64         `json:"maxGasLimit"`
 		TieBreakingGas             bool                   `json:"tieBreakingGas"`
@@ -135,6 +136,9 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	if num := genesis.Config.IstanbulBlock; num != nil {
 		spec.Params.IstanbulForkBlock = (*hexutil.Big)(num)
 	}
+	if num := genesis.Config.PlaceholderBlock; num != nil {
+		spec.Params.PlaceholderForkBlock = (*hexutil.Big)(num)
+	}
 	spec.Params.NetworkID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.ChainID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.MaximumExtraDataSize = (hexutil.Uint64)(params.MaximumExtraDataSize)
@@ -161,41 +165,41 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 
 	spec.setPrecompile(1, &alethGenesisSpecBuiltin{Name: "ecrecover",
 		Linear: &alethGenesisSpecLinearPricing{Base: 3000}})
-	// spec.setPrecompile(2, &alethGenesisSpecBuiltin{Name: "sha256",
-	// 	Linear: &alethGenesisSpecLinearPricing{Base: 60, Word: 12}})
-	// spec.setPrecompile(3, &alethGenesisSpecBuiltin{Name: "ripemd160",
-	// 	Linear: &alethGenesisSpecLinearPricing{Base: 600, Word: 120}})
+	spec.setPrecompile(2, &alethGenesisSpecBuiltin{Name: "sha256",
+		Linear: &alethGenesisSpecLinearPricing{Base: 60, Word: 12}})
+	spec.setPrecompile(3, &alethGenesisSpecBuiltin{Name: "ripemd160",
+		Linear: &alethGenesisSpecLinearPricing{Base: 600, Word: 120}})
 	spec.setPrecompile(4, &alethGenesisSpecBuiltin{Name: "identity",
 		Linear: &alethGenesisSpecLinearPricing{Base: 15, Word: 3}})
-	// if genesis.Config.ByzantiumBlock != nil {
-	// 	spec.setPrecompile(5, &alethGenesisSpecBuiltin{Name: "modexp",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock)})
-	// 	spec.setPrecompile(6, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_add",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
-	// 		Linear:        &alethGenesisSpecLinearPricing{Base: 500}})
-	// 	spec.setPrecompile(7, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_mul",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
-	// 		Linear:        &alethGenesisSpecLinearPricing{Base: 40000}})
-	// 	spec.setPrecompile(8, &alethGenesisSpecBuiltin{Name: "alt_bn128_pairing_product",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock)})
-	// }
-	// if genesis.Config.IstanbulBlock != nil {
-	// 	if genesis.Config.ByzantiumBlock == nil {
-	// 		return nil, errors.New("invalid genesis, istanbul fork is enabled while byzantium is not")
-	// 	}
-	// 	spec.setPrecompile(6, &alethGenesisSpecBuiltin{
-	// 		Name:          "alt_bn128_G1_add",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
-	// 	}) // Aleth hardcoded the gas policy
-	// 	spec.setPrecompile(7, &alethGenesisSpecBuiltin{
-	// 		Name:          "alt_bn128_G1_mul",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
-	// 	}) // Aleth hardcoded the gas policy
-	// 	spec.setPrecompile(9, &alethGenesisSpecBuiltin{
-	// 		Name:          "blake2_compression",
-	// 		StartingBlock: (*hexutil.Big)(genesis.Config.IstanbulBlock),
-	// 	})
-	// }
+	if genesis.Config.ByzantiumBlock != nil {
+		spec.setPrecompile(5, &alethGenesisSpecBuiltin{Name: "modexp",
+			StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock)})
+		spec.setPrecompile(6, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_add",
+			StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
+			Linear:        &alethGenesisSpecLinearPricing{Base: 500}})
+		spec.setPrecompile(7, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_mul",
+			StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
+			Linear:        &alethGenesisSpecLinearPricing{Base: 40000}})
+		spec.setPrecompile(8, &alethGenesisSpecBuiltin{Name: "alt_bn128_pairing_product",
+			StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock)})
+	}
+	if genesis.Config.IstanbulBlock != nil {
+		if genesis.Config.ByzantiumBlock == nil {
+			return nil, errors.New("invalid genesis, istanbul fork is enabled while byzantium is not")
+		}
+		spec.setPrecompile(6, &alethGenesisSpecBuiltin{
+			Name:          "alt_bn128_G1_add",
+			StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
+		}) // Aleth hardcoded the gas policy
+		spec.setPrecompile(7, &alethGenesisSpecBuiltin{
+			Name:          "alt_bn128_G1_mul",
+			StartingBlock: (*hexutil.Big)(genesis.Config.ByzantiumBlock),
+		}) // Aleth hardcoded the gas policy
+		spec.setPrecompile(9, &alethGenesisSpecBuiltin{
+			Name:          "blake2_compression",
+			StartingBlock: (*hexutil.Big)(genesis.Config.IstanbulBlock),
+		})
+	}
 	return spec, nil
 }
 

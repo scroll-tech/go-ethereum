@@ -201,6 +201,7 @@ func TestIsPrecompile(t *testing.T) {
 	chaincfg.ByzantiumBlock = big.NewInt(100)
 	chaincfg.IstanbulBlock = big.NewInt(200)
 	chaincfg.BerlinBlock = big.NewInt(300)
+	chaincfg.PlaceholderBlock = big.NewInt(400)
 	txCtx := vm.TxContext{GasPrice: big.NewInt(100000)}
 	tracer, err := newJsTracer("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
 	if err != nil {
@@ -224,6 +225,37 @@ func TestIsPrecompile(t *testing.T) {
 	}
 	if string(res) != "true" {
 		t.Errorf("Tracer should consider blake2f as precompile in istanbul")
+	}
+
+	// placeholder fork should only have identity and ecrecover and no other precompiles
+	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
+	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
+	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "false" {
+		t.Errorf("Tracer should not consider blake2f as precompile in istanbul")
+	}
+
+	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000001'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
+	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
+	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "true" {
+		t.Errorf("Tracer should keep ecrecover as precompile in scroll alpha")
+	}
+
+	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000004'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
+	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
+	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "true" {
+		t.Errorf("Tracer should keep identity as precompile in scroll alpha")
 	}
 }
 

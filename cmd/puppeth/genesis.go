@@ -158,7 +158,7 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	for address, account := range genesis.Alloc {
 		spec.setAccount(address, account)
 	}
-/*
+
 	spec.setPrecompile(1, &alethGenesisSpecBuiltin{Name: "ecrecover",
 		Linear: &alethGenesisSpecLinearPricing{Base: 3000}})
 	spec.setPrecompile(2, &alethGenesisSpecBuiltin{Name: "sha256",
@@ -196,7 +196,7 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 			StartingBlock: (*hexutil.Big)(genesis.Config.IstanbulBlock),
 		})
 	}
-	*/
+	
 	return spec, nil
 }
 

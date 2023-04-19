@@ -188,10 +188,10 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, override
 		if storedcfg == nil {
 			log.Warn("Found genesis block without chain config")
 		} else {
-			trieCfg = &trie.Config{Zktrie: storedcfg.Zktrie}
+			trieCfg = &trie.Config{Zktrie: storedcfg.Scroll.ZktrieEnabled()}
 		}
 	} else {
-		trieCfg = &trie.Config{Zktrie: genesis.Config.Zktrie}
+		trieCfg = &trie.Config{Zktrie: genesis.Config.Scroll.ZktrieEnabled()}
 	}
 
 	if _, err := state.New(header.Root, state.NewDatabaseWithConfig(db, trieCfg), nil); err != nil {
@@ -277,7 +277,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	}
 	var trieCfg *trie.Config
 	if g.Config != nil {
-		trieCfg = &trie.Config{Zktrie: g.Config.Zktrie}
+		trieCfg = &trie.Config{Zktrie: g.Config.Scroll.ZktrieEnabled()}
 	}
 	statedb, err := state.New(common.Hash{}, state.NewDatabaseWithConfig(db, trieCfg), nil)
 	if err != nil {
@@ -315,7 +315,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if g.Config != nil && g.Config.IsLondon(common.Big0) {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
-		} else if g.Config.EnableEIP2718 && g.Config.EnableEIP1559 {
+		} else if g.Config.Scroll.BaseFeeEnabled() {
 			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
 		} else {
 			head.BaseFee = nil
@@ -435,6 +435,18 @@ func DefaultSepoliaGenesisBlock() *Genesis {
 	}
 }
 
+// DefaultScrollAlphaGenesisBlock returns the Scroll Alpha network genesis block.
+func DefaultScrollAlphaGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollAlphaChainConfig,
+		Timestamp:  0x63f67207,
+		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000b7C0c58702D0781C0e2eB3aaE301E4c340073448Ec9c139eFCBBe6323DA406fffBF4Db02a60A9720589c71deC4302fE718bE62350c174922782Cc6600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   8000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollAlphaAllocData),
+	}
+}
+
 // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
 func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
@@ -467,7 +479,40 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 	}
 }
 
+// decodePrealloc does not support code and storage in prealloc config,
+// so we provide an alternative implementation here.
+func decodePreallocScroll(data string) (GenesisAlloc, error) {
+	var p []struct {
+		Addr, Balance *big.Int
+		Code          []byte
+		Storage       []struct{ Key, Value *big.Int }
+	}
+
+	if err := rlp.NewStream(strings.NewReader(data), 0).Decode(&p); err != nil {
+		return nil, err
+	}
+	ga := make(GenesisAlloc, len(p))
+
+	for _, account := range p {
+		s := make(map[common.Hash]common.Hash)
+		for _, entry := range account.Storage {
+			s[common.BigToHash(entry.Key)] = common.BigToHash(entry.Value)
+		}
+
+		ga[common.BigToAddress(account.Addr)] = GenesisAccount{
+			Balance: account.Balance,
+			Code:    account.Code,
+			Storage: s,
+		}
+	}
+
+	return ga, nil
+}
+
 func decodePrealloc(data string) GenesisAlloc {
+	if ga, err := decodePreallocScroll(data); err == nil {
+		return ga
+	}
 	var p []struct{ Addr, Balance *big.Int }
 	if err := rlp.NewStream(strings.NewReader(data), 0).Decode(&p); err != nil {
 		panic(err)

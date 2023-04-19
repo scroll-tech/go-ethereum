@@ -839,7 +839,6 @@ type OverrideAccount struct {
 	Nonce      *hexutil.Uint64              `json:"nonce"`
 	Code       *hexutil.Bytes               `json:"code"`
 	Balance    **hexutil.Big                `json:"balance"`
-	BalanceAdd **hexutil.Big                `json:"balanceAdd"`
 	State      *map[common.Hash]common.Hash `json:"state"`
 	StateDiff  *map[common.Hash]common.Hash `json:"stateDiff"`
 }

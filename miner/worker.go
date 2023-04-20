@@ -397,7 +397,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case head := <-w.chainHeadCh:
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
-			commit(true, commitInterruptNewHead)
+			commit(false, commitInterruptNewHead)
 
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
@@ -1037,11 +1037,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		if w.commitTransactions(txs, w.coinbase, interrupt) {
 			return
 		}
-	}
-
-	// do not produce empty blocks
-	if w.current.tcount == 0 {
-		return
 	}
 
 	w.commit(uncles, w.fullTaskHook, true, tstart)

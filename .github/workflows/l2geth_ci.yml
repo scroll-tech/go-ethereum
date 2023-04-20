@@ -1,5 +1,17 @@
-on: [pull_request, push]
-name: Continuous Integration
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+      - alpha
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop
+      - alpha
+name: CI
 jobs:
   build:
     runs-on: ubuntu-latest

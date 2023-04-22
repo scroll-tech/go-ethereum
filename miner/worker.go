@@ -911,11 +911,10 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 func (w *worker) fetchPendingL1Messages() []types.L1MessageTx {
 	includedL1BlockNumber := rawdb.ReadLastL1MessageInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
-	lastBlockNumberToFetch := rawdb.ReadSyncedL1BlockNumber(w.eth.ChainDb())
-	if *includedL1BlockNumber+w.chainConfig.L1Config.NumL1MessagesPerBlock < *lastBlockNumberToFetch {
-		*lastBlockNumberToFetch = *includedL1BlockNumber + w.chainConfig.L1Config.NumL1MessagesPerBlock
-	}
-	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), *includedL1BlockNumber+1, *lastBlockNumberToFetch, true)
+	// TODO: handle nil
+	first := *includedL1BlockNumber
+	last := first + w.chainConfig.L1Config.NumL1MessagesPerBlock - 1
+	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), first, last, false)
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
@@ -1073,7 +1072,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		return
 	}
 
-	// todo: update includedL1BlockNumber
+	// todo: update LastL1MessageInL2Block
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 

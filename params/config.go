@@ -28,11 +28,12 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	RopstenGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	SepoliaGenesisHash = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
-	RinkebyGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-	GoerliGenesisHash  = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	MainnetGenesisHash     = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+	RopstenGenesisHash     = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	SepoliaGenesisHash     = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
+	RinkebyGenesisHash     = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	GoerliGenesisHash      = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	ScrollAlphaGenesisHash = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
 )
 
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
@@ -253,6 +254,39 @@ var (
 		Threshold: 2,
 	}
 
+	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
+	ScrollFeeVaultAddress = common.HexToAddress("0x5300000000000000000000000000000000000005")
+	ScrollMaxTxPerBlock   = 44
+
+	ScrollAlphaChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(534353),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   nil,
+		Clique: &CliqueConfig{
+			Period: 3,
+			Epoch:  30000,
+		},
+		Scroll: ScrollConfig{
+			UseZktrie:       true,
+			MaxTxPerBlock:   &ScrollMaxTxPerBlock,
+			FeeVaultAddress: &ScrollFeeVaultAddress,
+			EnableEIP2718:   false,
+			EnableEIP1559:   false,
+		},
+	}
+
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
 	//
@@ -411,12 +445,22 @@ func (s ScrollConfig) BaseFeeEnabled() bool {
 	return s.EnableEIP2718 && s.EnableEIP1559
 }
 
-func (s ScrollConfig) L1FeeEnabled() bool {
+func (s ScrollConfig) FeeVaultEnabled() bool {
 	return s.FeeVaultAddress != nil
 }
 
 func (s ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
+}
+
+func (s ScrollConfig) String() string {
+	if s.MaxTxPerBlock == nil {
+		return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: <nil>, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
+			s.UseZktrie, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
+	}
+
+	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
+		s.UseZktrie, *s.MaxTxPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
 }
 
 // IsValidTxCount returns whether the given block's transaction count is below the limit.
@@ -454,7 +498,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -471,6 +515,7 @@ func (c *ChainConfig) String() string {
 		c.LondonBlock,
 		c.ArrowGlacierBlock,
 		engine,
+		c.Scroll,
 	)
 }
 

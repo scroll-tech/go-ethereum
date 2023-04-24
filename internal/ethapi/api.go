@@ -741,10 +741,10 @@ func (s *PublicBlockChainAPI) GetHeaderByHash(ctx context.Context, hash common.H
 }
 
 // GetBlockByNumber returns the requested canonical block.
-//   - When blockNr is -1 the chain head is returned.
-//   - When blockNr is -2 the pending chain head is returned.
-//   - When fullTx is true all transactions in the block are returned, otherwise
-//     only the transaction hash is returned.
+// * When blockNr is -1 the chain head is returned.
+// * When blockNr is -2 the pending chain head is returned.
+// * When fullTx is true all transactions in the block are returned, otherwise
+//   only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, number)
 	if block != nil && err == nil {
@@ -908,7 +908,7 @@ func newRPCBalance(balance *big.Int) **hexutil.Big {
 }
 
 func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
-	if !config.Scroll.L1FeeEnabled() {
+	if !config.Scroll.FeeVaultEnabled() {
 		return big.NewInt(0), nil
 	}
 
@@ -1669,7 +1669,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 		"type":              hexutil.Uint(tx.Type()),
-		"l1Fee":             receipt.L1Fee,
+		"l1Fee":             hexutil.Uint64(receipt.L1Fee.Uint64()),
 	}
 	// Assign the effective gas price paid
 	if !s.b.ChainConfig().IsLondon(bigblock) {

@@ -1,7 +1,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 
 	zkt "github.com/scroll-tech/zktrie/types"
@@ -54,7 +53,10 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 	// try the trie in stateObject first, else we would create one
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
-		return nil, errors.New("storage trie for requested address does not exist")
+		// still return a empty trie
+		addrHash := crypto.Keccak256Hash(addr[:])
+		dummy_trie, _ := s.db.OpenStorageTrie(addrHash, common.Hash{})
+		return dummy_trie, nil
 	}
 
 	trie := stateObject.trie

@@ -912,7 +912,12 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 func (w *worker) fetchPendingL1Messages() []types.L1MessageTx {
 	includedL1BlockNumber := rawdb.ReadLastL1MessageInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
 	// TODO: handle nil
-	first := *includedL1BlockNumber
+	var first uint64
+	if includedL1BlockNumber == nil {
+		first = 0
+	} else {
+		first = *includedL1BlockNumber
+	}
 	last := first + w.chainConfig.L1Config.NumL1MessagesPerBlock - 1
 	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), first, last, false)
 }

@@ -191,7 +191,7 @@ func WriteLastL1MessageInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Has
 func ReadLastL1MessageInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
 	data, err := db.Get(LastL1MessageInL2BlockKey(l2BlockHash))
 	if err != nil {
-		log.Crit("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
+		log.Error("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
 	}
 	if len(data) == 0 {
 		return nil

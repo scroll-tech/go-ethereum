@@ -80,7 +80,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 
 // ValidateL1Messages validates L1 messages contained in a block.
 // We check the following conditions:
-// - L1 messages are in a contiguous block at the front of the block.
+// - L1 messages are in a contiguous section at the front of the block.
 // - The first L1 message's QueueIndex is right after the last L1 message included in the chain.
 // - L1 messages follow the QueueIndex order. No L1 message is skipped.
 // - The L1 messages included in the block match the node's view of the L1 ledger.

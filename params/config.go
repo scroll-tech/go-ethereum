@@ -383,9 +383,9 @@ type ChainConfig struct {
 
 // L1Config contains the l1 parameters needed to collect l1 messages in the sequencer
 type L1Config struct {
-	L1ChainId             uint64          `json:"l1ChainId,omitempty"`
+	L1ChainId             uint64          `json:"l1ChainId,string,omitempty"`
 	L1MessageQueueAddress *common.Address `json:"l1MessageQueueAddress,omitempty"`
-	NumL1MessagesPerBlock uint64          `json:"numL1MessagesPerBlock,omitempty"`
+	NumL1MessagesPerBlock uint64          `json:"numL1MessagesPerBlock,string,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -418,7 +418,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Engine: %v, L1Config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -435,6 +435,7 @@ func (c *ChainConfig) String() string {
 		c.LondonBlock,
 		c.ArrowGlacierBlock,
 		engine,
+		c.L1Config,
 	)
 }
 

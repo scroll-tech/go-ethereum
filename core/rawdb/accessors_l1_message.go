@@ -3,14 +3,22 @@ package rawdb
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"math/big"
+
+	leveldb "github.com/syndtr/goleveldb/leveldb/errors"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
+
+func isNotFoundErr(err error) bool {
+	return errors.Is(err, leveldb.ErrNotFound) || errors.Is(err, memorydb.ErrMemorydbNotFound)
+}
 
 // WriteSyncedL1BlockNumber writes the highest synced L1 block number to the database.
 func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
@@ -24,6 +32,9 @@ func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
 // ReadSyncedL1BlockNumber retrieves the highest synced L1 block number.
 func ReadSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 	data, err := db.Get(syncedL1BlockNumberKey)
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
 	if err != nil {
 		log.Crit("Failed to read synced L1 block number from database", "err", err)
 	}
@@ -71,6 +82,9 @@ func WriteL1MessagesBatch(db ethdb.Batcher, l1Msgs []types.L1MessageTx) {
 // ReadL1MessageRLP retrieves an L1 message in its raw RLP database encoding.
 func ReadL1MessageRLP(db ethdb.Reader, enqueueIndex uint64) rlp.RawValue {
 	data, err := db.Get(L1MessageKey(enqueueIndex))
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
 	if err != nil {
 		log.Crit("Failed to load L1 message", "enqueueIndex", enqueueIndex, "err", err)
 	}
@@ -190,6 +204,9 @@ func WriteLastL1MessageInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Has
 // The caller must add special handling for the L2 genesis block.
 func ReadLastL1MessageInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
 	data, err := db.Get(LastL1MessageInL2BlockKey(l2BlockHash))
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
 	if err != nil {
 		log.Error("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
 	}

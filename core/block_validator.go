@@ -85,6 +85,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - L1 messages follow the QueueIndex order. No L1 message is skipped.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
+	if v.config.L1Config == nil || v.config.L1Config.NumL1MessagesPerBlock == 0 {
+		return nil
+	}
+
 	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(v.bc.db, block.ParentHash())
 	if nextQueueIndex == nil {
 		// TODO: make sure we correctly re-process block after ErrUnknownAncestor

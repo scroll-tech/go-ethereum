@@ -909,14 +909,17 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 	return false
 }
 
-func (w *worker) fetchPendingL1Messages() []types.L1MessageTx {
-	includedL1BlockNumber := rawdb.ReadLastL1MessageInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
-	// TODO: handle nil
+func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
 	var first uint64
-	if includedL1BlockNumber == nil {
+	if w.chain.CurrentHeader().Hash() == w.chain.Genesis().Hash() {
 		first = 0
 	} else {
-		first = *includedL1BlockNumber
+		lastIncludedQueueIndex := rawdb.ReadLastL1MessageInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
+		if lastIncludedQueueIndex == nil {
+			log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash(), " last L1 message is nil")
+		} else {
+			first = *lastIncludedQueueIndex + 1
+		}
 	}
 	last := first + w.chainConfig.L1Config.NumL1MessagesPerBlock - 1
 	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), first, last, false)
@@ -1023,17 +1026,19 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		w.commit(uncles, nil, false, tstart)
 	}
 	// fetch l1Txs
-	l1Messages := w.fetchPendingL1Messages()
 	l1Txs := make(map[common.Address]types.Transactions)
-	for _, l1msg := range l1Messages {
-		tx := types.NewTx(&l1msg)
-		sender := l1msg.Sender
-		senderTxs, ok := l1Txs[sender]
-		if ok {
-			senderTxs = append(senderTxs, tx)
-			l1Txs[sender] = senderTxs
-		} else {
-			l1Txs[sender] = types.Transactions{tx}
+	if w.chainConfig.L1Config.NumL1MessagesPerBlock > 0 {
+		l1Messages := w.collectPendingL1Messages()
+		for _, l1msg := range l1Messages {
+			tx := types.NewTx(&l1msg)
+			sender := l1msg.Sender
+			senderTxs, ok := l1Txs[sender]
+			if ok {
+				senderTxs = append(senderTxs, tx)
+				l1Txs[sender] = senderTxs
+			} else {
+				l1Txs[sender] = types.Transactions{tx}
+			}
 		}
 	}
 	// Fill the block with all available pending transactions.
@@ -1053,7 +1058,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
-	if len(l1Txs) > 0 {
+	if w.chainConfig.L1Config.NumL1MessagesPerBlock > 0 && len(l1Txs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
 		if w.commitTransactions(txs, w.coinbase, interrupt) {
 			return

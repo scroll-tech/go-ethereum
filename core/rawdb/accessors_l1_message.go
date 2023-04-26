@@ -208,7 +208,7 @@ func ReadLastL1MessageInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint6
 		return nil
 	}
 	if err != nil {
-		log.Error("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
+		log.Crit("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
 	}
 	if len(data) == 0 {
 		return nil

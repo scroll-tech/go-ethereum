@@ -1082,7 +1082,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		return
 	}
 
-	// todo: update LastL1MessageInL2Block
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 

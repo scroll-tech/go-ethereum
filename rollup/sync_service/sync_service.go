@@ -18,7 +18,7 @@ const (
 	DefaultFetchBlockRange = uint64(100)
 
 	// DefaultPollInterval is the frequency at which we query for new L1 messages.
-	DefaultPollInterval = time.Second * 15
+	DefaultPollInterval = time.Second * 10
 
 	// LogProgressInterval is the frequency at which we log progress.
 	LogProgressInterval = time.Second * 10

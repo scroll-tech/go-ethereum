@@ -34,6 +34,15 @@ jobs:
         go-version: 1.18.x
     - name: Checkout code
       uses: actions/checkout@v2
+    - name: Setup Golang caches
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-golang-
     - name: Lint
       run: |
         rm -rf $HOME/.cache/golangci-lint
@@ -66,6 +75,15 @@ jobs:
         go-version: 1.18.x
     - name: Checkout code
       uses: actions/checkout@v2
+    - name: Setup Golang caches
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-golang-
     - name: Test
       run: |
         go get ./...

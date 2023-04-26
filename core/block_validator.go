@@ -85,21 +85,12 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - L1 messages follow the QueueIndex order. No L1 message is skipped.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
-	var queueIndex uint64
-
-	if block.NumberU64() <= 1 {
-		queueIndex = 0
-	} else {
-		// all blocks should have previousQueueIndex in the database except for genesis
-		// TODO: handle case where we don't have this after snapshot sync
-		previousQueueIndex := rawdb.ReadLastL1MessageInL2Block(v.bc.db, block.ParentHash())
-		if previousQueueIndex == nil {
-			// TODO: make sure we correctly re-process block after ErrUnknownAncestor
-			return consensus.ErrUnknownAncestor
-		} else {
-			queueIndex = *previousQueueIndex
-		}
+	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(v.bc.db, block.ParentHash())
+	if nextQueueIndex == nil {
+		// TODO: make sure we correctly re-process block after ErrUnknownAncestor
+		return consensus.ErrUnknownAncestor
 	}
+	queueIndex := *nextQueueIndex
 
 	L1SectionOver := false
 	it := rawdb.IterateL1MessagesFrom(v.bc.db, queueIndex)
@@ -115,12 +106,12 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 			return consensus.ErrInvalidL1MessageOrder
 		}
 
-		queueIndex += 1
-
 		// check queue index
 		if tx.AsL1MessageTx().QueueIndex != queueIndex {
 			return consensus.ErrInvalidL1MessageOrder
 		}
+
+		queueIndex += 1
 
 		if exists := it.Next(); !exists {
 			// TODO: make sure we correctly re-process block after ErrUnknownAncestor
@@ -139,7 +130,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	// write to db
 	// TODO: ValidateL1Messages should not have side effects, consider
 	// moving this elsewhere.
-	rawdb.WriteLastL1MessageInL2Block(v.bc.db, block.Hash(), queueIndex)
+	rawdb.WriteFirstQueueIndexNotInL2Block(v.bc.db, block.Hash(), queueIndex)
 
 	return nil
 }

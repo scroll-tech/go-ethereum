@@ -386,7 +386,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			cliqueSnaps.Add(size)
 		case bytes.HasPrefix(key, L1MessagePrefix) && len(key) == len(L1MessagePrefix)+8:
 			l1Messages.Add(size)
-		case bytes.HasPrefix(key, LastL1MessageInL2BlockPrefix) && len(key) == len(LastL1MessageInL2BlockPrefix)+common.HashLength:
+		case bytes.HasPrefix(key, FirstQueueIndexNotInL2BlockPrefix) && len(key) == len(FirstQueueIndexNotInL2BlockPrefix)+common.HashLength:
 			lastL1Message.Add(size)
 		case bytes.HasPrefix(key, []byte("cht-")) ||
 			bytes.HasPrefix(key, []byte("chtIndexV2-")) ||

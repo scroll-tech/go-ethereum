@@ -87,7 +87,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	var queueIndex uint64
 
-	if block.NumberU64() != 1 {
+	if block.NumberU64() <= 1 {
 		queueIndex = 0
 	} else {
 		// all blocks should have previousQueueIndex in the database except for genesis

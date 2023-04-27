@@ -277,6 +277,9 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		return nil, ErrNoGenesis
 	}
 
+	// initialize L1 message index for genesis block
+	rawdb.WriteFirstQueueIndexNotInL2Block(db, bc.genesisBlock.Hash(), 0)
+
 	var nilBlock *types.Block
 	bc.currentBlock.Store(nilBlock)
 	bc.currentFastBlock.Store(nilBlock)

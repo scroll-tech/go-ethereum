@@ -255,8 +255,9 @@ var (
 	}
 
 	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
-	ScrollFeeVaultAddress = common.HexToAddress("0x5300000000000000000000000000000000000005")
-	ScrollMaxTxPerBlock   = 44
+	ScrollFeeVaultAddress       = common.HexToAddress("0x5300000000000000000000000000000000000005")
+	ScrollL1MessageQueueAddress = common.HexToAddress("0x79DB48002Aa861C8cb189cabc21c6B1468BC83BB")
+	ScrollMaxTxPerBlock         = 44
 
 	ScrollAlphaChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(534353),
@@ -284,6 +285,11 @@ var (
 			FeeVaultAddress: &ScrollFeeVaultAddress,
 			EnableEIP2718:   false,
 			EnableEIP1559:   false,
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: &ScrollL1MessageQueueAddress,
+				NumL1MessagesPerBlock: 0,
+			},
 		},
 	}
 

@@ -296,6 +296,15 @@ func (tx *Transaction) IsL1MessageTx() bool {
 	return tx.Type() == L1MessageTxType
 }
 
+// AsL1MessageTx casts the tx into an L1 cross-domain tx.
+func (tx *Transaction) AsL1MessageTx() *L1MessageTx {
+	if tx.Type() != L1MessageTxType {
+		return nil
+	}
+
+	return tx.inner.(*L1MessageTx)
+}
+
 // Cost returns gas * gasPrice + value.
 func (tx *Transaction) Cost() *big.Int {
 	total := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))

@@ -122,8 +122,5 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 	if dec.BaseFee != nil {
 		g.BaseFee = (*big.Int)(dec.BaseFee)
 	}
-	if g.Config.L1Config == nil {
-		g.Config.L1Config = &params.L1Config{}
-	}
 	return nil
 }

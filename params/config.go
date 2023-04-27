@@ -28,11 +28,12 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	RopstenGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	SepoliaGenesisHash = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
-	RinkebyGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-	GoerliGenesisHash  = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	MainnetGenesisHash     = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+	RopstenGenesisHash     = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	SepoliaGenesisHash     = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
+	RinkebyGenesisHash     = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	GoerliGenesisHash      = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	ScrollAlphaGenesisHash = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
 )
 
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
@@ -253,24 +254,95 @@ var (
 		Threshold: 2,
 	}
 
+	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
+	ScrollFeeVaultAddress       = common.HexToAddress("0x5300000000000000000000000000000000000005")
+	ScrollL1MessageQueueAddress = common.HexToAddress("0x79DB48002Aa861C8cb189cabc21c6B1468BC83BB")
+	ScrollMaxTxPerBlock         = 44
+
+	ScrollAlphaChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(534353),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   nil,
+		Clique: &CliqueConfig{
+			Period: 3,
+			Epoch:  30000,
+		},
+		Scroll: ScrollConfig{
+			UseZktrie:       true,
+			MaxTxPerBlock:   &ScrollMaxTxPerBlock,
+			FeeVaultAddress: &ScrollFeeVaultAddress,
+			EnableEIP2718:   false,
+			EnableEIP1559:   false,
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: &ScrollL1MessageQueueAddress,
+				NumL1MessagesPerBlock: 0,
+			},
+		},
+	}
+
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, false, nil, true, true, nil, true, &L1Config{5, nil, 0}}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
+		ScrollConfig{
+			UseZktrie:       false,
+			FeeVaultAddress: nil,
+			EnableEIP2718:   true,
+			EnableEIP1559:   true,
+			MaxTxPerBlock:   nil,
+			L1Config:        &L1Config{5, nil, 0},
+		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, false, nil, true, true, nil, true, &L1Config{5, nil, 0}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000},
+		ScrollConfig{
+			UseZktrie:       false,
+			FeeVaultAddress: nil,
+			EnableEIP2718:   true,
+			EnableEIP1559:   true,
+			MaxTxPerBlock:   nil,
+			L1Config:        &L1Config{5, nil, 0},
+		}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, false, &common.Address{123}, true, true, nil, true, &L1Config{5, nil, 0}}
-	TestRules       = TestChainConfig.Rules(new(big.Int))
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
+		ScrollConfig{
+			UseZktrie:       false,
+			FeeVaultAddress: &common.Address{123},
+			EnableEIP2718:   true,
+			EnableEIP1559:   true,
+			MaxTxPerBlock:   nil,
+			L1Config:        &L1Config{5, nil, 0},
+		}}
+	TestRules = TestChainConfig.Rules(new(big.Int))
 
-	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, false, &common.Address{123}, true, true, nil, false, &L1Config{5, nil, 0}}
+	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
+		ScrollConfig{
+			UseZktrie:       false,
+			FeeVaultAddress: nil,
+			EnableEIP2718:   true,
+			EnableEIP1559:   true,
+			MaxTxPerBlock:   nil,
+			L1Config:        &L1Config{5, nil, 0},
+		}}
 )
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and
@@ -358,26 +430,27 @@ type ChainConfig struct {
 	Ethash *EthashConfig `json:"ethash,omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty"`
 
-	// Scroll genesis extension: Use zktrie
-	Zktrie bool `json:"zktrie,omitempty"`
+	// Scroll genesis extension: enable scroll rollup-related traces & state transition
+	Scroll ScrollConfig `json:"scroll,omitempty"`
+}
 
-	// Scroll genesis extension: Transaction fee vault address [optional]
-	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
+type ScrollConfig struct {
+	// Use zktrie [optional]
+	UseZktrie bool `json:"useZktrie,omitempty"`
 
-	// Scroll genesis extension: enable EIP-2718 in tx pool.
-	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
-
-	// Scroll genesis extension: enable EIP-1559 in tx pool, EnableEIP2718 should be true too.
-	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
-
-	// Scroll genesis extension: Maximum number of transactions per block [optional]
+	// Maximum number of transactions per block [optional]
 	MaxTxPerBlock *int `json:"maxTxPerBlock,omitempty"`
 
-	// Scroll genesis extension: enable scroll rollup-related traces & state transition
-	// TODO: merge with these config: Zktrie, FeeVaultAddress, EnableEIP2718, EnableEIP1559 & MaxTxPerBlock
-	UsingScroll bool `json:"usingScroll,omitempty"`
+	// Transaction fee vault address [optional]
+	FeeVaultAddress *common.Address `json:"feeVaultAddress,omitempty"`
 
-	// Scroll genesis extension: L1 config
+	// Enable EIP-2718 in tx pool [optional]
+	EnableEIP2718 bool `json:"enableEIP2718,omitempty"`
+
+	// Enable EIP-1559 in tx pool, EnableEIP2718 should be true too [optional]
+	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
+
+	// L1 config
 	L1Config *L1Config `json:"l1Config,omitempty"`
 }
 
@@ -386,6 +459,33 @@ type L1Config struct {
 	L1ChainId             uint64          `json:"l1ChainId,string,omitempty"`
 	L1MessageQueueAddress *common.Address `json:"l1MessageQueueAddress,omitempty"`
 	NumL1MessagesPerBlock uint64          `json:"numL1MessagesPerBlock,string,omitempty"`
+}
+
+func (s ScrollConfig) BaseFeeEnabled() bool {
+	return s.EnableEIP2718 && s.EnableEIP1559
+}
+
+func (s ScrollConfig) FeeVaultEnabled() bool {
+	return s.FeeVaultAddress != nil
+}
+
+func (s ScrollConfig) ZktrieEnabled() bool {
+	return s.UseZktrie
+}
+
+func (s ScrollConfig) String() string {
+	if s.MaxTxPerBlock == nil {
+		return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: <nil>, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
+			s.UseZktrie, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
+	}
+
+	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
+		s.UseZktrie, *s.MaxTxPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
+}
+
+// IsValidTxCount returns whether the given block's transaction count is below the limit.
+func (s ScrollConfig) IsValidTxCount(count int) bool {
+	return s.MaxTxPerBlock == nil || count <= *s.MaxTxPerBlock
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -418,7 +518,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Engine: %v, L1Config: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -435,7 +535,7 @@ func (c *ChainConfig) String() string {
 		c.LondonBlock,
 		c.ArrowGlacierBlock,
 		engine,
-		c.L1Config,
+		c.Scroll,
 	)
 }
 
@@ -512,11 +612,6 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 		return false
 	}
 	return parentTotalDiff.Cmp(c.TerminalTotalDifficulty) < 0 && totalDiff.Cmp(c.TerminalTotalDifficulty) >= 0
-}
-
-// IsValidTxCount returns whether the given block's transaction count is below the limit.
-func (c *ChainConfig) IsValidTxCount(count int) bool {
-	return c.MaxTxPerBlock == nil || count <= *c.MaxTxPerBlock
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported

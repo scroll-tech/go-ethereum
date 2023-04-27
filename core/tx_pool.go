@@ -687,7 +687,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	// the sender is marked as local previously, treat it as the local transaction.
 	isLocal := local || pool.locals.containsTx(tx)
 
-	if pool.chainconfig.UsingScroll {
+	if pool.chainconfig.Scroll.FeeVaultEnabled() {
 		if err := fees.VerifyFee(pool.signer, tx, pool.currentState); err != nil {
 			log.Trace("Discarding insufficient l1fee transaction", "hash", hash, "err", err)
 			invalidTxMeter.Mark(1)
@@ -1334,8 +1334,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// Update all fork indicator by next pending block number.
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
 	pool.istanbul = pool.chainconfig.IsIstanbul(next)
-	pool.eip2718 = pool.chainconfig.EnableEIP2718 && pool.chainconfig.IsBerlin(next)
-	pool.eip1559 = pool.chainconfig.EnableEIP1559 && pool.chainconfig.IsLondon(next)
+
+	pool.eip2718 = pool.chainconfig.Scroll.EnableEIP2718 && pool.chainconfig.IsBerlin(next)
+	pool.eip1559 = pool.chainconfig.Scroll.EnableEIP1559 && pool.chainconfig.IsLondon(next)
 }
 
 // promoteExecutables moves transactions that have become processable from the

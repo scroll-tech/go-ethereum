@@ -118,8 +118,8 @@ func TestReadWriteLastL1MessageInL2Block(t *testing.T) {
 	db := NewMemoryDatabase()
 	for _, num := range inputs {
 		l2BlockHash := common.Hash{byte(num)}
-		WriteLastL1MessageInL2Block(db, l2BlockHash, num)
-		got := ReadLastL1MessageInL2Block(db, l2BlockHash)
+		WriteFirstQueueIndexNotInL2Block(db, l2BlockHash, num)
+		got := ReadFirstQueueIndexNotInL2Block(db, l2BlockHash)
 
 		if got == nil || *got != num {
 			t.Fatal("Enqueue index mismatch", "expected", num, "got", got)

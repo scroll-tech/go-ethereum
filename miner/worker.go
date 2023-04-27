@@ -820,8 +820,8 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
 		}
 		// If we have collected enough transactions then we're done
-		if !w.chainConfig.IsValidTxCount(w.current.tcount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.MaxTxPerBlock)
+		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount + 1) {
+			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done
@@ -910,18 +910,13 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 }
 
 func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
-	var first uint64
-	if w.chain.CurrentHeader().Hash() == w.chain.Genesis().Hash() {
-		first = 0
-	} else {
-		lastIncludedQueueIndex := rawdb.ReadLastL1MessageInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
-		if lastIncludedQueueIndex == nil {
-			log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash(), " last L1 message is nil")
-		} else {
-			first = *lastIncludedQueueIndex + 1
-		}
+	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
+	if nextQueueIndex == nil {
+		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash(), " last L1 message is nil")
 	}
-	last := first + w.chainConfig.L1Config.NumL1MessagesPerBlock - 1
+
+	first := *nextQueueIndex
+	last := first + w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock - 1
 	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), first, last, false)
 }
 
@@ -946,7 +941,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if w.chainConfig.IsLondon(header.Number) {
-		if w.chainConfig.EnableEIP2718 && w.chainConfig.EnableEIP1559 {
+		if w.chainConfig.Scroll.BaseFeeEnabled() {
 			header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
 		} else {
 			// When disabling EIP-2718 or EIP-1559, we do not set baseFeePerGas in RPC response.
@@ -1027,7 +1022,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	// fetch l1Txs
 	l1Txs := make(map[common.Address]types.Transactions)
-	if w.chainConfig.L1Config.NumL1MessagesPerBlock > 0 {
+	if w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock > 0 {
 		l1Messages := w.collectPendingL1Messages()
 		for _, l1msg := range l1Messages {
 			tx := types.NewTx(&l1msg)
@@ -1058,7 +1053,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
-	if w.chainConfig.L1Config.NumL1MessagesPerBlock > 0 && len(l1Txs) > 0 {
+	if w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock > 0 && len(l1Txs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
 		if w.commitTransactions(txs, w.coinbase, interrupt) {
 			return

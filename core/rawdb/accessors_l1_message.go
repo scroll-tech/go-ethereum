@@ -190,20 +190,20 @@ func ReadL1MessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueInde
 	return msgs
 }
 
-// WriteLastL1MessageInL2Block writes the enqueue index of the last message included in the
-// ledger up to and including the provided L2 block. The L2 block is identified by its block
-// hash. If the L2 block contains zero L1 messages, this value MUST equal its parent's value.
-func WriteLastL1MessageInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, enqueueIndex uint64) {
-	if err := db.Put(LastL1MessageInL2BlockKey(l2BlockHash), encodeEnqueueIndex(enqueueIndex)); err != nil {
+// WriteFirstQueueIndexNotInL2Block writes the queue index of the first message
+// that is NOT included in the ledger up to and including the provided L2 block.
+// The L2 block is identified by its block hash. If the L2 block contains zero
+// L1 messages, this value MUST equal its parent's value.
+func WriteFirstQueueIndexNotInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, enqueueIndex uint64) {
+	if err := db.Put(FirstQueueIndexNotInL2BlockKey(l2BlockHash), encodeEnqueueIndex(enqueueIndex)); err != nil {
 		log.Crit("Failed to store last L1 message in L2 block", "l2BlockHash", l2BlockHash, "err", err)
 	}
 }
 
-// ReadLastL1MessageInL2Block retrieves the enqueue index of the last message
-// included in the ledger up to and including the provided L2 block.
-// The caller must add special handling for the L2 genesis block.
-func ReadLastL1MessageInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
-	data, err := db.Get(LastL1MessageInL2BlockKey(l2BlockHash))
+// ReadFirstQueueIndexNotInL2Block retrieves the queue index of the first message
+// that is NOT included in the ledger up to and including the provided L2 block.
+func ReadFirstQueueIndexNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
+	data, err := db.Get(FirstQueueIndexNotInL2BlockKey(l2BlockHash))
 	if err != nil && isNotFoundErr(err) {
 		return nil
 	}

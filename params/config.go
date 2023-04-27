@@ -473,6 +473,10 @@ func (s ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
 }
 
+func (s ScrollConfig) L1MsgEnabled() bool {
+	return s.L1Config != nil && s.L1Config.NumL1MessagesPerBlock > 0
+}
+
 func (s ScrollConfig) String() string {
 	if s.MaxTxPerBlock == nil {
 		return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: <nil>, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",

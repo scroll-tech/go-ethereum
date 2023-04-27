@@ -661,7 +661,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		return nil, err
 	}
 
-	zktrie := s.b.ChainConfig().Zktrie
+	zktrie := s.b.ChainConfig().Scroll.ZktrieEnabled()
 
 	storageTrie := state.StorageTrie(address)
 	var storageHash common.Hash
@@ -741,10 +741,10 @@ func (s *PublicBlockChainAPI) GetHeaderByHash(ctx context.Context, hash common.H
 }
 
 // GetBlockByNumber returns the requested canonical block.
-//   - When blockNr is -1 the chain head is returned.
-//   - When blockNr is -2 the pending chain head is returned.
-//   - When fullTx is true all transactions in the block are returned, otherwise
-//     only the transaction hash is returned.
+// * When blockNr is -1 the chain head is returned.
+// * When blockNr is -2 the pending chain head is returned.
+// * When fullTx is true all transactions in the block are returned, otherwise
+//   only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, number)
 	if block != nil && err == nil {
@@ -908,7 +908,7 @@ func newRPCBalance(balance *big.Int) **hexutil.Big {
 }
 
 func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
-	if !config.UsingScroll {
+	if !config.Scroll.FeeVaultEnabled() {
 		return big.NewInt(0), nil
 	}
 
@@ -1249,7 +1249,7 @@ func RPCMarshalHeader(head *types.Header, enableBaseFee bool) map[string]interfa
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
 func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *params.ChainConfig) (map[string]interface{}, error) {
-	fields := RPCMarshalHeader(block.Header(), config.EnableEIP2718 && config.EnableEIP1559)
+	fields := RPCMarshalHeader(block.Header(), config.Scroll.BaseFeeEnabled())
 	fields["size"] = hexutil.Uint64(block.Size())
 
 	if inclTx {
@@ -1284,7 +1284,7 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool, config *param
 // rpcMarshalHeader uses the generalized output filler, then adds the total difficulty field, which requires
 // a `PublicBlockchainAPI`.
 func (s *PublicBlockChainAPI) rpcMarshalHeader(ctx context.Context, header *types.Header) map[string]interface{} {
-	fields := RPCMarshalHeader(header, s.b.ChainConfig().EnableEIP2718 && s.b.ChainConfig().EnableEIP1559)
+	fields := RPCMarshalHeader(header, s.b.ChainConfig().Scroll.BaseFeeEnabled())
 	fields["totalDifficulty"] = (*hexutil.Big)(s.b.GetTd(ctx, header.Hash()))
 	return fields
 }
@@ -1669,7 +1669,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 		"type":              hexutil.Uint(tx.Type()),
-		"l1Fee":             receipt.L1Fee,
+		"l1Fee":             hexutil.Uint64(receipt.L1Fee.Uint64()),
 	}
 	// Assign the effective gas price paid
 	if !s.b.ChainConfig().IsLondon(bigblock) {

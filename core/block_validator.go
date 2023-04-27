@@ -55,7 +55,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock
 	}
-	if !v.config.IsValidTxCount(len(block.Transactions())) {
+	if !v.config.Scroll.IsValidTxCount(len(block.Transactions())) {
 		return consensus.ErrInvalidTxCount
 	}
 	// Header validity is known at this point, check the uncles and transactions
@@ -85,7 +85,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - L1 messages follow the QueueIndex order. No L1 message is skipped.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
-	if v.config.L1Config == nil || v.config.L1Config.NumL1MessagesPerBlock == 0 {
+	if v.config.Scroll.L1Config == nil || v.config.Scroll.L1Config.NumL1MessagesPerBlock == 0 {
 		return nil
 	}
 

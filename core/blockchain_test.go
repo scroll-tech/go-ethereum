@@ -3242,8 +3242,8 @@ func TestTransactionCountLimit(t *testing.T) {
 // TestInsertBlocksWithL1Messages tests that the chain accepts blocks with L1MessageTx transactions.
 func TestInsertBlocksWithL1Messages(t *testing.T) {
 	var (
-		db      = rawdb.NewMemoryDatabase()
-		engine  = ethash.NewFaker()
+		db     = rawdb.NewMemoryDatabase()
+		engine = ethash.NewFaker()
 	)
 
 	// initialize genesis
@@ -3251,7 +3251,7 @@ func TestInsertBlocksWithL1Messages(t *testing.T) {
 	config.Scroll.L1Config.NumL1MessagesPerBlock = 1
 
 	genspec := &Genesis{
-		Config: config,
+		Config:  config,
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
 	genesis := genspec.MustCommit(db)
@@ -3284,6 +3284,24 @@ func TestInsertBlocksWithL1Messages(t *testing.T) {
 	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[len(blocks)-1].Hash())
 	assert.NotNil(t, queueIndex)
 	assert.Equal(t, uint64(len(msgs)), *queueIndex)
+
+	// generate fork with 2 L1 messages in each block
+	blocks, _ = GenerateChain(config, genesis, engine, db, len(msgs)/2, func(i int, b *BlockGen) {
+		tx1 := types.NewTx(&msgs[2*i])
+		b.AddTxWithChain(blockchain, tx1)
+		tx2 := types.NewTx(&msgs[2*i+1])
+		b.AddTxWithChain(blockchain, tx2)
+	})
+
+	// insert blocks, validation should pass
+	index, err = blockchain.InsertChain(blocks)
+	assert.Nil(t, err)
+	assert.Equal(t, len(msgs)/2, index)
+
+	// L1 message DB should be updated
+	queueIndex = rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[len(blocks)-1].Hash())
+	assert.NotNil(t, queueIndex)
+	assert.Equal(t, uint64(len(msgs)), *queueIndex)
 }
 
 // TestL1MessageValidationFailure tests that the chain rejects blocks with incorrect L1MessageTx transactions.
@@ -3314,7 +3332,6 @@ func TestL1MessageValidationFailure(t *testing.T) {
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
 		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
 		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
-		{QueueIndex: 3, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
 	}
 	rawdb.WriteL1Messages(db, msgs)
 
@@ -3355,4 +3372,24 @@ func TestL1MessageValidationFailure(t *testing.T) {
 	index, err = blockchain.InsertChain(blocks)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, consensus.ErrUnknownL1Message, err)
+
+	// missing message
+	msg := types.L1MessageTx{QueueIndex: 3, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}
+	blocks, _ = generateBlock([]*types.Transaction{types.NewTx(&msgs[0]), types.NewTx(&msgs[1]), types.NewTx(&msgs[2]), types.NewTx(&msg)})
+	index, err = blockchain.InsertChain(blocks)
+	assert.Equal(t, 0, index)
+	assert.Equal(t, consensus.ErrUnknownAncestor, err)
+
+	// insert missing message into DB
+	rawdb.WriteL1Message(db, msg)
+	blockchain.procFutureBlocks()
+
+	index, err = blockchain.InsertChain(blocks)
+	assert.Equal(t, 1, index)
+	assert.Nil(t, err)
+
+	// L1 message DB should be updated
+	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[len(blocks)-1].Hash())
+	assert.NotNil(t, queueIndex)
+	assert.Equal(t, uint64(4), *queueIndex)
 }

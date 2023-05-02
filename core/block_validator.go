@@ -55,7 +55,13 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock
 	}
-	if !v.config.Scroll.IsValidTxCount(len(block.Transactions())) {
+	l1txcount := 0
+	for _, tx := range block.Transactions() {
+		if tx.Type() == types.L1MessageTxType {
+			l1txcount++
+		}
+	}
+	if !v.config.Scroll.IsValidTxCount(len(block.Transactions()) - l1txcount) {
 		return consensus.ErrInvalidTxCount
 	}
 	// Header validity is known at this point, check the uncles and transactions

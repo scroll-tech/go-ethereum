@@ -560,7 +560,6 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
 		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
 	rawdb.WriteL1Messages(db, msgs)
-	rawdb.WriteSyncedL1BlockNumber(db, 1)
 
 	chainConfig.LondonBlock = big.NewInt(0)
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
@@ -596,7 +595,10 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 				t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 			}
 			assert.Equal(2, len(block.Transactions()))
-			assert.Equal(i+1, rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash()))
+
+			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
+			assert.NotNil(queueIndex)
+			assert.Equal(uint64(i+1), *queueIndex)
 		case <-time.After(3 * time.Second):
 			t.Fatalf("timeout")
 		}

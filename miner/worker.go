@@ -88,7 +88,7 @@ type environment struct {
 	family    mapset.Set     // family set (used for checking uncle invalidity)
 	uncles    mapset.Set     // uncle set
 	tcount    int            // tx count in cycle
-	l1txcount int			 // l1 msg count in cycle
+	l1txcount int            // l1 msg count in cycle
 	gasPool   *core.GasPool  // available gas used to pack transactions
 
 	header   *types.Header
@@ -823,7 +823,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		}
 		// If we have collected enough transactions then we're done
 		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount - w.current.l1txcount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount - w.current.l1txcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1txcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done

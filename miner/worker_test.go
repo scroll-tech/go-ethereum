@@ -622,10 +622,11 @@ func TestExcludeL1MsgFromTxlimit(t *testing.T) {
 		NumL1MessagesPerBlock: 2,
 	}
 
-	msgs := []types.L1MessageTx{
+	// Insert 2 l1msgs
+	l1msgs := []types.L1MessageTx{
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
 		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
-	rawdb.WriteL1Messages(db, msgs)
+	rawdb.WriteL1Messages(db, l1msgs)
 
 	chainConfig.LondonBlock = big.NewInt(0)
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
@@ -649,6 +650,7 @@ func TestExcludeL1MsgFromTxlimit(t *testing.T) {
 
 	// Start mining!
 	w.start()
+	// Insert 2 non-l1msg txs
 	b.txPool.AddLocal(b.newRandomTx(true))
 	b.txPool.AddLocal(b.newRandomTx(false))
 

@@ -872,7 +872,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
-			if tx.Type() == types.L1MessageTxType {
+			if tx.IsL1MessageTx() {
 				w.current.l1txcount++
 			}
 			w.current.tcount++

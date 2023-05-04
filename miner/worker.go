@@ -83,13 +83,14 @@ const (
 type environment struct {
 	signer types.Signer
 
-	state     *state.StateDB // apply state changes here
-	ancestors mapset.Set     // ancestor set (used for checking uncle parent validity)
-	family    mapset.Set     // family set (used for checking uncle invalidity)
-	uncles    mapset.Set     // uncle set
-	tcount    int            // tx count in cycle
-	l1txcount int            // l1 msg count in cycle
-	gasPool   *core.GasPool  // available gas used to pack transactions
+	state     *state.StateDB     // apply state changes here
+	ancestors mapset.Set         // ancestor set (used for checking uncle parent validity)
+	family    mapset.Set         // family set (used for checking uncle invalidity)
+	uncles    mapset.Set         // uncle set
+	tcount    int                // tx count in cycle
+	blockSize common.StorageSize // approximate size of tx payload in bytes
+	l1txcount int                // l1 msg count in cycle
+	gasPool   *core.GasPool      // available gas used to pack transactions
 
 	header   *types.Header
 	txs      []*types.Transaction
@@ -709,6 +710,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 	// Keep track of transactions which return errors so they can be removed
 	env.tcount = 0
+	env.blockSize = 0
 	env.l1txcount = 0
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
@@ -836,6 +838,10 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		if tx == nil {
 			break
 		}
+		if !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize + tx.Size()) {
+			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
+			break
+		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		//
@@ -876,6 +882,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 				w.current.l1txcount++
 			}
 			w.current.tcount++
+			w.current.blockSize += tx.Size()
 			txs.Shift()
 
 		case errors.Is(err, core.ErrTxTypeNotSupported):

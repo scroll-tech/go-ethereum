@@ -1,16 +1,6 @@
 on:
   push:
-    branches:
-      - main
-      - staging
-      - develop
-      - alpha
   pull_request:
-    branches:
-      - main
-      - staging
-      - develop
-      - alpha
 name: CI
 jobs:
   build:

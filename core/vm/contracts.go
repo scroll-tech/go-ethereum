@@ -92,6 +92,8 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2F{},
 }
 
+// PrecompiledContractsArchimedes contains the default set of pre-compiled Ethereum
+// contracts used in the Archimedes release. Same as Berlin but without sha2, blake2f, ripemd160
 var PrecompiledContractsArchimedes = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},

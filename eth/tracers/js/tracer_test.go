@@ -227,7 +227,7 @@ func TestIsPrecompile(t *testing.T) {
 		t.Errorf("Tracer should consider blake2f as precompile in istanbul")
 	}
 
-	// archimedes fork should disable sha2, ripemd, blake2f precompiles
+	// test blake2f disabled in archimedes
 	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
 	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
 	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
@@ -235,27 +235,27 @@ func TestIsPrecompile(t *testing.T) {
 		t.Error(err)
 	}
 	if string(res) != "false" {
-		t.Errorf("Tracer should not consider blake2f as precompile in istanbul")
+		t.Errorf("Tracer should not consider blake2f as precompile in scroll alpha")
 	}
 
+	// test blake2f disabled in archimedes
+	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
+	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "false" {
+		t.Errorf("Tracer should not consider blake2f as precompile in scroll alpha")
+	}
+
+	// test ecrecover enabled in archimedes
 	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000001'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
-	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
 	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
 	if err != nil {
 		t.Error(err)
 	}
 	if string(res) != "true" {
 		t.Errorf("Tracer should keep ecrecover as precompile in scroll alpha")
-	}
-
-	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000004'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
-	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
-	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
-	if err != nil {
-		t.Error(err)
-	}
-	if string(res) != "true" {
-		t.Errorf("Tracer should keep identity as precompile in scroll alpha")
 	}
 }
 

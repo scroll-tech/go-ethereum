@@ -131,11 +131,6 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 		}
 	}
 
-	// write to db
-	// TODO: ValidateL1Messages should not have side effects, consider
-	// moving this elsewhere.
-	rawdb.WriteFirstQueueIndexNotInL2Block(v.bc.db, block.Hash(), queueIndex)
-
 	return nil
 }
 

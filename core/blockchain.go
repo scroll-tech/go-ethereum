@@ -698,6 +698,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	batch := bc.db.NewBatch()
 	rawdb.WriteTd(batch, genesis.Hash(), genesis.NumberU64(), genesis.Difficulty())
 	rawdb.WriteBlock(batch, genesis)
+	rawdb.WriteFirstQueueIndexNotInL2Block(batch, genesis.Hash(), 0)
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to write genesis block", "err", err)
 	}
@@ -1179,6 +1180,14 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	batch := bc.db.NewBatch()
 	rawdb.WriteTd(batch, block.Hash(), block.NumberU64(), td)
 	rawdb.WriteBlock(batch, block)
+
+	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())
+	if queueIndex != nil {
+		// note: we can insert blocks with header-only ancestors here,
+		// so queueIndex might not yet be available in DB.
+		rawdb.WriteFirstQueueIndexNotInL2Block(batch, block.Hash(), *queueIndex+uint64(block.CountL1MessageTx()))
+	}
+
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}
@@ -1233,6 +1242,15 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	rawdb.WriteBlock(blockBatch, block)
 	rawdb.WriteReceipts(blockBatch, block.Hash(), block.NumberU64(), receipts)
 	rawdb.WritePreimages(blockBatch, state.Preimages())
+
+	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())
+	if queueIndex == nil {
+		// We expect that we only insert contiguous chain segments,
+		// so the parent will always be inserted first.
+		log.Crit("Queue index in DB is nil", "parent", block.ParentHash(), "hash", block.Hash())
+	}
+	rawdb.WriteFirstQueueIndexNotInL2Block(blockBatch, block.Hash(), *queueIndex+uint64(block.CountL1MessageTx()))
+
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}

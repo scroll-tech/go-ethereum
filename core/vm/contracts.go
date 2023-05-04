@@ -92,7 +92,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2F{},
 }
 
-var PrecompiledContractsPlaceholder = map[common.Address]PrecompiledContract{
+var PrecompiledContractsArchimedes = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},
 	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true},
@@ -116,11 +116,11 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 }
 
 var (
-	PrecompiledAddressesPlaceholder []common.Address
-	PrecompiledAddressesBerlin      []common.Address
-	PrecompiledAddressesIstanbul    []common.Address
-	PrecompiledAddressesByzantium   []common.Address
-	PrecompiledAddressesHomestead   []common.Address
+	PrecompiledAddressesArchimedes []common.Address
+	PrecompiledAddressesBerlin     []common.Address
+	PrecompiledAddressesIstanbul   []common.Address
+	PrecompiledAddressesByzantium  []common.Address
+	PrecompiledAddressesHomestead  []common.Address
 )
 
 func init() {
@@ -136,16 +136,16 @@ func init() {
 	for k := range PrecompiledContractsBerlin {
 		PrecompiledAddressesBerlin = append(PrecompiledAddressesBerlin, k)
 	}
-	for k := range PrecompiledContractsPlaceholder {
-		PrecompiledAddressesPlaceholder = append(PrecompiledAddressesPlaceholder, k)
+	for k := range PrecompiledContractsArchimedes {
+		PrecompiledAddressesArchimedes = append(PrecompiledAddressesArchimedes, k)
 	}
 }
 
 // ActivePrecompiles returns the precompiles enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
-	case rules.IsPlaceholder:
-		return PrecompiledAddressesPlaceholder
+	case rules.IsArchimedes:
+		return PrecompiledAddressesArchimedes
 	case rules.IsBerlin:
 		return PrecompiledAddressesBerlin
 	case rules.IsIstanbul:

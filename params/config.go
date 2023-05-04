@@ -411,7 +411,7 @@ type ChainConfig struct {
 	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
 	LondonBlock         *big.Int `json:"londonBlock,omitempty"`         // London switch block (nil = no fork, 0 = already on london)
 	ArrowGlacierBlock   *big.Int `json:"arrowGlacierBlock,omitempty"`   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
-	PlaceholderBlock    *big.Int `json:"placeholderBlock,omitempty"`    // Placeholder switch block (nil = no fork, 0 = already on placeholder)
+	ArchimedesBlock     *big.Int `json:"ArchimedesBlock,omitempty"`     // Archimedes switch block (nil = no fork, 0 = already on archimedes)
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
 	TerminalTotalDifficulty *big.Int `json:"terminalTotalDifficulty,omitempty"`
@@ -498,7 +498,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Placeholder: %v,Engine: %v, Scroll config: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v,Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -514,7 +514,7 @@ func (c *ChainConfig) String() string {
 		c.BerlinBlock,
 		c.LondonBlock,
 		c.ArrowGlacierBlock,
-		c.PlaceholderBlock,
+		c.ArchimedesBlock,
 		engine,
 		c.Scroll,
 	)
@@ -587,8 +587,8 @@ func (c *ChainConfig) IsArrowGlacier(num *big.Int) bool {
 	return isForked(c.ArrowGlacierBlock, num)
 }
 
-func (c *ChainConfig) IsPlaceholder(num *big.Int) bool {
-	return isForked(c.PlaceholderBlock, num)
+func (c *ChainConfig) IsArchimedes(num *big.Int) bool {
+	return isForked(c.ArchimedesBlock, num)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
@@ -640,7 +640,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "berlinBlock", block: c.BerlinBlock},
 		{name: "londonBlock", block: c.LondonBlock},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
-		{name: "placeholderBlock", block: c.PlaceholderBlock, optional: true},
+		{name: "ArchimedesBlock", block: c.ArchimedesBlock, optional: true},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -713,8 +713,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.ArrowGlacierBlock, newcfg.ArrowGlacierBlock, head) {
 		return newCompatError("Arrow Glacier fork block", c.ArrowGlacierBlock, newcfg.ArrowGlacierBlock)
 	}
-	if isForkIncompatible(c.PlaceholderBlock, newcfg.PlaceholderBlock, head) {
-		return newCompatError("Placeholder fork block", c.PlaceholderBlock, newcfg.PlaceholderBlock)
+	if isForkIncompatible(c.ArchimedesBlock, newcfg.ArchimedesBlock, head) {
+		return newCompatError("Archimedes fork block", c.ArchimedesBlock, newcfg.ArchimedesBlock)
 	}
 	return nil
 }
@@ -783,7 +783,7 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsLondon, IsPlaceholder                       bool
+	IsBerlin, IsLondon, IsArchimedes                        bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -804,6 +804,6 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
-		IsPlaceholder:    c.IsPlaceholder(num),
+		IsArchimedes:     c.IsArchimedes(num),
 	}
 }

@@ -68,7 +68,7 @@ func setDefaults(cfg *Config) {
 			MuirGlacierBlock:    new(big.Int),
 			BerlinBlock:         new(big.Int),
 			LondonBlock:         new(big.Int),
-			PlaceholderBlock:    new(big.Int),
+			ArchimedesBlock:     new(big.Int),
 		}
 	}
 

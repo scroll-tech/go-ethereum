@@ -227,15 +227,25 @@ func TestIsPrecompile(t *testing.T) {
 		t.Errorf("Tracer should consider blake2f as precompile in istanbul")
 	}
 
-	// test blake2f disabled in archimedes
-	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
+	// test sha disabled in archimedes
+	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000002'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
 	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
 	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
 	if err != nil {
 		t.Error(err)
 	}
 	if string(res) != "false" {
-		t.Errorf("Tracer should not consider blake2f as precompile in scroll alpha")
+		t.Errorf("Tracer should not consider blake2f as precompile in archimedes")
+	}
+
+	tracer, _ = newJsTracer("{addr: toAddress('0000000000000000000000000000000000000003'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", nil)
+	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(450)}
+	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "false" {
+		t.Errorf("Tracer should not consider ripemd as precompile in archimedes")
 	}
 
 	// test blake2f disabled in archimedes
@@ -245,7 +255,7 @@ func TestIsPrecompile(t *testing.T) {
 		t.Error(err)
 	}
 	if string(res) != "false" {
-		t.Errorf("Tracer should not consider blake2f as precompile in scroll alpha")
+		t.Errorf("Tracer should not consider blake2f as precompile in archimedes")
 	}
 
 	// test ecrecover enabled in archimedes
@@ -255,7 +265,7 @@ func TestIsPrecompile(t *testing.T) {
 		t.Error(err)
 	}
 	if string(res) != "true" {
-		t.Errorf("Tracer should keep ecrecover as precompile in scroll alpha")
+		t.Errorf("Tracer should keep ecrecover as precompile in archimedes")
 	}
 }
 

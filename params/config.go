@@ -275,7 +275,7 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   nil,
-		ArchimedesBlock:     big.NewInt(0),
+		ArchimedesBlock:     nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,

@@ -290,6 +290,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 
 	// merge required proof data
 	proofAccounts := tracer.UpdatedAccounts()
+	proofAccounts[vmenv.FeeRecipient()] = struct{}{}
 	proofAccounts[rcfg.L1GasPriceOracleAddress] = struct{}{}
 	for addr := range proofAccounts {
 		addrStr := addr.String()

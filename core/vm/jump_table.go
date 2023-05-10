@@ -58,7 +58,6 @@ var (
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	berlinInstructionSet           = newBerlinInstructionSet()
 	londonInstructionSet           = newLondonInstructionSet()
-	mergeInstructionSet            = newMergeInstructionSet()
 	shanghaiInstructionSet         = newShanghaiInstructionSet()
 )
 
@@ -66,19 +65,8 @@ var (
 type JumpTable [256]*operation
 
 func newShanghaiInstructionSet() JumpTable {
-	instructionSet := newMergeInstructionSet()
-	enable3860(&instructionSet)
-	return instructionSet
-}
-
-func newMergeInstructionSet() JumpTable {
 	instructionSet := newLondonInstructionSet()
-	/*instructionSet[PREVRANDAO] = &operation{
-		execute:     opRandom,
-		constantGas: GasQuickStep,
-		minStack:    minStack(0, 1),
-		maxStack:    maxStack(0, 1),
-	}*/
+	enable3860(&instructionSet)
 	return instructionSet
 }
 

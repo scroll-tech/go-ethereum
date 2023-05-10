@@ -76,8 +76,6 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		switch {
 		case evm.chainRules.IsShanghai:
 			jt = shanghaiInstructionSet
-		case evm.chainRules.IsMerge:
-			jt = mergeInstructionSet
 		case evm.chainRules.IsLondon:
 			jt = londonInstructionSet
 		case evm.chainRules.IsBerlin:

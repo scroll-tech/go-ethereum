@@ -329,9 +329,8 @@ func TestStateProcessorErrors(t *testing.T) {
 					BerlinBlock:         big.NewInt(0),
 					LondonBlock:         big.NewInt(0),
 					ArrowGlacierBlock:   big.NewInt(0),
-					GrayGlacierBlock:    big.NewInt(0),
-					MergeNetsplitBlock:  big.NewInt(0),
-					ShanghaiTime:        big.NewInt(0),
+					ArchimedesBlock:     big.NewInt(0),
+					ShanghaiBlock:       big.NewInt(0),
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{

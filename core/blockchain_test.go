@@ -3291,8 +3291,7 @@ func TestEIP3651(t *testing.T) {
 
 	gspec.Config.BerlinBlock = common.Big0
 	gspec.Config.LondonBlock = common.Big0
-	// todo: uncomment when enabled
-	// gspec.Config.ShanghaiBlock = common.Big0
+	gspec.Config.ShanghaiBlock = common.Big0
 	signer := types.LatestSigner(gspec.Config)
 
 	blocks, _ := GenerateChain(gspec.Config, genesis, engine, db, 1, func(i int, b *BlockGen) {

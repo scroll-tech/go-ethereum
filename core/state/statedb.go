@@ -1043,10 +1043,9 @@ func (s *StateDB) PrepareAccessList(rules params.Rules, sender, coinbase common.
 			s.AddSlotToAccessList(el.Address, key)
 		}
 	}
-	// todo: uncomment when enabled
-	// if rules.IsShanghai { // EIP-3651: warm coinbase
-	s.AddAddressToAccessList(coinbase)
-	// }
+	if rules.IsShanghai { // EIP-3651: warm coinbase
+		s.AddAddressToAccessList(coinbase)
+	}
 }
 
 // AddAddressToAccessList adds the given address to the access list

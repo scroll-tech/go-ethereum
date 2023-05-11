@@ -813,6 +813,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 	var coalescedLogs []*types.Log
 
+loop:
 	for {
 		// In the following three cases, we will interrupt the execution of the transaction.
 		// (1) new head block event arrival, the interrupt signal is 1
@@ -901,7 +902,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 		case errors.Is(err, circuitscapacitychecker.ErrCircuitsCapacityOverflow):
 			log.Trace("Circuits capacity limit reached") // TODO: add more logs
-			break
+			break loop
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the

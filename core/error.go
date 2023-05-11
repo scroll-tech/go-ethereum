@@ -26,6 +26,9 @@ var (
 	// ErrKnownBlock is returned when a block to import is already known locally.
 	ErrKnownBlock = errors.New("block already known")
 
+	// ErrInvalidBlockSize is returned when a block to import has an invalid block size
+	ErrInvalidBlockSize = errors.New("invalid block size")
+
 	// ErrBannedHash is returned if a block to import is on the banned list.
 	ErrBannedHash = errors.New("banned hash")
 

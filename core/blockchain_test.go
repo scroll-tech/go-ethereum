@@ -3241,8 +3241,8 @@ func TestTransactionCountLimit(t *testing.T) {
 
 func TestEIP3651(t *testing.T) {
 	var (
-		aa     = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
-		bb     = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
+		addraa = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
+		addrbb = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
 		engine = ethash.NewFaker()
 		db     = rawdb.NewMemoryDatabase()
 
@@ -3258,7 +3258,7 @@ func TestEIP3651(t *testing.T) {
 				addr1: {Balance: funds},
 				addr2: {Balance: funds},
 				// The address 0xAAAA sloads 0x00 and 0x01
-				aa: {
+				addraa: {
 					Code: []byte{
 						byte(vm.PC),
 						byte(vm.PC),
@@ -3269,7 +3269,7 @@ func TestEIP3651(t *testing.T) {
 					Balance: big.NewInt(0),
 				},
 				// The address 0xBBBB calls 0xAAAA
-				bb: {
+				addrbb: {
 					Code: []byte{
 						byte(vm.PUSH1), 0, // out size
 						byte(vm.DUP1),  // out offset
@@ -3295,12 +3295,12 @@ func TestEIP3651(t *testing.T) {
 	signer := types.LatestSigner(gspec.Config)
 
 	blocks, _ := GenerateChain(gspec.Config, genesis, engine, db, 1, func(i int, b *BlockGen) {
-		b.SetCoinbase(aa)
+		b.SetCoinbase(addraa)
 		// One transaction to Coinbase
 		txdata := &types.DynamicFeeTx{
 			ChainID:    gspec.Config.ChainID,
 			Nonce:      0,
-			To:         &bb,
+			To:         &addrbb,
 			Gas:        500000,
 			GasFeeCap:  newGwei(5),
 			GasTipCap:  big.NewInt(2),
@@ -3308,8 +3308,10 @@ func TestEIP3651(t *testing.T) {
 			Data:       []byte{},
 		}
 		tx := types.NewTx(txdata)
-		tx, _ = types.SignTx(tx, signer, key1)
-
+		tx, err := types.SignTx(tx, signer, key1)
+		if err != nil {
+			t.Fatalf("failed to sign tx: %v", err)
+		}
 		b.AddTx(tx)
 	})
 	chain, err := NewBlockChain(db, nil, gspec.Config, engine, vm.Config{}, nil, nil)
@@ -3329,7 +3331,10 @@ func TestEIP3651(t *testing.T) {
 		t.Fatalf("incorrect amount of gas spent: expected %d, got %d", expectedGas, block.GasUsed())
 	}
 
-	state, _ := chain.State()
+	state, err := chain.State()
+	if err != nil {
+		t.Fatalf("failed to get new state: %v", err)
+	}
 
 	// 3: Ensure that miner received only the tx's tip.
 	actual := state.GetBalance(block.Coinbase())

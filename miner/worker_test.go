@@ -548,6 +548,7 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
 		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
 	rawdb.WriteL1Messages(db, msgs)
+	time.Sleep(1 * time.Second)
 
 	if isClique {
 		chainConfig = params.AllCliqueProtocolChanges

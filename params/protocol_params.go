@@ -37,7 +37,6 @@ const (
 
 	Sha3Gas          uint64 = 30 // Once per SHA3 operation.
 	Sha3WordGas      uint64 = 6  // Once per word of the SHA3 operation's data.
-	Keccak256Gas     uint64 = 30 // Once per KECCAK256 operation.
 	Keccak256WordGas uint64 = 6  // Once per word of the KECCAK256 operation's data.
 	InitCodeWordGas  uint64 = 2  // Once per word of the init code when creating a contract.
 

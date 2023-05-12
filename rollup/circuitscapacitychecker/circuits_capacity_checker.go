@@ -1,4 +1,4 @@
-//go:build placeholder
+//go:build cgo
 
 package circuitscapacitychecker
 

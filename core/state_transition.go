@@ -364,7 +364,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Set up the initial access list.
 	if rules.IsBerlin {
-		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+		st.state.PrepareAccessList(rules, msg.From(), st.evm.Context.Coinbase, msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 	}
 
 	var (

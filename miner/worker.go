@@ -41,6 +41,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
 const (
@@ -815,7 +816,12 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
 		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
 		// ExecutionResults []*ExecutionResult `json:"executionResults"`
-		// MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
+	}
+	// only zktrie model has the ability to get `mptwitness`.
+	if w.chainConfig.Scroll.ZktrieEnabled() {
+		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessType(w.chain.CacheConfig().MPTWitness), traces); err != nil {
+			log.Error("fill mpt witness fail", "error", err)
+		}
 	}
 
 	if err := w.circuitsCapacityChecker.ApplyTransaction(traces); err != nil {

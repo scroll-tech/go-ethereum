@@ -791,7 +791,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		Version: params.Version,
 
 		// Coinbase         *AccountWrapper    `json:"coinbase"`
-		// Transactions     []*TransactionData `json:"transactions"`
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
 		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
 		// ExecutionResults []*ExecutionResult `json:"executionResults"`
@@ -814,6 +813,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
+
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 

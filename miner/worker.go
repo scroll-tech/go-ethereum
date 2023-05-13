@@ -806,6 +806,9 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 
 	traces.Header = w.current.header
+	traces.Transactions = []*types.TransactionData{
+		types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
+	}
 
 	if err := w.circuitsCapacityChecker.ApplyTransaction(traces); err != nil {
 		w.current.state.RevertToSnapshot(snap)

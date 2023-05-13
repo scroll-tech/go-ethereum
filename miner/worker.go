@@ -38,6 +38,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitscapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -808,12 +810,12 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(coinbase),
 			CodeSize:         w.current.state.GetCodeSize(coinbase),
 		},
+		WithdrawTrieRoot: withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, w.current.state),
 
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
 		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
 		// ExecutionResults []*ExecutionResult `json:"executionResults"`
 		// MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
-		// WithdrawTrieRoot common.Hash        `json:"withdraw_trie_root,omitempty"`
 	}
 
 	if err := w.circuitsCapacityChecker.ApplyTransaction(traces); err != nil {

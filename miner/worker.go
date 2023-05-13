@@ -785,10 +785,20 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	tracer := w.chain.GetVMConfig().Tracer.(*vm.StructLogger)
 	tracer.Reset()
 
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
+
 	// TODO:
 	traces := &types.BlockTrace{
 		ChainID: w.chainConfig.ChainID.Uint64(),
-		Version: params.Version,
+		Version: params.ArchiveVersion(params.CommitHash),
+		Header:  w.current.header,
+		Transactions: []*types.TransactionData{
+			types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
+		},
 
 		// Coinbase         *AccountWrapper    `json:"coinbase"`
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
@@ -796,17 +806,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// ExecutionResults []*ExecutionResult `json:"executionResults"`
 		// MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
 		// WithdrawTrieRoot common.Hash        `json:"withdraw_trie_root,omitempty"`
-	}
-
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
-	if err != nil {
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
-
-	traces.Header = w.current.header
-	traces.Transactions = []*types.TransactionData{
-		types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
 	}
 
 	if err := w.circuitsCapacityChecker.ApplyTransaction(traces); err != nil {

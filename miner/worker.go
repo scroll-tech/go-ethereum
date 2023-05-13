@@ -27,6 +27,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -799,8 +800,15 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		Transactions: []*types.TransactionData{
 			types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
 		},
+		Coinbase: &types.AccountWrapper{
+			Address:          coinbase,
+			Nonce:            w.current.state.GetNonce(coinbase),
+			Balance:          (*hexutil.Big)(w.current.state.GetBalance(coinbase)),
+			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(coinbase),
+			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(coinbase),
+			CodeSize:         w.current.state.GetCodeSize(coinbase),
+		},
 
-		// Coinbase         *AccountWrapper    `json:"coinbase"`
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
 		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
 		// ExecutionResults []*ExecutionResult `json:"executionResults"`

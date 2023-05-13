@@ -792,7 +792,22 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 
 	// TODO:
-	traces := &types.BlockTrace{}
+	traces := &types.BlockTrace{
+		// ChainID          uint64             `json:"chainID"`
+		ChainID: w.chainConfig.ChainID.Uint64(),
+
+		// Version          string             `json:"version"`
+		Version: params.Version,
+
+		// Coinbase         *AccountWrapper    `json:"coinbase"`
+		// Header           *Header            `json:"header"`
+		// Transactions     []*TransactionData `json:"transactions"`
+		// StorageTrace     *StorageTrace      `json:"storageTrace"`
+		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
+		// ExecutionResults []*ExecutionResult `json:"executionResults"`
+		// MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
+		// WithdrawTrieRoot common.Hash        `json:"withdraw_trie_root,omitempty"`
+	}
 
 	if err := w.circuitsCapacityChecker.ApplyTransaction(traces); err != nil {
 		w.current.state.RevertToSnapshot(snap)

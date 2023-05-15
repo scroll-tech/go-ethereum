@@ -789,6 +789,16 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	tracer := w.chain.GetVMConfig().Tracer.(*vm.StructLogger)
 	tracer.Reset()
 
+	from, _ := types.Sender(w.current.signer, tx)
+	sender := &types.AccountWrapper{
+		Address:          from,
+		Nonce:            w.current.state.GetNonce(from),
+		Balance:          (*hexutil.Big)(w.current.state.GetBalance(from)),
+		KeccakCodeHash:   w.current.state.GetKeccakCodeHash(from),
+		PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(from),
+		CodeSize:         w.current.state.GetCodeSize(from),
+	}
+
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
@@ -814,11 +824,11 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		},
 		ExecutionResults: []*types.ExecutionResult{
 			&types.ExecutionResult{
-				// From:           sender,
+				From: sender,
 				// To:             receiver,
 				// AccountCreated: createdAcc,
 				// AccountsAfter:  after,
-				// Gas:            result.UsedGas,
+				Gas: receipt.GasUsed,
 				// Failed:         result.Failed(),
 				// ReturnValue:    fmt.Sprintf("%x", returnVal),
 				StructLogs: vm.FormatLogs(tracer.StructLogs()),

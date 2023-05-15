@@ -800,9 +800,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		ChainID: w.chainConfig.ChainID.Uint64(),
 		Version: params.ArchiveVersion(params.CommitHash),
 		Header:  w.current.header,
-		Transactions: []*types.TransactionData{
-			types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
-		},
 		Coinbase: &types.AccountWrapper{
 			Address:          coinbase,
 			Nonce:            w.current.state.GetNonce(coinbase),
@@ -812,11 +809,37 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			CodeSize:         w.current.state.GetCodeSize(coinbase),
 		},
 		WithdrawTrieRoot: withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, w.current.state),
+		Transactions: []*types.TransactionData{
+			types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
+		},
+		ExecutionResults: []*types.ExecutionResult{
+			&types.ExecutionResult{
+				// From:           sender,
+				// To:             receiver,
+				// AccountCreated: createdAcc,
+				// AccountsAfter:  after,
+				// L1Fee:          l1Fee,
+				// Gas:            result.UsedGas,
+				// Failed:         result.Failed(),
+				// ReturnValue:    fmt.Sprintf("%x", returnVal),
+				StructLogs: vm.FormatLogs(tracer.StructLogs()),
+			},
+		},
 
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
 		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
-		// ExecutionResults []*ExecutionResult `json:"executionResults"`
 	}
+
+	// probably a Contract Call
+	if len(tx.Data()) != 0 && tx.To() != nil {
+		traces.ExecutionResults[0].ByteCode = hexutil.Encode(w.current.state.GetCode(*tx.To()))
+		// Get tx.to address's code hash.
+		codeHash := w.current.state.GetPoseidonCodeHash(*tx.To())
+		traces.ExecutionResults[0].PoseidonCodeHash = &codeHash
+	} else if tx.To() == nil { // Contract is created.
+		traces.ExecutionResults[0].ByteCode = hexutil.Encode(tx.Data())
+	}
+
 	// only zktrie model has the ability to get `mptwitness`.
 	if w.chainConfig.Scroll.ZktrieEnabled() {
 		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessType(w.chain.CacheConfig().MPTWitness), traces); err != nil {

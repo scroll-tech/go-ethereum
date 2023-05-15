@@ -818,7 +818,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 				// To:             receiver,
 				// AccountCreated: createdAcc,
 				// AccountsAfter:  after,
-				// L1Fee:          l1Fee,
 				// Gas:            result.UsedGas,
 				// Failed:         result.Failed(),
 				// ReturnValue:    fmt.Sprintf("%x", returnVal),
@@ -828,6 +827,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 		// StorageTrace     *StorageTrace      `json:"storageTrace"`
 		// TxStorageTrace   []*StorageTrace    `json:"txStorageTrace,omitempty"`
+	}
+
+	if receipt.L1Fee != nil {
+		traces.ExecutionResults[0].L1Fee = receipt.L1Fee.Uint64()
 	}
 
 	// probably a Contract Call

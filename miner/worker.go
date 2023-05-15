@@ -798,6 +798,18 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(from),
 		CodeSize:         w.current.state.GetCodeSize(from),
 	}
+	var receiver *types.AccountWrapper
+	to := tx.To()
+	if to != nil {
+		receiver = &types.AccountWrapper{
+			Address:          *to,
+			Nonce:            w.current.state.GetNonce(*to),
+			Balance:          (*hexutil.Big)(w.current.state.GetBalance(*to)),
+			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(*to),
+			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(*to),
+			CodeSize:         w.current.state.GetCodeSize(*to),
+		}
+	}
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
@@ -825,7 +837,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		ExecutionResults: []*types.ExecutionResult{
 			&types.ExecutionResult{
 				From: sender,
-				// To:             receiver,
+				To:   receiver,
 				// AccountCreated: createdAcc,
 				// AccountsAfter:  after,
 				Gas: receipt.GasUsed,

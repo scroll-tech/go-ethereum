@@ -57,9 +57,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	if !v.config.Scroll.IsValidTxCount(len(block.Transactions())) {
 		return consensus.ErrInvalidTxCount
 	}
-	// Check if block size is smaller than the max size
-	if !v.config.Scroll.IsValidBlockSize(block.Size()) {
-		return ErrInvalidBlockSize
+	// Check if block payload size is smaller than the max size
+	if !v.config.Scroll.IsValidBlockSize(block.PayloadSize()) {
+		return ErrInvalidBlockPayloadSize
 	}
 	// Header validity is known at this point, check the uncles and transactions
 	header := block.Header()

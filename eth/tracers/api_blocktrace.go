@@ -318,7 +318,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	proofStorages := tracer.UpdatedStorages()
 	proofStorages[rcfg.L1GasPriceOracleAddress] = vm.Storage(
 		map[common.Hash]common.Hash{
-			rcfg.L1BaseFeeSlot: {},
+			rcfg.L1BaseFeeSlot: {}, // notice we do not need the right value here
 			rcfg.OverheadSlot:  {},
 			rcfg.ScalarSlot:    {},
 		})

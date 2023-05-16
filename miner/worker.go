@@ -791,6 +791,8 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	tracer.Reset()
 
 	from, _ := types.Sender(w.current.signer, tx)
+	to := tx.To()
+
 	sender := &types.AccountWrapper{
 		Address:          from,
 		Nonce:            w.current.state.GetNonce(from),
@@ -800,7 +802,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		CodeSize:         w.current.state.GetCodeSize(from),
 	}
 	var receiver *types.AccountWrapper
-	to := tx.To()
 	if to != nil {
 		receiver = &types.AccountWrapper{
 			Address:          *to,
@@ -816,6 +817,26 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
+	}
+
+	createdAcc := tracer.CreatedAccount()
+	if to == nil {
+		if createdAcc == nil {
+			return nil, errors.New("unexpected tx: address for created contract unavailable")
+		}
+		to = &createdAcc.Address
+	}
+	var after []*types.AccountWrapper
+	// collect affected account after tx being applied
+	for _, acc := range []common.Address{from, *to, coinbase} {
+		after = append(after, &types.AccountWrapper{
+			Address:          acc,
+			Nonce:            w.current.state.GetNonce(acc),
+			Balance:          (*hexutil.Big)(w.current.state.GetBalance(acc)),
+			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(acc),
+			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(acc),
+			CodeSize:         w.current.state.GetCodeSize(acc),
+		})
 	}
 
 	// TODO:
@@ -837,14 +858,14 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		},
 		ExecutionResults: []*types.ExecutionResult{
 			&types.ExecutionResult{
-				From: sender,
-				To:   receiver,
-				// AccountCreated: createdAcc,
-				// AccountsAfter:  after,
-				Gas:         receipt.GasUsed,
-				Failed:      receipt.Status == types.ReceiptStatusFailed,
-				ReturnValue: fmt.Sprintf("%x", common.CopyBytes(receipt.ReturnValue)),
-				StructLogs:  vm.FormatLogs(tracer.StructLogs()),
+				From:           sender,
+				To:             receiver,
+				AccountCreated: createdAcc,
+				AccountsAfter:  after,
+				Gas:            receipt.GasUsed,
+				Failed:         receipt.Status == types.ReceiptStatusFailed,
+				ReturnValue:    fmt.Sprintf("%x", common.CopyBytes(receipt.ReturnValue)),
+				StructLogs:     vm.FormatLogs(tracer.StructLogs()),
 			},
 		},
 

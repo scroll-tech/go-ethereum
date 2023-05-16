@@ -329,8 +329,8 @@ func (b *Block) Size() common.StorageSize {
 func (b *Block) PayloadSize() common.StorageSize {
 	// add up all txs sizes
 	var totalSize common.StorageSize
-	for i := range b.transactions {
-		totalSize += b.transactions[i].Size()
+	for _, tx := range b.transactions {
+		totalSize += tx.Size()
 	}
 	return totalSize
 }

@@ -19,6 +19,7 @@ package miner
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -840,10 +841,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 				To:   receiver,
 				// AccountCreated: createdAcc,
 				// AccountsAfter:  after,
-				Gas: receipt.GasUsed,
-				// Failed:         result.Failed(),
-				// ReturnValue:    fmt.Sprintf("%x", returnVal),
-				StructLogs: vm.FormatLogs(tracer.StructLogs()),
+				Gas:         receipt.GasUsed,
+				Failed:      receipt.Status == types.ReceiptStatusFailed,
+				ReturnValue: fmt.Sprintf("%x", common.CopyBytes(receipt.ReturnValue)),
+				StructLogs:  vm.FormatLogs(tracer.StructLogs()),
 			},
 		},
 

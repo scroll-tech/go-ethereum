@@ -812,11 +812,19 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		}
 	}
 
+	txStorageTrace := &types.StorageTrace{
+		RootBefore:    w.current.state.IntermediateRoot(w.chainConfig.IsEIP158(w.current.header.Number)),
+		Proofs:        make(map[string][]hexutil.Bytes),
+		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+	}
+
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
+
+	txStorageTrace.RootAfter = w.current.state.IntermediateRoot(w.chainConfig.IsEIP158(w.current.header.Number))
 
 	createdAcc := tracer.CreatedAccount()
 	if to == nil {

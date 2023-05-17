@@ -3244,6 +3244,8 @@ func TestBlockPayloadSizeLimit(t *testing.T) {
 	config := params.TestChainConfig
 	config.Scroll.MaxTxPayloadBytesPerBlock = new(int)
 	*config.Scroll.MaxTxPayloadBytesPerBlock = 150
+	config.Scroll.MaxTxPerBlock = new(int)
+	*config.Scroll.MaxTxPerBlock = 3
 
 	var (
 		engine  = ethash.NewFaker()
@@ -3297,7 +3299,6 @@ func TestBlockPayloadSizeLimit(t *testing.T) {
 	if !errors.Is(err, ErrInvalidBlockPayloadSize) {
 		t.Fatalf("error mismatch: have: %v, want: %v", err, ErrInvalidBlockPayloadSize)
 	}
-
 }
 
 func TestEIP3651(t *testing.T) {

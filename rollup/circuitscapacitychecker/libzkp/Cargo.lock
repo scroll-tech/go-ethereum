@@ -370,7 +370,7 @@ checksum = "3c6ed94e98ecff0c12dd1b04c15ec0d7d9458ca8fe806cea6f12954efe74c63b"
 [[package]]
 name = "bus-mapping"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "eth-types",
  "ethers-core",
@@ -1020,7 +1020,7 @@ dependencies = [
 [[package]]
 name = "eth-types"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "ethers-core",
  "ethers-signers",
@@ -1198,7 +1198,7 @@ dependencies = [
 [[package]]
 name = "external-tracer"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "eth-types",
  "geth-utils",
@@ -1411,7 +1411,7 @@ dependencies = [
 [[package]]
 name = "gadgets"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "digest 0.7.6",
  "eth-types",
@@ -1451,7 +1451,7 @@ dependencies = [
 [[package]]
 name = "geth-utils"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "env_logger 0.9.3",
  "gobuild",
@@ -2039,7 +2039,7 @@ dependencies = [
 [[package]]
 name = "keccak256"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "env_logger 0.9.3",
  "eth-types",
@@ -2213,7 +2213,7 @@ dependencies = [
 [[package]]
 name = "mock"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "eth-types",
  "ethers-core",
@@ -2228,7 +2228,7 @@ dependencies = [
 [[package]]
 name = "mpt-zktrie"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "bus-mapping",
  "eth-types",
@@ -2663,6 +2663,15 @@ dependencies = [
  "hex",
  "lazy_static",
  "rustix 0.35.13",
+]
+
+[[package]]
+name = "psm"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5787f7cda34e3033a72192c018bc5883100330f362ef279a8cbccfce8bb4e874"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -3270,6 +3279,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_stacker"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f5557f4c1103cecd0e639a17ab22d670b89912d8a506589ee627bf738a15a5d"
+dependencies = [
+ "serde",
+ "stacker",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3486,6 +3505,19 @@ checksum = "67cf02bbac7a337dc36e4f5a693db6c21e7863f45070f7064577eb4367a3212b"
 dependencies = [
  "base64ct",
  "der",
+]
+
+[[package]]
+name = "stacker"
+version = "0.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c886bd4480155fd3ef527d45e9ac8dd7118a898a46530b7b94c3e21866259fce"
+dependencies = [
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "psm",
+ "winapi",
 ]
 
 [[package]]
@@ -3798,8 +3830,8 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "types"
-version = "0.3.0"
-source = "git+https://github.com/scroll-tech/scroll-zkevm?branch=feat/sealing_api#d658c989fd35984d6b775c8eeb537a137d9a9408"
+version = "0.4.0"
+source = "git+https://github.com/scroll-tech/scroll-zkevm?rev=66d021e#66d021e6faad74c226e4f67ec22426f59fa63174"
 dependencies = [
  "base64 0.13.1",
  "blake2",
@@ -4268,8 +4300,8 @@ checksum = "2a0956f1ba7c7909bfb66c2e9e4124ab6f6482560f6628b5aaeba39207c9aad9"
 
 [[package]]
 name = "zkevm"
-version = "0.3.0"
-source = "git+https://github.com/scroll-tech/scroll-zkevm?branch=feat/sealing_api#d658c989fd35984d6b775c8eeb537a137d9a9408"
+version = "0.4.0"
+source = "git+https://github.com/scroll-tech/scroll-zkevm?rev=66d021e#66d021e6faad74c226e4f67ec22426f59fa63174"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4296,6 +4328,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "serde_stacker",
  "sha2 0.10.6",
  "snark-verifier",
  "snark-verifier-sdk",
@@ -4308,7 +4341,7 @@ dependencies = [
 [[package]]
 name = "zkevm-circuits"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=feat/sealer_api#4f8ca2abd175acc2a393c9a5cee6f67cfc471dbc"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?branch=develop#fbcfd0f0ba43e605eb16a7a8cc1fb836ed46d51b"
 dependencies = [
  "array-init",
  "bus-mapping",

@@ -234,7 +234,7 @@ func abigen(c *cli.Context) error {
 			nameParts := strings.Split(name, ":")
 			typeName := nameParts[len(nameParts)-1]
 			// If contract flag is used and then choose the specified.
-			if c.IsSet(contractFlag.Name) && c.String(contractFlag.Name) != typeName {
+			if c.GlobalIsSet(contractFlag.Name) && c.GlobalString(contractFlag.Name) != typeName {
 				continue
 			}
 			if exclude[strings.ToLower(name)] {

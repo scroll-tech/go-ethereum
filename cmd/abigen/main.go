@@ -230,10 +230,10 @@ func abigen(c *cli.Context) error {
 		}
 		// Gather all non-excluded contract for binding
 		for name, contract := range contracts {
-			// fully qualified name is of the form <solFilePath>:<type>
+			// The fully qualified name is of the form <solFilePath>:<type>
 			nameParts := strings.Split(name, ":")
 			typeName := nameParts[len(nameParts)-1]
-			// If contract flag is used and then choose the specified.
+			// If a contract name is provided then ignore all other contracts
 			if c.GlobalIsSet(contractFlag.Name) && c.GlobalString(contractFlag.Name) != typeName {
 				continue
 			}

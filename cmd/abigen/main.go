@@ -101,7 +101,7 @@ var (
 	}
 	contractFlag = cli.StringFlag{
 		Name:  "contract",
-		Usage: "Use this flag can just translate specified contract",
+		Usage: "Name of the contract to generate the bindings for",
 	}
 )
 

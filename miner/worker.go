@@ -178,7 +178,7 @@ type worker struct {
 	// atomic status counters
 	running   int32 // The indicator whether the consensus engine is running or not.
 	newTxs    int32 // New arrival transaction count since last sealing work submitting.
-	newL1Msgs int32 // New arrival L1 messages count since last sealing work submitting.
+	newL1Msgs int32 // New arrival L1 message count since last sealing work submitting.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).

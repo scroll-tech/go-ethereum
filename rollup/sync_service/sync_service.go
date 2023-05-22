@@ -6,8 +6,10 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
@@ -39,8 +41,10 @@ type SyncService struct {
 	cancel               context.CancelFunc
 	client               *BridgeClient
 	db                   ethdb.Database
+	msgCountFeed         event.Feed
 	pollInterval         time.Duration
 	latestProcessedBlock uint64
+	scope                event.SubscriptionScope
 }
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
@@ -124,9 +128,18 @@ func (s *SyncService) Stop() {
 
 	log.Info("Stopping sync service")
 
+	// Unsubscribe all subscriptions registered
+	s.scope.Close()
+
 	if s.cancel != nil {
 		s.cancel()
 	}
+}
+
+// SubscribeNewL1MsgsEvent registers a subscription of NewL1MsgsEvent and
+// starts sending event to the given channel.
+func (s *SyncService) SubscribeNewL1MsgsEvent(ch chan<- core.NewL1MsgsEvent) event.Subscription {
+	return s.scope.Track(s.msgCountFeed.Subscribe(ch))
 }
 
 func (s *SyncService) fetchMessages() {
@@ -140,6 +153,7 @@ func (s *SyncService) fetchMessages() {
 
 	batchWriter := s.db.NewBatch()
 	numBlocksPendingDbWrite := uint64(0)
+	numMessagesPendingDbWrite := 0
 
 	// helper function to flush database writes cached in memory
 	flush := func(lastBlock uint64) {
@@ -153,9 +167,15 @@ func (s *SyncService) fetchMessages() {
 			log.Crit("failed to write L1 messages to database", "err", err)
 		}
 
-		s.latestProcessedBlock = lastBlock
 		batchWriter.Reset()
 		numBlocksPendingDbWrite = 0
+
+		if numMessagesPendingDbWrite > 0 {
+			s.msgCountFeed.Send(core.NewL1MsgsEvent{Count: numMessagesPendingDbWrite})
+			numMessagesPendingDbWrite = 0
+		}
+
+		s.latestProcessedBlock = lastBlock
 	}
 
 	// ticker for logging progress
@@ -197,6 +217,7 @@ func (s *SyncService) fetchMessages() {
 		}
 
 		numBlocksPendingDbWrite += to - from
+		numMessagesPendingDbWrite += len(msgs)
 
 		// flush new messages to database periodically
 		if to == latestConfirmed || batchWriter.ValueSize() >= DbWriteThresholdBytes || numBlocksPendingDbWrite >= DbWriteThresholdBlocks {

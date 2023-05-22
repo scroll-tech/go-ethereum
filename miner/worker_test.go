@@ -38,6 +38,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
 const (
@@ -168,9 +169,10 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 	}
 }
 
-func (b *testWorkerBackend) BlockChain() *core.BlockChain { return b.chain }
-func (b *testWorkerBackend) TxPool() *core.TxPool         { return b.txPool }
-func (b *testWorkerBackend) ChainDb() ethdb.Database      { return b.db }
+func (b *testWorkerBackend) BlockChain() *core.BlockChain           { return b.chain }
+func (b *testWorkerBackend) TxPool() *core.TxPool                   { return b.txPool }
+func (b *testWorkerBackend) ChainDb() ethdb.Database                { return b.db }
+func (b *testWorkerBackend) SyncService() *sync_service.SyncService { return nil }
 
 func (b *testWorkerBackend) newRandomUncle() *types.Block {
 	var parent *types.Block

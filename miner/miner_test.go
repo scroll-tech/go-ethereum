@@ -32,6 +32,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -55,6 +56,10 @@ func (m *mockBackend) BlockChain() *core.BlockChain {
 
 func (m *mockBackend) TxPool() *core.TxPool {
 	return m.txPool
+}
+
+func (m *mockBackend) SyncService() *sync_service.SyncService {
+	return nil
 }
 
 func (m *mockBackend) ChainDb() ethdb.Database {

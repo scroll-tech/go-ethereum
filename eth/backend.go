@@ -515,17 +515,18 @@ func (s *Ethereum) StopMining() {
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
-func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager }
-func (s *Ethereum) BlockChain() *core.BlockChain       { return s.blockchain }
-func (s *Ethereum) TxPool() *core.TxPool               { return s.txPool }
-func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
-func (s *Ethereum) Engine() consensus.Engine           { return s.engine }
-func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
-func (s *Ethereum) IsListening() bool                  { return true } // Always listening
-func (s *Ethereum) Downloader() *downloader.Downloader { return s.handler.downloader }
-func (s *Ethereum) Synced() bool                       { return atomic.LoadUint32(&s.handler.acceptTxs) == 1 }
-func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
-func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
+func (s *Ethereum) AccountManager() *accounts.Manager      { return s.accountManager }
+func (s *Ethereum) BlockChain() *core.BlockChain           { return s.blockchain }
+func (s *Ethereum) TxPool() *core.TxPool                   { return s.txPool }
+func (s *Ethereum) EventMux() *event.TypeMux               { return s.eventMux }
+func (s *Ethereum) Engine() consensus.Engine               { return s.engine }
+func (s *Ethereum) ChainDb() ethdb.Database                { return s.chainDb }
+func (s *Ethereum) IsListening() bool                      { return true } // Always listening
+func (s *Ethereum) Downloader() *downloader.Downloader     { return s.handler.downloader }
+func (s *Ethereum) Synced() bool                           { return atomic.LoadUint32(&s.handler.acceptTxs) == 1 }
+func (s *Ethereum) ArchiveMode() bool                      { return s.config.NoPruning }
+func (s *Ethereum) BloomIndexer() *core.ChainIndexer       { return s.bloomIndexer }
+func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncService }
 
 // Protocols returns all the currently configured
 // network protocols to start.

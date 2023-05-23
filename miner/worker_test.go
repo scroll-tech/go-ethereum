@@ -588,15 +588,13 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 
 	for i := 0; i < 2; i++ {
 
-		b.txPool.AddLocal(b.newRandomTx(true))
-
 		select {
 		case ev := <-sub.Chan():
 			block := ev.Data.(core.NewMinedBlockEvent).Block
 			if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
 				t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 			}
-			assert.Equal(2, len(block.Transactions()))
+			assert.Equal(1, len(block.Transactions()))
 
 			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
 			assert.NotNil(queueIndex)
@@ -651,11 +649,12 @@ func TestExcludeL1MsgFromTxlimit(t *testing.T) {
 	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
 	defer sub.Unsubscribe()
 
-	// Start mining!
-	w.start()
 	// Insert 2 non-l1msg txs
 	b.txPool.AddLocal(b.newRandomTx(true))
 	b.txPool.AddLocal(b.newRandomTx(false))
+
+	// Start mining!
+	w.start()
 
 	select {
 	case ev := <-sub.Chan():

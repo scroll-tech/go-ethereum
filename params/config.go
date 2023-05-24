@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -255,7 +256,6 @@ var (
 	}
 
 	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
-	ScrollFeeVaultAddress           = common.HexToAddress("0x5300000000000000000000000000000000000005")
 	ScrollMaxTxPerBlock             = 44
 	ScrollMaxTxPayloadBytesPerBlock = 120 * 1024
 
@@ -275,7 +275,7 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   nil,
-		ArchimedesBlock:     big.NewInt(2444711),
+		ArchimedesBlock:     big.NewInt(2646311),
 		ShanghaiBlock:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
@@ -285,7 +285,7 @@ var (
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
-			FeeVaultAddress:           &ScrollFeeVaultAddress,
+			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			EnableEIP2718:             false,
 			EnableEIP1559:             false,
 		},

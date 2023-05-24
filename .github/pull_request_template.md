@@ -20,9 +20,9 @@ Your PR title must follow [conventional commits](https://www.conventionalcommits
 
 ## 3. Deployment tag versioning
 
-Has `tag` in `common/version.go` been updated?
+Has the version in `params/version.go` been updated?
 
-- [ ] This PR doesn't involve a new deployment, git tag, docker image tag
+- [ ] This PR doesn't involve a new deployment, git tag, docker image tag, and it doesn't affect traces
 - [ ] Yes
 
 

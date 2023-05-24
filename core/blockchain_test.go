@@ -3244,6 +3244,7 @@ func TestBlockPayloadSizeLimit(t *testing.T) {
 	config := params.TestChainConfig
 	config.Scroll.MaxTxPayloadBytesPerBlock = new(int)
 	*config.Scroll.MaxTxPayloadBytesPerBlock = 150
+	config.Scroll.MaxTxPerBlock = nil
 
 	var (
 		engine  = ethash.NewFaker()

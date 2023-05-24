@@ -3,6 +3,7 @@ name: Docker
 on:
   push:
     tags:
+      - '*'
 
 jobs:
   build-and-push:

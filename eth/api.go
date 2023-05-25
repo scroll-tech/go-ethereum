@@ -627,3 +627,22 @@ func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err 
 func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, queueIndex uint64) (height *types.L1MessageTx, err error) {
 	return rawdb.ReadL1Message(api.eth.ChainDb(), queueIndex), nil
 }
+
+// GetFirstQueueIndexNotInL2Block returns the first L1 message queue index that's not included in the provided block.
+func (api *ScrollAPI) GetFirstQueueIndexNotInL2Block(ctx context.Context, hash common.Hash) (queueIndex *uint64, err error) {
+	return rawdb.ReadFirstQueueIndexNotInL2Block(api.eth.ChainDb(), hash), nil
+}
+
+// GetLatestRelayedQueueIndex returns the highest L1 message queue index included in the canonical chain.
+func (api *ScrollAPI) GetLatestRelayedQueueIndex(ctx context.Context) (queueIndex *uint64, err error) {
+	block := api.eth.blockchain.CurrentBlock()
+	queueIndex, err = api.GetFirstQueueIndexNotInL2Block(ctx, block.Hash())
+	if queueIndex == nil || err != nil {
+		return queueIndex, err
+	}
+	if *queueIndex == 0 {
+		return nil, nil
+	}
+	lastIncluded := *queueIndex - 1
+	return &lastIncluded, nil
+}

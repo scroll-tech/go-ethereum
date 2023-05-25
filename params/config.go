@@ -474,6 +474,20 @@ type L1Config struct {
 	NumL1MessagesPerBlock uint64          `json:"numL1MessagesPerBlock,string,omitempty"`
 }
 
+func (c *L1Config) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+
+	messageQueueAddress := "<nil>"
+	if c.L1MessageQueueAddress != nil {
+		messageQueueAddress = fmt.Sprintf("%v", *c.L1MessageQueueAddress)
+	}
+
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, numL1MessagesPerBlock: %v}",
+		c.L1ChainId, messageQueueAddress, c.NumL1MessagesPerBlock)
+}
+
 func (s ScrollConfig) BaseFeeEnabled() bool {
 	return s.EnableEIP2718 && s.EnableEIP1559
 }
@@ -501,8 +515,8 @@ func (s ScrollConfig) String() string {
 		maxTxPayloadBytesPerBlock = fmt.Sprintf("%v", *s.MaxTxPayloadBytesPerBlock)
 	}
 
-	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
-		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
+	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, enableEIP2718: %v, enableEIP1559: %v, l1Config: %v}",
+		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559, s.L1Config.String())
 }
 
 // IsValidTxCount returns whether the given block's transaction count is below the limit.

@@ -3352,12 +3352,14 @@ func TestL1MessageValidationFailure(t *testing.T) {
 	index, err := blockchain.InsertChain(blocks)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, consensus.ErrInvalidL1MessageOrder, err)
+	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
 
 	// skip #1
 	blocks, _ = generateBlock([]*types.Transaction{types.NewTx(&msgs[0]), types.NewTx(&msgs[2])})
 	index, err = blockchain.InsertChain(blocks)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, consensus.ErrInvalidL1MessageOrder, err)
+	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
 
 	// L2 tx precedes L1 message tx
 	tx, _ := types.SignTx(types.NewTransaction(0, common.Address{0x00}, new(big.Int), params.TxGas, genspec.BaseFee, nil), signer, key)
@@ -3365,6 +3367,7 @@ func TestL1MessageValidationFailure(t *testing.T) {
 	index, err = blockchain.InsertChain(blocks)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, consensus.ErrInvalidL1MessageOrder, err)
+	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
 
 	// unknown message
 	unknown := types.L1MessageTx{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x02}, Sender: common.Address{2}}
@@ -3372,24 +3375,28 @@ func TestL1MessageValidationFailure(t *testing.T) {
 	index, err = blockchain.InsertChain(blocks)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, consensus.ErrUnknownL1Message, err)
+	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
 
 	// missing message
 	msg := types.L1MessageTx{QueueIndex: 3, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}
 	blocks, _ = generateBlock([]*types.Transaction{types.NewTx(&msgs[0]), types.NewTx(&msgs[1]), types.NewTx(&msgs[2]), types.NewTx(&msg)})
 	index, err = blockchain.InsertChain(blocks)
-	assert.Equal(t, 0, index)
-	assert.Equal(t, consensus.ErrUnknownAncestor, err)
+	assert.Equal(t, 1, index)
+	assert.NoError(t, err)
+
+	// blocks is inserted into future blocks queue
+	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
 
 	// insert missing message into DB
 	rawdb.WriteL1Message(db, msg)
 	blockchain.procFutureBlocks()
 
-	index, err = blockchain.InsertChain(blocks)
-	assert.Equal(t, 1, index)
-	assert.Nil(t, err)
+	// the block is now processed
+	assert.Equal(t, big.NewInt(1), blockchain.CurrentBlock().Number())
+	assert.Equal(t, blocks[0].Hash(), blockchain.CurrentBlock().Hash())
 
 	// L1 message DB should be updated
-	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[len(blocks)-1].Hash())
+	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[0].Hash())
 	assert.NotNil(t, queueIndex)
 	assert.Equal(t, uint64(4), *queueIndex)
 }

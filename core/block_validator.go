@@ -55,7 +55,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock
 	}
-	if !v.config.Scroll.IsValidTxCount(len(block.Transactions()) - block.CountL1MessageTx()) {
+	if !v.config.Scroll.IsValidL2TxCount(block.CountL2Tx()) {
 		return consensus.ErrInvalidTxCount
 	}
 	// Check if block payload size is smaller than the max size

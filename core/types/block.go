@@ -394,13 +394,20 @@ func (b *Block) Hash() common.Hash {
 
 // CountL1MessageTx returns the number of L1 messages in this block.
 func (b *Block) CountL1MessageTx() int {
-	for ii, tx := range b.transactions {
-		if !tx.IsL1MessageTx() {
-			return ii
+	count := 0
+
+	for _, tx := range b.transactions {
+		if tx.IsL1MessageTx() {
+			count += 1
 		}
 	}
 
-	return len(b.transactions)
+	return count
+}
+
+// CountL2Tx returns the number of L2 transactions in this block.
+func (b *Block) CountL2Tx() int {
+	return len(b.transactions) - b.CountL1MessageTx()
 }
 
 type Blocks []*Block

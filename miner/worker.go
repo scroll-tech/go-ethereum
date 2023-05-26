@@ -848,7 +848,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
 		}
 		// If we have collected enough transactions then we're done
-		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount - w.current.l1txcount + 1) {
+		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1txcount + 1) {
 			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1txcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}

@@ -276,6 +276,7 @@ func (s eip2930Signer) Sender(tx *Transaction) (common.Address, error) {
 		// id, add 27 to become equivalent to unprotected Homestead signatures.
 		V = new(big.Int).Add(V, big.NewInt(27))
 	default:
+		// L1MessageTx not supported
 		return common.Address{}, ErrTxTypeNotSupported
 	}
 	if tx.ChainId().Cmp(s.chainId) != 0 {
@@ -285,9 +286,6 @@ func (s eip2930Signer) Sender(tx *Transaction) (common.Address, error) {
 }
 
 func (s eip2930Signer) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
-	if tx.IsL1MessageTx() {
-		return nil, nil, nil, fmt.Errorf("l1 message tx do not have a signature")
-	}
 	switch txdata := tx.inner.(type) {
 	case *LegacyTx:
 		return s.EIP155Signer.SignatureValues(tx, sig)
@@ -300,6 +298,7 @@ func (s eip2930Signer) SignatureValues(tx *Transaction, sig []byte) (R, S, V *bi
 		R, S, _ = decodeSignature(sig)
 		V = big.NewInt(int64(sig[64]))
 	default:
+		// L1MessageTx not supported
 		return nil, nil, nil, ErrTxTypeNotSupported
 	}
 	return R, S, V, nil

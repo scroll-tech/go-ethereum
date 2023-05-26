@@ -310,7 +310,7 @@ func (tx *Transaction) L1MessageQueueIndex() uint64 {
 
 // AsL1MessageTx casts the tx into an L1 cross-domain tx.
 func (tx *Transaction) AsL1MessageTx() *L1MessageTx {
-	if tx.Type() != L1MessageTxType {
+	if !tx.IsL1MessageTx() {
 		return nil
 	}
 
@@ -354,7 +354,7 @@ func (tx *Transaction) GasTipCapIntCmp(other *big.Int) int {
 // Note: if the effective gasTipCap is negative, this method returns both error
 // the actual negative value, _and_ ErrGasFeeCapTooLow
 func (tx *Transaction) EffectiveGasTip(baseFee *big.Int) (*big.Int, error) {
-	if tx.Type() == L1MessageTxType {
+	if tx.IsL1MessageTx() {
 		return new(big.Int), nil
 	}
 	if baseFee == nil {

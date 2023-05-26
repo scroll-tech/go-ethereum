@@ -101,7 +101,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(v.bc.db, block.ParentHash())
 	if nextQueueIndex == nil {
 		// we'll reprocess this block at a later time
-		return consensus.ErrUnknownAncestor
+		return consensus.ErrMissingL1MessageData
 	}
 	queueIndex := *nextQueueIndex
 
@@ -129,7 +129,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 
 		if exists := it.Next(); !exists {
 			// we'll reprocess this block at a later time
-			return consensus.ErrUnknownAncestor
+			return consensus.ErrMissingL1MessageData
 		}
 
 		// check that the L1 message in the block is the same that we collected from L1

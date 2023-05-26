@@ -500,7 +500,7 @@ func (s ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
 }
 
-func (s ScrollConfig) L1MsgEnabled() bool {
+func (s ScrollConfig) ShouldIncludeL1Messages() bool {
 	return s.L1Config != nil && s.L1Config.NumL1MessagesPerBlock > 0
 }
 

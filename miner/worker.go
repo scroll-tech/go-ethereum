@@ -1060,7 +1060,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// fetch l1Txs
 	l1Txs := make(map[common.Address]types.Transactions)
 	pendingL1Txs := 0
-	if w.chainConfig.Scroll.L1MsgEnabled() {
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
 		l1Messages := w.collectPendingL1Messages()
 		pendingL1Txs = len(l1Messages)
 		for _, l1msg := range l1Messages {
@@ -1092,7 +1092,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
-	if w.chainConfig.Scroll.L1MsgEnabled() && len(l1Txs) > 0 {
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Txs) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", pendingL1Txs)
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
 		if w.commitTransactions(txs, w.coinbase, interrupt) {

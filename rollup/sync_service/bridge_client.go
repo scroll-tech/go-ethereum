@@ -66,7 +66,6 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 		log.Trace("eth_getLogs failed", "query", query, "err", err)
 		return nil, fmt.Errorf("eth_getLogs failed: %w", err)
 	}
-
 	if len(logs) == 0 {
 		return nil, nil
 	}
@@ -76,9 +75,7 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 		log.Trace("failed to parse emitted event logs", "logs", logs, "err", err)
 		return nil, fmt.Errorf("failed to parse emitted event logs: %w", err)
 	}
-
 	log.Trace("Received new L1 events", "fromBlock", from, "toBlock", to, "msgs", msgs)
-
 	return msgs, nil
 }
 

@@ -194,7 +194,6 @@ func (s *SyncService) fetchMessages() {
 		}
 
 		to := from + DefaultFetchBlockRange - 1
-
 		if to > latestConfirmed {
 			to = latestConfirmed
 		}

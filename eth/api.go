@@ -623,12 +623,13 @@ func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err 
 	return rawdb.ReadSyncedL1BlockNumber(api.eth.ChainDb()), nil
 }
 
-// GetL1MessageByIndex returns an queries an L1 message by its index in the local database.
+// GetL1MessageByIndex queries an L1 message by its index in the local database.
 func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, queueIndex uint64) (height *types.L1MessageTx, err error) {
 	return rawdb.ReadL1Message(api.eth.ChainDb(), queueIndex), nil
 }
 
-// GetFirstQueueIndexNotInL2Block returns the first L1 message queue index that's not included in the provided block.
+// GetFirstQueueIndexNotInL2Block returns the first L1 message queue index that is
+// not included in the chain up to and including the provided block.
 func (api *ScrollAPI) GetFirstQueueIndexNotInL2Block(ctx context.Context, hash common.Hash) (queueIndex *uint64, err error) {
 	return rawdb.ReadFirstQueueIndexNotInL2Block(api.eth.ChainDb(), hash), nil
 }

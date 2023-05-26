@@ -63,18 +63,10 @@ func WriteL1Message(db ethdb.KeyValueWriter, l1Msg types.L1MessageTx) {
 }
 
 // WriteL1Messages writes an array of L1 messages to the database.
+// Note: pass a db of type `ethdb.Batcher` to batch writes in memory.
 func WriteL1Messages(db ethdb.KeyValueWriter, l1Msgs []types.L1MessageTx) {
 	for _, msg := range l1Msgs {
 		WriteL1Message(db, msg)
-	}
-}
-
-// WriteL1MessagesBatch writes an array of L1 messages to the database in a single batch.
-func WriteL1MessagesBatch(db ethdb.Batcher, l1Msgs []types.L1MessageTx) {
-	batch := db.NewBatch()
-	WriteL1Messages(batch, l1Msgs)
-	if err := batch.Write(); err != nil {
-		log.Crit("Failed to store L1 message batch", "err", err)
 	}
 }
 
@@ -126,6 +118,7 @@ func IterateL1MessagesFrom(db ethdb.Iteratee, fromQueueIndex uint64) L1MessageIt
 
 // Next moves the iterator to the next key/value pair.
 // It returns false when the iterator is exhausted.
+// TODO: Consider reading items in batches.
 func (it *L1MessageIterator) Next() bool {
 	for it.inner.Next() {
 		key := it.inner.Key()
@@ -196,7 +189,7 @@ func ReadL1MessagesFrom(db ethdb.Iteratee, startIndex, maxCount uint64) []types.
 // L1 messages, this value MUST equal its parent's value.
 func WriteFirstQueueIndexNotInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, queueIndex uint64) {
 	if err := db.Put(FirstQueueIndexNotInL2BlockKey(l2BlockHash), encodeQueueIndex(queueIndex)); err != nil {
-		log.Crit("Failed to store last L1 message in L2 block", "l2BlockHash", l2BlockHash, "err", err)
+		log.Crit("Failed to store first L1 message not in L2 block", "l2BlockHash", l2BlockHash, "err", err)
 	}
 }
 
@@ -208,7 +201,7 @@ func ReadFirstQueueIndexNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *
 		return nil
 	}
 	if err != nil {
-		log.Crit("Failed to read last L1 message in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
+		log.Crit("Failed to read first L1 message not in L2 block from database", "l2BlockHash", l2BlockHash, "err", err)
 	}
 	if len(data) == 0 {
 		return nil

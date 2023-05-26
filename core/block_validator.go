@@ -89,7 +89,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - L1 messages follow the QueueIndex order. No L1 message is skipped.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
-	if v.config.Scroll.L1Config == nil || v.config.Scroll.L1Config.NumL1MessagesPerBlock == 0 {
+	if v.config.Scroll.L1Config == nil {
 		return nil
 	}
 
@@ -106,7 +106,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	for _, tx := range block.Transactions() {
 		if !tx.IsL1MessageTx() {
 			L1SectionOver = true
-			continue
+			continue // we do not verify L2 transactions here
 		}
 
 		// check that L1 messages are before L2 transactions
@@ -115,6 +115,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 		}
 
 		// check queue index
+		// TODO: account for skipped messages here
 		if tx.AsL1MessageTx().QueueIndex != queueIndex {
 			return consensus.ErrInvalidL1MessageOrder
 		}
@@ -134,6 +135,10 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 			return consensus.ErrUnknownL1Message
 		}
 	}
+
+	// TODO: consider adding a rule to enforce L1Config.NumL1MessagesPerBlock.
+	// If there are L1 messages available, sequencer nodes should include them.
+	// However, this is hard to enforce as different nodes might have different views of L1.
 
 	return nil
 }

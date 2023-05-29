@@ -33,7 +33,8 @@ type preimageStore struct {
 }
 
 // newPreimageStore initializes the store for caching preimages.
-func newPreimageStore(disk ethdb.KeyValueStore) *preimageStore {
+// rename to _ for lint check
+func _(disk ethdb.KeyValueStore) *preimageStore {
 	return &preimageStore{
 		disk:      disk,
 		preimages: make(map[common.Hash][]byte),

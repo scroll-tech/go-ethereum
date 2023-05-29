@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // stateAtBlock retrieves the state database associated with a certain block.
@@ -63,7 +64,7 @@ func (eth *Ethereum) stateAtBlock(block *types.Block, reexec uint64, base *state
 		if preferDisk {
 			// Create an ephemeral trie.Database for isolating the live one. Otherwise
 			// the internal junks created by tracing will be persisted into the disk.
-			database = state.NewDatabaseWithConfig(eth.chainDb, &trie.Config{Cache: 16})
+			database = state.NewDatabaseWithConfig(eth.chainDb, &zktrie.Config{Cache: 16})
 			if statedb, err = state.New(block.Root(), database, nil); err == nil {
 				log.Info("Found disk backend for state trie", "root", block.Root(), "number", block.Number())
 				return statedb, nil
@@ -78,7 +79,7 @@ func (eth *Ethereum) stateAtBlock(block *types.Block, reexec uint64, base *state
 
 		// Create an ephemeral trie.Database for isolating the live one. Otherwise
 		// the internal junks created by tracing will be persisted into the disk.
-		database = state.NewDatabaseWithConfig(eth.chainDb, &trie.Config{Cache: 16})
+		database = state.NewDatabaseWithConfig(eth.chainDb, &zktrie.Config{Cache: 16})
 
 		// If we didn't check the dirty database, do check the clean one, otherwise
 		// we would rewind past a persisted block (specific corner case is chain

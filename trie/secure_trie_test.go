@@ -18,12 +18,18 @@ package trie
 
 import (
 	"bytes"
+	"encoding/binary"
+	"math/rand"
+	"os"
 	"runtime"
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 
@@ -141,4 +147,66 @@ func TestSecureTrieConcurrency(t *testing.T) {
 	}
 	// Wait for all threads to finish
 	pend.Wait()
+}
+
+const benchElemCountZk = 10000
+
+func BenchmarkTrieGet(b *testing.B) {
+	_, tmpdb := tempDB()
+	trie, _ := NewSecure(common.Hash{}, tmpdb)
+	defer func() {
+		ldb := trie.trie.db.diskdb.(*leveldb.Database)
+		ldb.Close()
+		os.RemoveAll(ldb.Path())
+	}()
+
+	var keys [][]byte
+	for i := 0; i < benchElemCountZk; i++ {
+		key := make([]byte, 32)
+		binary.LittleEndian.PutUint64(key, uint64(i))
+
+		err := trie.TryUpdate(key, key)
+		keys = append(keys, key)
+		assert.NoError(b, err)
+	}
+
+	_, _, err := trie.Commit(nil)
+	assert.NoError(b, err)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := trie.TryGet(keys[rand.Intn(len(keys))])
+		assert.NoError(b, err)
+	}
+	b.StopTimer()
+}
+
+func BenchmarkTrieUpdateExisting(b *testing.B) {
+	_, tmpdb := tempDB()
+	trie, _ := NewSecure(common.Hash{}, tmpdb)
+	defer func() {
+		ldb := trie.trie.db.diskdb.(*leveldb.Database)
+		ldb.Close()
+		os.RemoveAll(ldb.Path())
+	}()
+
+	b.ReportAllocs()
+
+	var keys [][]byte
+	for i := 0; i < benchElemCountZk; i++ {
+		key := make([]byte, 32)
+		binary.LittleEndian.PutUint64(key, uint64(i))
+
+		err := trie.TryUpdate(key, key)
+		keys = append(keys, key)
+		assert.NoError(b, err)
+	}
+
+	_, _, err := trie.Commit(nil)
+	assert.NoError(b, err)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := trie.TryUpdate(keys[rand.Intn(len(keys))], keys[rand.Intn(len(keys))])
+		assert.NoError(b, err)
+	}
+	b.StopTimer()
 }

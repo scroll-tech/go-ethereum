@@ -17,13 +17,17 @@
 package light
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 
+	itrie "github.com/scroll-tech/zktrie/trie"
+
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // NodeSet stores a set of trie nodes. It implements trie.Database and can also
@@ -130,7 +134,14 @@ type NodeList []rlp.RawValue
 // Store writes the contents of the list to the given database
 func (n NodeList) Store(db ethdb.KeyValueWriter) {
 	for _, node := range n {
-		db.Put(crypto.Keccak256(node), node)
+		if bytes.Equal(node, itrie.ProofMagicBytes()) {
+			continue
+		}
+		hash, err := zktrie.NodeStoreHash(node)
+		if err != nil {
+			log.Error("get node hash failed", "err", err)
+		}
+		db.Put(hash[:], node)
 	}
 }
 

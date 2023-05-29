@@ -38,7 +38,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/light"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 func TestHashing(t *testing.T) {
@@ -127,9 +127,9 @@ type testPeer struct {
 	test          *testing.T
 	remote        *Syncer
 	logger        log.Logger
-	accountTrie   *trie.Trie
+	accountTrie   *zktrie.Trie
 	accountValues entrySlice
-	storageTries  map[common.Hash]*trie.Trie
+	storageTries  map[common.Hash]*zktrie.Trie
 	storageValues map[common.Hash]entrySlice
 
 	accountRequestHandler accountHandlerFunc
@@ -255,8 +255,10 @@ func createAccountRequestResponse(t *testPeer, root common.Hash, origin common.H
 		}
 		if bytes.Compare(origin[:], entry.k) <= 0 {
 			keys = append(keys, common.BytesToHash(entry.k))
-			vals = append(vals, entry.v)
-			size += uint64(32 + len(entry.v))
+			account, _ := types.UnmarshalStateAccount(entry.v)
+			accountRlp, _ := rlp.EncodeToBytes(account)
+			vals = append(vals, accountRlp)
+			size += uint64(32 + len(accountRlp))
 		}
 		// If we've exceeded the request threshold, abort
 		if bytes.Compare(entry.k, limit[:]) >= 0 {
@@ -761,7 +763,7 @@ func TestMultiSyncManyUseless(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, noAccount, noStorage, noTrieNode bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -807,7 +809,7 @@ func TestMultiSyncManyUselessWithLowTimeout(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, noAccount, noStorage, noTrieNode bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -858,7 +860,7 @@ func TestMultiSyncManyUnresponsive(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, noAccount, noStorage, noTrieNode bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1159,7 +1161,7 @@ func TestSyncWithStorageAndOneCappedPeer(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(300, 1000, false, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, false, false)
 
 	mkSource := func(name string, slow bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1200,7 +1202,7 @@ func TestSyncWithStorageAndCorruptPeer(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, handler storageHandlerFunc) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1238,7 +1240,7 @@ func TestSyncWithStorageAndNonProvingPeer(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, handler storageHandlerFunc) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1363,22 +1365,22 @@ func getCodeByHash(hash common.Hash) []byte {
 }
 
 // makeAccountTrieNoStorage spits out a trie, along with the leafs
-func makeAccountTrieNoStorage(n int) (*trie.Trie, entrySlice) {
-	db := trie.NewDatabase(rawdb.NewMemoryDatabase())
-	accTrie, _ := trie.New(common.Hash{}, db)
+func makeAccountTrieNoStorage(n int) (*zktrie.Trie, entrySlice) {
+	db := zktrie.NewDatabase(rawdb.NewMemoryDatabase())
+	accTrie, _ := zktrie.New(common.Hash{}, db)
 	var entries entrySlice
 	for i := uint64(1); i <= uint64(n); i++ {
-		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:            i,
-			Balance:          big.NewInt(int64(i)),
-			Root:             emptyRoot,
-			KeccakCodeHash:   getKeccakCodeHash(i),
-			PoseidonCodeHash: getPoseidonCodeHash(i),
-			CodeSize:         1,
-		})
+		account := new(types.StateAccount)
+		account.Nonce = i
+		account.Balance = big.NewInt(int64(i))
+		account.Root = common.Hash{}
+		account.KeccakCodeHash = getKeccakCodeHash(i)
+		account.PoseidonCodeHash = getPoseidonCodeHash(i)
+		account.CodeSize = 1
+
 		key := key32(i)
-		elem := &kv{key, value}
-		accTrie.Update(elem.k, elem.v)
+		accTrie.UpdateAccount(key, account)
+		elem := &kv{key, accTrie.Get(key)}
 		entries = append(entries, elem)
 	}
 	sort.Sort(entries)
@@ -1386,59 +1388,67 @@ func makeAccountTrieNoStorage(n int) (*trie.Trie, entrySlice) {
 	return accTrie, entries
 }
 
+func reverseByteArray(arr []byte) []byte {
+	reversed := make([]byte, len(arr))
+	for i := 0; i < len(arr); i++ {
+		reversed[i] = arr[len(arr)-i-1]
+	}
+	return reversed
+}
+
 // makeBoundaryAccountTrie constructs an account trie. Instead of filling
 // accounts normally, this function will fill a few accounts which have
 // boundary hash.
-func makeBoundaryAccountTrie(n int) (*trie.Trie, entrySlice) {
+func makeBoundaryAccountTrie(n int) (*zktrie.Trie, entrySlice) {
 	var (
 		entries    entrySlice
-		boundaries []common.Hash
+		boundaries [][]byte
 
-		db      = trie.NewDatabase(rawdb.NewMemoryDatabase())
-		trie, _ = trie.New(common.Hash{}, db)
+		db      = zktrie.NewDatabase(rawdb.NewMemoryDatabase())
+		trie, _ = zktrie.New(common.Hash{}, db)
 	)
-	// Initialize boundaries
+	// Initialize boundaries, use Big248 because Fp used as zkTrie key is smaller than 2^256.
 	var next common.Hash
 	step := new(big.Int).Sub(
 		new(big.Int).Div(
-			new(big.Int).Exp(common.Big2, common.Big256, nil),
+			new(big.Int).Exp(common.Big2, common.Big248, nil),
 			big.NewInt(int64(accountConcurrency)),
 		), common.Big1,
 	)
 	for i := 0; i < accountConcurrency; i++ {
 		last := common.BigToHash(new(big.Int).Add(next.Big(), step))
-		if i == accountConcurrency-1 {
-			last = common.HexToHash("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-		}
-		boundaries = append(boundaries, last)
+		lastLE := reverseByteArray(last[:])
+		boundaries = append(boundaries, lastLE)
 		next = common.BigToHash(new(big.Int).Add(last.Big(), common.Big1))
 	}
 	// Fill boundary accounts
 	for i := 0; i < len(boundaries); i++ {
-		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:            uint64(0),
-			Balance:          big.NewInt(int64(i)),
-			Root:             emptyRoot,
-			KeccakCodeHash:   getKeccakCodeHash(uint64(i)),
-			PoseidonCodeHash: getPoseidonCodeHash(uint64(i)),
-			CodeSize:         1,
-		})
-		elem := &kv{boundaries[i].Bytes(), value}
-		trie.Update(elem.k, elem.v)
+		account := new(types.StateAccount)
+		account.Nonce = uint64(0)
+		account.Balance = big.NewInt(int64(i))
+		account.Root = common.Hash{}
+		account.KeccakCodeHash = getKeccakCodeHash(uint64(i))
+		account.PoseidonCodeHash = getPoseidonCodeHash(uint64(i))
+		account.CodeSize = 1
+
+		key := boundaries[i]
+		trie.UpdateAccount(key, account)
+		elem := &kv{key, trie.Get(key)}
 		entries = append(entries, elem)
 	}
 	// Fill other accounts if required
 	for i := uint64(1); i <= uint64(n); i++ {
-		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:            i,
-			Balance:          big.NewInt(int64(i)),
-			Root:             emptyRoot,
-			KeccakCodeHash:   getKeccakCodeHash(i),
-			PoseidonCodeHash: getPoseidonCodeHash(i),
-			CodeSize:         1,
-		})
-		elem := &kv{key32(i), value}
-		trie.Update(elem.k, elem.v)
+		account := new(types.StateAccount)
+		account.Nonce = i
+		account.Balance = big.NewInt(int64(i))
+		account.Root = common.Hash{}
+		account.KeccakCodeHash = getKeccakCodeHash(i)
+		account.PoseidonCodeHash = getPoseidonCodeHash(i)
+		account.CodeSize = 1
+
+		key := key32(i)
+		trie.UpdateAccount(key, account)
+		elem := &kv{key, trie.Get(key)}
 		entries = append(entries, elem)
 	}
 	sort.Sort(entries)
@@ -1448,12 +1458,12 @@ func makeBoundaryAccountTrie(n int) (*trie.Trie, entrySlice) {
 
 // makeAccountTrieWithStorageWithUniqueStorage creates an account trie where each accounts
 // has a unique storage set.
-func makeAccountTrieWithStorageWithUniqueStorage(accounts, slots int, code bool) (*trie.Trie, entrySlice, map[common.Hash]*trie.Trie, map[common.Hash]entrySlice) {
+func makeAccountTrieWithStorageWithUniqueStorage(accounts, slots int, code bool) (*zktrie.Trie, entrySlice, map[common.Hash]*zktrie.Trie, map[common.Hash]entrySlice) {
 	var (
-		db             = trie.NewDatabase(rawdb.NewMemoryDatabase())
-		accTrie, _     = trie.New(common.Hash{}, db)
+		db             = zktrie.NewDatabase(rawdb.NewMemoryDatabase())
+		accTrie, _     = zktrie.New(common.Hash{}, db)
 		entries        entrySlice
-		storageTries   = make(map[common.Hash]*trie.Trie)
+		storageTries   = make(map[common.Hash]*zktrie.Trie)
 		storageEntries = make(map[common.Hash]entrySlice)
 	)
 	// Create n accounts in the trie
@@ -1469,16 +1479,18 @@ func makeAccountTrieWithStorageWithUniqueStorage(accounts, slots int, code bool)
 		stTrie, stEntries := makeStorageTrieWithSeed(uint64(slots), i, db)
 		stRoot := stTrie.Hash()
 		stTrie.Commit(nil)
-		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:            i,
-			Balance:          big.NewInt(int64(i)),
-			Root:             stRoot,
-			KeccakCodeHash:   keccakCodehash,
-			PoseidonCodeHash: poseidonCodeHash,
-			CodeSize:         1,
-		})
-		elem := &kv{key, value}
-		accTrie.Update(elem.k, elem.v)
+
+		// create account value
+		account := new(types.StateAccount)
+		account.Nonce = i
+		account.Balance = big.NewInt(int64(i))
+		account.Root = stRoot
+		account.KeccakCodeHash = keccakCodehash
+		account.PoseidonCodeHash = poseidonCodeHash
+		account.CodeSize = 1
+
+		accTrie.UpdateAccount(key, account)
+		elem := &kv{key, accTrie.Get(key)}
 		entries = append(entries, elem)
 
 		storageTries[common.BytesToHash(key)] = stTrie
@@ -1491,17 +1503,17 @@ func makeAccountTrieWithStorageWithUniqueStorage(accounts, slots int, code bool)
 }
 
 // makeAccountTrieWithStorage spits out a trie, along with the leafs
-func makeAccountTrieWithStorage(accounts, slots int, code, boundary bool) (*trie.Trie, entrySlice, map[common.Hash]*trie.Trie, map[common.Hash]entrySlice) {
+func makeAccountTrieWithStorage(accounts, slots int, code, boundary bool) (*zktrie.Trie, entrySlice, map[common.Hash]*zktrie.Trie, map[common.Hash]entrySlice) {
 	var (
-		db             = trie.NewDatabase(rawdb.NewMemoryDatabase())
-		accTrie, _     = trie.New(common.Hash{}, db)
+		db             = zktrie.NewDatabase(rawdb.NewMemoryDatabase())
+		accTrie, _     = zktrie.New(common.Hash{}, db)
 		entries        entrySlice
-		storageTries   = make(map[common.Hash]*trie.Trie)
+		storageTries   = make(map[common.Hash]*zktrie.Trie)
 		storageEntries = make(map[common.Hash]entrySlice)
 	)
 	// Make a storage trie which we reuse for the whole lot
 	var (
-		stTrie    *trie.Trie
+		stTrie    *zktrie.Trie
 		stEntries entrySlice
 	)
 	if boundary {
@@ -1520,16 +1532,18 @@ func makeAccountTrieWithStorage(accounts, slots int, code, boundary bool) (*trie
 			keccakCodehash = getKeccakCodeHash(i)
 			poseidonCodeHash = getPoseidonCodeHash(i)
 		}
-		value, _ := rlp.EncodeToBytes(types.StateAccount{
-			Nonce:            i,
-			Balance:          big.NewInt(int64(i)),
-			Root:             stRoot,
-			KeccakCodeHash:   keccakCodehash,
-			PoseidonCodeHash: poseidonCodeHash,
-			CodeSize:         1,
-		})
-		elem := &kv{key, value}
-		accTrie.Update(elem.k, elem.v)
+
+		// create accounts
+		account := new(types.StateAccount)
+		account.Nonce = i
+		account.Balance = big.NewInt(int64(i))
+		account.Root = stRoot
+		account.KeccakCodeHash = keccakCodehash
+		account.PoseidonCodeHash = poseidonCodeHash
+		account.CodeSize = 1
+
+		accTrie.UpdateAccount(key, account)
+		elem := &kv{key, accTrie.Get(key)}
 		entries = append(entries, elem)
 		// we reuse the same one for all accounts
 		storageTries[common.BytesToHash(key)] = stTrie
@@ -1544,18 +1558,16 @@ func makeAccountTrieWithStorage(accounts, slots int, code, boundary bool) (*trie
 // makeStorageTrieWithSeed fills a storage trie with n items, returning the
 // not-yet-committed trie and the sorted entries. The seeds can be used to ensure
 // that tries are unique.
-func makeStorageTrieWithSeed(n, seed uint64, db *trie.Database) (*trie.Trie, entrySlice) {
-	trie, _ := trie.New(common.Hash{}, db)
+func makeStorageTrieWithSeed(n, seed uint64, db *zktrie.Database) (*zktrie.Trie, entrySlice) {
+	trie, _ := zktrie.New(common.Hash{}, db)
 	var entries entrySlice
 	for i := uint64(1); i <= n; i++ {
 		// store 'x' at slot 'x'
+		key := key32(i)
 		slotValue := key32(i + seed)
 		rlpSlotValue, _ := rlp.EncodeToBytes(common.TrimLeftZeroes(slotValue[:]))
 
-		slotKey := key32(i)
-		key := crypto.Keccak256Hash(slotKey[:])
-
-		elem := &kv{key[:], rlpSlotValue}
+		elem := &kv{key, rlpSlotValue}
 		trie.Update(elem.k, elem.v)
 		entries = append(entries, elem)
 	}
@@ -1567,26 +1579,24 @@ func makeStorageTrieWithSeed(n, seed uint64, db *trie.Database) (*trie.Trie, ent
 // makeBoundaryStorageTrie constructs a storage trie. Instead of filling
 // storage slots normally, this function will fill a few slots which have
 // boundary hash.
-func makeBoundaryStorageTrie(n int, db *trie.Database) (*trie.Trie, entrySlice) {
+func makeBoundaryStorageTrie(n int, db *zktrie.Database) (*zktrie.Trie, entrySlice) {
 	var (
 		entries    entrySlice
-		boundaries []common.Hash
-		trie, _    = trie.New(common.Hash{}, db)
+		boundaries [][]byte
+		trie, _    = zktrie.New(common.Hash{}, db)
 	)
 	// Initialize boundaries
 	var next common.Hash
 	step := new(big.Int).Sub(
 		new(big.Int).Div(
-			new(big.Int).Exp(common.Big2, common.Big256, nil),
+			new(big.Int).Exp(common.Big2, common.Big248, nil),
 			big.NewInt(int64(accountConcurrency)),
 		), common.Big1,
 	)
 	for i := 0; i < accountConcurrency; i++ {
 		last := common.BigToHash(new(big.Int).Add(next.Big(), step))
-		if i == accountConcurrency-1 {
-			last = common.HexToHash("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-		}
-		boundaries = append(boundaries, last)
+		lastLE := reverseByteArray(last[:])
+		boundaries = append(boundaries, lastLE)
 		next = common.BigToHash(new(big.Int).Add(last.Big(), common.Big1))
 	}
 	// Fill boundary slots
@@ -1594,15 +1604,13 @@ func makeBoundaryStorageTrie(n int, db *trie.Database) (*trie.Trie, entrySlice) 
 		key := boundaries[i]
 		val := []byte{0xde, 0xad, 0xbe, 0xef}
 
-		elem := &kv{key[:], val}
+		elem := &kv{key, val}
 		trie.Update(elem.k, elem.v)
 		entries = append(entries, elem)
 	}
 	// Fill other slots if required
 	for i := uint64(1); i <= uint64(n); i++ {
-		slotKey := key32(i)
-		key := crypto.Keccak256Hash(slotKey[:])
-
+		key := key32(i)
 		slotValue := key32(i)
 		rlpSlotValue, _ := rlp.EncodeToBytes(common.TrimLeftZeroes(slotValue[:]))
 
@@ -1617,32 +1625,25 @@ func makeBoundaryStorageTrie(n int, db *trie.Database) (*trie.Trie, entrySlice) 
 
 func verifyTrie(db ethdb.KeyValueStore, root common.Hash, t *testing.T) {
 	t.Helper()
-	triedb := trie.NewDatabase(db)
-	accTrie, err := trie.New(root, triedb)
+	triedb := zktrie.NewDatabase(db)
+	accTrie, err := zktrie.New(root, triedb)
 	if err != nil {
 		t.Fatal(err)
 	}
 	accounts, slots := 0, 0
-	accIt := trie.NewIterator(accTrie.NodeIterator(nil))
+	accIt := zktrie.NewIterator(accTrie.NodeIterator(nil))
 	for accIt.Next() {
-		var acc struct {
-			Nonce            uint64
-			Balance          *big.Int
-			Root             common.Hash
-			KeccakCodeHash   []byte
-			PoseidonCodeHash []byte
-			CodeSize         uint64
-		}
-		if err := rlp.DecodeBytes(accIt.Value, &acc); err != nil {
-			log.Crit("Invalid account encountered during snapshot creation", "err", err)
+		acc, err := types.UnmarshalStateAccount(accIt.Value)
+		if err != nil {
+			t.Fatalf("Invalid account encountered during snapshot creation: %v", err)
 		}
 		accounts++
 		if acc.Root != emptyRoot {
-			storeTrie, err := trie.NewSecure(acc.Root, triedb)
+			storeTrie, err := zktrie.New(acc.Root, triedb)
 			if err != nil {
 				t.Fatal(err)
 			}
-			storeIt := trie.NewIterator(storeTrie.NodeIterator(nil))
+			storeIt := zktrie.NewIterator(storeTrie.NodeIterator(nil))
 			for storeIt.Next() {
 				slots++
 			}

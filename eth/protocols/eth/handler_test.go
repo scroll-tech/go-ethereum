@@ -34,7 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
@@ -91,9 +91,9 @@ func (b *testBackend) close() {
 	b.chain.Stop()
 }
 
-func (b *testBackend) Chain() *core.BlockChain     { return b.chain }
-func (b *testBackend) StateBloom() *trie.SyncBloom { return nil }
-func (b *testBackend) TxPool() TxPool              { return b.txpool }
+func (b *testBackend) Chain() *core.BlockChain       { return b.chain }
+func (b *testBackend) StateBloom() *zktrie.SyncBloom { return nil }
+func (b *testBackend) TxPool() TxPool                { return b.txpool }
 
 func (b *testBackend) RunPeer(peer *Peer, handler Handler) error {
 	// Normally the backend would do peer mainentance and handshakes. All that
@@ -425,7 +425,7 @@ func testGetNodeData(t *testing.T, protocol uint) {
 	it := backend.db.NewIterator(nil, nil)
 	for it.Next() {
 		if key := it.Key(); len(key) == common.HashLength {
-			hashes = append(hashes, common.BytesToHash(key))
+			hashes = append(hashes, zktrie.NodeHashFromStoreKey(key))
 		}
 	}
 	it.Release()
@@ -450,7 +450,9 @@ func testGetNodeData(t *testing.T, protocol uint) {
 	// Verify that all hashes correspond to the requested data.
 	data := res.NodeDataPacket
 	for i, want := range hashes {
-		if hash := crypto.Keccak256Hash(data[i]); hash != want {
+		if hash, err := zktrie.NodeHash(data[i]); err != nil {
+			t.Errorf("get node data hash failed: %v", err)
+		} else if hash != want {
 			t.Errorf("data hash mismatch: have %x, want %x", hash, want)
 		}
 	}
@@ -458,7 +460,7 @@ func testGetNodeData(t *testing.T, protocol uint) {
 	// Reconstruct state tree from the received data.
 	reconstructDB := rawdb.NewMemoryDatabase()
 	for i := 0; i < len(data); i++ {
-		rawdb.WriteTrieNode(reconstructDB, hashes[i], data[i])
+		rawdb.WriteZKTrieNode(reconstructDB, hashes[i], data[i])
 	}
 
 	// Sanity check whether all state matches.

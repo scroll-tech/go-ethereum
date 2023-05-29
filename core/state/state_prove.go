@@ -3,9 +3,9 @@ package state
 import (
 	"fmt"
 
-	zkt "github.com/scroll-tech/zktrie/types"
+	itypes "github.com/scroll-tech/zktrie/types"
 
-	zktrie "github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
@@ -22,7 +22,7 @@ type ZktrieProofTracer struct {
 
 // MarkDeletion overwrite the underlayer method with secure key
 func (t ZktrieProofTracer) MarkDeletion(key common.Hash) {
-	key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
+	key_s, _ := itypes.ToSecureKeyBytes(key.Bytes())
 	t.ProofTracer.MarkDeletion(key_s.Bytes())
 }
 
@@ -37,14 +37,11 @@ func (t ZktrieProofTracer) Available() bool {
 
 // NewProofTracer is not in Db interface and used explictily for reading proof in storage trie (not updated by the dirty value)
 func (s *StateDB) NewProofTracer(trieS Trie) ZktrieProofTracer {
-	if s.IsZktrie() {
-		zkTrie := trieS.(*zktrie.ZkTrie)
-		if zkTrie == nil {
-			panic("unexpected trie type for zktrie")
-		}
-		return ZktrieProofTracer{zkTrie.NewProofTracer()}
+	zkTrie := trieS.(*zktrie.SecureTrie)
+	if zkTrie == nil {
+		panic("unexpected trie type for zktrie")
 	}
-	return ZktrieProofTracer{}
+	return ZktrieProofTracer{zkTrie.NewProofTracer()}
 }
 
 // GetStorageTrieForProof is not in Db interface and used explictily for reading proof in storage trie (not updated by the dirty value)
@@ -54,7 +51,7 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
 		// still return a empty trie
-		addrHash := crypto.Keccak256Hash(addr[:])
+		addrHash := crypto.PoseidonSecureHash(addr[:])
 		dummy_trie, _ := s.db.OpenStorageTrie(addrHash, common.Hash{})
 		return dummy_trie, nil
 	}
@@ -75,14 +72,9 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 // GetSecureTrieProof handle any interface with Prove (should be a Trie in most case) and
 // deliver the proof in bytes
 func (s *StateDB) GetSecureTrieProof(trieProve TrieProve, key common.Hash) ([][]byte, error) {
-
 	var proof proofList
 	var err error
-	if s.IsZktrie() {
-		key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
-		err = trieProve.Prove(key_s.Bytes(), 0, &proof)
-	} else {
-		err = trieProve.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
-	}
+	key_s, _ := itypes.ToSecureKeyBytes(key.Bytes())
+	err = trieProve.Prove(key_s.Bytes(), 0, &proof)
 	return proof, err
 }

@@ -31,7 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const journalVersion uint64 = 0
@@ -127,7 +127,7 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 }
 
 // loadSnapshot loads a pre-existing state snapshot backed by a key-value store.
-func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash, recovery bool) (snapshot, bool, error) {
+func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *zktrie.Database, cache int, root common.Hash, recovery bool) (snapshot, bool, error) {
 	// If snapshotting is disabled (initial sync in progress), don't do anything,
 	// wait for the chain to permit us to do something meaningful
 	if rawdb.ReadSnapshotDisabled(diskdb) {
@@ -136,9 +136,10 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 	// Retrieve the block number and hash of the snapshot, failing if no snapshot
 	// is present in the database (or crashed mid-update).
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
-	if baseRoot == (common.Hash{}) {
-		return nil, false, errors.New("missing or corrupted snapshot")
-	}
+	// common.Hash{} is an empty trie
+	//if baseRoot == (common.Hash{}) {
+	//	return nil, false, errors.New("missing or corrupted snapshot")
+	//}
 	base := &diskLayer{
 		diskdb: diskdb,
 		triedb: triedb,

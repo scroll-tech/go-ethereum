@@ -1864,6 +1864,10 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	}
 }
 
+func skipForTrieDB(t *testing.T) {
+	t.Skip("skipping testing because zktrie database is not support now")
+}
+
 // TestIssue23496 tests scenario described in https://github.com/scroll-tech/go-ethereum/pull/23496#issuecomment-926393893
 // Credits to @zzyalbert for finding the issue.
 //
@@ -1879,6 +1883,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 // In this case the snapshot layer of B3 is not created because of existent
 // state.
 func TestIssue23496(t *testing.T) {
+	skipForTrieDB(t)
 	// It's hard to follow the test case, visualize the input
 	//log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
 

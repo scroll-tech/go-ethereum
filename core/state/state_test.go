@@ -24,7 +24,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 type stateTest struct {
@@ -40,7 +40,7 @@ func newStateTest() *stateTest {
 
 func TestDump(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	sdb, _ := New(common.Hash{}, NewDatabaseWithConfig(db, &trie.Config{Preimages: true}), nil)
+	sdb, _ := New(common.Hash{}, NewDatabaseWithConfig(db, &zktrie.Config{Preimages: true}), nil)
 	s := &stateTest{db: db, state: sdb}
 
 	// generate a few entries
@@ -54,40 +54,42 @@ func TestDump(t *testing.T) {
 	// write some of them to the trie
 	s.state.updateStateObject(obj1)
 	s.state.updateStateObject(obj2)
-	s.state.Commit(false)
+	if _, err := s.state.Commit(false); err != nil {
+		panic("commit error")
+	}
 
 	// check that DumpToCollector contains the state objects that are in trie
 	got := string(s.state.Dump(nil))
 	want := `{
-    "root": "789955993afb9d2a04b957a91be5d7b139aabb60fb7af63df6405021211c13c4",
+    "root": "296fe45ef15b2e6e57705ef8ecfbcd2063ec59ab3212865e413a0292dac1fddc",
     "accounts": {
         "0x0000000000000000000000000000000000000001": {
             "balance": "22",
             "nonce": 0,
-            "root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+            "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "keccakCodeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
             "poseidonCodeHash": "0x2098f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864",
             "codeSize": 0,
-            "key": "0x1468288056310c82aa4c01a7e12a10f8111a0560e72b700555479031b86c357d"
+            "key": "0x2760e792f57640bddf69cfb2a8ffe16409e746d1dac4a3e216088dde4ed6f104"
         },
         "0x0000000000000000000000000000000000000002": {
             "balance": "44",
             "nonce": 0,
-            "root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+            "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "keccakCodeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
             "poseidonCodeHash": "0x2098f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864",
             "codeSize": 0,
-            "key": "0xd52688a8f926c816ca1e079067caba944f158e764817b83fc43594370ca9cf62"
+            "key": "0xd37a368cb220cdb2bae28e0bdc309cdae1392707c56f97c7a344ca324f09f028"
         },
         "0x0000000000000000000000000000000000000102": {
             "balance": "0",
             "nonce": 0,
-            "root": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+            "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "keccakCodeHash": "0x87874902497a5bb968da31a2998d8f22e949d1ef6214bcdedd8bae24cca4b9e3",
             "poseidonCodeHash": "0x1f090de833dd6dee7af5ee49f94fd64d1079aee3df47795eaaf2775d6921458c",
             "codeSize": 7,
             "code": "0x03030303030303",
-            "key": "0xa17eacbc25cda025e81db9c5c62868822c73ce097cee2a63e33a2e41268358a1"
+            "key": "0x894d88d0e5e464b4988d191a508024e80e0bdd0fe5631806505197b8c9f85cd4"
         }
     }
 }`

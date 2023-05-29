@@ -26,13 +26,13 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // diskLayer is a low level persistent snapshot built on top of a key-value store.
 type diskLayer struct {
 	diskdb ethdb.KeyValueStore // Key-value store containing the base snapshot
-	triedb *trie.Database      // Trie node cache for reconstruction purposes
+	triedb *zktrie.Database    // Trie node cache for reconstruction purposes
 	cache  *fastcache.Cache    // Cache to avoid hitting the disk for direct access
 
 	root  common.Hash // Root hash of the base snapshot

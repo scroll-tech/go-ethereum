@@ -37,7 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const (
@@ -104,7 +104,7 @@ type handler struct {
 	maxPeers int
 
 	downloader   *downloader.Downloader
-	stateBloom   *trie.SyncBloom
+	stateBloom   *zktrie.SyncBloom
 	blockFetcher *fetcher.BlockFetcher
 	txFetcher    *fetcher.TxFetcher
 	peers        *peerSet
@@ -180,7 +180,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	// want to avoid, is a 90%-finished (but restarted) snap-sync to begin
 	// indexing the entire trie
 	if atomic.LoadUint32(&h.fastSync) == 1 && atomic.LoadUint32(&h.snapSync) == 0 {
-		h.stateBloom = trie.NewSyncBloom(config.BloomCache, config.Database)
+		h.stateBloom = zktrie.NewSyncBloom(config.BloomCache, config.Database)
 	}
 	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, h.removePeer)
 

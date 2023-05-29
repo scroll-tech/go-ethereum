@@ -58,7 +58,8 @@ type ExecutionResult struct {
 
 	// Record all accounts' state which would be affected AFTER tx executed
 	// currently they are just `from` and `to` account
-	AccountsAfter []*AccountWrapper `json:"accountAfter"`
+	// omitempty for tracer testcase
+	AccountsAfter []*AccountWrapper `json:"accountAfter,omitempty"`
 
 	// `PoseidonCodeHash` only exists when tx is a contract call.
 	PoseidonCodeHash *common.Hash `json:"poseidonCodeHash,omitempty"`

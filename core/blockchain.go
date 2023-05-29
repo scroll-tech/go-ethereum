@@ -45,8 +45,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
-	"github.com/scroll-tech/go-ethereum/trie/zkproof"
+	"github.com/scroll-tech/go-ethereum/zktrie"
+	"github.com/scroll-tech/go-ethereum/zktrie/zkproof"
 )
 
 var (
@@ -230,14 +230,14 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	blockCache, _ := lru.New(blockCacheLimit)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	futureBlocks, _ := lru.New(maxFutureBlocks)
-	// override snapshot setting
-	if chainConfig.Scroll.ZktrieEnabled() && cacheConfig.SnapshotLimit > 0 {
-		log.Warn("Snapshot has been disabled by zktrie")
-		cacheConfig.SnapshotLimit = 0
-	}
 
 	if chainConfig.Scroll.FeeVaultEnabled() {
 		log.Warn("Using fee vault address", "FeeVaultAddress", *chainConfig.Scroll.FeeVaultAddress)
+	}
+
+	if !chainConfig.Scroll.ZktrieEnabled() {
+		log.Warn("zktrie should not be disabled, we will enable it")
+		chainConfig.Scroll.UseZktrie = true
 	}
 
 	bc := &BlockChain{
@@ -245,11 +245,10 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		cacheConfig: cacheConfig,
 		db:          db,
 		triegc:      prque.New(nil),
-		stateCache: state.NewDatabaseWithConfig(db, &trie.Config{
-			Cache:     cacheConfig.TrieCleanLimit,
-			Journal:   cacheConfig.TrieCleanJournal,
+		stateCache: state.NewDatabaseWithConfig(db, &zktrie.Config{
+			Cache: cacheConfig.TrieCleanLimit,
+			//Journal:   cacheConfig.TrieCleanJournal,
 			Preimages: cacheConfig.Preimages,
-			Zktrie:    chainConfig.Scroll.ZktrieEnabled(),
 		}),
 		quit:           make(chan struct{}),
 		chainmu:        syncx.NewClosableMutex(),
@@ -653,7 +652,7 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	if block == nil {
 		return fmt.Errorf("non existent block [%x..]", hash[:4])
 	}
-	if _, err := trie.NewSecure(block.Root(), bc.stateCache.TrieDB()); err != nil {
+	if _, err := zktrie.NewSecure(block.Root(), bc.stateCache.TrieDB()); err != nil {
 		return err
 	}
 

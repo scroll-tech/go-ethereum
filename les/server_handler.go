@@ -35,7 +35,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const (
@@ -358,8 +358,8 @@ func (h *serverHandler) AddTxsSync() bool {
 }
 
 // getAccount retrieves an account from the state based on root.
-func getAccount(triedb *trie.Database, root, hash common.Hash) (types.StateAccount, error) {
-	trie, err := trie.New(root, triedb)
+func getAccount(triedb *zktrie.Database, root, hash common.Hash) (types.StateAccount, error) {
+	trie, err := zktrie.New(root, triedb)
 	if err != nil {
 		return types.StateAccount{}, err
 	}
@@ -375,7 +375,7 @@ func getAccount(triedb *trie.Database, root, hash common.Hash) (types.StateAccou
 }
 
 // getHelperTrie returns the post-processed trie root for the given trie ID and section index
-func (h *serverHandler) GetHelperTrie(typ uint, index uint64) *trie.Trie {
+func (h *serverHandler) GetHelperTrie(typ uint, index uint64) *zktrie.Trie {
 	var (
 		root   common.Hash
 		prefix string
@@ -391,7 +391,7 @@ func (h *serverHandler) GetHelperTrie(typ uint, index uint64) *trie.Trie {
 	if root == (common.Hash{}) {
 		return nil
 	}
-	trie, _ := trie.New(root, trie.NewDatabase(rawdb.NewTable(h.chainDb, prefix)))
+	trie, _ := zktrie.New(root, zktrie.NewDatabase(rawdb.NewTable(h.chainDb, prefix)))
 	return trie
 }
 

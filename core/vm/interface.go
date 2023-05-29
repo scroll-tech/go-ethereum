@@ -52,8 +52,7 @@ type StateDB interface {
 	GetRootHash() common.Hash
 	GetLiveStateAccount(addr common.Address) *types.StateAccount
 	GetProof(addr common.Address) ([][]byte, error)
-	GetProofByHash(addrHash common.Hash) ([][]byte, error)
-	GetStorageProof(a common.Address, key common.Hash) ([][]byte, error)
+	GetStorageProof(addr common.Address, key common.Hash) ([][]byte, error)
 
 	Suicide(common.Address) bool
 	HasSuicided(common.Address) bool

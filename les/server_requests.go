@@ -28,7 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // serverBackend defines the backend functions needed for serving LES requests
@@ -37,7 +37,7 @@ type serverBackend interface {
 	AddTxsSync() bool
 	BlockChain() *core.BlockChain
 	TxPool() *core.TxPool
-	GetHelperTrie(typ uint, index uint64) *trie.Trie
+	GetHelperTrie(typ uint, index uint64) *zktrie.Trie
 }
 
 // Decoder is implemented by the messages passed to the handler functions
@@ -457,7 +457,7 @@ func handleGetHelperTrieProofs(msg Decoder) (serveRequestFn, uint64, uint64, err
 		var (
 			lastIdx  uint64
 			lastType uint
-			auxTrie  *trie.Trie
+			auxTrie  *zktrie.Trie
 			auxBytes int
 			auxData  [][]byte
 		)

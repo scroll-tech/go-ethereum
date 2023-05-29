@@ -30,7 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/crypto"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var dumper = spew.ConfigState{Indent: "    "}
@@ -68,7 +68,7 @@ func TestAccountRange(t *testing.T) {
 	t.Parallel()
 
 	var (
-		statedb  = state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &trie.Config{Preimages: true})
+		statedb  = state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &zktrie.Config{Preimages: true})
 		state, _ = state.New(common.Hash{}, statedb, nil)
 		addrs    = [AccountRangeMaxResults * 2]common.Address{}
 		m        = map[common.Address]bool{}
@@ -76,7 +76,7 @@ func TestAccountRange(t *testing.T) {
 
 	for i := range addrs {
 		hash := common.HexToHash(fmt.Sprintf("%x", i))
-		addr := common.BytesToAddress(crypto.Keccak256Hash(hash.Bytes()).Bytes())
+		addr := common.BytesToAddress(crypto.PoseidonSecureHash(hash.Bytes()).Bytes())
 		addrs[i] = addr
 		state.SetBalance(addrs[i], big.NewInt(1))
 		if _, ok := m[addr]; ok {
@@ -107,7 +107,7 @@ func TestAccountRange(t *testing.T) {
 		if _, duplicate := secondResult.Accounts[addr1]; duplicate {
 			t.Fatalf("pagination test failed:  results should not overlap")
 		}
-		hList = append(hList, crypto.Keccak256Hash(addr1.Bytes()))
+		hList = append(hList, crypto.PoseidonSecureHash(addr1.Bytes()))
 	}
 	// Test to see if it's possible to recover from the middle of the previous
 	// set and get an even split between the first and second sets.
@@ -165,16 +165,16 @@ func TestStorageRangeAt(t *testing.T) {
 	var (
 		state, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		addr     = common.Address{0x01}
-		keys     = []common.Hash{ // hashes of Keys of storage
-			common.HexToHash("340dd630ad21bf010b4e676dbfa9ba9a02175262d1fa356232cfde6cb5b47ef2"),
-			common.HexToHash("426fcb404ab2d5d8e61a3d918108006bbb0a9be65e92235bb10eefbdb6dcd053"),
-			common.HexToHash("48078cfed56339ea54962e72c37c7f588fc4f8e5bc173827ba75cb10a63a96a5"),
-			common.HexToHash("5723d2c3a83af9b735e3b7f21531e5623d183a9095a56604ead41f3582fdfb75"),
+		keys     = []common.Hash{ // hashes of Keys of storage in store key order
+			common.HexToHash("06f60c3e2d40b30a782a622896192c4d8d0df5a5a969cb71974553d4f9f63220"),
+			common.HexToHash("1e9b6c9f774ee34301b8c18958288625f001e5beb023deb36d0921c015748258"),
+			common.HexToHash("559e15c798d44ff1771f07b5e3dc5ebafa85f06529c122e582eb7e0ca3a9e498"),
+			common.HexToHash("61456fca1c06c256d5e5267d7bc7402509e8f653e0c47044a44e27dc52d0d5d0"),
 		}
 		storage = storageMap{
-			keys[0]: {Key: &common.Hash{0x02}, Value: common.Hash{0x01}},
-			keys[1]: {Key: &common.Hash{0x04}, Value: common.Hash{0x02}},
-			keys[2]: {Key: &common.Hash{0x01}, Value: common.Hash{0x03}},
+			keys[0]: {Key: &common.Hash{0x04}, Value: common.Hash{0x01}},
+			keys[1]: {Key: &common.Hash{0x01}, Value: common.Hash{0x02}},
+			keys[2]: {Key: &common.Hash{0x02}, Value: common.Hash{0x03}},
 			keys[3]: {Key: &common.Hash{0x03}, Value: common.Hash{0x04}},
 		}
 	)
@@ -205,7 +205,7 @@ func TestStorageRangeAt(t *testing.T) {
 			want: StorageRangeResult{storage, nil},
 		},
 		{
-			start: []byte{0x40}, limit: 2,
+			start: []byte{0x10}, limit: 2,
 			want: StorageRangeResult{storageMap{keys[1]: storage[keys[1]], keys[2]: storage[keys[2]]}, &keys[3]},
 		},
 	}

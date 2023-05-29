@@ -36,6 +36,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const (
@@ -57,7 +58,7 @@ const (
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	emptyRoot = common.Hash{}
 
 	// emptyKeccakCodeHash is the known hash of the empty EVM bytecode.
 	emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash.Bytes()
@@ -89,7 +90,7 @@ func NewPruner(db ethdb.Database, datadir, trieCachePath string, bloomSize uint6
 	if headBlock == nil {
 		return nil, errors.New("Failed to load head block")
 	}
-	snaptree, err := snapshot.New(db, trie.NewDatabase(db), 256, headBlock.Root(), false, false, false)
+	snaptree, err := snapshot.New(db, zktrie.NewDatabase(db), 256, headBlock.Root(), false, false, false)
 	if err != nil {
 		return nil, err // The relevant snapshot(s) might not exist
 	}
@@ -265,7 +266,7 @@ func (p *Pruner) Prune(root common.Hash) error {
 	// Ensure the root is really present. The weak assumption
 	// is the presence of root can indicate the presence of the
 	// entire trie.
-	if blob := rawdb.ReadTrieNode(p.db, root); len(blob) == 0 {
+	if blob := rawdb.ReadZKTrieNode(p.db, root); len(blob) == 0 {
 		// The special case is for clique based networks(rinkeby, goerli
 		// and some other private networks), it's possible that two
 		// consecutive blocks will have same root. In this case snapshot
@@ -279,7 +280,7 @@ func (p *Pruner) Prune(root common.Hash) error {
 		// as the pruning target.
 		var found bool
 		for i := len(layers) - 2; i >= 2; i-- {
-			if blob := rawdb.ReadTrieNode(p.db, layers[i].Root()); len(blob) != 0 {
+			if blob := rawdb.ReadZKTrieNode(p.db, layers[i].Root()); len(blob) != 0 {
 				root = layers[i].Root()
 				found = true
 				log.Info("Selecting middle-layer as the pruning target", "root", root, "depth", i)
@@ -362,7 +363,7 @@ func RecoverPruning(datadir string, db ethdb.Database, trieCachePath string) err
 	// - The state HEAD is rewound already because of multiple incomplete `prune-state`
 	// In this case, even the state HEAD is not exactly matched with snapshot, it
 	// still feasible to recover the pruning correctly.
-	snaptree, err := snapshot.New(db, trie.NewDatabase(db), 256, headBlock.Root(), false, false, true)
+	snaptree, err := snapshot.New(db, zktrie.NewDatabase(db), 256, headBlock.Root(), false, false, true)
 	if err != nil {
 		return err // The relevant snapshot(s) might not exist
 	}

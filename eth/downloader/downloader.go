@@ -37,7 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
@@ -94,8 +94,8 @@ type Downloader struct {
 	queue      *queue   // Scheduler for selecting the hashes to download
 	peers      *peerSet // Set of active peers from which download can proceed
 
-	stateDB    ethdb.Database  // Database to state sync into (and deduplicate via)
-	stateBloom *trie.SyncBloom // Bloom filter for fast trie node and contract code existence checks
+	stateDB    ethdb.Database    // Database to state sync into (and deduplicate via)
+	stateBloom *zktrie.SyncBloom // Bloom filter for fast trie node and contract code existence checks
 
 	// Statistics
 	syncStatsChainOrigin uint64 // Origin block number where syncing started at
@@ -204,7 +204,7 @@ type BlockChain interface {
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
-func New(checkpoint uint64, stateDb ethdb.Database, stateBloom *trie.SyncBloom, mux *event.TypeMux, chain BlockChain, lightchain LightChain, dropPeer peerDropFn) *Downloader {
+func New(checkpoint uint64, stateDb ethdb.Database, stateBloom *zktrie.SyncBloom, mux *event.TypeMux, chain BlockChain, lightchain LightChain, dropPeer peerDropFn) *Downloader {
 	if lightchain == nil {
 		lightchain = chain
 	}

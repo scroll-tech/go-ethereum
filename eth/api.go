@@ -38,7 +38,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rpc"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // PublicEthereumAPI provides an API to access Ethereum full node-related
@@ -442,14 +442,10 @@ func (api *PrivateDebugAPI) StorageRangeAt(blockHash common.Hash, txIndex int, c
 }
 
 func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeResult, error) {
-	it := trie.NewIterator(st.NodeIterator(start))
+	it := zktrie.NewIterator(st.NodeIterator(start))
 	result := StorageRangeResult{Storage: storageMap{}}
 	for i := 0; i < maxResult && it.Next(); i++ {
-		_, content, _, err := rlp.Split(it.Value)
-		if err != nil {
-			return StorageRangeResult{}, err
-		}
-		e := storageEntry{Value: common.BytesToHash(content)}
+		e := storageEntry{Value: common.BytesToHash(it.Value)}
 		if preimage := st.GetKey(it.Key); preimage != nil {
 			preimage := common.BytesToHash(preimage)
 			e.Key = &preimage
@@ -525,16 +521,16 @@ func (api *PrivateDebugAPI) getModifiedAccounts(startBlock, endBlock *types.Bloc
 	}
 	triedb := api.eth.BlockChain().StateCache().TrieDB()
 
-	oldTrie, err := trie.NewSecure(startBlock.Root(), triedb)
+	oldTrie, err := zktrie.NewSecure(startBlock.Root(), triedb)
 	if err != nil {
 		return nil, err
 	}
-	newTrie, err := trie.NewSecure(endBlock.Root(), triedb)
+	newTrie, err := zktrie.NewSecure(endBlock.Root(), triedb)
 	if err != nil {
 		return nil, err
 	}
-	diff, _ := trie.NewDifferenceIterator(oldTrie.NodeIterator([]byte{}), newTrie.NodeIterator([]byte{}))
-	iter := trie.NewIterator(diff)
+	diff, _ := zktrie.NewDifferenceIterator(oldTrie.NodeIterator([]byte{}), newTrie.NodeIterator([]byte{}))
+	iter := zktrie.NewIterator(diff)
 
 	var dirty []common.Address
 	for iter.Next() {

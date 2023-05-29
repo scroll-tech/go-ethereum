@@ -19,7 +19,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	"github.com/scroll-tech/go-ethereum/rpc"
-	"github.com/scroll-tech/go-ethereum/trie/zkproof"
+	"github.com/scroll-tech/go-ethereum/zktrie/zkproof"
 )
 
 type TraceBlock interface {

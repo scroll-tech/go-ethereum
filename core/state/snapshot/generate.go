@@ -36,12 +36,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	emptyRoot = common.Hash{}
 
 	// emptyPoseidonCode is the known hash of the empty EVM bytecode.
 	emptyPoseidonCode = codehash.EmptyPoseidonCodeHash
@@ -146,7 +146,7 @@ func (gs *generatorStats) Log(msg string, root common.Hash, marker []byte) {
 // generateSnapshot regenerates a brand new snapshot based on an existing state
 // database and head block asynchronously. The snapshot is returned immediately
 // and generation is continued in the background until done.
-func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash) *diskLayer {
+func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *zktrie.Database, cache int, root common.Hash) *diskLayer {
 	// Create a new disk layer with an initialized state marker at zero
 	var (
 		stats     = &generatorStats{start: time.Now()}
@@ -208,12 +208,12 @@ func journalProgress(db ethdb.KeyValueWriter, marker []byte, stats *generatorSta
 // proofResult contains the output of range proving which can be used
 // for further processing regardless if it is successful or not.
 type proofResult struct {
-	keys     [][]byte   // The key set of all elements being iterated, even proving is failed
-	vals     [][]byte   // The val set of all elements being iterated, even proving is failed
-	diskMore bool       // Set when the database has extra snapshot states since last iteration
-	trieMore bool       // Set when the trie has extra snapshot states(only meaningful for successful proving)
-	proofErr error      // Indicator whether the given state range is valid or not
-	tr       *trie.Trie // The trie, in case the trie was resolved by the prover (may be nil)
+	keys     [][]byte     // The key set of all elements being iterated, even proving is failed
+	vals     [][]byte     // The val set of all elements being iterated, even proving is failed
+	diskMore bool         // Set when the database has extra snapshot states since last iteration
+	trieMore bool         // Set when the trie has extra snapshot states(only meaningful for successful proving)
+	proofErr error        // Indicator whether the given state range is valid or not
+	tr       *zktrie.Trie // The trie, in case the trie was resolved by the prover (may be nil)
 }
 
 // valid returns the indicator that range proof is successful or not.
@@ -308,9 +308,19 @@ func (dl *diskLayer) proveRange(stats *generatorStats, root common.Hash, prefix 
 
 	// The snap state is exhausted, pass the entire key/val set for verification
 	if origin == nil && !diskMore {
-		stackTr := trie.NewStackTrie(nil)
+		stackTr := zktrie.NewStackTrie(nil)
 		for i, key := range keys {
-			stackTr.TryUpdate(key, vals[i])
+			if err := stackTr.TryUpdateWithKind(kind, key, vals[i]); err != nil {
+				// corrupted snapshot value is possible, let the fallback generation to heal the invalid data
+				if errors.Is(err, zktrie.InvalidStateAccountRLPEncodingError) {
+					return &proofResult{
+						keys:     keys,
+						vals:     vals,
+						proofErr: fmt.Errorf("invalid state data"),
+					}, nil
+				}
+				return nil, fmt.Errorf("update stack trie failed: %w", err)
+			}
 		}
 		if gotRoot := stackTr.Hash(); gotRoot != root {
 			return &proofResult{
@@ -322,7 +332,7 @@ func (dl *diskLayer) proveRange(stats *generatorStats, root common.Hash, prefix 
 		return &proofResult{keys: keys, vals: vals}, nil
 	}
 	// Snap state is chunked, generate edge proofs for verification.
-	tr, err := trie.New(root, dl.triedb)
+	tr, err := zktrie.New(root, dl.triedb)
 	if err != nil {
 		stats.Log("Trie missing, state snapshotting paused", dl.root, dl.genMarker)
 		return nil, errMissingTrie
@@ -360,7 +370,7 @@ func (dl *diskLayer) proveRange(stats *generatorStats, root common.Hash, prefix 
 	}
 	// Verify the snapshot segment with range prover, ensure that all flat states
 	// in this range correspond to merkle trie.
-	cont, err := trie.VerifyRangeProof(root, origin, last, keys, vals, proof)
+	cont, err := zktrie.VerifyRangeProof(root, kind, origin, last, keys, vals, proof)
 	return &proofResult{
 			keys:     keys,
 			vals:     vals,
@@ -433,17 +443,24 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 	var snapNodeCache ethdb.KeyValueStore
 	if len(result.keys) > 0 {
 		snapNodeCache = memorydb.New()
-		snapTrieDb := trie.NewDatabase(snapNodeCache)
-		snapTrie, _ := trie.New(common.Hash{}, snapTrieDb)
+		snapTrieDb := zktrie.NewDatabase(snapNodeCache)
+		snapTrie, _ := zktrie.New(common.Hash{}, snapTrieDb)
 		for i, key := range result.keys {
-			snapTrie.Update(key, result.vals[i])
+			if err := snapTrie.TryUpdateWithKind(kind, key, result.vals[i]); err != nil {
+				if errors.Is(err, zktrie.InvalidStateAccountRLPEncodingError) {
+					// corrupted snapshot value is possible, skip it
+					continue
+				} else {
+					return false, nil, err
+				}
+			}
 		}
 		root, _, _ := snapTrie.Commit(nil)
 		snapTrieDb.Commit(root, false, nil)
 	}
 	tr := result.tr
 	if tr == nil {
-		tr, err = trie.New(root, dl.triedb)
+		tr, err = zktrie.New(root, dl.triedb)
 		if err != nil {
 			stats.Log("Trie missing, state snapshotting paused", dl.root, dl.genMarker)
 			return false, nil, errMissingTrie
@@ -453,7 +470,7 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 	var (
 		trieMore       bool
 		nodeIt         = tr.NodeIterator(origin)
-		iter           = trie.NewIterator(nodeIt)
+		iter           = zktrie.NewIterator(nodeIt)
 		kvkeys, kvvals = result.keys, result.vals
 
 		// counters
@@ -502,7 +519,13 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 			break
 		}
 		istart := time.Now()
-		if err := onState(iter.Key, iter.Value, write, false); err != nil {
+		value := iter.Value
+		if kind == "account" {
+			if value, err = iter.AccountRLP(); err != nil {
+				return false, nil, err
+			}
+		}
+		if err := onState(iter.Key, value, write, false); err != nil {
 			return false, nil, err
 		}
 		internal += time.Since(istart)

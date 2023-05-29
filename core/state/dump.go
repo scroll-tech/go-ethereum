@@ -26,7 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // DumpConfig is a set of options to control what portions of the statewill be
@@ -141,10 +141,10 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 	log.Info("Trie dumping started", "root", s.trie.Hash())
 	c.OnRoot(s.trie.Hash())
 
-	it := trie.NewIterator(s.trie.NodeIterator(conf.Start))
+	it := zktrie.NewIterator(s.trie.NodeIterator(conf.Start))
 	for it.Next() {
-		var data types.StateAccount
-		if err := rlp.DecodeBytes(it.Value, &data); err != nil {
+		data, err := types.UnmarshalStateAccount(it.Value)
+		if err != nil {
 			panic(err)
 		}
 		account := DumpAccount{
@@ -166,13 +166,13 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 			account.SecureKey = it.Key
 		}
 		addr := common.BytesToAddress(addrBytes)
-		obj := newObject(s, addr, data)
+		obj := newObject(s, addr, *data)
 		if !conf.SkipCode {
 			account.Code = obj.Code(s.db)
 		}
 		if !conf.SkipStorage {
 			account.Storage = make(map[common.Hash]string)
-			storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(nil))
+			storageIt := zktrie.NewIterator(obj.getTrie(s.db).NodeIterator(nil))
 			for storageIt.Next() {
 				_, content, _, err := rlp.Split(storageIt.Value)
 				if err != nil {

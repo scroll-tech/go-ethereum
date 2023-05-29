@@ -37,7 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // testEthHandler is a mock event handler to listen for inbound network requests
@@ -49,7 +49,7 @@ type testEthHandler struct {
 }
 
 func (h *testEthHandler) Chain() *core.BlockChain              { panic("no backing chain") }
-func (h *testEthHandler) StateBloom() *trie.SyncBloom          { panic("no backing state bloom") }
+func (h *testEthHandler) StateBloom() *zktrie.SyncBloom        { panic("no backing state bloom") }
 func (h *testEthHandler) TxPool() eth.TxPool                   { panic("no backing tx pool") }
 func (h *testEthHandler) AcceptTxs() bool                      { return true }
 func (h *testEthHandler) RunPeer(*eth.Peer, eth.Handler) error { panic("not used in tests") }

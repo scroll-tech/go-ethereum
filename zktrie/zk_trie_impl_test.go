@@ -1,4 +1,4 @@
-package trie
+package zktrie
 
 import (
 	"math/big"
@@ -22,13 +22,13 @@ type zkTrieImplTestWrapper struct {
 	*zktrie.ZkTrieImpl
 }
 
-func newZkTrieImpl(storage *ZktrieDatabase, maxLevels int) (*zkTrieImplTestWrapper, error) {
+func newZkTrieImpl(storage *Database, maxLevels int) (*zkTrieImplTestWrapper, error) {
 	return newZkTrieImplWithRoot(storage, &zkt.HashZero, maxLevels)
 }
 
 // NewZkTrieImplWithRoot loads a new ZkTrieImpl. If in the storage already exists one
 // will open that one, if not, will create a new one.
-func newZkTrieImplWithRoot(storage *ZktrieDatabase, root *zkt.Hash, maxLevels int) (*zkTrieImplTestWrapper, error) {
+func newZkTrieImplWithRoot(storage *Database, root *zkt.Hash, maxLevels int) (*zkTrieImplTestWrapper, error) {
 	impl, err := zktrie.NewZkTrieImplWithRoot(storage, root, maxLevels)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ type Fatalable interface {
 }
 
 func newTestingMerkle(f Fatalable, numLevels int) *zkTrieImplTestWrapper {
-	mt, err := newZkTrieImpl(NewZktrieDatabase((memorydb.New())), numLevels)
+	mt, err := newZkTrieImpl(NewDatabase((memorydb.New())), numLevels)
 	if err != nil {
 		f.Fatal(err)
 		return nil

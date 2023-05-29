@@ -24,12 +24,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // testAccount is the data associated with an account used by the state tests.
@@ -103,10 +101,10 @@ func checkStateAccounts(t *testing.T, db ethdb.Database, root common.Hash, accou
 
 // checkTrieConsistency checks that all nodes in a (sub-)trie are indeed present.
 func checkTrieConsistency(db ethdb.Database, root common.Hash) error {
-	if v, _ := db.Get(root[:]); v == nil {
+	if val := rawdb.ReadZKTrieNode(db, root); val == nil {
 		return nil // Consider a non existent state consistent.
 	}
-	trie, err := trie.New(root, trie.NewDatabase(db))
+	trie, err := zktrie.New(root, zktrie.NewDatabase(db))
 	if err != nil {
 		return err
 	}
@@ -119,7 +117,7 @@ func checkTrieConsistency(db ethdb.Database, root common.Hash) error {
 // checkStateConsistency checks that all data of a state root is present.
 func checkStateConsistency(db ethdb.Database, root common.Hash) error {
 	// Create and iterate a state trie rooted in a sub-node
-	if _, err := db.Get(root.Bytes()); err != nil {
+	if val := rawdb.ReadZKTrieNode(db, root); val == nil {
 		return nil // Consider a non existent state consistent.
 	}
 	state, err := New(root, NewDatabase(db), nil)
@@ -134,8 +132,8 @@ func checkStateConsistency(db ethdb.Database, root common.Hash) error {
 
 // Tests that an empty state is not scheduled for syncing.
 func TestEmptyStateSync(t *testing.T) {
-	empty := common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-	sync := NewStateSync(empty, rawdb.NewMemoryDatabase(), trie.NewSyncBloom(1, memorydb.New()), nil)
+	empty := common.Hash{}
+	sync := NewStateSync(empty, rawdb.NewMemoryDatabase(), zktrie.NewSyncBloom(1, memorydb.New()), nil)
 	if nodes, paths, codes := sync.Missing(1); len(nodes) != 0 || len(paths) != 0 || len(codes) != 0 {
 		t.Errorf(" content requested for empty state: %v, %v, %v", nodes, paths, codes)
 	}
@@ -168,16 +166,16 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 	if commit {
 		srcDb.TrieDB().Commit(srcRoot, false, nil)
 	}
-	srcTrie, _ := trie.New(srcRoot, srcDb.TrieDB())
+	srcTrie, _ := zktrie.New(srcRoot, srcDb.TrieDB())
 
 	// Create a destination state and sync with the scheduler
 	dstDb := rawdb.NewMemoryDatabase()
-	sched := NewStateSync(srcRoot, dstDb, trie.NewSyncBloom(1, dstDb), nil)
+	sched := NewStateSync(srcRoot, dstDb, zktrie.NewSyncBloom(1, dstDb), nil)
 
 	nodes, paths, codes := sched.Missing(count)
 	var (
 		hashQueue []common.Hash
-		pathQueue []trie.SyncPath
+		pathQueue []zktrie.SyncPath
 	)
 	if !bypath {
 		hashQueue = append(append(hashQueue[:0], nodes...), codes...)
@@ -186,7 +184,7 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 		pathQueue = append(pathQueue[:0], paths...)
 	}
 	for len(hashQueue)+len(pathQueue) > 0 {
-		results := make([]trie.SyncResult, len(hashQueue)+len(pathQueue))
+		results := make([]zktrie.SyncResult, len(hashQueue)+len(pathQueue))
 		for i, hash := range hashQueue {
 			data, err := srcDb.TrieDB().Node(hash)
 			if err != nil {
@@ -195,7 +193,7 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 			if err != nil {
 				t.Fatalf("failed to retrieve node data for hash %x", hash)
 			}
-			results[i] = trie.SyncResult{Hash: hash, Data: data}
+			results[i] = zktrie.SyncResult{Hash: hash, Data: data}
 		}
 		for i, path := range pathQueue {
 			if len(path) == 1 {
@@ -203,13 +201,17 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 				if err != nil {
 					t.Fatalf("failed to retrieve node data for path %x: %v", path, err)
 				}
-				results[len(hashQueue)+i] = trie.SyncResult{Hash: crypto.Keccak256Hash(data), Data: data}
+				hash, err := zktrie.NodeHash(data)
+				if err != nil {
+					t.Fatalf("failed to get hash of node: %v", err)
+				}
+				results[len(hashQueue)+i] = zktrie.SyncResult{Hash: hash, Data: data}
 			} else {
-				var acc types.StateAccount
-				if err := rlp.DecodeBytes(srcTrie.Get(path[0]), &acc); err != nil {
+				acc, err := types.UnmarshalStateAccount(srcTrie.Get(path[0]))
+				if err != nil {
 					t.Fatalf("failed to decode account on path %x: %v", path, err)
 				}
-				stTrie, err := trie.New(acc.Root, srcDb.TrieDB())
+				stTrie, err := zktrie.New(acc.Root, srcDb.TrieDB())
 				if err != nil {
 					t.Fatalf("failed to retriev storage trie for path %x: %v", path, err)
 				}
@@ -217,7 +219,11 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 				if err != nil {
 					t.Fatalf("failed to retrieve node data for path %x: %v", path, err)
 				}
-				results[len(hashQueue)+i] = trie.SyncResult{Hash: crypto.Keccak256Hash(data), Data: data}
+				hash, err := zktrie.NodeHash(data)
+				if err != nil {
+					t.Fatalf("failed to get hash of node: %v", err)
+				}
+				results[len(hashQueue)+i] = zktrie.SyncResult{Hash: hash, Data: data}
 			}
 		}
 		for _, result := range results {
@@ -251,14 +257,14 @@ func TestIterativeDelayedStateSync(t *testing.T) {
 
 	// Create a destination state and sync with the scheduler
 	dstDb := rawdb.NewMemoryDatabase()
-	sched := NewStateSync(srcRoot, dstDb, trie.NewSyncBloom(1, dstDb), nil)
+	sched := NewStateSync(srcRoot, dstDb, zktrie.NewSyncBloom(1, dstDb), nil)
 
 	nodes, _, codes := sched.Missing(0)
 	queue := append(append([]common.Hash{}, nodes...), codes...)
 
 	for len(queue) > 0 {
 		// Sync only half of the scheduled nodes
-		results := make([]trie.SyncResult, len(queue)/2+1)
+		results := make([]zktrie.SyncResult, len(queue)/2+1)
 		for i, hash := range queue[:len(results)] {
 			data, err := srcDb.TrieDB().Node(hash)
 			if err != nil {
@@ -267,7 +273,7 @@ func TestIterativeDelayedStateSync(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to retrieve node data for %x", hash)
 			}
-			results[i] = trie.SyncResult{Hash: hash, Data: data}
+			results[i] = zktrie.SyncResult{Hash: hash, Data: data}
 		}
 		for _, result := range results {
 			if err := sched.Process(result); err != nil {
@@ -299,7 +305,7 @@ func testIterativeRandomStateSync(t *testing.T, count int) {
 
 	// Create a destination state and sync with the scheduler
 	dstDb := rawdb.NewMemoryDatabase()
-	sched := NewStateSync(srcRoot, dstDb, trie.NewSyncBloom(1, dstDb), nil)
+	sched := NewStateSync(srcRoot, dstDb, zktrie.NewSyncBloom(1, dstDb), nil)
 
 	queue := make(map[common.Hash]struct{})
 	nodes, _, codes := sched.Missing(count)
@@ -308,7 +314,7 @@ func testIterativeRandomStateSync(t *testing.T, count int) {
 	}
 	for len(queue) > 0 {
 		// Fetch all the queued nodes in a random order
-		results := make([]trie.SyncResult, 0, len(queue))
+		results := make([]zktrie.SyncResult, 0, len(queue))
 		for hash := range queue {
 			data, err := srcDb.TrieDB().Node(hash)
 			if err != nil {
@@ -317,7 +323,7 @@ func testIterativeRandomStateSync(t *testing.T, count int) {
 			if err != nil {
 				t.Fatalf("failed to retrieve node data for %x", hash)
 			}
-			results = append(results, trie.SyncResult{Hash: hash, Data: data})
+			results = append(results, zktrie.SyncResult{Hash: hash, Data: data})
 		}
 		// Feed the retrieved results back and queue new tasks
 		for _, result := range results {
@@ -349,7 +355,7 @@ func TestIterativeRandomDelayedStateSync(t *testing.T) {
 
 	// Create a destination state and sync with the scheduler
 	dstDb := rawdb.NewMemoryDatabase()
-	sched := NewStateSync(srcRoot, dstDb, trie.NewSyncBloom(1, dstDb), nil)
+	sched := NewStateSync(srcRoot, dstDb, zktrie.NewSyncBloom(1, dstDb), nil)
 
 	queue := make(map[common.Hash]struct{})
 	nodes, _, codes := sched.Missing(0)
@@ -358,7 +364,7 @@ func TestIterativeRandomDelayedStateSync(t *testing.T) {
 	}
 	for len(queue) > 0 {
 		// Sync only half of the scheduled nodes, even those in random order
-		results := make([]trie.SyncResult, 0, len(queue)/2+1)
+		results := make([]zktrie.SyncResult, 0, len(queue)/2+1)
 		for hash := range queue {
 			delete(queue, hash)
 
@@ -369,7 +375,7 @@ func TestIterativeRandomDelayedStateSync(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to retrieve node data for %x", hash)
 			}
-			results = append(results, trie.SyncResult{Hash: hash, Data: data})
+			results = append(results, zktrie.SyncResult{Hash: hash, Data: data})
 
 			if len(results) >= cap(results) {
 				break
@@ -416,7 +422,7 @@ func TestIncompleteStateSync(t *testing.T) {
 
 	// Create a destination state and sync with the scheduler
 	dstDb := rawdb.NewMemoryDatabase()
-	sched := NewStateSync(srcRoot, dstDb, trie.NewSyncBloom(1, dstDb), nil)
+	sched := NewStateSync(srcRoot, dstDb, zktrie.NewSyncBloom(1, dstDb), nil)
 
 	var added []common.Hash
 
@@ -425,7 +431,7 @@ func TestIncompleteStateSync(t *testing.T) {
 
 	for len(queue) > 0 {
 		// Fetch a batch of state nodes
-		results := make([]trie.SyncResult, len(queue))
+		results := make([]zktrie.SyncResult, len(queue))
 		for i, hash := range queue {
 			data, err := srcDb.TrieDB().Node(hash)
 			if err != nil {
@@ -434,7 +440,7 @@ func TestIncompleteStateSync(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to retrieve node data for %x", hash)
 			}
-			results[i] = trie.SyncResult{Hash: hash, Data: data}
+			results[i] = zktrie.SyncResult{Hash: hash, Data: data}
 		}
 		// Process each of the state nodes
 		for _, result := range results {
@@ -474,8 +480,8 @@ func TestIncompleteStateSync(t *testing.T) {
 			val = rawdb.ReadCode(dstDb, node)
 			rawdb.DeleteCode(dstDb, node)
 		} else {
-			val = rawdb.ReadTrieNode(dstDb, node)
-			rawdb.DeleteTrieNode(dstDb, node)
+			val = rawdb.ReadZKTrieNode(dstDb, node)
+			rawdb.DeleteZKTrieNode(dstDb, node)
 		}
 		if err := checkStateConsistency(dstDb, added[0]); err == nil {
 			t.Fatalf("trie inconsistency not caught, missing: %x", key)
@@ -483,7 +489,7 @@ func TestIncompleteStateSync(t *testing.T) {
 		if code {
 			rawdb.WriteCode(dstDb, node, val)
 		} else {
-			rawdb.WriteTrieNode(dstDb, node, val)
+			rawdb.WriteZKTrieNode(dstDb, node, val)
 		}
 	}
 }

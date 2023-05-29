@@ -32,7 +32,7 @@ import (
 	l "github.com/scroll-tech/go-ethereum/les"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
@@ -47,8 +47,8 @@ var (
 	addrHashes []common.Hash
 	txHashes   []common.Hash
 
-	chtTrie   *trie.Trie
-	bloomTrie *trie.Trie
+	chtTrie   *zktrie.Trie
+	bloomTrie *zktrie.Trie
 	chtKeys   [][]byte
 	bloomKeys [][]byte
 )
@@ -87,9 +87,9 @@ func makechain() (bc *core.BlockChain, addrHashes, txHashes []common.Hash) {
 	return
 }
 
-func makeTries() (chtTrie *trie.Trie, bloomTrie *trie.Trie, chtKeys, bloomKeys [][]byte) {
-	chtTrie, _ = trie.New(common.Hash{}, trie.NewDatabase(rawdb.NewMemoryDatabase()))
-	bloomTrie, _ = trie.New(common.Hash{}, trie.NewDatabase(rawdb.NewMemoryDatabase()))
+func makeTries() (chtTrie *zktrie.Trie, bloomTrie *zktrie.Trie, chtKeys, bloomKeys [][]byte) {
+	chtTrie, _ = zktrie.New(common.Hash{}, zktrie.NewDatabase(rawdb.NewMemoryDatabase()))
+	bloomTrie, _ = zktrie.New(common.Hash{}, zktrie.NewDatabase(rawdb.NewMemoryDatabase()))
 	for i := 0; i < testChainLen; i++ {
 		// The element in CHT is <big-endian block number> -> <block hash>
 		key := make([]byte, 8)
@@ -121,8 +121,8 @@ type fuzzer struct {
 
 	chtKeys   [][]byte
 	bloomKeys [][]byte
-	chtTrie   *trie.Trie
-	bloomTrie *trie.Trie
+	chtTrie   *zktrie.Trie
+	bloomTrie *zktrie.Trie
 
 	input     io.Reader
 	exhausted bool
@@ -243,7 +243,7 @@ func (f *fuzzer) AddTxsSync() bool {
 	return false
 }
 
-func (f *fuzzer) GetHelperTrie(typ uint, index uint64) *trie.Trie {
+func (f *fuzzer) GetHelperTrie(typ uint, index uint64) *zktrie.Trie {
 	if typ == 0 {
 		return f.chtTrie
 	} else if typ == 1 {

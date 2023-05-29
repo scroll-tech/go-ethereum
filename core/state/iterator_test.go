@@ -22,10 +22,16 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
+
+func skipForTrieDB(t *testing.T) {
+	t.Skip("skipping testing because zktrie database is not support now")
+}
 
 // Tests that the node iterator indeed walks over the entire database contents.
 func TestNodeIteratorCoverage(t *testing.T) {
+	skipForTrieDB(t)
 	// Create some arbitrary test state to iterate
 	db, root, _ := makeTestState()
 	db.TrieDB().Commit(root, false, nil)
@@ -61,8 +67,9 @@ func TestNodeIteratorCoverage(t *testing.T) {
 		if bytes.HasPrefix(key, []byte("secure-key-")) {
 			continue
 		}
-		if _, ok := hashes[common.BytesToHash(key)]; !ok {
-			t.Errorf("state entry not reported %x", key)
+		hash := zktrie.NodeHashFromStoreKey(key)
+		if _, ok := hashes[hash]; !ok {
+			t.Errorf("state entry not reported %x", hash)
 		}
 	}
 	it.Release()

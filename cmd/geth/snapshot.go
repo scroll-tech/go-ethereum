@@ -34,13 +34,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	emptyRoot = common.Hash{}
 
 	// emptyKeccakCodeHash is the known hash of the empty EVM bytecode.
 	emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash.Bytes()
@@ -226,7 +225,7 @@ func verifyState(ctx *cli.Context) error {
 		log.Error("Failed to load head block")
 		return errors.New("no head block")
 	}
-	snaptree, err := snapshot.New(chaindb, trie.NewDatabase(chaindb), 256, headBlock.Root(), false, false, false)
+	snaptree, err := snapshot.New(chaindb, zktrie.NewDatabase(chaindb), 256, headBlock.Root(), false, false, false)
 	if err != nil {
 		log.Error("Failed to open snapshot tree", "err", err)
 		return err
@@ -283,8 +282,8 @@ func traverseState(ctx *cli.Context) error {
 		root = headBlock.Root()
 		log.Info("Start traversing the state", "root", root, "number", headBlock.NumberU64())
 	}
-	triedb := trie.NewDatabase(chaindb)
-	t, err := trie.NewSecure(root, triedb)
+	triedb := zktrie.NewDatabase(chaindb)
+	t, err := zktrie.NewSecure(root, triedb)
 	if err != nil {
 		log.Error("Failed to open trie", "root", root, "err", err)
 		return err
@@ -296,21 +295,21 @@ func traverseState(ctx *cli.Context) error {
 		lastReport time.Time
 		start      = time.Now()
 	)
-	accIter := trie.NewIterator(t.NodeIterator(nil))
+	accIter := zktrie.NewIterator(t.NodeIterator(nil))
 	for accIter.Next() {
 		accounts += 1
-		var acc types.StateAccount
-		if err := rlp.DecodeBytes(accIter.Value, &acc); err != nil {
+		acc, err := types.UnmarshalStateAccount(accIter.Value)
+		if err != nil {
 			log.Error("Invalid account encountered during traversal", "err", err)
 			return err
 		}
 		if acc.Root != emptyRoot {
-			storageTrie, err := trie.NewSecure(acc.Root, triedb)
+			storageTrie, err := zktrie.NewSecure(acc.Root, triedb)
 			if err != nil {
 				log.Error("Failed to open storage trie", "root", acc.Root, "err", err)
 				return err
 			}
-			storageIter := trie.NewIterator(storageTrie.NodeIterator(nil))
+			storageIter := zktrie.NewIterator(storageTrie.NodeIterator(nil))
 			for storageIter.Next() {
 				slots += 1
 			}
@@ -373,8 +372,8 @@ func traverseRawState(ctx *cli.Context) error {
 		root = headBlock.Root()
 		log.Info("Start traversing the state", "root", root, "number", headBlock.NumberU64())
 	}
-	triedb := trie.NewDatabase(chaindb)
-	t, err := trie.NewSecure(root, triedb)
+	triedb := zktrie.NewDatabase(chaindb)
+	t, err := zktrie.NewSecure(root, triedb)
 	if err != nil {
 		log.Error("Failed to open trie", "root", root, "err", err)
 		return err
@@ -395,7 +394,7 @@ func traverseRawState(ctx *cli.Context) error {
 		if node != (common.Hash{}) {
 			// Check the present for non-empty hash node(embedded node doesn't
 			// have their own hash).
-			blob := rawdb.ReadTrieNode(chaindb, node)
+			blob := rawdb.ReadZKTrieNode(chaindb, node)
 			if len(blob) == 0 {
 				log.Error("Missing trie node(account)", "hash", node)
 				return errors.New("missing account")
@@ -405,13 +404,13 @@ func traverseRawState(ctx *cli.Context) error {
 		// dig into the storage trie further.
 		if accIter.Leaf() {
 			accounts += 1
-			var acc types.StateAccount
-			if err := rlp.DecodeBytes(accIter.LeafBlob(), &acc); err != nil {
+			var acc *types.StateAccount
+			if acc, err = types.UnmarshalStateAccount(accIter.LeafBlob()); err != nil {
 				log.Error("Invalid account encountered during traversal", "err", err)
 				return errors.New("invalid account")
 			}
 			if acc.Root != emptyRoot {
-				storageTrie, err := trie.NewSecure(acc.Root, triedb)
+				storageTrie, err := zktrie.NewSecure(acc.Root, triedb)
 				if err != nil {
 					log.Error("Failed to open storage trie", "root", acc.Root, "err", err)
 					return errors.New("missing storage trie")
@@ -424,7 +423,7 @@ func traverseRawState(ctx *cli.Context) error {
 					// Check the present for non-empty hash node(embedded node doesn't
 					// have their own hash).
 					if node != (common.Hash{}) {
-						blob := rawdb.ReadTrieNode(chaindb, node)
+						blob := rawdb.ReadZKTrieNode(chaindb, node)
 						if len(blob) == 0 {
 							log.Error("Missing trie node(storage)", "hash", node)
 							return errors.New("missing storage")
@@ -478,7 +477,7 @@ func dumpState(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	snaptree, err := snapshot.New(db, trie.NewDatabase(db), 256, root, false, false, false)
+	snaptree, err := snapshot.New(db, zktrie.NewDatabase(db), 256, root, false, false, false)
 	if err != nil {
 		return err
 	}

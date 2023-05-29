@@ -212,6 +212,14 @@ func preimageKey(hash common.Hash) []byte {
 	return append(PreimagePrefix, hash.Bytes()...)
 }
 
+func trieNodeKey(hash common.Hash) []byte {
+	dst := append([]byte{}, hash[:]...)
+	for i, j := 0, len(dst)-1; i < j; i, j = i+1, j-1 {
+		dst[i], dst[j] = dst[j], dst[i]
+	}
+	return dst
+}
+
 // codeKey = CodePrefix + hash
 func codeKey(hash common.Hash) []byte {
 	return append(CodePrefix, hash.Bytes()...)

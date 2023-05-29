@@ -76,6 +76,26 @@ func DeleteCode(db ethdb.KeyValueWriter, hash common.Hash) {
 }
 
 // ReadTrieNode retrieves the trie node of the provided hash.
+func ReadZKTrieNode(db ethdb.KeyValueReader, hash common.Hash) []byte {
+	data, _ := db.Get(trieNodeKey(hash))
+	return data
+}
+
+// WriteTrieNode writes the provided trie node database.
+func WriteZKTrieNode(db ethdb.KeyValueWriter, hash common.Hash, node []byte) {
+	if err := db.Put(trieNodeKey(hash), node); err != nil {
+		log.Crit("Failed to store trie node", "err", err)
+	}
+}
+
+// DeleteTrieNode deletes the specified trie node from the database.
+func DeleteZKTrieNode(db ethdb.KeyValueWriter, hash common.Hash) {
+	if err := db.Delete(trieNodeKey(hash)); err != nil {
+		log.Crit("Failed to delete trie node", "err", err)
+	}
+}
+
+// ReadTrieNode retrieves the trie node of the provided hash.
 func ReadTrieNode(db ethdb.KeyValueReader, hash common.Hash) []byte {
 	data, _ := db.Get(hash.Bytes())
 	return data

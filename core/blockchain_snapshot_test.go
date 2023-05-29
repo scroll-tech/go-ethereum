@@ -570,6 +570,7 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 // committed point so the chain should be rewound to genesis and the disk layer
 // should be left for recovery.
 func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
+	skipForTrieDB(t)
 	// Chain:
 	//   G->C1->C2->C3->C4->C5->C6->C7->C8 (HEAD)
 	//

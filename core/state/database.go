@@ -27,7 +27,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const (
@@ -56,7 +56,7 @@ type Database interface {
 	ContractCodeSize(addrHash, codeHash common.Hash) (int, error)
 
 	// TrieDB retrieves the low level trie database used for data storage.
-	TrieDB() *trie.Database
+	TrieDB() *zktrie.Database
 }
 
 // Trie is a Ethereum Merkle Patricia trie.
@@ -79,6 +79,7 @@ type Trie interface {
 	// existing value is deleted from the trie. The value bytes must not be modified
 	// by the caller while they are stored in the trie. If a node was not found in the
 	// database, a trie.MissingNodeError is returned.
+	// note that this is used for update storage data only!
 	TryUpdate(key, value []byte) error
 
 	// TryDelete removes any existing value for key from the trie. If a node was not
@@ -91,11 +92,11 @@ type Trie interface {
 
 	// Commit writes all nodes to the trie's memory database, tracking the internal
 	// and external (for account tries) references.
-	Commit(onleaf trie.LeafCallback) (common.Hash, int, error)
+	Commit(onleaf zktrie.LeafCallback) (common.Hash, int, error)
 
 	// NodeIterator returns an iterator that returns nodes of the trie. Iteration
 	// starts at the key after the given start key.
-	NodeIterator(startKey []byte) trie.NodeIterator
+	NodeIterator(startKey []byte) zktrie.NodeIterator
 
 	// Prove constructs a Merkle proof for key. The result contains all encoded nodes
 	// on the path to the value at key. The value itself is also included in the last
@@ -117,33 +118,24 @@ func NewDatabase(db ethdb.Database) Database {
 // NewDatabaseWithConfig creates a backing store for state. The returned database
 // is safe for concurrent use and retains a lot of collapsed RLP trie nodes in a
 // large memory cache.
-func NewDatabaseWithConfig(db ethdb.Database, config *trie.Config) Database {
+func NewDatabaseWithConfig(db ethdb.Database, config *zktrie.Config) Database {
 	csc, _ := lru.New(codeSizeCacheSize)
 	return &cachingDB{
-		zktrie:        config != nil && config.Zktrie,
-		db:            trie.NewDatabaseWithConfig(db, config),
+		db:            zktrie.NewDatabaseWithConfig(db, config),
 		codeSizeCache: csc,
 		codeCache:     fastcache.New(codeCacheSize),
 	}
 }
 
 type cachingDB struct {
-	db            *trie.Database
+	db            *zktrie.Database
 	codeSizeCache *lru.Cache
 	codeCache     *fastcache.Cache
-	zktrie        bool
 }
 
 // OpenTrie opens the main account trie at a specific root hash.
 func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
-	if db.zktrie {
-		tr, err := trie.NewZkTrie(root, trie.NewZktrieDatabaseFromTriedb(db.db))
-		if err != nil {
-			return nil, err
-		}
-		return tr, nil
-	}
-	tr, err := trie.NewSecure(root, db.db)
+	tr, err := zktrie.NewSecure(root, db.db)
 	if err != nil {
 		return nil, err
 	}
@@ -152,14 +144,7 @@ func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
 
 // OpenStorageTrie opens the storage trie of an account.
 func (db *cachingDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
-	if db.zktrie {
-		tr, err := trie.NewZkTrie(root, trie.NewZktrieDatabaseFromTriedb(db.db))
-		if err != nil {
-			return nil, err
-		}
-		return tr, nil
-	}
-	tr, err := trie.NewSecure(root, db.db)
+	tr, err := zktrie.NewSecure(root, db.db)
 	if err != nil {
 		return nil, err
 	}
@@ -169,9 +154,7 @@ func (db *cachingDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
 // CopyTrie returns an independent copy of the given trie.
 func (db *cachingDB) CopyTrie(t Trie) Trie {
 	switch t := t.(type) {
-	case *trie.SecureTrie:
-		return t.Copy()
-	case *trie.ZkTrie:
+	case *zktrie.SecureTrie:
 		return t.Copy()
 	default:
 		panic(fmt.Errorf("unknown trie type %T", t))
@@ -218,6 +201,6 @@ func (db *cachingDB) ContractCodeSize(addrHash, codeHash common.Hash) (int, erro
 }
 
 // TrieDB retrieves any intermediate trie-node caching layer.
-func (db *cachingDB) TrieDB() *trie.Database {
+func (db *cachingDB) TrieDB() *zktrie.Database {
 	return db.db
 }

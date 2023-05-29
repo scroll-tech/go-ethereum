@@ -355,6 +355,8 @@ func TestZeroValueToNotExitCall(t *testing.T) {
 		to: core.GenesisAccount{
 			Nonce: 1,
 			Code:  code,
+			// nil balance may lead to panic in stateAccount unmarshaling
+			Balance: big.NewInt(0),
 		},
 		origin: core.GenesisAccount{
 			Nonce:   0,

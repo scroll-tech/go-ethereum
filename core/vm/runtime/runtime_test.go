@@ -698,13 +698,14 @@ func TestColdAccountAccessCost(t *testing.T) {
 			step: 6,
 			want: 2855,
 		},
-		{ // SELFDESTRUCT(0xff)
-			code: []byte{
-				byte(vm.PUSH1), 0xff, byte(vm.SELFDESTRUCT),
-			},
-			step: 1,
-			want: 7600,
-		},
+		// Destruct has been disabled in scroll
+		//{ // SELFDESTRUCT(0xff)
+		//	code: []byte{
+		//		byte(vm.PUSH1), 0xff, byte(vm.SELFDESTRUCT),
+		//	},
+		//	step: 1,
+		//	want: 7600,
+		//},
 	} {
 		tracer := vm.NewStructLogger(nil)
 		Execute(tc.code, nil, &Config{
@@ -839,19 +840,20 @@ func TestRuntimeJSTracer(t *testing.T) {
 			},
 			results: []string{`"1,1,4294964719,6,12"`, `"1,1,4294964719,6,0"`},
 		},
-		{
-			// CALL self-destructing contract
-			code: []byte{
-				// outsize, outoffset, insize, inoffset
-				byte(vm.PUSH1), 0, byte(vm.PUSH1), 0, byte(vm.PUSH1), 0, byte(vm.PUSH1), 0,
-				byte(vm.PUSH1), 0, // value
-				byte(vm.PUSH1), 0xff, //address
-				byte(vm.GAS), // gas
-				byte(vm.CALL),
-				byte(vm.POP),
-			},
-			results: []string{`"2,2,0,5003,12"`, `"2,2,0,5003,0"`},
-		},
+		// Destruct has been disabled in scroll
+		//{
+		//	// CALL self-destructing contract
+		//	code: []byte{
+		//		// outsize, outoffset, insize, inoffset
+		//		byte(vm.PUSH1), 0, byte(vm.PUSH1), 0, byte(vm.PUSH1), 0, byte(vm.PUSH1), 0,
+		//		byte(vm.PUSH1), 0, // value
+		//		byte(vm.PUSH1), 0xff, //address
+		//		byte(vm.GAS), // gas
+		//		byte(vm.CALL),
+		//		byte(vm.POP),
+		//	},
+		//	results: []string{`"2,2,0,5003,12"`, `"2,2,0,5003,0"`},
+		//},
 	}
 	calleeCode := []byte{
 		byte(vm.PUSH1), 0,

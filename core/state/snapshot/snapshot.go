@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -30,7 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
@@ -159,7 +160,7 @@ type snapshot interface {
 // cheap iteration of the account/storage tries for sync aid.
 type Tree struct {
 	diskdb ethdb.KeyValueStore      // Persistent database to store the snapshot
-	triedb *trie.Database           // In-memory cache to access the trie through
+	triedb *zktrie.Database         // In-memory cache to access the trie through
 	cache  int                      // Megabytes permitted to use for read caches
 	layers map[common.Hash]snapshot // Collection of all known layers
 	lock   sync.RWMutex
@@ -179,15 +180,12 @@ type Tree struct {
 // If the memory layers in the journal do not match the disk layer (e.g. there is
 // a gap) or the journal is missing, there are two repair cases:
 //
-// - if the 'recovery' parameter is true, all memory diff-layers will be discarded.
-//   This case happens when the snapshot is 'ahead' of the state trie.
-// - otherwise, the entire snapshot is considered invalid and will be recreated on
-//   a background thread.
-func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash, async bool, rebuild bool, recovery bool) (*Tree, error) {
+//   - if the 'recovery' parameter is true, all memory diff-layers will be discarded.
+//     This case happens when the snapshot is 'ahead' of the state trie.
+//   - otherwise, the entire snapshot is considered invalid and will be recreated on
+//     a background thread.
+func New(diskdb ethdb.KeyValueStore, triedb *zktrie.Database, cache int, root common.Hash, async bool, rebuild bool, recovery bool) (*Tree, error) {
 	// Create a new, empty snapshot tree
-	if triedb.Zktrie {
-		panic("zktrie does not support snapshot yet")
-	}
 	snap := &Tree{
 		diskdb: diskdb,
 		triedb: triedb,
@@ -490,7 +488,16 @@ func (t *Tree) cap(diff *diffLayer, layers int) *diskLayer {
 			// there's a snapshot being generated currently. In that case, the trie
 			// will move from underneath the generator so we **must** merge all the
 			// partial data down into the snapshot and restart the generation.
-			if flattened.parent.(*diskLayer).genAbort == nil {
+			//if flattened.parent.(*diskLayer).genAbort == nil {
+			//	return nil
+			//}
+
+			// In order to prevent the generation process from being frequently interrupted
+			// and affect performance, we wait 5 seconds and then do the diff-to-disk work
+			if flattened.parent.(*diskLayer).genAbort != nil {
+				log.Debug("diff flatten downward while snapshot generation, wait for 5s and write diff into disk")
+				time.Sleep(5 * time.Second)
+			} else {
 				return nil
 			}
 		}
@@ -672,9 +679,10 @@ func (t *Tree) Journal(root common.Hash) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	diskroot := t.diskRoot()
-	if diskroot == (common.Hash{}) {
-		return common.Hash{}, errors.New("invalid disk root")
-	}
+	// common.Hash{} is an empty trie
+	//if diskroot == (common.Hash{}) {
+	//	return common.Hash{}, errors.New("invalid disk root")
+	//}
 	// Secondly write out the disk layer root, ensure the
 	// diff journal is continuous with disk.
 	if err := rlp.Encode(journal, diskroot); err != nil {

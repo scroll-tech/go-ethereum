@@ -29,7 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 func NewState(ctx context.Context, head *types.Header, odr OdrBackend) *state.StateDB {
@@ -89,14 +89,14 @@ func (db *odrDatabase) ContractCodeSize(addrHash, codeHash common.Hash) (int, er
 	return len(code), err
 }
 
-func (db *odrDatabase) TrieDB() *trie.Database {
+func (db *odrDatabase) TrieDB() *zktrie.Database {
 	return nil
 }
 
 type odrTrie struct {
 	db   *odrDatabase
 	id   *TrieID
-	trie *trie.Trie
+	trie *zktrie.Trie
 }
 
 func (t *odrTrie) TryGet(key []byte) ([]byte, error) {
@@ -134,7 +134,7 @@ func (t *odrTrie) TryDelete(key []byte) error {
 	})
 }
 
-func (t *odrTrie) Commit(onleaf trie.LeafCallback) (common.Hash, int, error) {
+func (t *odrTrie) Commit(onleaf zktrie.LeafCallback) (common.Hash, int, error) {
 	if t.trie == nil {
 		return t.id.Root, 0, nil
 	}
@@ -148,7 +148,7 @@ func (t *odrTrie) Hash() common.Hash {
 	return t.trie.Hash()
 }
 
-func (t *odrTrie) NodeIterator(startkey []byte) trie.NodeIterator {
+func (t *odrTrie) NodeIterator(startkey []byte) zktrie.NodeIterator {
 	return newNodeIterator(t, startkey)
 }
 
@@ -166,12 +166,12 @@ func (t *odrTrie) do(key []byte, fn func() error) error {
 	for {
 		var err error
 		if t.trie == nil {
-			t.trie, err = trie.New(t.id.Root, trie.NewDatabase(t.db.backend.Database()))
+			t.trie, err = zktrie.New(t.id.Root, zktrie.NewDatabase(t.db.backend.Database()))
 		}
 		if err == nil {
 			err = fn()
 		}
-		if _, ok := err.(*trie.MissingNodeError); !ok {
+		if _, ok := err.(*zktrie.MissingNodeError); !ok {
 			return err
 		}
 		r := &TrieRequest{Id: t.id, Key: key}
@@ -182,17 +182,17 @@ func (t *odrTrie) do(key []byte, fn func() error) error {
 }
 
 type nodeIterator struct {
-	trie.NodeIterator
+	zktrie.NodeIterator
 	t   *odrTrie
 	err error
 }
 
-func newNodeIterator(t *odrTrie, startkey []byte) trie.NodeIterator {
+func newNodeIterator(t *odrTrie, startkey []byte) zktrie.NodeIterator {
 	it := &nodeIterator{t: t}
 	// Open the actual non-ODR trie if that hasn't happened yet.
 	if t.trie == nil {
 		it.do(func() error {
-			t, err := trie.New(t.id.Root, trie.NewDatabase(t.db.backend.Database()))
+			t, err := zktrie.New(t.id.Root, zktrie.NewDatabase(t.db.backend.Database()))
 			if err == nil {
 				it.t.trie = t
 			}
@@ -220,7 +220,7 @@ func (it *nodeIterator) do(fn func() error) {
 	var lasthash common.Hash
 	for {
 		it.err = fn()
-		missing, ok := it.err.(*trie.MissingNodeError)
+		missing, ok := it.err.(*zktrie.MissingNodeError)
 		if !ok {
 			return
 		}

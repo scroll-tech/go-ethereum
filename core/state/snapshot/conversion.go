@@ -31,7 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // trieKV represents a trie key-value pair
@@ -43,7 +43,7 @@ type trieKV struct {
 type (
 	// trieGeneratorFn is the interface of trie generation which can
 	// be implemented by different trie algorithm.
-	trieGeneratorFn func(db ethdb.KeyValueWriter, in chan (trieKV), out chan (common.Hash))
+	trieGeneratorFn func(db ethdb.KeyValueWriter, kind string, in chan (trieKV), out chan (common.Hash))
 
 	// leafCallbackFn is the callback invoked at the leaves of the trie,
 	// returns the subtrie root with the specified subtrie identifier.
@@ -253,7 +253,13 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		generatorFn(db, in, out)
+		var kind string
+		if account == (common.Hash{}) {
+			kind = "account"
+		} else {
+			kind = "storage"
+		}
+		generatorFn(db, kind, in, out)
 	}()
 	// Spin up a go-routine for progress logging
 	if report && stats != nil {
@@ -360,10 +366,10 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 	return stop(nil)
 }
 
-func stackTrieGenerate(db ethdb.KeyValueWriter, in chan trieKV, out chan common.Hash) {
-	t := trie.NewStackTrie(db)
+func stackTrieGenerate(db ethdb.KeyValueWriter, kind string, in chan trieKV, out chan common.Hash) {
+	t := zktrie.NewStackTrie(db)
 	for leaf := range in {
-		t.TryUpdate(leaf.key[:], leaf.value)
+		t.TryUpdateWithKind(kind, leaf.key[:], leaf.value)
 	}
 	var root common.Hash
 	if db == nil {

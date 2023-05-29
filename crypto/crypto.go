@@ -30,14 +30,17 @@ import (
 	"math/big"
 	"os"
 
+	itypes "github.com/scroll-tech/zktrie/types"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
+	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-//SignatureLength indicates the byte length required to carry a signature with recovery id.
+// SignatureLength indicates the byte length required to carry a signature with recovery id.
 const SignatureLength = 64 + 1 // 64 bytes ECDSA signature + 1 byte recovery id
 
 // RecoveryIDOffset points to the byte offset within the signature that contains the recovery id.
@@ -52,6 +55,10 @@ var (
 )
 
 var errInvalidPubkey = errors.New("invalid secp256k1 public key")
+
+func init() {
+	itypes.InitHashScheme(poseidon.HashFixed)
+}
 
 // KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
 // Read to get a variable amount of data from the hash state. Read is faster than Sum
@@ -103,6 +110,35 @@ func Keccak512(data ...[]byte) []byte {
 		d.Write(b)
 	}
 	return d.Sum(nil)
+}
+
+func reverseBitInPlace(b []byte) {
+	var v [8]uint8
+	for i := 0; i < len(b); i++ {
+		for j := 0; j < 8; j++ {
+			v[j] = (b[i] >> j) & 1
+		}
+		b[i] = 0
+		for j := 0; j < 8; j++ {
+			b[i] |= v[8-j-1] << j
+		}
+	}
+}
+
+func PoseidonSecure(data []byte) []byte {
+	sk, err := itypes.ToSecureKey(data)
+	if err != nil {
+		fmt.Printf("err: %v", err)
+		log.Error(fmt.Sprintf("make data secure failed: %v", err))
+		return nil
+	}
+	b := itypes.NewHashFromBigInt(sk)
+	reverseBitInPlace(b[:])
+	return b[:]
+}
+
+func PoseidonSecureHash(data []byte) common.Hash {
+	return common.BytesToHash(PoseidonSecure(data))
 }
 
 // CreateAddress creates an ethereum address given the bytes and the nonce

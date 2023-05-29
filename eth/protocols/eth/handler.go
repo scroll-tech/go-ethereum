@@ -29,7 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/p2p/enr"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const (
@@ -70,7 +70,7 @@ type Backend interface {
 	Chain() *core.BlockChain
 
 	// StateBloom retrieves the bloom filter - if any - for state trie nodes.
-	StateBloom() *trie.SyncBloom
+	StateBloom() *zktrie.SyncBloom
 
 	// TxPool retrieves the transaction pool object to serve data.
 	TxPool() TxPool

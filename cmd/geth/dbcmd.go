@@ -38,7 +38,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
@@ -501,12 +501,12 @@ func dbDumpTrie(ctx *cli.Context) error {
 			return err
 		}
 	}
-	theTrie, err := trie.New(stRoot, trie.NewDatabase(db))
+	theTrie, err := zktrie.New(stRoot, zktrie.NewDatabase(db))
 	if err != nil {
 		return err
 	}
 	var count int64
-	it := trie.NewIterator(theTrie.NodeIterator(start))
+	it := zktrie.NewIterator(theTrie.NodeIterator(start))
 	for it.Next() {
 		if max > 0 && count == max {
 			fmt.Printf("Exiting after %d values\n", count)

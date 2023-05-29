@@ -923,8 +923,8 @@ func decreseKey(key []byte) []byte {
 	return key
 }
 
-func BenchmarkProve(b *testing.B) {
-	trie, vals := randomTrie(100)
+func BenchmarkProveTrie(b *testing.B) {
+	trie, vals := randomTrie(4096)
 	var keys []string
 	for k := range vals {
 		keys = append(keys, k)
@@ -934,7 +934,24 @@ func BenchmarkProve(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		kv := vals[keys[i%len(keys)]]
 		proofs := memorydb.New()
-		if trie.Prove(kv.k, 0, proofs); proofs.Len() == 0 {
+		if err := trie.Prove(kv.k, 0, proofs); err != nil || proofs.Len() == 0 {
+			b.Fatalf("zero length proof for %x", kv.k)
+		}
+	}
+}
+
+func BenchmarkProveSecureTrie(b *testing.B) {
+	trie, vals := randomSecureTrie(4096)
+	var keys []string
+	for k := range vals {
+		keys = append(keys, k)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		kv := vals[keys[i%len(keys)]]
+		proofs := memorydb.New()
+		if err := trie.Prove(kv.k, 0, proofs); err != nil || proofs.Len() == 0 {
 			b.Fatalf("zero length proof for %x", kv.k)
 		}
 	}
@@ -1027,7 +1044,7 @@ func benchmarkVerifyRangeNoProof(b *testing.B, size int) {
 }
 
 func randomTrie(n int) (*Trie, map[string]*kv) {
-	trie := new(Trie)
+	trie, _ := New(common.Hash{}, NewDatabase(memorydb.New()))
 	vals := make(map[string]*kv)
 	for i := byte(0); i < 100; i++ {
 		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
@@ -1042,6 +1059,27 @@ func randomTrie(n int) (*Trie, map[string]*kv) {
 		trie.Update(value.k, value.v)
 		vals[string(value.k)] = value
 	}
+	trie.Commit(nil)
+	return trie, vals
+}
+
+func randomSecureTrie(n int) (*SecureTrie, map[string]*kv) {
+	trie, _ := NewSecure(common.Hash{}, NewDatabase(memorydb.New()))
+	vals := make(map[string]*kv)
+	for i := byte(0); i < 100; i++ {
+		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
+		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), []byte{i}, false}
+		trie.Update(value.k, value.v)
+		trie.Update(value2.k, value2.v)
+		vals[string(value.k)] = value
+		vals[string(value2.k)] = value2
+	}
+	for i := 0; i < n; i++ {
+		value := &kv{randBytes(32), randBytes(20), false}
+		trie.Update(value.k, value.v)
+		vals[string(value.k)] = value
+	}
+	trie.Commit(nil)
 	return trie, vals
 }
 

@@ -30,8 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/p2p/enr"
-	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 const (
@@ -165,7 +164,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 			req.Bytes = softResponseLimit
 		}
 		// Retrieve the requested state and bail out if non existent
-		tr, err := trie.New(req.Root, backend.Chain().StateCache().TrieDB())
+		tr, err := zktrie.New(req.Root, backend.Chain().StateCache().TrieDB())
 		if err != nil {
 			return p2p.Send(peer.rw, AccountRangeMsg, &AccountRangePacket{ID: req.ID})
 		}
@@ -315,15 +314,15 @@ func handleMessage(backend Backend, peer *Peer) error {
 			if origin != (common.Hash{}) || abort {
 				// Request started at a non-zero hash or was capped prematurely, add
 				// the endpoint Merkle proofs
-				accTrie, err := trie.New(req.Root, backend.Chain().StateCache().TrieDB())
+				accTrie, err := zktrie.New(req.Root, backend.Chain().StateCache().TrieDB())
 				if err != nil {
 					return p2p.Send(peer.rw, StorageRangesMsg, &StorageRangesPacket{ID: req.ID})
 				}
-				var acc types.StateAccount
-				if err := rlp.DecodeBytes(accTrie.Get(account[:]), &acc); err != nil {
+				acc, err := types.UnmarshalStateAccount(accTrie.Get(account[:]))
+				if err != nil {
 					return p2p.Send(peer.rw, StorageRangesMsg, &StorageRangesPacket{ID: req.ID})
 				}
-				stTrie, err := trie.New(acc.Root, backend.Chain().StateCache().TrieDB())
+				stTrie, err := zktrie.New(acc.Root, backend.Chain().StateCache().TrieDB())
 				if err != nil {
 					return p2p.Send(peer.rw, StorageRangesMsg, &StorageRangesPacket{ID: req.ID})
 				}
@@ -430,7 +429,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 		// Make sure we have the state associated with the request
 		triedb := backend.Chain().StateCache().TrieDB()
 
-		accTrie, err := trie.NewSecure(req.Root, triedb)
+		accTrie, err := zktrie.NewSecure(req.Root, triedb)
 		if err != nil {
 			// We don't have the requested state available, bail out
 			return p2p.Send(peer.rw, TrieNodesMsg, &TrieNodesPacket{ID: req.ID})
@@ -472,7 +471,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 				if err != nil || account == nil {
 					break
 				}
-				stTrie, err := trie.NewSecure(common.BytesToHash(account.Root), triedb)
+				stTrie, err := zktrie.NewSecure(common.BytesToHash(account.Root), triedb)
 				loads++ // always account database reads, even for failures
 				if err != nil {
 					break

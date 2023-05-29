@@ -43,12 +43,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/p2p/msgrate"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	emptyRoot = common.Hash{}
 
 	// emptyKeccakCodeHash is the known keccak hash of the empty EVM bytecode.
 	emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
@@ -235,8 +235,8 @@ type trienodeHealRequest struct {
 	timeout *time.Timer                // Timer to track delivery timeout
 	stale   chan struct{}              // Channel to signal the request was dropped
 
-	hashes []common.Hash   // Trie node hashes to validate responses
-	paths  []trie.SyncPath // Trie node paths requested for rescheduling
+	hashes []common.Hash     // Trie node hashes to validate responses
+	paths  []zktrie.SyncPath // Trie node paths requested for rescheduling
 
 	task *healTask // Task which this request is filling (only access fields through the runloop!!)
 }
@@ -245,9 +245,9 @@ type trienodeHealRequest struct {
 type trienodeHealResponse struct {
 	task *healTask // Task which this request is filling
 
-	hashes []common.Hash   // Hashes of the trie nodes to avoid double hashing
-	paths  []trie.SyncPath // Trie node paths requested for rescheduling missing ones
-	nodes  [][]byte        // Actual trie nodes to store into the database (nil = missing)
+	hashes []common.Hash     // Hashes of the trie nodes to avoid double hashing
+	paths  []zktrie.SyncPath // Trie node paths requested for rescheduling missing ones
+	nodes  [][]byte          // Actual trie nodes to store into the database (nil = missing)
 }
 
 // bytecodeHealRequest tracks a pending bytecode request to ensure responses are to
@@ -301,8 +301,8 @@ type accountTask struct {
 	codeTasks  map[common.Hash]struct{}    // Code hashes that need retrieval
 	stateTasks map[common.Hash]common.Hash // Account hashes->roots that need full state retrieval
 
-	genBatch ethdb.Batch     // Batch used by the node generator
-	genTrie  *trie.StackTrie // Node generator from storage slots
+	genBatch ethdb.Batch       // Batch used by the node generator
+	genTrie  *zktrie.StackTrie // Node generator from storage slots
 
 	done bool // Flag whether the task can be removed
 }
@@ -316,18 +316,18 @@ type storageTask struct {
 	root common.Hash     // Storage root hash for this instance
 	req  *storageRequest // Pending request to fill this task
 
-	genBatch ethdb.Batch     // Batch used by the node generator
-	genTrie  *trie.StackTrie // Node generator from storage slots
+	genBatch ethdb.Batch       // Batch used by the node generator
+	genTrie  *zktrie.StackTrie // Node generator from storage slots
 
 	done bool // Flag whether the task can be removed
 }
 
 // healTask represents the sync task for healing the snap-synced chunk boundaries.
 type healTask struct {
-	scheduler *trie.Sync // State trie sync scheduler defining the tasks
+	scheduler *zktrie.Sync // State trie sync scheduler defining the tasks
 
-	trieTasks map[common.Hash]trie.SyncPath // Set of trie node tasks currently queued for retrieval
-	codeTasks map[common.Hash]struct{}      // Set of byte code tasks currently queued for retrieval
+	trieTasks map[common.Hash]zktrie.SyncPath // Set of trie node tasks currently queued for retrieval
+	codeTasks map[common.Hash]struct{}        // Set of byte code tasks currently queued for retrieval
 }
 
 // syncProgress is a database entry to allow suspending and resuming a snapshot state
@@ -549,7 +549,7 @@ func (s *Syncer) Sync(root common.Hash, cancel chan struct{}) error {
 	s.root = root
 	s.healer = &healTask{
 		scheduler: state.NewStateSync(root, s.db, nil, s.onHealState),
-		trieTasks: make(map[common.Hash]trie.SyncPath),
+		trieTasks: make(map[common.Hash]zktrie.SyncPath),
 		codeTasks: make(map[common.Hash]struct{}),
 	}
 	s.statelessPeers = make(map[string]struct{})
@@ -693,7 +693,7 @@ func (s *Syncer) loadSyncStatus() {
 						s.accountBytes += common.StorageSize(len(key) + len(value))
 					},
 				}
-				task.genTrie = trie.NewStackTrie(task.genBatch)
+				task.genTrie = zktrie.NewStackTrie(task.genBatch)
 
 				for _, subtasks := range task.SubTasks {
 					for _, subtask := range subtasks {
@@ -703,7 +703,7 @@ func (s *Syncer) loadSyncStatus() {
 								s.storageBytes += common.StorageSize(len(key) + len(value))
 							},
 						}
-						subtask.genTrie = trie.NewStackTrie(subtask.genBatch)
+						subtask.genTrie = zktrie.NewStackTrie(subtask.genBatch)
 					}
 				}
 			}
@@ -757,7 +757,7 @@ func (s *Syncer) loadSyncStatus() {
 			Last:     last,
 			SubTasks: make(map[common.Hash][]*storageTask),
 			genBatch: batch,
-			genTrie:  trie.NewStackTrie(batch),
+			genTrie:  zktrie.NewStackTrie(batch),
 		})
 		log.Debug("Created account sync task", "from", next, "last", last)
 		next = common.BigToHash(new(big.Int).Add(last.Big(), common.Big1))
@@ -1291,7 +1291,7 @@ func (s *Syncer) assignTrienodeHealTasks(success chan *trienodeHealResponse, fai
 		}
 		var (
 			hashes   = make([]common.Hash, 0, cap)
-			paths    = make([]trie.SyncPath, 0, cap)
+			paths    = make([]zktrie.SyncPath, 0, cap)
 			pathsets = make([]TrieNodePathSet, 0, cap)
 		)
 		for hash, pathset := range s.healer.trieTasks {
@@ -1766,7 +1766,7 @@ func (s *Syncer) processAccountResponse(res *accountResponse) {
 		}
 		// Check if the account is a contract with an unknown storage trie
 		if account.Root != emptyRoot {
-			if node, err := s.db.Get(account.Root[:]); err != nil || node == nil {
+			if node := rawdb.ReadZKTrieNode(s.db, account.Root); node == nil {
 				// If there was a previous large state retrieval in progress,
 				// don't restart it from scratch. This happens if a sync cycle
 				// is interrupted and resumed later. However, *do* update the
@@ -1938,7 +1938,7 @@ func (s *Syncer) processStorageResponse(res *storageResponse) {
 						Last:     r.End(),
 						root:     acc.Root,
 						genBatch: batch,
-						genTrie:  trie.NewStackTrie(batch),
+						genTrie:  zktrie.NewStackTrie(batch),
 					})
 					for r.Next() {
 						batch := ethdb.HookedBatch{
@@ -1952,7 +1952,7 @@ func (s *Syncer) processStorageResponse(res *storageResponse) {
 							Last:     r.End(),
 							root:     acc.Root,
 							genBatch: batch,
-							genTrie:  trie.NewStackTrie(batch),
+							genTrie:  zktrie.NewStackTrie(batch),
 						})
 					}
 					for _, task := range tasks {
@@ -1997,7 +1997,7 @@ func (s *Syncer) processStorageResponse(res *storageResponse) {
 		slots += len(res.hashes[i])
 
 		if i < len(res.hashes)-1 || res.subTask == nil {
-			tr := trie.NewStackTrie(batch)
+			tr := zktrie.NewStackTrie(batch)
 			for j := 0; j < len(res.hashes[i]); j++ {
 				tr.Update(res.hashes[i][j][:], res.slots[i][j])
 			}
@@ -2070,12 +2070,12 @@ func (s *Syncer) processTrienodeHealResponse(res *trienodeHealResponse) {
 		s.trienodeHealSynced++
 		s.trienodeHealBytes += common.StorageSize(len(node))
 
-		err := s.healer.scheduler.Process(trie.SyncResult{Hash: hash, Data: node})
+		err := s.healer.scheduler.Process(zktrie.SyncResult{Hash: hash, Data: node})
 		switch err {
 		case nil:
-		case trie.ErrAlreadyProcessed:
+		case zktrie.ErrAlreadyProcessed:
 			s.trienodeHealDups++
-		case trie.ErrNotRequested:
+		case zktrie.ErrNotRequested:
 			s.trienodeHealNops++
 		default:
 			log.Error("Invalid trienode processed", "hash", hash, "err", err)
@@ -2106,12 +2106,12 @@ func (s *Syncer) processBytecodeHealResponse(res *bytecodeHealResponse) {
 		s.bytecodeHealSynced++
 		s.bytecodeHealBytes += common.StorageSize(len(node))
 
-		err := s.healer.scheduler.Process(trie.SyncResult{Hash: hash, Data: node})
+		err := s.healer.scheduler.Process(zktrie.SyncResult{Hash: hash, Data: node})
 		switch err {
 		case nil:
-		case trie.ErrAlreadyProcessed:
+		case zktrie.ErrAlreadyProcessed:
 			s.bytecodeHealDups++
-		case trie.ErrNotRequested:
+		case zktrie.ErrNotRequested:
 			s.bytecodeHealNops++
 		default:
 			log.Error("Invalid bytecode processed", "hash", hash, "err", err)
@@ -2159,11 +2159,7 @@ func (s *Syncer) forwardAccountTask(task *accountTask) {
 		// If the task is complete, drop it into the stack trie to generate
 		// account trie nodes for it
 		if !task.needHeal[i] {
-			full, err := snapshot.FullAccountRLP(slim) // TODO(karalabe): Slim parsing can be omitted
-			if err != nil {
-				panic(err) // Really shouldn't ever happen
-			}
-			task.genTrie.Update(hash[:], full)
+			task.genTrie.UpdateAccount(hash[:], res.accounts[i])
 		}
 	}
 	// Flush anything written just now and update the stats
@@ -2273,7 +2269,7 @@ func (s *Syncer) OnAccounts(peer SyncPeer, id uint64, hashes []common.Hash, acco
 	if len(keys) > 0 {
 		end = keys[len(keys)-1]
 	}
-	cont, err := trie.VerifyRangeProof(root, req.origin[:], end, keys, accounts, proofdb)
+	cont, err := zktrie.VerifyRangeProof(root, "account", req.origin[:], end, keys, accounts, proofdb)
 	if err != nil {
 		logger.Warn("Account range failed proof", "err", err)
 		// Signal this request as failed, and ready for rescheduling
@@ -2510,7 +2506,7 @@ func (s *Syncer) OnStorage(peer SyncPeer, id uint64, hashes [][]common.Hash, slo
 		if len(nodes) == 0 {
 			// No proof has been attached, the response must cover the entire key
 			// space and hash to the origin root.
-			_, err = trie.VerifyRangeProof(req.roots[i], nil, nil, keys, slots[i], nil)
+			_, err = zktrie.VerifyRangeProof(req.roots[i], "storage", nil, nil, keys, slots[i], nil)
 			if err != nil {
 				s.scheduleRevertStorageRequest(req) // reschedule request
 				logger.Warn("Storage slots failed proof", "err", err)
@@ -2525,7 +2521,7 @@ func (s *Syncer) OnStorage(peer SyncPeer, id uint64, hashes [][]common.Hash, slo
 			if len(keys) > 0 {
 				end = keys[len(keys)-1]
 			}
-			cont, err = trie.VerifyRangeProof(req.roots[i], req.origin[:], end, keys, slots[i], proofdb)
+			cont, err = zktrie.VerifyRangeProof(req.roots[i], "storage", req.origin[:], end, keys, slots[i], proofdb)
 			if err != nil {
 				s.scheduleRevertStorageRequest(req) // reschedule request
 				logger.Warn("Storage range failed proof", "err", err)
@@ -2607,23 +2603,18 @@ func (s *Syncer) OnTrieNodes(peer SyncPeer, id uint64, trienodes [][]byte) error
 
 	// Cross reference the requested trienodes with the response to find gaps
 	// that the serving node is missing
-	hasher := sha3.NewLegacyKeccak256().(crypto.KeccakState)
-	hash := make([]byte, 32)
-
 	nodes := make([][]byte, len(req.hashes))
 	for i, j := 0, 0; i < len(trienodes); i++ {
 		// Find the next hash that we've been served, leaving misses with nils
-		hasher.Reset()
-		hasher.Write(trienodes[i])
-		hasher.Read(hash)
-
-		for j < len(req.hashes) && !bytes.Equal(hash, req.hashes[j][:]) {
-			j++
-		}
-		if j < len(req.hashes) {
-			nodes[j] = trienodes[i]
-			j++
-			continue
+		if hash, err := zktrie.NodeHash(trienodes[i]); err == nil {
+			for j < len(req.hashes) && !bytes.Equal(hash[:], req.hashes[j][:]) {
+				j++
+			}
+			if j < len(req.hashes) {
+				nodes[j] = trienodes[i]
+				j++
+				continue
+			}
 		}
 		// We've either ran out of hashes, or got unrequested data
 		logger.Warn("Unexpected healing trienodes", "count", len(trienodes)-i)
@@ -2746,8 +2737,8 @@ func (s *Syncer) onHealByteCodes(peer SyncPeer, id uint64, bytecodes [][]byte) e
 // Note it's not concurrent safe, please handle the concurrent issue outside.
 func (s *Syncer) onHealState(paths [][]byte, value []byte) error {
 	if len(paths) == 1 {
-		var account types.StateAccount
-		if err := rlp.DecodeBytes(value, &account); err != nil {
+		account, err := types.UnmarshalStateAccount(value)
+		if err != nil {
 			return nil
 		}
 		blob := snapshot.SlimAccountRLP(account.Nonce, account.Balance, account.Root, account.KeccakCodeHash, account.PoseidonCodeHash, account.CodeSize)

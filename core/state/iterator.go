@@ -22,7 +22,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -105,10 +104,14 @@ func (it *NodeIterator) step() error {
 		return nil
 	}
 	// Otherwise we've reached an account node, initiate data iteration
-	var account types.StateAccount
-	if err := rlp.Decode(bytes.NewReader(it.stateIt.LeafBlob()), &account); err != nil {
+	account, err := types.UnmarshalStateAccount(it.stateIt.LeafBlob())
+	if err != nil {
 		return err
 	}
+	//var account types.StateAccount
+	//if err := rlp.Decode(bytes.NewReader(it.stateIt.LeafBlob()), &account); err != nil {
+	//	return err
+	//}
 	dataTrie, err := it.state.db.OpenStorageTrie(common.BytesToHash(it.stateIt.LeafKey()), account.Root)
 	if err != nil {
 		return err

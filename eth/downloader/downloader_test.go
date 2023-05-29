@@ -34,7 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/eth/protocols/eth"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // Reduce some of the parameters to make the tester faster.
@@ -87,9 +87,9 @@ func newTester() *downloadTester {
 		ancientChainTd:  map[common.Hash]*big.Int{testGenesis.Hash(): testGenesis.Difficulty()},
 	}
 	tester.stateDb = rawdb.NewMemoryDatabase()
-	tester.stateDb.Put(testGenesis.Root().Bytes(), []byte{0x00})
+	writeZKTrieNode(tester.stateDb, testGenesis.Root(), []byte{0x00})
 
-	tester.downloader = New(0, tester.stateDb, trie.NewSyncBloom(1, tester.stateDb), new(event.TypeMux), tester, nil, tester.dropPeer)
+	tester.downloader = New(0, tester.stateDb, zktrie.NewSyncBloom(1, tester.stateDb), new(event.TypeMux), tester, nil, tester.dropPeer)
 	return tester
 }
 
@@ -188,6 +188,16 @@ func (dl *downloadTester) CurrentHeader() *types.Header {
 	return dl.genesis.Header()
 }
 
+func readZKTrieNode(db ethdb.KeyValueReader, hash common.Hash) ([]byte, error) {
+	storeHash := zktrie.StoreHashFromNodeHash(hash)
+	return db.Get(storeHash[:])
+}
+
+func writeZKTrieNode(db ethdb.KeyValueWriter, hash common.Hash, value []byte) error {
+	storeHash := zktrie.StoreHashFromNodeHash(hash)
+	return db.Put(storeHash[:], value)
+}
+
 // CurrentBlock retrieves the current head block from the canonical chain.
 func (dl *downloadTester) CurrentBlock() *types.Block {
 	dl.lock.RLock()
@@ -195,13 +205,13 @@ func (dl *downloadTester) CurrentBlock() *types.Block {
 
 	for i := len(dl.ownHashes) - 1; i >= 0; i-- {
 		if block := dl.ancientBlocks[dl.ownHashes[i]]; block != nil {
-			if _, err := dl.stateDb.Get(block.Root().Bytes()); err == nil {
+			if _, err := readZKTrieNode(dl.stateDb, block.Root()); err == nil {
 				return block
 			}
 			return block
 		}
 		if block := dl.ownBlocks[dl.ownHashes[i]]; block != nil {
-			if _, err := dl.stateDb.Get(block.Root().Bytes()); err == nil {
+			if _, err := readZKTrieNode(dl.stateDb, block.Root()); err == nil {
 				return block
 			}
 		}
@@ -229,7 +239,7 @@ func (dl *downloadTester) CurrentFastBlock() *types.Block {
 func (dl *downloadTester) FastSyncCommitHead(hash common.Hash) error {
 	// For now only check that the state trie is correct
 	if block := dl.GetBlockByHash(hash); block != nil {
-		_, err := trie.NewSecure(block.Root(), trie.NewDatabase(dl.stateDb))
+		_, err := zktrie.NewSecure(block.Root(), zktrie.NewDatabase(dl.stateDb))
 		return err
 	}
 	return fmt.Errorf("non existent block: %x", hash[:4])
@@ -296,7 +306,7 @@ func (dl *downloadTester) InsertChain(blocks types.Blocks) (i int, err error) {
 	for i, block := range blocks {
 		if parent, ok := dl.ownBlocks[block.ParentHash()]; !ok {
 			return i, fmt.Errorf("InsertChain: unknown parent at position %d / %d", i, len(blocks))
-		} else if _, err := dl.stateDb.Get(parent.Root().Bytes()); err != nil {
+		} else if _, err := readZKTrieNode(dl.stateDb, parent.Root()); err != nil {
 			return i, fmt.Errorf("InsertChain: unknown parent state %x: %v", parent.Root(), err)
 		}
 		if hdr := dl.getHeaderByHash(block.Hash()); hdr == nil {
@@ -305,7 +315,7 @@ func (dl *downloadTester) InsertChain(blocks types.Blocks) (i int, err error) {
 		}
 		dl.ownBlocks[block.Hash()] = block
 		dl.ownReceipts[block.Hash()] = make(types.Receipts, 0)
-		dl.stateDb.Put(block.Root().Bytes(), []byte{0x00})
+		writeZKTrieNode(dl.stateDb, block.Root(), []byte{0x00})
 		td := dl.getTd(block.ParentHash())
 		dl.ownChainTd[block.Hash()] = new(big.Int).Add(td, block.Difficulty())
 	}
@@ -474,7 +484,7 @@ func (dlp *downloadTesterPeer) RequestNodeData(hashes []common.Hash) error {
 
 	results := make([][]byte, 0, len(hashes))
 	for _, hash := range hashes {
-		if data, err := dlp.dl.peerDb.Get(hash.Bytes()); err == nil {
+		if data, err := readZKTrieNode(dlp.dl.peerDb, hash); err == nil {
 			if !dlp.missingStates[hash] {
 				results = append(results, data)
 			}

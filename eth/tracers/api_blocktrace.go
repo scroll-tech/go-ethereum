@@ -182,7 +182,7 @@ func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTr
 		msg, _ := tx.AsMessage(env.signer, block.BaseFee())
 		env.state.Prepare(tx.Hash(), i)
 		vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, api.backend.ChainConfig(), vm.Config{})
-		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas())); err != nil {
+		if _, err := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas())); err != nil {
 			failed = err
 			break
 		}
@@ -258,7 +258,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	state.Prepare(txctx.TxHash, txctx.TxIndex)
 
 	// Computes the new state by applying the given message.
-	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
+	result, err := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
 	if err != nil {
 		return fmt.Errorf("tracing failed: %w", err)
 	}

@@ -98,7 +98,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	evm.Reset(txContext, statedb)
 
 	// Apply the transaction to the current state (included in the env).
-	result, err := ApplyMessage(evm, msg, gp)
+	result, err := ApplyMessageAndL1DataFee(evm, msg, gp)
 	if err != nil {
 		return nil, err
 	}

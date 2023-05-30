@@ -22,10 +22,7 @@ var (
 	// to the RLP-encoded unsigned transaction. Note that these are all assumed
 	// to be non-zero.
 	// - tx length prefix: 4 bytes
-	// - sig.r: 32 bytes + 1 byte rlp prefix
-	// - sig.s: 32 bytes + 1 byte rlp prefix
-	// - sig.v:  3 bytes + 1 byte rlp prefix
-	txExtraDataBytes = uint64(74)
+	txExtraDataBytes = uint64(4)
 )
 
 // Message represents the interface of a message.
@@ -48,10 +45,7 @@ type StateDB interface {
 	GetBalance(addr common.Address) *big.Int
 }
 
-// CalculateL1MsgFee computes the L1 portion of the fee given
-// a Message and a StateDB
-// Reference: https://github.com/ethereum-optimism/optimism/blob/develop/l2geth/rollup/fees/rollup_fee.go
-func CalculateL1MsgFee(msg Message, state StateDB) (*big.Int, error) {
+func EstimateL1DataFeeForMessage(msg Message, state StateDB) (*big.Int, error) {
 	tx := asTransaction(msg)
 	raw, err := rlpEncode(tx)
 	if err != nil {
@@ -59,10 +53,11 @@ func CalculateL1MsgFee(msg Message, state StateDB) (*big.Int, error) {
 	}
 
 	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-	l1Fee := CalculateL1Fee(raw, overhead, l1BaseFee, scalar)
-	return l1Fee, nil
+	l1DataFee := CalculateL1Fee(raw, overhead, l1BaseFee, scalar)
+	return l1DataFee, nil
 }
 
+// TODO: other types
 // asTransaction turns a Message into a types.Transaction
 func asTransaction(msg Message) *types.Transaction {
 	if msg.To() == nil {
@@ -98,6 +93,7 @@ func rlpEncode(tx *types.Transaction) ([]byte, error) {
 		return nil, errTransactionSigned
 	}
 
+	// TODO: double-check this?
 	// Slice off the 0 bytes representing the signature
 	b := raw.Bytes()
 	return b[:len(b)-3], nil
@@ -150,6 +146,8 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
+// TODO: diff types?
+// TODO: keep signature?
 // copyTransaction copies the transaction, removing the signature
 func copyTransaction(tx *types.Transaction) *types.Transaction {
 	if tx.To() == nil {

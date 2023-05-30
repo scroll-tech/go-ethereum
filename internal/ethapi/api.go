@@ -907,6 +907,7 @@ func newRPCBalance(balance *big.Int) **hexutil.Big {
 	return &rpcBalance
 }
 
+// TODO: rename this API to EstimateL1MsgFee?
 func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
 	if !config.Scroll.FeeVaultEnabled() {
 		return big.NewInt(0), nil
@@ -947,7 +948,7 @@ func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blo
 		evm.Cancel()
 	}()
 
-	return fees.CalculateL1MsgFee(msg, evm.StateDB)
+	return fees.EstimateL1DataFeeForMessage(msg, evm.StateDB)
 }
 
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
@@ -990,7 +991,13 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 
 	// Execute the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	result, err := core.ApplyMessageAndL1DataFee(evm, msg, gp)
+
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, state)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := core.ApplyMessageAndL1DataFee(evm, msg, gp, l1DataFee)
 	if err := vmError(); err != nil {
 		return nil, err
 	}
@@ -1501,7 +1508,11 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		if err != nil {
 			return nil, 0, nil, err
 		}
-		res, err := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
+		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, statedb)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+		res, err := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}

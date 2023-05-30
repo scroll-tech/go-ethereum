@@ -37,6 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -166,8 +167,15 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		snapshot := statedb.Snapshot()
 		evm := vm.NewEVM(vmContext, txContext, statedb, chainConfig, vmConfig)
 
+		l1DataFee, _, _, err := fees.CalculateFees(tx, state)
+		if err != nil {
+			log.Info("rejected tx", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)
+			rejectedTxs = append(rejectedTxs, &rejectedTx{i, err.Error()})
+			continue
+		}
+
 		// (ret []byte, usedGas uint64, failed bool, err error)
-		msgResult, err := core.ApplyMessageAndL1DataFee(evm, msg, gaspool)
+		msgResult, err := core.ApplyMessageAndL1DataFee(evm, msg, gaspool, l1DataFee)
 		if err != nil {
 			statedb.RevertToSnapshot(snapshot)
 			log.Info("rejected tx", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)

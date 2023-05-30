@@ -28,7 +28,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
 
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
@@ -66,7 +65,7 @@ type StateTransition struct {
 	evm        *vm.EVM
 
 	// l1 rollup fee
-	l1Fee *big.Int
+	l1Fee *big.Int // TODO: rename to l1DataFee
 }
 
 // Message represents a message sent to a contract.
@@ -182,12 +181,7 @@ func toWordSize(size uint64) uint64 {
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
-	l1Fee := new(big.Int)
-	if evm.ChainConfig().Scroll.FeeVaultEnabled() {
-		l1Fee, _ = fees.CalculateL1MsgFee(msg, evm.StateDB)
-	}
-
+func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) *StateTransition {
 	return &StateTransition{
 		gp:        gp,
 		evm:       evm,
@@ -198,7 +192,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		value:     msg.Value(),
 		data:      msg.Data(),
 		state:     evm.StateDB,
-		l1Fee:     l1Fee,
+		l1Fee:     l1DataFee,
 	}
 }
 
@@ -209,8 +203,8 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessageAndL1DataFee(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb()
+func ApplyMessageAndL1DataFee(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) (*ExecutionResult, error) {
+	return NewStateTransition(evm, msg, gp, l1DataFee).TransitionDb()
 }
 
 // to returns the recipient of the message.

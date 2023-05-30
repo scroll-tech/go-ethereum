@@ -39,6 +39,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
 
 // StateTest checks transaction processing without block context.
@@ -225,7 +226,14 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	snapshot := statedb.Snapshot()
 	gaspool := new(core.GasPool)
 	gaspool.AddGas(block.GasLimit())
-	if _, err := core.ApplyMessageAndL1DataFee(evm, msg, gaspool); err != nil {
+
+	// TODO: use ttx?
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, statedb)
+	if err != nil {
+		return nil, nil, common.Hash{}, err
+	}
+
+	if _, err = core.ApplyMessageAndL1DataFee(evm, msg, gaspool, l1DataFee); err != nil {
 		statedb.RevertToSnapshot(snapshot)
 	}
 

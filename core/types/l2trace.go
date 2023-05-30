@@ -186,13 +186,11 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 	return result
 }
 
-// Wrapproof turn the bytes array into proof type (array of hexutil.Bytes)
-func Wrapproof(proofBytes [][]byte) (wrappedProof []hexutil.Bytes) {
-
+// WrapProof turn the bytes array into proof type (array of hexutil.Bytes)
+func WrapProof(proofBytes [][]byte) (wrappedProof []hexutil.Bytes) {
 	wrappedProof = make([]hexutil.Bytes, len(proofBytes))
 	for i, bt := range proofBytes {
 		wrappedProof[i] = bt
 	}
 	return
-
 }

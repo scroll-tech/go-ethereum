@@ -93,7 +93,6 @@ type proofCache struct {
 }
 
 func newProofCache(stateDb *state.StateDB, addr common.Address) *proofCache {
-
 	var zktrieTracer state.ZktrieProofTracer
 	trie, err := stateDb.GetStorageTrieForProof(addr)
 	// notice storage trie can be non-existed if the account is not existed
@@ -861,7 +860,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		proofAccounts[coinbase] = struct{}{}
 	}
 	proofAccounts[rcfg.L1GasPriceOracleAddress] = struct{}{}
-	proofAccounts[coinbase] = struct{}{}
 	for addr := range proofAccounts {
 		addrStr := addr.String()
 		proofCache, existed := proofCaches[addrStr]
@@ -872,7 +870,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 				log.Error("Proof not available", "address", addrStr, "error", err)
 				// but we still mark the proofs map with nil array
 			}
-			proofCache.accountProof = types.Wrapproof(proof)
+			proofCache.accountProof = types.WrapProof(proof)
 			proofCaches[addrStr] = proofCache
 
 		}
@@ -887,7 +885,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			rcfg.ScalarSlot:    {},
 		})
 	for addr, keys := range proofStorages {
-
 		addrStr := addr.String()
 		txStorageTrace.StorageProofs[addrStr] = make(map[string][]hexutil.Bytes)
 		proofCache, existed := proofCaches[addrStr]
@@ -923,7 +920,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 					log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 					// but we still mark the proofs map with nil array
 				}
-				stgProof = types.Wrapproof(proof)
+				stgProof = types.WrapProof(proof)
 				proofCache.storageProof[keyStr] = stgProof
 			}
 			txStorageTrace.StorageProofs[addrStr][keyStr] = stgProof

@@ -95,6 +95,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	}
 
 	if v.config.Scroll.L1Config == nil {
+		// TODO: should we allow follower nodes to skip L1 message verification?
 		panic("Running on L1Message-enabled network but no l1Config was provided")
 	}
 

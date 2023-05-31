@@ -22,9 +22,9 @@ type BridgeClient struct {
 	l1MessageQueueAddress common.Address
 }
 
-func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress *common.Address) (*BridgeClient, error) {
-	if l1MessageQueueAddress == nil {
-		return nil, errors.New("must pass l1MessageQueueAddress to BridgeClient")
+func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address) (*BridgeClient, error) {
+	if l1MessageQueueAddress == (common.Address{}) {
+		return nil, errors.New("must pass non-zero l1MessageQueueAddress to BridgeClient")
 	}
 
 	// sanity check: compare chain IDs
@@ -39,7 +39,7 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 	client := BridgeClient{
 		client:                l1Client,
 		confirmations:         confirmations,
-		l1MessageQueueAddress: *l1MessageQueueAddress,
+		l1MessageQueueAddress: l1MessageQueueAddress,
 	}
 
 	return &client, nil

@@ -63,14 +63,12 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		return nil, fmt.Errorf("failed to initialize bridge client: %w", err)
 	}
 
-	// restart from latest synced block number
-	latestProcessedBlock := uint64(0)
+	// assume deployment block has 0 messages
+	latestProcessedBlock := nodeConfig.L1DeploymentBlock
 	block := rawdb.ReadSyncedL1BlockNumber(db)
 	if block != nil {
+		// restart from latest synced block number
 		latestProcessedBlock = *block
-	} else {
-		// assume deployment block has 0 messages
-		latestProcessedBlock = nodeConfig.L1DeploymentBlock
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

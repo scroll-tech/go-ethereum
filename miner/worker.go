@@ -909,10 +909,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 				var err error
 				if proofCache.trieTracer.Available() {
 					proof, err = w.current.state.GetSecureTrieProof(proofCache.trieTracer, key)
-					// isDelete
-					if bytes.Equal(values.Bytes(), common.Hash{}.Bytes()) {
-						proofCache.trieTracer.MarkDeletion(key)
-					}
 				} else {
 					proof, err = w.current.state.GetSecureTrieProof(proofCache.storageTrie, key)
 				}
@@ -922,6 +918,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 				}
 				stgProof = types.WrapProof(proof)
 				proofCache.storageProof[keyStr] = stgProof
+			}
+			// isDelete
+			if proofCache.trieTracer.Available() && bytes.Equal(values.Bytes(), common.Hash{}.Bytes()) {
+				proofCache.trieTracer.MarkDeletion(key)
 			}
 			txStorageTrace.StorageProofs[addrStr][keyStr] = stgProof
 		}

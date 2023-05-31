@@ -544,7 +544,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 
 		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
 		if err != nil {
-			log.Warn("Tracing intermediate roots did not complete", "txindex", i, "txhash", tx.Hash(), "err", err)
+			log.Warn("Tracing intermediate roots did not complete due to fees.CalculateFees", "txindex", i, "txhash", tx.Hash(), "err", err)
 			return roots, nil
 		}
 
@@ -625,6 +625,8 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 
 				l1DataFee, _, _, err := fees.CalculateFees(txs[task.index], task.statedb)
 				if err != nil {
+					// though it's not a "tracing error", we still need to put it here
+					results[task.index] = &txTraceResult{Error: err.Error()}
 					continue
 				}
 				res, err := api.traceTx(ctx, msg, txctx, blockCtx, task.statedb, config, l1DataFee)
@@ -764,11 +766,8 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.Prepare(tx.Hash(), i)
-		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
-		if err != nil {
-			return nil, err
-		}
-		_, err = core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+		l1DataFee, _, _, err1 := fees.CalculateFees(tx, statedb)
+		_, err2 := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if writer != nil {
 			writer.Flush()
 		}
@@ -776,7 +775,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 			dump.Close()
 			log.Info("Wrote standard trace", "file", dump.Name())
 		}
-		if err != nil {
+		if err1 != nil || err2 != nil {
 			return dumps, err
 		}
 		// Finalize the state so any modifications are written to the trie
@@ -889,7 +888,8 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 		}
 	}
 
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, statedb)
+	signer := types.MakeSigner(api.backend.ChainConfig(), block.Number())
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, signer, statedb)
 	if err != nil {
 		return nil, err
 	}

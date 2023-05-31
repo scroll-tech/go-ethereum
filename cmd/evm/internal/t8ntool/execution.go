@@ -167,9 +167,9 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		snapshot := statedb.Snapshot()
 		evm := vm.NewEVM(vmContext, txContext, statedb, chainConfig, vmConfig)
 
-		l1DataFee, _, _, err := fees.CalculateFees(tx, state)
+		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
 		if err != nil {
-			log.Info("rejected tx", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)
+			log.Info("rejected tx due to fees.CalculateFees", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)
 			rejectedTxs = append(rejectedTxs, &rejectedTx{i, err.Error()})
 			continue
 		}

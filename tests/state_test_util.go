@@ -202,9 +202,9 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 		return nil, nil, common.Hash{}, err
 	}
 
+	var ttx types.Transaction
 	// Try to recover tx with current signer
 	if len(post.TxBytes) != 0 {
-		var ttx types.Transaction
 		err := ttx.UnmarshalBinary(post.TxBytes)
 		if err != nil {
 			return nil, nil, common.Hash{}, err
@@ -227,8 +227,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	gaspool := new(core.GasPool)
 	gaspool.AddGas(block.GasLimit())
 
-	// TODO: use ttx?
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, statedb)
+	l1DataFee, _, _, err := fees.CalculateFees(&ttx, statedb)
 	if err != nil {
 		return nil, nil, common.Hash{}, err
 	}

@@ -8,18 +8,14 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 var (
-	// errTransactionSigned represents the error case of passing in a signed
-	// transaction to the L1 fee calculation routine. The signature is accounted
-	// for externally
-	errTransactionSigned = errors.New("transaction is signed")
-
 	// txExtraDataBytes is the number of bytes that we commit to L1 in addition
-	// to the RLP-encoded unsigned transaction. Note that these are all assumed
+	// to the RLP-encoded signed transaction. Note that these are all assumed
 	// to be non-zero.
 	// - tx length prefix: 4 bytes
 	txExtraDataBytes = uint64(4)
@@ -45,8 +41,13 @@ type StateDB interface {
 	GetBalance(addr common.Address) *big.Int
 }
 
-func EstimateL1DataFeeForMessage(msg Message, state StateDB) (*big.Int, error) {
-	tx := asTransaction(msg)
+func EstimateL1DataFeeForMessage(msg Message, signer types.Signer, state StateDB) (*big.Int, error) {
+	unsigned := asUnsignedTransaction(msg)
+	tx, err := unsigned.WithSignature(signer, bytes.Repeat([]byte{0xff}, crypto.SignatureLength))
+	if err != nil {
+		return nil, err
+	}
+
 	raw, err := rlpEncode(tx)
 	if err != nil {
 		return nil, err
@@ -58,8 +59,8 @@ func EstimateL1DataFeeForMessage(msg Message, state StateDB) (*big.Int, error) {
 }
 
 // TODO: other types
-// asTransaction turns a Message into a types.Transaction
-func asTransaction(msg Message) *types.Transaction {
+// asUnsignedTransaction turns a Message into a types.Transaction
+func asUnsignedTransaction(msg Message) *types.Transaction {
 	if msg.To() == nil {
 		return types.NewContractCreation(
 			msg.Nonce(),
@@ -80,23 +81,13 @@ func asTransaction(msg Message) *types.Transaction {
 }
 
 // rlpEncode RLP encodes the transaction into bytes
-// When a signature is not included, set pad to true to
-// fill in a dummy signature full on non 0 bytes
 func rlpEncode(tx *types.Transaction) ([]byte, error) {
 	raw := new(bytes.Buffer)
 	if err := tx.EncodeRLP(raw); err != nil {
 		return nil, err
 	}
 
-	r, v, s := tx.RawSignatureValues()
-	if r.Cmp(common.Big0) != 0 || v.Cmp(common.Big0) != 0 || s.Cmp(common.Big0) != 0 {
-		return nil, errTransactionSigned
-	}
-
-	// TODO: double-check this?
-	// Slice off the 0 bytes representing the signature
-	b := raw.Bytes()
-	return b[:len(b)-3], nil
+	return raw.Bytes(), nil
 }
 
 func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int, *big.Int) {
@@ -146,32 +137,8 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
-// TODO: diff types?
-// TODO: keep signature?
-// copyTransaction copies the transaction, removing the signature
-func copyTransaction(tx *types.Transaction) *types.Transaction {
-	if tx.To() == nil {
-		return types.NewContractCreation(
-			tx.Nonce(),
-			tx.Value(),
-			tx.Gas(),
-			tx.GasPrice(),
-			tx.Data(),
-		)
-	}
-	return types.NewTransaction(
-		tx.Nonce(),
-		*tx.To(),
-		tx.Value(),
-		tx.Gas(),
-		tx.GasPrice(),
-		tx.Data(),
-	)
-}
-
 func CalculateFees(tx *types.Transaction, state StateDB) (*big.Int, *big.Int, *big.Int, error) {
-	unsigned := copyTransaction(tx)
-	raw, err := rlpEncode(unsigned)
+	raw, err := rlpEncode(tx)
 	if err != nil {
 		return nil, nil, nil, err
 	}

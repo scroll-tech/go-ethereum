@@ -34,7 +34,7 @@ func (tx *L1MessageTx) copy() TxData {
 
 // accessors for innerTx.
 func (tx *L1MessageTx) txType() byte           { return L1MessageTxType }
-func (tx *L1MessageTx) chainID() *big.Int      { return common.Big0 } // todo: update
+func (tx *L1MessageTx) chainID() *big.Int      { return common.Big0 }
 func (tx *L1MessageTx) accessList() AccessList { return nil }
 func (tx *L1MessageTx) data() []byte           { return tx.Data }
 func (tx *L1MessageTx) gas() uint64            { return tx.Gas }

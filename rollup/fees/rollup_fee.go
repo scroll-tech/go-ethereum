@@ -29,9 +29,12 @@ type Message interface {
 	To() *common.Address
 	GasPrice() *big.Int
 	Gas() uint64
+	GasFeeCap() *big.Int
+	GasTipCap() *big.Int
 	Value() *big.Int
 	Nonce() uint64
 	Data() []byte
+	AccessList() types.AccessList
 }
 
 // StateDB represents the StateDB interface
@@ -41,8 +44,8 @@ type StateDB interface {
 	GetBalance(addr common.Address) *big.Int
 }
 
-func EstimateL1DataFeeForMessage(msg Message, signer types.Signer, state StateDB) (*big.Int, error) {
-	unsigned := asUnsignedTransaction(msg)
+func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer types.Signer, state StateDB) (*big.Int, error) {
+	unsigned := asUnsignedTx(msg, baseFee, chainID)
 	tx, err := unsigned.WithSignature(signer, bytes.Repeat([]byte{0xff}, crypto.SignatureLength))
 	if err != nil {
 		return nil, err
@@ -58,26 +61,55 @@ func EstimateL1DataFeeForMessage(msg Message, signer types.Signer, state StateDB
 	return l1DataFee, nil
 }
 
-// TODO: other types
-// asUnsignedTransaction turns a Message into a types.Transaction
-func asUnsignedTransaction(msg Message) *types.Transaction {
-	if msg.To() == nil {
-		return types.NewContractCreation(
-			msg.Nonce(),
-			msg.Value(),
-			msg.Gas(),
-			msg.GasPrice(),
-			msg.Data(),
-		)
+// asUnsignedTx turns a Message into a types.Transaction
+func asUnsignedTx(msg Message, baseFee, chainID *big.Int) *types.Transaction {
+	if msg.AccessList() == nil {
+		return asUnsignedLegacyTx(msg)
 	}
-	return types.NewTransaction(
-		msg.Nonce(),
-		*msg.To(),
-		msg.Value(),
-		msg.Gas(),
-		msg.GasPrice(),
-		msg.Data(),
-	)
+
+	if baseFee == nil {
+		return asUnsignedAccessListTx(msg, chainID)
+	}
+
+	return asUnsignedDynamicTx(msg, chainID)
+}
+
+func asUnsignedLegacyTx(msg Message) *types.Transaction {
+	return types.NewTx(&types.LegacyTx{
+		Nonce:    msg.Nonce(),
+		To:       msg.To(),
+		Value:    msg.Value(),
+		Gas:      msg.Gas(),
+		GasPrice: msg.GasPrice(),
+		Data:     msg.Data(),
+	})
+}
+
+func asUnsignedAccessListTx(msg Message, chainID *big.Int) *types.Transaction {
+	return types.NewTx(&types.AccessListTx{
+		Nonce:      msg.Nonce(),
+		To:         msg.To(),
+		Value:      msg.Value(),
+		Gas:        msg.Gas(),
+		GasPrice:   msg.GasPrice(),
+		Data:       msg.Data(),
+		AccessList: msg.AccessList(),
+		ChainID:    chainID,
+	})
+}
+
+func asUnsignedDynamicTx(msg Message, chainID *big.Int) *types.Transaction {
+	return types.NewTx(&types.DynamicFeeTx{
+		Nonce:      msg.Nonce(),
+		To:         msg.To(),
+		Value:      msg.Value(),
+		Gas:        msg.Gas(),
+		GasFeeCap:  msg.GasFeeCap(),
+		GasTipCap:  msg.GasTipCap(),
+		Data:       msg.Data(),
+		AccessList: msg.AccessList(),
+		ChainID:    chainID,
+	})
 }
 
 // rlpEncode RLP encodes the transaction into bytes

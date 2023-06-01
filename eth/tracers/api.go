@@ -889,7 +889,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	}
 
 	signer := types.MakeSigner(api.backend.ChainConfig(), block.Number())
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, signer, statedb)
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, block.BaseFee(), api.backend.ChainConfig().ChainID, signer, statedb)
 	if err != nil {
 		return nil, err
 	}

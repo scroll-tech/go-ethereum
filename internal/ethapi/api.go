@@ -949,7 +949,7 @@ func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blo
 	}()
 
 	signer := types.MakeSigner(config, header.Number)
-	return fees.EstimateL1DataFeeForMessage(msg, signer, evm.StateDB)
+	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config.ChainID, signer, evm.StateDB)
 }
 
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
@@ -994,7 +994,7 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 
 	signer := types.MakeSigner(b.ChainConfig(), header.Number)
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, signer, state)
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig().ChainID, signer, state)
 	if err != nil {
 		return nil, err
 	}
@@ -1511,7 +1511,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 			return nil, 0, nil, err
 		}
 		signer := types.MakeSigner(b.ChainConfig(), header.Number)
-		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, signer, statedb)
+		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig().ChainID, signer, statedb)
 		if err != nil {
 			return nil, 0, nil, err
 		}

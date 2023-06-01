@@ -196,14 +196,14 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.In
 	}
 }
 
-// ApplyMessageAndL1DataFee computes the new state by applying the given message
+// ApplyMessage computes the new state by applying the given message
 // against the old state within the environment.
 //
-// ApplyMessageAndL1DataFee returns the bytes returned by any EVM execution (if it took place),
+// ApplyMessage returns the bytes returned by any EVM execution (if it took place),
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessageAndL1DataFee(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) (*ExecutionResult, error) {
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) (*ExecutionResult, error) {
 	return NewStateTransition(evm, msg, gp, l1DataFee).TransitionDb()
 }
 

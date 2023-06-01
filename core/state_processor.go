@@ -104,7 +104,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	}
 
 	// Apply the transaction to the current state (included in the env).
-	result, err := ApplyMessageAndL1DataFee(evm, msg, gp, l1DataFee)
+	result, err := ApplyMessage(evm, msg, gp, l1DataFee)
 	if err != nil {
 		return nil, err
 	}

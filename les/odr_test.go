@@ -146,7 +146,7 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 				gp := new(core.GasPool).AddGas(math.MaxUint64)
 				signer := types.MakeSigner(config, header.Number)
 				l1DataFee, _ := fees.EstimateL1DataFeeForMessage(msg, signer, statedb)
-				result, _ := core.ApplyMessageAndL1DataFee(vmenv, msg, gp, l1DataFee)
+				result, _ := core.ApplyMessage(vmenv, msg, gp, l1DataFee)
 				res = append(res, result.Return()...)
 			}
 		} else {
@@ -160,7 +160,7 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 			gp := new(core.GasPool).AddGas(math.MaxUint64)
 			signer := types.MakeSigner(config, header.Number)
 			l1DataFee, _ := fees.EstimateL1DataFeeForMessage(msg, signer, state)
-			result, _ := core.ApplyMessageAndL1DataFee(vmenv, msg, gp, l1DataFee)
+			result, _ := core.ApplyMessage(vmenv, msg, gp, l1DataFee)
 			if state.Error() == nil {
 				res = append(res, result.Return()...)
 			}

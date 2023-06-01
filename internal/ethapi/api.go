@@ -999,7 +999,7 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 		return nil, err
 	}
 
-	result, err := core.ApplyMessageAndL1DataFee(evm, msg, gp, l1DataFee)
+	result, err := core.ApplyMessage(evm, msg, gp, l1DataFee)
 	if err := vmError(); err != nil {
 		return nil, err
 	}
@@ -1515,7 +1515,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		if err != nil {
 			return nil, 0, nil, err
 		}
-		res, err := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+		res, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}

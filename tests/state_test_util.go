@@ -232,7 +232,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 		return nil, nil, common.Hash{}, err
 	}
 
-	if _, err = core.ApplyMessageAndL1DataFee(evm, msg, gaspool, l1DataFee); err != nil {
+	if _, err = core.ApplyMessage(evm, msg, gaspool, l1DataFee); err != nil {
 		statedb.RevertToSnapshot(snapshot)
 	}
 

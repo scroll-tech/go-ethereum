@@ -69,7 +69,7 @@ func (leth *LightEthereum) stateAtTransaction(ctx context.Context, block *types.
 		if err != nil {
 			return nil, vm.BlockContext{}, nil, err
 		}
-		if _, err = core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee); err != nil {
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee); err != nil {
 			return nil, vm.BlockContext{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}
 		// Ensure any modifications are committed to the state

@@ -548,7 +548,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 			return roots, nil
 		}
 
-		if _, err = core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
 			log.Warn("Tracing intermediate roots did not complete", "txindex", i, "txhash", tx.Hash(), "err", err)
 			// We intentionally don't return the error here: if we do, then the RPC server will not
 			// return the roots. Most likely, the caller already knows that a certain transaction fails to
@@ -653,7 +653,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 			failed = err
 			break
 		}
-		if _, err = core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
 			failed = err
 			break
 		}
@@ -767,7 +767,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.Prepare(tx.Hash(), i)
 		l1DataFee, _, _, err1 := fees.CalculateFees(tx, statedb)
-		_, err2 := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+		_, err2 := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if writer != nil {
 			writer.Flush()
 		}
@@ -945,7 +945,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 	// Call Prepare to clear out the statedb access list
 	statedb.Prepare(txctx.TxHash, txctx.TxIndex)
 
-	result, err := core.ApplyMessageAndL1DataFee(vmenv, message, new(core.GasPool).AddGas(message.Gas()), l1DataFee)
+	result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()), l1DataFee)
 	if err != nil {
 		return nil, fmt.Errorf("tracing failed: %w", err)
 	}

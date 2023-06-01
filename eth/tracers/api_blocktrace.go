@@ -188,7 +188,7 @@ func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTr
 			failed = err
 			break
 		}
-		if _, err = core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
 			failed = err
 			break
 		}
@@ -268,7 +268,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	if err != nil {
 		return err
 	}
-	result, err := core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 	if err != nil {
 		return fmt.Errorf("tracing failed: %w", err)
 	}

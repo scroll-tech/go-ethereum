@@ -177,7 +177,7 @@ func (b *testBackend) StateAtTransaction(ctx context.Context, block *types.Block
 		if err != nil {
 			return nil, vm.BlockContext{}, nil, err
 		}
-		if _, err = core.ApplyMessageAndL1DataFee(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee); err != nil {
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee); err != nil {
 			return nil, vm.BlockContext{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}
 		statedb.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))

@@ -175,7 +175,7 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		}
 
 		// (ret []byte, usedGas uint64, failed bool, err error)
-		msgResult, err := core.ApplyMessageAndL1DataFee(evm, msg, gaspool, l1DataFee)
+		msgResult, err := core.ApplyMessage(evm, msg, gaspool, l1DataFee)
 		if err != nil {
 			statedb.RevertToSnapshot(snapshot)
 			log.Info("rejected tx", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)

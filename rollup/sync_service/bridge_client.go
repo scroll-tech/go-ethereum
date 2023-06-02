@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/scroll-tech/go-ethereum"
-	"github.com/scroll-tech/go-ethereum/accounts/abi"
+	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
@@ -20,6 +19,7 @@ type BridgeClient struct {
 	client                EthClient
 	confirmations         rpc.BlockNumber
 	l1MessageQueueAddress common.Address
+	filterer              *L1MessageQueueFilterer
 }
 
 func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address) (*BridgeClient, error) {
@@ -36,10 +36,16 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", l1ChainId, got)
 	}
 
+	filterer, err := NewL1MessageQueueFilterer(l1MessageQueueAddress, l1Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize L1MessageQueueFilterer, err = %w", err)
+	}
+
 	client := BridgeClient{
 		client:                l1Client,
 		confirmations:         confirmations,
 		l1MessageQueueAddress: l1MessageQueueAddress,
+		filterer:              filterer,
 	}
 
 	return &client, nil
@@ -50,44 +56,21 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, error) {
 	log.Trace("Sync service fetchMessagesInRange", "fromBlock", from, "toBlock", to)
 
-	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(0).SetUint64(from),
-		ToBlock:   big.NewInt(0).SetUint64(to),
-		Addresses: []common.Address{
-			c.l1MessageQueueAddress,
-		},
-		Topics: [][]common.Hash{
-			{L1QueueTransactionEventSignature},
-		},
+	opts := bind.FilterOpts{
+		Start:   from,
+		End:     &to,
+		Context: ctx,
 	}
-
-	logs, err := c.client.FilterLogs(ctx, query)
+	it, err := c.filterer.FilterQueueTransaction(&opts, nil, nil)
 	if err != nil {
-		log.Trace("eth_getLogs failed", "query", query, "err", err)
-		return nil, fmt.Errorf("eth_getLogs failed: %w", err)
-	}
-	if len(logs) == 0 {
-		return nil, nil
+		return nil, err
 	}
 
-	msgs, err := c.parseLogs(logs)
-	if err != nil {
-		log.Trace("failed to parse emitted event logs", "logs", logs, "err", err)
-		return nil, fmt.Errorf("failed to parse emitted event logs: %w", err)
-	}
-	log.Trace("Received new L1 events", "fromBlock", from, "toBlock", to, "msgs", msgs)
-	return msgs, nil
-}
-
-func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) {
 	var msgs []types.L1MessageTx
 
-	for _, vLog := range logs {
-		event := L1QueueTransactionEvent{}
-		err := unpackLog(L1MessageQueueABI, &event, "QueueTransaction", vLog)
-		if err != nil {
-			return msgs, fmt.Errorf("failed to unpack L1 QueueTransaction event: %w", err)
-		}
+	for it.Next() {
+		event := it.Event
+		log.Trace("Received new L1 QueueTransaction event", "event", event)
 
 		if !event.QueueIndex.IsUint64() || !event.GasLimit.IsUint64() {
 			return nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
@@ -104,27 +87,6 @@ func (c *BridgeClient) parseLogs(logs []types.Log) ([]types.L1MessageTx, error) 
 	}
 
 	return msgs, nil
-}
-
-func unpackLog(c *abi.ABI, out interface{}, event string, log types.Log) error {
-	if event, ok := c.Events[event]; !ok || log.Topics[0] != event.ID {
-		return fmt.Errorf("event signature mismatch")
-	}
-
-	if len(log.Data) > 0 {
-		if err := c.UnpackIntoInterface(out, event, log.Data); err != nil {
-			return err
-		}
-	}
-
-	var indexed abi.Arguments
-	for _, arg := range c.Events[event].Inputs {
-		if arg.Indexed {
-			indexed = append(indexed, arg)
-		}
-	}
-
-	return abi.ParseTopics(out, indexed, log.Topics[1:])
 }
 
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {

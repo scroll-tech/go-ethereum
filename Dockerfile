@@ -24,6 +24,8 @@ RUN find ./ | grep libzktrie.so | xargs -I{} cp {} /app/target/release/
 FROM scrolltech/go-rust-builder:go-1.19-rust-nightly-2022-12-10 as builder
 
 ADD . /go-ethereum
+COPY --from=zkp-builder /app/target/release/libzkp.so /go-ethereum/rollup/circuitcapacitychecker/
+COPY --from=zkp-builder /app/target/release/libzktrie.so /go-ethereum/rollup/circuitcapacitychecker/
 RUN cd /go-ethereum && env GO111MODULE=on go run build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 
 # Pull Geth into a second stage deploy alpine container

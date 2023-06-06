@@ -24,17 +24,18 @@ RUN find ./ | grep libzktrie.so | xargs -I{} cp {} /app/target/release/
 FROM scrolltech/go-rust-builder:go-1.19-rust-nightly-2022-12-10 as builder
 
 ADD . /go-ethereum
-COPY --from=zkp-builder /app/target/release/libzkp.so /go-ethereum/rollup/circuitcapacitychecker/libzkp/
-COPY --from=zkp-builder /app/target/release/libzktrie.so /go-ethereum/rollup/circuitcapacitychecker/libzkp/
+COPY --from=zkp-builder /app/target/release/libzkp.so /usr/local/lib/
+COPY --from=zkp-builder /app/target/release/libzktrie.so /usr/local/lib/
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
 RUN cd /go-ethereum && env GO111MODULE=on go run build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 
 # Pull Geth into a second stage deploy alpine container
 FROM ubuntu:20.04
 
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
-COPY --from=zkp-builder /app/target/release/libzkp.so /go-ethereum/rollup/circuitcapacitychecker/libzkp/
-COPY --from=zkp-builder /app/target/release/libzktrie.so /go-ethereum/rollup/circuitcapacitychecker/libzkp/
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/go-ethereum/rollup/circuitcapacitychecker/libzkp/
+COPY --from=zkp-builder /app/target/release/libzkp.so /usr/local/lib/
+COPY --from=zkp-builder /app/target/release/libzktrie.so /usr/local/lib/
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
 
 EXPOSE 8545 8546 30303 30303/udp
 ENTRYPOINT ["geth"]

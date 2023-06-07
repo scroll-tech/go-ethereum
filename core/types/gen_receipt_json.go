@@ -29,7 +29,7 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 		BlockNumber       *hexutil.Big   `json:"blockNumber,omitempty"`
 		TransactionIndex  hexutil.Uint   `json:"transactionIndex"`
 		ReturnValue       []byte         `json:"returnValue,omitempty"`
-		L1Fee             *hexutil.Big   `json:"l1Fee,omitempty"`
+		L1DataFee         *hexutil.Big   `json:"l1DataFee,omitempty"`
 	}
 	var enc Receipt
 	enc.Type = hexutil.Uint64(r.Type)
@@ -45,7 +45,7 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 	enc.BlockNumber = (*hexutil.Big)(r.BlockNumber)
 	enc.TransactionIndex = hexutil.Uint(r.TransactionIndex)
 	enc.ReturnValue = r.ReturnValue
-	enc.L1Fee = (*hexutil.Big)(r.L1Fee)
+	enc.L1DataFee = (*hexutil.Big)(r.L1DataFee)
 	return json.Marshal(&enc)
 }
 
@@ -65,7 +65,7 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 		BlockNumber       *hexutil.Big    `json:"blockNumber,omitempty"`
 		TransactionIndex  *hexutil.Uint   `json:"transactionIndex"`
 		ReturnValue       []byte          `json:"returnValue,omitempty"`
-		L1Fee             *hexutil.Big    `json:"l1Fee,omitempty"`
+		L1DataFee         *hexutil.Big    `json:"l1DataFee,omitempty"`
 	}
 	var dec Receipt
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -115,8 +115,8 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 	if dec.ReturnValue != nil {
 		r.ReturnValue = dec.ReturnValue
 	}
-	if dec.L1Fee != nil {
-		r.L1Fee = (*big.Int)(dec.L1Fee)
+	if dec.L1DataFee != nil {
+		r.L1DataFee = (*big.Int)(dec.L1DataFee)
 	}
 	return nil
 }

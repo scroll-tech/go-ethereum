@@ -57,7 +57,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer 
 	}
 
 	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-	l1DataFee := CalculateL1Fee(raw, overhead, l1BaseFee, scalar)
+	l1DataFee := CalculateL1DataFee(raw, overhead, l1BaseFee, scalar)
 	return l1DataFee, nil
 }
 
@@ -129,11 +129,11 @@ func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int
 	return l1BaseFee.Big(), overhead.Big(), scalar.Big()
 }
 
-// CalculateL1Fee computes the L1 fee
-func CalculateL1Fee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Int) *big.Int {
+// CalculateL1DataFee computes the L1 fee
+func CalculateL1DataFee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Int) *big.Int {
 	l1GasUsed := CalculateL1GasUsed(data, overhead)
-	l1Fee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
-	return mulAndScale(l1Fee, scalar, rcfg.Precision)
+	l1DataFee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
+	return mulAndScale(l1DataFee, scalar, rcfg.Precision)
 }
 
 // CalculateL1GasUsed computes the L1 gas used based on the calldata and
@@ -176,12 +176,12 @@ func CalculateFees(tx *types.Transaction, state StateDB) (*big.Int, *big.Int, *b
 	}
 
 	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-	l1Fee := CalculateL1Fee(raw, overhead, l1BaseFee, scalar)
+	l1DataFee := CalculateL1DataFee(raw, overhead, l1BaseFee, scalar)
 
 	l2GasLimit := new(big.Int).SetUint64(tx.Gas())
 	l2Fee := new(big.Int).Mul(tx.GasPrice(), l2GasLimit)
-	fee := new(big.Int).Add(l1Fee, l2Fee)
-	return l1Fee, l2Fee, fee, nil
+	fee := new(big.Int).Add(l1DataFee, l2Fee)
+	return l1DataFee, l2Fee, fee, nil
 }
 
 func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error {
@@ -192,7 +192,7 @@ func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error 
 
 	balance := state.GetBalance(from)
 
-	l1Fee, l2Fee, _, err := CalculateFees(tx, state)
+	l1DataFee, l2Fee, _, err := CalculateFees(tx, state)
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
@@ -203,9 +203,9 @@ func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error 
 		return errors.New("invalid transaction: insufficient funds for gas * price + value")
 	}
 
-	cost = cost.Add(cost, l1Fee)
+	cost = cost.Add(cost, l1DataFee)
 	if balance.Cmp(cost) < 0 {
-		return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
+		return errors.New("invalid transaction: insufficient funds for l1DataFee + gas * price + value")
 	}
 
 	// TODO: check GasPrice is in an expected range

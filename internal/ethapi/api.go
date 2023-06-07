@@ -1052,7 +1052,7 @@ func (e *revertError) ErrorData() interface{} {
 // useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride) (hexutil.Bytes, error) {
 	// If gasPrice is 0 and no state override is set, make sure
-	// that the account has sufficient balance to cover `l1Fee`.
+	// that the account has sufficient balance to cover `l1DataFee`.
 	isGasPriceZero := args.GasPrice == nil || args.GasPrice.ToInt().Cmp(big.NewInt(0)) == 0
 
 	if overrides == nil {
@@ -1061,13 +1061,13 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 	_, isOverrideSet := (*overrides)[args.from()]
 
 	if isGasPriceZero && !isOverrideSet {
-		l1Fee, err := CalculateL1MsgFee(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap(), s.b.ChainConfig())
+		l1DataFee, err := CalculateL1MsgFee(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap(), s.b.ChainConfig())
 		if err != nil {
 			return nil, err
 		}
 
 		(*overrides)[args.from()] = OverrideAccount{
-			BalanceAdd: newRPCBalance(l1Fee),
+			BalanceAdd: newRPCBalance(l1DataFee),
 		}
 	}
 
@@ -1136,14 +1136,14 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		}
 
 		// account for l1 fee
-		l1Fee, err := CalculateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, b.ChainConfig())
+		l1DataFee, err := CalculateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, b.ChainConfig())
 		if err != nil {
 			return 0, err
 		}
-		if l1Fee.Cmp(available) >= 0 {
+		if l1DataFee.Cmp(available) >= 0 {
 			return 0, errors.New("insufficient funds for l1 fee")
 		}
-		available.Sub(available, l1Fee)
+		available.Sub(available, l1DataFee)
 
 		allowance := new(big.Int).Div(available, feeCap)
 
@@ -1683,7 +1683,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 		"type":              hexutil.Uint(tx.Type()),
-		"l1Fee":             (*hexutil.Big)(receipt.L1Fee),
+		"l1DataFee":         (*hexutil.Big)(receipt.L1DataFee),
 	}
 	// Assign the effective gas price paid
 	if !s.b.ChainConfig().IsLondon(bigblock) {

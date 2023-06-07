@@ -75,7 +75,7 @@ type Receipt struct {
 	ReturnValue []byte `json:"returnValue,omitempty"`
 
 	// Scroll rollup
-	L1Fee *big.Int `json:"l1Fee,omitempty"`
+	L1DataFee *big.Int `json:"l1DataFee,omitempty"`
 }
 
 type receiptMarshaling struct {
@@ -86,7 +86,7 @@ type receiptMarshaling struct {
 	GasUsed           hexutil.Uint64
 	BlockNumber       *hexutil.Big
 	TransactionIndex  hexutil.Uint
-	L1Fee             *hexutil.Big
+	L1DataFee         *hexutil.Big
 }
 
 // receiptRLP is the consensus encoding of a receipt.
@@ -102,7 +102,7 @@ type storedReceiptRLP struct {
 	PostStateOrStatus []byte
 	CumulativeGasUsed uint64
 	Logs              []*LogForStorage
-	L1Fee             *big.Int
+	L1DataFee         *big.Int
 }
 
 // v5StoredReceiptRLP is the storage encoding of a receipt used in database version 5.
@@ -307,7 +307,7 @@ func (r *ReceiptForStorage) EncodeRLP(w io.Writer) error {
 		PostStateOrStatus: (*Receipt)(r).statusEncoding(),
 		CumulativeGasUsed: r.CumulativeGasUsed,
 		Logs:              make([]*LogForStorage, len(r.Logs)),
-		L1Fee:             r.L1Fee,
+		L1DataFee:         r.L1DataFee,
 	}
 	for i, log := range r.Logs {
 		enc.Logs[i] = (*LogForStorage)(log)
@@ -352,7 +352,7 @@ func decodeStoredReceiptRLP(r *ReceiptForStorage, blob []byte) error {
 		r.Logs[i] = (*Log)(log)
 	}
 	r.Bloom = CreateBloom(Receipts{(*Receipt)(r)})
-	r.L1Fee = stored.L1Fee
+	r.L1DataFee = stored.L1DataFee
 
 	return nil
 }

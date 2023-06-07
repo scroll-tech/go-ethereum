@@ -89,7 +89,7 @@ type environment struct {
 	uncles    mapset.Set         // uncle set
 	tcount    int                // tx count in cycle
 	blockSize common.StorageSize // approximate size of tx payload in bytes
-	l1txcount int                // l1 msg count in cycle
+	l1TxCount int                // l1 msg count in cycle
 	gasPool   *core.GasPool      // available gas used to pack transactions
 
 	header   *types.Header
@@ -735,7 +735,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	// Keep track of transactions which return errors so they can be removed
 	env.tcount = 0
 	env.blockSize = 0
-	env.l1txcount = 0
+	env.l1TxCount = 0
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
 	// processes in the mean time and starting a new one.
@@ -848,8 +848,8 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
 		}
 		// If we have collected enough transactions then we're done
-		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1txcount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1txcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1TxCount + 1) {
+			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1TxCount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done
@@ -904,7 +904,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
 			if tx.IsL1MessageTx() {
-				w.current.l1txcount++
+				w.current.l1TxCount++
 			}
 			w.current.tcount++
 			w.current.blockSize += tx.Size()

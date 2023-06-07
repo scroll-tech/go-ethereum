@@ -184,6 +184,10 @@ func (s *SyncService) fetchMessages() {
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		select {
 		case <-s.ctx.Done():
+			// flush pending writes to database
+			if from > 0 {
+				flush(from - 1)
+			}
 			return
 		case <-t.C:
 			progress := 100 * float64(s.latestProcessedBlock) / float64(latestConfirmed)

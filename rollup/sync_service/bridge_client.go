@@ -54,7 +54,7 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 // fetchMessagesInRange retrieves and parses all L1 messages between the
 // provided from and to L1 block numbers (inclusive).
 func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, error) {
-	log.Trace("Sync service fetchMessagesInRange", "fromBlock", from, "toBlock", to)
+	log.Trace("BridgeClient fetchMessagesInRange", "fromBlock", from, "toBlock", to)
 
 	opts := bind.FilterOpts{
 		Start:   from,
@@ -98,7 +98,7 @@ func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint6
 			return 0, err
 		}
 		if !header.Number.IsInt64() {
-			return 0, fmt.Errorf("received invalid block confirm: %v", header.Number)
+			return 0, fmt.Errorf("received unexpected block number in BridgeClient: %v", header.Number)
 		}
 		return header.Number.Uint64(), nil
 	}

@@ -143,7 +143,7 @@ func (s *SyncService) SubscribeNewL1MsgsEvent(ch chan<- core.NewL1MsgsEvent) eve
 func (s *SyncService) fetchMessages() {
 	latestConfirmed, err := s.client.getLatestConfirmedBlockNumber(s.ctx)
 	if err != nil {
-		log.Warn("failed to get latest confirmed block number", "err", err)
+		log.Warn("Failed to get latest confirmed block number", "err", err)
 		return
 	}
 
@@ -162,7 +162,7 @@ func (s *SyncService) fetchMessages() {
 		err := batchWriter.Write()
 		if err != nil {
 			// crash on database error, no risk of inconsistency here
-			log.Crit("failed to write L1 messages to database", "err", err)
+			log.Crit("Failed to write L1 messages to database", "err", err)
 		}
 
 		batchWriter.Reset()
@@ -202,8 +202,7 @@ func (s *SyncService) fetchMessages() {
 			if from > 0 {
 				flush(from - 1)
 			}
-
-			log.Warn("failed to fetch L1 messages in range", "fromBlock", from, "toBlock", to, "err", err)
+			log.Warn("Failed to fetch L1 messages in range", "fromBlock", from, "toBlock", to, "err", err)
 			return
 		}
 

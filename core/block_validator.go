@@ -90,7 +90,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	// no further processing if the block contains no L1 messages
-	if block.CountL1MessageTx() == 0 {
+	if block.L1MessageCount() == 0 {
 		return nil
 	}
 

@@ -35,6 +35,7 @@ type Message interface {
 	Nonce() uint64
 	Data() []byte
 	AccessList() types.AccessList
+	IsL1MessageTx() bool
 }
 
 // StateDB represents the StateDB interface
@@ -45,6 +46,10 @@ type StateDB interface {
 }
 
 func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer types.Signer, state StateDB) (*big.Int, error) {
+	if msg.IsL1MessageTx() {
+		return big.NewInt(0), nil
+	}
+
 	unsigned := asUnsignedTx(msg, baseFee, chainID)
 	tx, err := unsigned.WithSignature(signer, bytes.Repeat([]byte{0xff}, crypto.SignatureLength))
 	if err != nil {
@@ -170,13 +175,18 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 }
 
 func CalculateFees(tx *types.Transaction, state StateDB) (*big.Int, *big.Int, *big.Int, error) {
-	raw, err := rlpEncode(tx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	var l1DataFee *big.Int
+	if tx.IsL1MessageTx() {
+		l1DataFee = big.NewInt(0)
+	} else {
+		raw, err := rlpEncode(tx)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 
-	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-	l1DataFee := CalculateL1DataFee(raw, overhead, l1BaseFee, scalar)
+		l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+		l1DataFee = CalculateL1DataFee(raw, overhead, l1BaseFee, scalar)
+	}
 
 	l2GasLimit := new(big.Int).SetUint64(tx.Gas())
 	l2Fee := new(big.Int).Mul(tx.GasPrice(), l2GasLimit)

@@ -218,9 +218,12 @@ func (st *StateTransition) buyGas() error {
 	mgval = mgval.Mul(mgval, st.gasPrice)
 
 	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
-		// always add l1DataFee, because all tx are L2-to-L1 ATM
-		log.Debug("Adding L1DataFee", "l1DataFee", st.l1DataFee)
-		mgval = mgval.Add(mgval, st.l1DataFee)
+		// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
+		// but double check to make sure
+		if !st.msg.IsL1MessageTx() {
+			log.Debug("Adding L1DataFee", "l1DataFee", st.l1DataFee)
+			mgval = mgval.Add(mgval, st.l1DataFee)
+		}
 	}
 
 	balanceCheck := mgval
@@ -229,8 +232,11 @@ func (st *StateTransition) buyGas() error {
 		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
 		balanceCheck.Add(balanceCheck, st.value)
 		if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
-			// always add l1DataFee, because all tx are L2-to-L1 ATM
-			balanceCheck.Add(balanceCheck, st.l1DataFee)
+			// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
+			// but double check to make sure
+			if !st.msg.IsL1MessageTx() {
+				balanceCheck.Add(balanceCheck, st.l1DataFee)
+			}
 		}
 	}
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {

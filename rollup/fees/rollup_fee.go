@@ -51,7 +51,8 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer 
 	}
 
 	unsigned := asUnsignedTx(msg, baseFee, chainID)
-	tx, err := unsigned.WithSignature(signer, bytes.Repeat([]byte{0xff}, crypto.SignatureLength))
+	// with v=1
+	tx, err := unsigned.WithSignature(signer, append(bytes.Repeat([]byte{0xff}, crypto.SignatureLength-1), 0x01))
 	if err != nil {
 		return nil, err
 	}

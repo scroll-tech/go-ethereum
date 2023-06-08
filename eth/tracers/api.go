@@ -284,9 +284,9 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 						TxHash:    tx.Hash(),
 					}
 
-					l1DataFee, _, _, err := fees.CalculateFees(tx, task.statedb)
+					l1DataFee, err := fees.CalculateL1DataFee(tx, task.statedb)
 					if err != nil {
-						log.Warn("CalculateFees failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
+						log.Warn("CalculateL1DataFee failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
 						break
 					}
 
@@ -542,9 +542,9 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		)
 		statedb.Prepare(tx.Hash(), i)
 
-		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 		if err != nil {
-			log.Warn("Tracing intermediate roots did not complete due to fees.CalculateFees", "txindex", i, "txhash", tx.Hash(), "err", err)
+			log.Warn("Tracing intermediate roots did not complete due to fees.CalculateL1DataFee", "txindex", i, "txhash", tx.Hash(), "err", err)
 			return roots, nil
 		}
 
@@ -623,7 +623,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 					TxHash:    txs[task.index].Hash(),
 				}
 
-				l1DataFee, _, _, err := fees.CalculateFees(txs[task.index], task.statedb)
+				l1DataFee, err := fees.CalculateL1DataFee(txs[task.index], task.statedb)
 				if err != nil {
 					// though it's not a "tracing error", we still need to put it here
 					results[task.index] = &txTraceResult{Error: err.Error()}
@@ -648,7 +648,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		msg, _ := tx.AsMessage(signer, block.BaseFee())
 		statedb.Prepare(tx.Hash(), i)
 		vmenv := vm.NewEVM(blockCtx, core.NewEVMTxContext(msg), statedb, api.backend.ChainConfig(), vm.Config{})
-		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 		if err != nil {
 			failed = err
 			break
@@ -766,7 +766,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.Prepare(tx.Hash(), i)
-		l1DataFee, _, _, err1 := fees.CalculateFees(tx, statedb)
+		l1DataFee, err1 := fees.CalculateL1DataFee(tx, statedb)
 		_, err2 := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if writer != nil {
 			writer.Flush()
@@ -829,7 +829,7 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 		TxIndex:   int(index),
 		TxHash:    hash,
 	}
-	l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 	if err != nil {
 		return nil, err
 	}

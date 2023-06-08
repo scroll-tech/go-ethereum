@@ -98,7 +98,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
 
-	l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 	if err != nil {
 		return nil, err
 	}

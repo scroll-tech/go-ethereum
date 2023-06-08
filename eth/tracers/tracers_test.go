@@ -112,7 +112,7 @@ func BenchmarkTransactionTrace(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		snap := statedb.Snapshot()
-		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 		if err != nil {
 			b.Fatal(err)
 		}

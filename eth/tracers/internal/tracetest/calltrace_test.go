@@ -193,9 +193,9 @@ func testCallTracer(tracerName string, dirPath string, t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to prepare transaction for tracing: %v", err)
 			}
-			l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+			l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 			if err != nil {
-				t.Fatalf("failed to calculate fees: %v", err)
+				t.Fatalf("failed to calculate l1DataFee: %v", err)
 			}
 			st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee)
 			if _, err = st.TransitionDb(); err != nil {
@@ -308,9 +308,9 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 		}
 		evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
 		snap := statedb.Snapshot()
-		l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 		if err != nil {
-			b.Fatalf("failed to calculate fees: %v", err)
+			b.Fatalf("failed to calculate l1DataFee: %v", err)
 		}
 		st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee)
 		if _, err = st.TransitionDb(); err != nil {
@@ -381,9 +381,9 @@ func TestZeroValueToNotExitCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to prepare transaction for tracing: %v", err)
 	}
-	l1DataFee, _, _, err := fees.CalculateFees(tx, statedb)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 	if err != nil {
-		t.Fatalf("failed to calculate fees: %v", err)
+		t.Fatalf("failed to calculate l1DataFee: %v", err)
 	}
 	st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee)
 	if _, err = st.TransitionDb(); err != nil {

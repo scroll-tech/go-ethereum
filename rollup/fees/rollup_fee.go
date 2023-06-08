@@ -62,7 +62,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer 
 	}
 
 	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-	l1DataFee := CalculateL1DataFee(raw, overhead, l1BaseFee, scalar)
+	l1DataFee := calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
 	return l1DataFee, nil
 }
 
@@ -134,8 +134,8 @@ func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int
 	return l1BaseFee.Big(), overhead.Big(), scalar.Big()
 }
 
-// CalculateL1DataFee computes the L1 fee
-func CalculateL1DataFee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Int) *big.Int {
+// calculateEncodedL1DataFee computes the L1 fee for an RLP-encoded tx
+func calculateEncodedL1DataFee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Int) *big.Int {
 	l1GasUsed := CalculateL1GasUsed(data, overhead)
 	l1DataFee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
 	return mulAndScale(l1DataFee, scalar, rcfg.Precision)
@@ -174,24 +174,24 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
-func CalculateFees(tx *types.Transaction, state StateDB) (*big.Int, *big.Int, *big.Int, error) {
-	var l1DataFee *big.Int
+func CalculateL1DataFee(tx *types.Transaction, state StateDB) (*big.Int, error) {
 	if tx.IsL1MessageTx() {
-		l1DataFee = big.NewInt(0)
-	} else {
-		raw, err := rlpEncode(tx)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-		l1DataFee = CalculateL1DataFee(raw, overhead, l1BaseFee, scalar)
+		return big.NewInt(0), nil
 	}
 
+	raw, err := rlpEncode(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+	l1DataFee := calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
+	return l1DataFee, nil
+}
+
+func calculateL2Fee(tx *types.Transaction) *big.Int {
 	l2GasLimit := new(big.Int).SetUint64(tx.Gas())
-	l2Fee := new(big.Int).Mul(tx.GasPrice(), l2GasLimit)
-	fee := new(big.Int).Add(l1DataFee, l2Fee)
-	return l1DataFee, l2Fee, fee, nil
+	return new(big.Int).Mul(tx.GasPrice(), l2GasLimit)
 }
 
 func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error {
@@ -201,8 +201,8 @@ func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error 
 	}
 
 	balance := state.GetBalance(from)
-
-	l1DataFee, l2Fee, _, err := CalculateFees(tx, state)
+	l2Fee := calculateL2Fee(tx)
+	l1DataFee, err := CalculateL1DataFee(tx, state)
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %w", err)
 	}

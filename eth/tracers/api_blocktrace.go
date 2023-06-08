@@ -183,7 +183,7 @@ func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTr
 		msg, _ := tx.AsMessage(env.signer, block.BaseFee())
 		env.state.Prepare(tx.Hash(), i)
 		vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, api.backend.ChainConfig(), vm.Config{})
-		l1DataFee, _, _, err := fees.CalculateFees(tx, env.state)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
 		if err != nil {
 			failed = err
 			break
@@ -264,7 +264,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	state.Prepare(txctx.TxHash, txctx.TxIndex)
 
 	// Computes the new state by applying the given message.
-	l1DataFee, _, _, err := fees.CalculateFees(tx, state)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
 	if err != nil {
 		return err
 	}

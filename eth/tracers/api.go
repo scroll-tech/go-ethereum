@@ -286,6 +286,8 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 
 					l1DataFee, err := fees.CalculateL1DataFee(tx, task.statedb)
 					if err != nil {
+						// though it's not a "tracing error", we still need to put it here
+						task.results[i] = &txTraceResult{Error: err.Error()}
 						log.Warn("CalculateL1DataFee failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
 						break
 					}
@@ -545,7 +547,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 		if err != nil {
 			log.Warn("Tracing intermediate roots did not complete due to fees.CalculateL1DataFee", "txindex", i, "txhash", tx.Hash(), "err", err)
-			return roots, nil
+			return nil, err
 		}
 
 		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {

@@ -907,8 +907,7 @@ func newRPCBalance(balance *big.Int) **hexutil.Big {
 	return &rpcBalance
 }
 
-// TODO: rename this API to EstimateL1MsgFee?
-func CalculateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
+func EstimateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
 	if !config.Scroll.FeeVaultEnabled() {
 		return big.NewInt(0), nil
 	}
@@ -1061,7 +1060,7 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 	_, isOverrideSet := (*overrides)[args.from()]
 
 	if isGasPriceZero && !isOverrideSet {
-		l1DataFee, err := CalculateL1MsgFee(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap(), s.b.ChainConfig())
+		l1DataFee, err := EstimateL1MsgFee(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap(), s.b.ChainConfig())
 		if err != nil {
 			return nil, err
 		}
@@ -1136,7 +1135,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		}
 
 		// account for l1 fee
-		l1DataFee, err := CalculateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, b.ChainConfig())
+		l1DataFee, err := EstimateL1MsgFee(ctx, b, args, blockNrOrHash, nil, 0, gasCap, b.ChainConfig())
 		if err != nil {
 			return 0, err
 		}

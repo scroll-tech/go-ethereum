@@ -334,11 +334,15 @@ func TestBlockhash(t *testing.T) {
 	if zero.BitLen() != 0 {
 		t.Fatalf("expected zeroes, got %x", ret[0:32])
 	}
-	if first.Uint64() != 999 {
-		t.Fatalf("second block should be 999, got %d (%x)", first, ret[32:64])
+	firstExpectedHash := new(big.Int)
+	firstExpectedHash.SetString("28525242282991764410928388969629048828364902165951050041155951997565487454728",10)
+	if first.Uint64() != firstExpectedHash.Uint64() {
+		t.Fatalf("second block should be 28525242282991764410928388969629048828364902165951050041155951997565487454728, got %d (%x)", first, ret[32:64])
 	}
-	if last.Uint64() != 0 {
-		t.Fatalf("last block should be 0, got %d (%x)", last, ret[64:96])
+	lastExpectedHash := new(big.Int)
+	lastExpectedHash.SetString("74125838724246450952714155232654699779143198907823435068566450025433879593973",10)
+	if last.Uint64() != lastExpectedHash.Uint64() {
+		t.Fatalf("last block should be 74125838724246450952714155232654699779143198907823435068566450025433879593973, got %d (%x)", last, ret[64:96])
 	}
 	if exp, got := 0, chain.counter; exp != got {
 		t.Errorf("suboptimal; too much chain iteration, expected %d, got %d", exp, got)

@@ -335,7 +335,7 @@ func TestBlockhash(t *testing.T) {
 		t.Fatalf("expected zeroes, got %x", ret[0:32])
 	}
 	firstExpectedHash := new(big.Int)
-	firstExpectedHash.SetString("28525242282991764410928388969629048828364902165951050041155951997565487454728",10)
+	firstExpectedHash.SetString("28525242282991764410928388969629048828364902165951050041155951997565487454728", 10)
 	if first.Uint64() != firstExpectedHash.Uint64() {
 		t.Fatalf("first hash should be 28525242282991764410928388969629048828364902165951050041155951997565487454728, got %d (%x)", first, ret[32:64])
 	}

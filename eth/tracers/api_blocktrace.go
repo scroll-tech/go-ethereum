@@ -389,7 +389,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		To:             receiver,
 		AccountCreated: createdAcc,
 		AccountsAfter:  after,
-		L1Fee:          result.L1Fee,
+		L1Fee:          (*hexutil.Big)(result.L1Fee),
 		Gas:            result.UsedGas,
 		Failed:         result.Failed(),
 		ReturnValue:    fmt.Sprintf("%x", returnVal),

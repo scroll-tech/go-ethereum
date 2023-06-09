@@ -394,16 +394,12 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		}
 	}
 
-	var l1Fee uint64
-	if result.L1DataFee != nil {
-		l1Fee = result.L1DataFee.Uint64()
-	}
 	env.executionResults[index] = &types.ExecutionResult{
 		From:           sender,
 		To:             receiver,
 		AccountCreated: createdAcc,
 		AccountsAfter:  after,
-		L1DataFee:      l1Fee,
+		L1DataFee:      (*hexutil.Big)(result.L1DataFee),
 		Gas:            result.UsedGas,
 		Failed:         result.Failed(),
 		ReturnValue:    fmt.Sprintf("%x", returnVal),

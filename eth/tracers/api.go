@@ -769,18 +769,9 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.Prepare(tx.Hash(), i)
 		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
-		if err != nil {
-			if writer != nil {
-				writer.Flush()
-			}
-			if dump != nil {
-				dump.Close()
-				log.Info("Wrote standard trace due to CalculateL1DataFee error", "file", dump.Name(), "err", err)
-			}
-			return dumps, err
+		if err == nil {
+			_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		}
-
-		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if writer != nil {
 			writer.Flush()
 		}

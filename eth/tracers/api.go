@@ -768,8 +768,18 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.Prepare(tx.Hash(), i)
-		l1DataFee, err1 := fees.CalculateL1DataFee(tx, statedb)
-		_, err2 := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
+		if err != nil {
+			if writer != nil {
+				writer.Flush()
+			}
+			if dump != nil {
+				dump.Close()
+			}
+			return dumps, nil
+		}
+
+		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		if writer != nil {
 			writer.Flush()
 		}
@@ -777,7 +787,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 			dump.Close()
 			log.Info("Wrote standard trace", "file", dump.Name())
 		}
-		if err1 != nil || err2 != nil {
+		if err != nil {
 			return dumps, err
 		}
 		// Finalize the state so any modifications are written to the trie

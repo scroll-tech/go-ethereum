@@ -775,8 +775,9 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 			}
 			if dump != nil {
 				dump.Close()
+				log.Info("Wrote standard trace due to CalculateL1DataFee error", "file", dump.Name(), "err", err)
 			}
-			return dumps, nil
+			return dumps, err
 		}
 
 		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)

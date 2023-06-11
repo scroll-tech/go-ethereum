@@ -342,7 +342,7 @@ func TestBlockhash(t *testing.T) {
 	lastExpectedHash := new(big.Int)
 	lastExpectedHash.SetString("74125838724246450952714155232654699779143198907823435068566450025433879593973", 10)
 	if last.Uint64() != lastExpectedHash.Uint64() {
-		t.Fatalf("last block should be 74125838724246450952714155232654699779143198907823435068566450025433879593973, got %d (%x)", last, ret[64:96])
+		t.Fatalf("last hash should be 74125838724246450952714155232654699779143198907823435068566450025433879593973, got %d (%x)", last, ret[64:96])
 	}
 	if exp, got := 0, chain.counter; exp != got {
 		t.Errorf("suboptimal; too much chain iteration, expected %d, got %d", exp, got)

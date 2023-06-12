@@ -275,7 +275,7 @@ func abigen(c *cli.Context) error {
 		tmplFile := c.GlobalString(tmplFlag.Name)
 		data, err := os.ReadFile(tmplFile)
 		if err != nil {
-			utils.Fatalf("Failed to read tmpl file: %v", err)
+			utils.Fatalf("Failed to read template file: %v", err)
 		}
 		bind.SetTmplSource(bind.LangGo, string(data))
 	}

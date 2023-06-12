@@ -270,7 +270,7 @@ func abigen(c *cli.Context) error {
 			aliases[match[1]] = match[2]
 		}
 	}
-	// Set customize tmpl file.
+	// Set customize template file.
 	if c.GlobalIsSet(tmplFlag.Name) {
 		tmplFile := c.GlobalString(tmplFlag.Name)
 		data, err := os.ReadFile(tmplFile)

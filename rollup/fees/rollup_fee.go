@@ -69,11 +69,11 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer 
 
 // asUnsignedTx turns a Message into a types.Transaction
 func asUnsignedTx(msg Message, baseFee, chainID *big.Int) *types.Transaction {
-	if msg.AccessList() == nil {
-		return asUnsignedLegacyTx(msg)
-	}
-
 	if baseFee == nil {
+		if msg.AccessList() == nil {
+			return asUnsignedLegacyTx(msg)
+		}
+
 		return asUnsignedAccessListTx(msg, chainID)
 	}
 

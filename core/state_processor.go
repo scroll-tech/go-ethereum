@@ -145,7 +145,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	receipt.BlockHash = blockHash
 	receipt.BlockNumber = blockNumber
 	receipt.TransactionIndex = uint(statedb.TxIndex())
-	receipt.L1DataFee = result.L1DataFee
+	receipt.L1Fee = result.L1DataFee
 	return receipt, err
 }
 

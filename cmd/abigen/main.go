@@ -277,7 +277,7 @@ func abigen(c *cli.Context) error {
 		if err != nil {
 			utils.Fatalf("Failed to read template file: %v", err)
 		}
-		bind.SetTmplSource(bind.LangGo, string(data))
+		bind.SetTmplSource(lang, string(data))
 	}
 	// Generate the contract binding
 	code, err := bind.Bind(types, abis, bins, sigs, c.GlobalString(pkgFlag.Name), lang, libs, aliases)

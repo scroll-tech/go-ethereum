@@ -105,7 +105,7 @@ var (
 	}
 	tmplFlag = cli.StringFlag{
 		Name:  "tmpl",
-		Usage: "Support user tmpl file",
+		Usage: "Template file if a user wants to customize",
 	}
 )
 

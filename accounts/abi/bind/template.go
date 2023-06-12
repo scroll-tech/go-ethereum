@@ -79,7 +79,7 @@ var tmplSource = map[Lang]string{
 	LangJava: tmplSourceJava,
 }
 
-// SetTmplSource supports this func in order to set special tmpl file.
+// SetTmplSource supports this func in order to set special template file.
 func SetTmplSource(lang Lang, source string) {
 	if _, ok := tmplSource[lang]; ok {
 		tmplSource[lang] = source

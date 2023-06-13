@@ -266,7 +266,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 	// Computes the new state by applying the given message.
 	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
 	if err != nil {
-		return err
+		return fmt.Errorf("tracing failed: %w", err)
 	}
 	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 	if err != nil {

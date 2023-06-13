@@ -35,7 +35,8 @@ import (
 )
 
 var (
-	errPrecompileDisabled = errors.New("sha256, ripemd160, blake2f precompiles temporarily disabled")
+	errPrecompileDisabled     = errors.New("sha256, ripemd160, blake2f precompiles temporarily disabled")
+	errModexpUnsupportedInput = errors.New("modexp temporarily accepts only 32-byte (256-bit) input")
 )
 
 // PrecompiledContract is the basic interface for native Go contracts. The implementation
@@ -412,7 +413,7 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 	)
 	// Check that all inputs are `u256` (32 - bytes), revert otherwise
 	if baseLen != 32 || expLen != 32 || modLen != 32 {
-		return nil, ErrExecutionReverted
+		return nil, errModexpUnsupportedInput
 	}
 	if len(input) > 96 {
 		input = input[96:]

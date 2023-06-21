@@ -166,7 +166,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 
-func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
+func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
 	tracer *vm.StructLogger, proofCaches map[string]*circuitcapacitychecker.ProofCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	// reset StructLogger to avoid OOM
 	tracer.Reset()
@@ -257,8 +257,8 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 		}
 
 		if proofCache.StorageTrie == nil {
-			// we have no storage proof available (maybe the account is not existed yet)
-			// , just continue to next address
+			// we have no storage proof available (maybe the account is not existed yet),
+			// just continue to next address
 			log.Info("Storage trie not available", "address", addr)
 			continue
 		}
@@ -322,9 +322,9 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 	}
 
 	traces := &types.BlockTrace{
-		// ChainID: w.chainConfig.ChainID.Uint64(),
+		ChainID: config.ChainID.Uint64(),
 		Version: params.ArchiveVersion(params.CommitHash),
-		// Header:  w.current.header,
+		Header:  header,
 		Coinbase: &types.AccountWrapper{
 			Address:          *traceCoinbase,
 			Nonce:            statedb.GetNonce(*traceCoinbase),
@@ -334,9 +334,9 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 			CodeSize:         statedb.GetCodeSize(*traceCoinbase),
 		},
 		WithdrawTrieRoot: withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, statedb),
-		// Transactions: []*types.TransactionData{
-		// 	types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
-		// },
+		Transactions: []*types.TransactionData{
+			types.NewTransactionData(tx, header.Number.Uint64(), config),
+		},
 		ExecutionResults: []*types.ExecutionResult{
 			{
 				From:           sender,
@@ -373,10 +373,10 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 
 	// Update the state with pending changes.
 	var root []byte
-	if config.IsByzantium(blockNumber) {
+	if config.IsByzantium(header.Number) {
 		statedb.Finalise(true)
 	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
+		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
 	}
 	*usedGas += result.UsedGas
 
@@ -397,10 +397,10 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 	}
 
 	// Set the receipt logs and create the bloom filter.
-	receipt.Logs = statedb.GetLogs(tx.Hash(), blockHash)
+	receipt.Logs = statedb.GetLogs(tx.Hash(), header.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
-	receipt.BlockHash = blockHash
-	receipt.BlockNumber = blockNumber
+	receipt.BlockHash = header.Hash()
+	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(statedb.TxIndex())
 	receipt.L1Fee = result.L1Fee
 	return receipt, err
@@ -419,5 +419,5 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger), proofCaches, checker)
+	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header, signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger), proofCaches, checker)
 }

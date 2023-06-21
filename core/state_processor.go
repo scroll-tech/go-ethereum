@@ -30,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 )
 
@@ -218,11 +219,26 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 	}
 	panic(sender)
 	panic(receiver)
-	panic(txStorageTrace)
 
 	proofAccounts := tracer.UpdatedAccounts()
 	proofAccounts[*traceCoinbase] = struct{}{}
 	proofAccounts[rcfg.L1GasPriceOracleAddress] = struct{}{}
+	for addr := range proofAccounts {
+		addrStr := addr.String()
+		proofCache, existed := proofCaches[addrStr]
+		if !existed {
+			proofCache = circuitcapacitychecker.NewProofCache(statedb, addr)
+			proof, err := statedb.GetProof(addr)
+			if err != nil {
+				log.Error("Proof not available", "address", addrStr, "error", err)
+				// but we still mark the proofs map with nil array
+			}
+			proofCache.AccountProof = types.WrapProof(proof)
+			proofCaches[addrStr] = proofCache
+
+		}
+		txStorageTrace.Proofs[addrStr] = proofCache.AccountProof
+	}
 
 
 

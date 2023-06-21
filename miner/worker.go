@@ -19,7 +19,6 @@ package miner
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -28,19 +27,15 @@ import (
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
-	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
-	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -788,207 +783,8 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	// TODO: clean up
-	// reset StructLogger to avoid OOM
-	tracer := w.chain.GetVMConfig().Tracer.(*vm.StructLogger)
-	tracer.Reset()
-
-	// TODO: clean up
-	proofCaches := w.current.proofCaches
-
-	// TODO: clean up
-	var traceCoinbase common.Address
-	if w.chainConfig.Scroll.FeeVaultEnabled() {
-		traceCoinbase = *w.chainConfig.Scroll.FeeVaultAddress
-	} else {
-		traceCoinbase = coinbase
-	}
-
-	// TODO: clean up
-	from, _ := types.Sender(w.current.signer, tx)
-	to := tx.To()
-
-	sender := &types.AccountWrapper{
-		Address:          from,
-		Nonce:            w.current.state.GetNonce(from),
-		Balance:          (*hexutil.Big)(w.current.state.GetBalance(from)),
-		KeccakCodeHash:   w.current.state.GetKeccakCodeHash(from),
-		PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(from),
-		CodeSize:         w.current.state.GetCodeSize(from),
-	}
-	var receiver *types.AccountWrapper
-	if to != nil {
-		receiver = &types.AccountWrapper{
-			Address:          *to,
-			Nonce:            w.current.state.GetNonce(*to),
-			Balance:          (*hexutil.Big)(w.current.state.GetBalance(*to)),
-			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(*to),
-			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(*to),
-			CodeSize:         w.current.state.GetCodeSize(*to),
-		}
-	}
-
 	receipt, err := core.ApplyTransactionWithCircuitCheck(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, w.current.signer, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig(), w.current.proofCaches, w.circuitCapacityChecker)
 	if err != nil {
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
-
-	// currently `RootBefore` & `RootAfter` are not used
-	txStorageTrace := &types.StorageTrace{
-		Proofs:        make(map[string][]hexutil.Bytes),
-		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
-	}
-
-	proofAccounts := tracer.UpdatedAccounts()
-	proofAccounts[traceCoinbase] = struct{}{}
-	proofAccounts[rcfg.L1GasPriceOracleAddress] = struct{}{}
-	for addr := range proofAccounts {
-		addrStr := addr.String()
-		proofCache, existed := proofCaches[addrStr]
-		if !existed {
-			proofCache = circuitcapacitychecker.NewProofCache(w.current.state, addr)
-			proof, err := w.current.state.GetProof(addr)
-			if err != nil {
-				log.Error("Proof not available", "address", addrStr, "error", err)
-				// but we still mark the proofs map with nil array
-			}
-			proofCache.AccountProof = types.WrapProof(proof)
-			proofCaches[addrStr] = proofCache
-
-		}
-		txStorageTrace.Proofs[addrStr] = proofCache.AccountProof
-	}
-
-	proofStorages := tracer.UpdatedStorages()
-	proofStorages[rcfg.L1GasPriceOracleAddress] = vm.Storage(
-		map[common.Hash]common.Hash{
-			rcfg.L1BaseFeeSlot: {},
-			rcfg.OverheadSlot:  {},
-			rcfg.ScalarSlot:    {},
-		})
-	for addr, keys := range proofStorages {
-		addrStr := addr.String()
-		txStorageTrace.StorageProofs[addrStr] = make(map[string][]hexutil.Bytes)
-		proofCache, existed := proofCaches[addrStr]
-		if !existed {
-			panic("any storage proof under an account must come along with account proof")
-		}
-
-		if proofCache.StorageTrie == nil {
-			// we have no storage proof available (maybe the account is not existed yet)
-			// , just continue to next address
-			log.Info("Storage trie not available", "address", addr)
-			continue
-		}
-
-		for key, values := range keys {
-
-			keyStr := key.String()
-
-			stgProof, existed := proofCache.StorageProof[keyStr]
-			if !existed {
-				var proof [][]byte
-				var err error
-				if proofCache.TrieTracer.Available() {
-					proof, err = w.current.state.GetSecureTrieProof(proofCache.TrieTracer, key)
-				} else {
-					proof, err = w.current.state.GetSecureTrieProof(proofCache.StorageTrie, key)
-				}
-				if err != nil {
-					log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
-					// but we still mark the proofs map with nil array
-				}
-				stgProof = types.WrapProof(proof)
-				proofCache.StorageProof[keyStr] = stgProof
-			}
-			// isDelete
-			if proofCache.TrieTracer.Available() && bytes.Equal(values.Bytes(), common.Hash{}.Bytes()) {
-				proofCache.TrieTracer.MarkDeletion(key)
-			}
-			txStorageTrace.StorageProofs[addrStr][keyStr] = stgProof
-		}
-
-		// build dummy per-tx deletion proof
-		if proofCache.TrieTracer.Available() {
-			delProofs, err := proofCache.TrieTracer.GetDeletionProofs()
-			if err != nil {
-				log.Error("deletion proof failure", "error", err)
-			} else {
-				for _, proof := range delProofs {
-					txStorageTrace.DeletionProofs = append(txStorageTrace.DeletionProofs, proof)
-				}
-			}
-		}
-	}
-
-	createdAcc := tracer.CreatedAccount()
-	if to == nil {
-		if createdAcc == nil {
-			return nil, errors.New("unexpected tx: address for created contract unavailable")
-		}
-		to = &createdAcc.Address
-	}
-	var after []*types.AccountWrapper
-	// collect affected account after tx being applied
-	for _, acc := range []common.Address{from, *to, traceCoinbase} {
-		after = append(after, &types.AccountWrapper{
-			Address:          acc,
-			Nonce:            w.current.state.GetNonce(acc),
-			Balance:          (*hexutil.Big)(w.current.state.GetBalance(acc)),
-			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(acc),
-			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(acc),
-			CodeSize:         w.current.state.GetCodeSize(acc),
-		})
-	}
-
-	traces := &types.BlockTrace{
-		ChainID: w.chainConfig.ChainID.Uint64(),
-		Version: params.ArchiveVersion(params.CommitHash),
-		Header:  w.current.header,
-		Coinbase: &types.AccountWrapper{
-			Address:          traceCoinbase,
-			Nonce:            w.current.state.GetNonce(traceCoinbase),
-			Balance:          (*hexutil.Big)(w.current.state.GetBalance(traceCoinbase)),
-			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(traceCoinbase),
-			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(traceCoinbase),
-			CodeSize:         w.current.state.GetCodeSize(traceCoinbase),
-		},
-		WithdrawTrieRoot: withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, w.current.state),
-		Transactions: []*types.TransactionData{
-			types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
-		},
-		ExecutionResults: []*types.ExecutionResult{
-			{
-				From:           sender,
-				To:             receiver,
-				AccountCreated: createdAcc,
-				AccountsAfter:  after,
-				Gas:            receipt.GasUsed,
-				Failed:         receipt.Status == types.ReceiptStatusFailed,
-				ReturnValue:    fmt.Sprintf("%x", common.CopyBytes(receipt.ReturnValue)),
-				StructLogs:     vm.FormatLogs(tracer.StructLogs()),
-			},
-		},
-		StorageTrace:   txStorageTrace,
-		TxStorageTrace: []*types.StorageTrace{txStorageTrace},
-	}
-
-	if receipt.L1Fee != nil {
-		traces.ExecutionResults[0].L1Fee = receipt.L1Fee.Uint64()
-	}
-
-	// probably a Contract Call
-	if len(tx.Data()) != 0 && tx.To() != nil {
-		traces.ExecutionResults[0].ByteCode = hexutil.Encode(w.current.state.GetCode(*tx.To()))
-		// Get tx.to address's code hash.
-		codeHash := w.current.state.GetPoseidonCodeHash(*tx.To())
-		traces.ExecutionResults[0].PoseidonCodeHash = &codeHash
-	} else if tx.To() == nil { // Contract is created.
-		traces.ExecutionResults[0].ByteCode = hexutil.Encode(tx.Data())
-	}
-
-	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}

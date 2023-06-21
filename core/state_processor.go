@@ -203,26 +203,17 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 		}
 	}
 
-
-	// ---------------------------------------------------------------
-	// ---------------------------------------------------------------
-
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
 	}
 
-	// ---------------------------------------------------------------
-	// ---------------------------------------------------------------
-
 	// currently `RootBefore` & `RootAfter` are not used
 	txStorageTrace := &types.StorageTrace{
 		Proofs:        make(map[string][]hexutil.Bytes),
 		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 	}
-	panic(sender)
-	panic(receiver)
 
 	proofAccounts := tracer.UpdatedAccounts()
 	proofAccounts[*traceCoinbase] = struct{}{}

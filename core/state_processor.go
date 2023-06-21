@@ -192,15 +192,28 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 			CodeSize:         statedb.GetCodeSize(*to),
 		}
 	}
-	panic(traceCoinbase)
-	panic(sender)
-	panic(receiver)
 
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
 	}
+
+
+
+	// currently `RootBefore` & `RootAfter` are not used
+	txStorageTrace := &types.StorageTrace{
+		Proofs:        make(map[string][]hexutil.Bytes),
+		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+	}
+	panic(traceCoinbase)
+	panic(sender)
+	panic(receiver)
+	panic(txStorageTrace)
+
+
+
+
 
 	// Update the state with pending changes.
 	var root []byte

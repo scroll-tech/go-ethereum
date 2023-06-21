@@ -29,6 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -164,7 +165,6 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 	// reset StructLogger to avoid OOM
 	tracer.Reset()
 
-
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
@@ -197,23 +197,31 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 		}
 	}
 
+
+	// ---------------------------------------------------------------
+	// ---------------------------------------------------------------
+
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
 	}
 
-
+	// ---------------------------------------------------------------
+	// ---------------------------------------------------------------
 
 	// currently `RootBefore` & `RootAfter` are not used
 	txStorageTrace := &types.StorageTrace{
 		Proofs:        make(map[string][]hexutil.Bytes),
 		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 	}
-	panic(traceCoinbase)
 	panic(sender)
 	panic(receiver)
 	panic(txStorageTrace)
+
+	proofAccounts := tracer.UpdatedAccounts()
+	proofAccounts[*traceCoinbase] = struct{}{}
+	proofAccounts[rcfg.L1GasPriceOracleAddress] = struct{}{}
 
 
 

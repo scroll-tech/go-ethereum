@@ -818,6 +818,13 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	proofCaches := w.current.proofCaches
 
+	var traceCoinbase common.Address
+	if w.chainConfig.Scroll.FeeVaultEnabled() {
+		traceCoinbase = *w.chainConfig.Scroll.FeeVaultAddress
+	} else {
+		traceCoinbase = coinbase
+	}
+
 	from, _ := types.Sender(w.current.signer, tx)
 	to := tx.To()
 
@@ -854,11 +861,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 
 	proofAccounts := tracer.UpdatedAccounts()
-	if w.chainConfig.Scroll.FeeVaultEnabled() {
-		proofAccounts[*w.chainConfig.Scroll.FeeVaultAddress] = struct{}{}
-	} else {
-		proofAccounts[coinbase] = struct{}{}
-	}
+	proofAccounts[traceCoinbase] = struct{}{}
 	proofAccounts[rcfg.L1GasPriceOracleAddress] = struct{}{}
 	for addr := range proofAccounts {
 		addrStr := addr.String()
@@ -948,7 +951,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 	var after []*types.AccountWrapper
 	// collect affected account after tx being applied
-	for _, acc := range []common.Address{from, *to, coinbase} {
+	for _, acc := range []common.Address{from, *to, traceCoinbase} {
 		after = append(after, &types.AccountWrapper{
 			Address:          acc,
 			Nonce:            w.current.state.GetNonce(acc),
@@ -964,12 +967,12 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		Version: params.ArchiveVersion(params.CommitHash),
 		Header:  w.current.header,
 		Coinbase: &types.AccountWrapper{
-			Address:          coinbase,
-			Nonce:            w.current.state.GetNonce(coinbase),
-			Balance:          (*hexutil.Big)(w.current.state.GetBalance(coinbase)),
-			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(coinbase),
-			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(coinbase),
-			CodeSize:         w.current.state.GetCodeSize(coinbase),
+			Address:          traceCoinbase,
+			Nonce:            w.current.state.GetNonce(traceCoinbase),
+			Balance:          (*hexutil.Big)(w.current.state.GetBalance(traceCoinbase)),
+			KeccakCodeHash:   w.current.state.GetKeccakCodeHash(traceCoinbase),
+			PoseidonCodeHash: w.current.state.GetPoseidonCodeHash(traceCoinbase),
+			CodeSize:         w.current.state.GetCodeSize(traceCoinbase),
 		},
 		WithdrawTrieRoot: withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, w.current.state),
 		Transactions: []*types.TransactionData{

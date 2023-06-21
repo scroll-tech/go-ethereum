@@ -209,6 +209,12 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 		return nil, err
 	}
 
+	// If the result contains a revert reason, return it.
+	returnVal := result.Return()
+	if len(result.Revert()) > 0 {
+		returnVal = result.Revert()
+	}
+
 	// currently `RootBefore` & `RootAfter` are not used
 	txStorageTrace := &types.StorageTrace{
 		Proofs:        make(map[string][]hexutil.Bytes),
@@ -317,7 +323,7 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 
 	traces := &types.BlockTrace{
 		// ChainID: w.chainConfig.ChainID.Uint64(),
-		// Version: params.ArchiveVersion(params.CommitHash),
+		Version: params.ArchiveVersion(params.CommitHash),
 		// Header:  w.current.header,
 		Coinbase: &types.AccountWrapper{
 			Address:          *traceCoinbase,
@@ -338,8 +344,8 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 				AccountCreated: createdAcc,
 				AccountsAfter:  after,
 				Gas:            result.UsedGas,
-				// Failed:         receipt.Status == types.ReceiptStatusFailed,
-				// ReturnValue:    fmt.Sprintf("%x", common.CopyBytes(receipt.ReturnValue)),
+				Failed:         result.Failed(),
+				ReturnValue:    fmt.Sprintf("%x", common.CopyBytes(returnVal)),
 				StructLogs:     vm.FormatLogs(tracer.StructLogs()),
 			},
 		},
@@ -374,11 +380,6 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 	}
 	*usedGas += result.UsedGas
 
-	// If the result contains a revert reason, return it.
-	returnVal := result.Return()
-	if len(result.Revert()) > 0 {
-		returnVal = result.Revert()
-	}
 	// Create a new receipt for the transaction, storing the intermediate root and gas used
 	// by the tx.
 	receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas, ReturnValue: returnVal}

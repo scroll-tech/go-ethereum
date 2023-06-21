@@ -18,7 +18,9 @@ package core
 
 import (
 	"fmt"
+	"bytes"
 	"math/big"
+	"errors"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -32,6 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -163,7 +166,8 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 
-func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM, tracer *vm.StructLogger, proofCaches map[string]*circuitcapacitychecker.ProofCache) (*types.Receipt, error) {
+func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
+	tracer *vm.StructLogger, proofCaches map[string]*circuitcapacitychecker.ProofCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	// reset StructLogger to avoid OOM
 	tracer.Reset()
 
@@ -240,9 +244,135 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 		txStorageTrace.Proofs[addrStr] = proofCache.AccountProof
 	}
 
+	proofStorages := tracer.UpdatedStorages()
+	proofStorages[rcfg.L1GasPriceOracleAddress] = vm.Storage(
+		map[common.Hash]common.Hash{
+			rcfg.L1BaseFeeSlot: {},
+			rcfg.OverheadSlot:  {},
+			rcfg.ScalarSlot:    {},
+		})
+	for addr, keys := range proofStorages {
+		addrStr := addr.String()
+		txStorageTrace.StorageProofs[addrStr] = make(map[string][]hexutil.Bytes)
+		proofCache, existed := proofCaches[addrStr]
+		if !existed {
+			panic("any storage proof under an account must come along with account proof")
+		}
 
+		if proofCache.StorageTrie == nil {
+			// we have no storage proof available (maybe the account is not existed yet)
+			// , just continue to next address
+			log.Info("Storage trie not available", "address", addr)
+			continue
+		}
 
+		for key, values := range keys {
+			keyStr := key.String()
+			stgProof, existed := proofCache.StorageProof[keyStr]
+			if !existed {
+				var proof [][]byte
+				var err error
+				if proofCache.TrieTracer.Available() {
+					proof, err = statedb.GetSecureTrieProof(proofCache.TrieTracer, key)
+				} else {
+					proof, err = statedb.GetSecureTrieProof(proofCache.StorageTrie, key)
+				}
+				if err != nil {
+					log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
+					// but we still mark the proofs map with nil array
+				}
+				stgProof = types.WrapProof(proof)
+				proofCache.StorageProof[keyStr] = stgProof
+			}
+			// isDelete
+			if proofCache.TrieTracer.Available() && bytes.Equal(values.Bytes(), common.Hash{}.Bytes()) {
+				proofCache.TrieTracer.MarkDeletion(key)
+			}
+			txStorageTrace.StorageProofs[addrStr][keyStr] = stgProof
+		}
 
+		// build dummy per-tx deletion proof
+		if proofCache.TrieTracer.Available() {
+			delProofs, err := proofCache.TrieTracer.GetDeletionProofs()
+			if err != nil {
+				log.Error("deletion proof failure", "error", err)
+			} else {
+				for _, proof := range delProofs {
+					txStorageTrace.DeletionProofs = append(txStorageTrace.DeletionProofs, proof)
+				}
+			}
+		}
+	}
+
+	createdAcc := tracer.CreatedAccount()
+	if to == nil {
+		if createdAcc == nil {
+			return nil, errors.New("unexpected tx: address for created contract unavailable")
+		}
+		to = &createdAcc.Address
+	}
+	var after []*types.AccountWrapper
+	// collect affected account after tx being applied
+	for _, acc := range []common.Address{from, *to, *traceCoinbase} {
+		after = append(after, &types.AccountWrapper{
+			Address:          acc,
+			Nonce:            statedb.GetNonce(acc),
+			Balance:          (*hexutil.Big)(statedb.GetBalance(acc)),
+			KeccakCodeHash:   statedb.GetKeccakCodeHash(acc),
+			PoseidonCodeHash: statedb.GetPoseidonCodeHash(acc),
+			CodeSize:         statedb.GetCodeSize(acc),
+		})
+	}
+
+	traces := &types.BlockTrace{
+		// ChainID: w.chainConfig.ChainID.Uint64(),
+		// Version: params.ArchiveVersion(params.CommitHash),
+		// Header:  w.current.header,
+		Coinbase: &types.AccountWrapper{
+			Address:          *traceCoinbase,
+			Nonce:            statedb.GetNonce(*traceCoinbase),
+			Balance:          (*hexutil.Big)(statedb.GetBalance(*traceCoinbase)),
+			KeccakCodeHash:   statedb.GetKeccakCodeHash(*traceCoinbase),
+			PoseidonCodeHash: statedb.GetPoseidonCodeHash(*traceCoinbase),
+			CodeSize:         statedb.GetCodeSize(*traceCoinbase),
+		},
+		WithdrawTrieRoot: withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, statedb),
+		// Transactions: []*types.TransactionData{
+		// 	types.NewTransactionData(tx, w.current.header.Number.Uint64(), w.chainConfig),
+		// },
+		ExecutionResults: []*types.ExecutionResult{
+			{
+				From:           sender,
+				To:             receiver,
+				AccountCreated: createdAcc,
+				AccountsAfter:  after,
+				Gas:            result.UsedGas,
+				// Failed:         receipt.Status == types.ReceiptStatusFailed,
+				// ReturnValue:    fmt.Sprintf("%x", common.CopyBytes(receipt.ReturnValue)),
+				StructLogs:     vm.FormatLogs(tracer.StructLogs()),
+			},
+		},
+		StorageTrace:   txStorageTrace,
+		TxStorageTrace: []*types.StorageTrace{txStorageTrace},
+	}
+
+	if result.L1Fee != nil {
+		traces.ExecutionResults[0].L1Fee = result.L1Fee.Uint64()
+	}
+
+	// probably a Contract Call
+	if len(tx.Data()) != 0 && tx.To() != nil {
+		traces.ExecutionResults[0].ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
+		// Get tx.to address's code hash.
+		codeHash := statedb.GetPoseidonCodeHash(*tx.To())
+		traces.ExecutionResults[0].PoseidonCodeHash = &codeHash
+	} else if tx.To() == nil { // Contract is created.
+		traces.ExecutionResults[0].ByteCode = hexutil.Encode(tx.Data())
+	}
+
+	if err := checker.ApplyTransaction(traces); err != nil {
+		return nil, err
+	}
 
 	// Update the state with pending changes.
 	var root []byte
@@ -288,7 +418,8 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer,tx *types.Transaction, usedGas *uint64, cfg vm.Config, proofCaches map[string]*circuitcapacitychecker.ProofCache) (*types.Receipt, error) {
+func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer,tx *types.Transaction, usedGas *uint64, cfg vm.Config,
+	proofCaches map[string]*circuitcapacitychecker.ProofCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee)
 	if err != nil {
 		return nil, err
@@ -296,5 +427,5 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger), proofCaches)
+	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger), proofCaches, checker)
 }

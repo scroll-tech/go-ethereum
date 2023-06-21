@@ -160,7 +160,11 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 
-func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
+func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM, tracer *vm.StructLogger) (*types.Receipt, error) {
+	// reset StructLogger to avoid OOM
+	tracer.Reset()
+
+
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
@@ -267,10 +271,5 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-
-	// reset StructLogger to avoid OOM
-	tracer := cfg.Tracer.(*vm.StructLogger)
-	tracer.Reset()
-
-	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv)
+	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger))
 }

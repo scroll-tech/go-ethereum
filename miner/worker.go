@@ -804,6 +804,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		traceCoinbase = coinbase
 	}
 
+	// TODO: clean up
 	from, _ := types.Sender(w.current.signer, tx)
 	to := tx.To()
 

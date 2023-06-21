@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -159,10 +160,41 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 
-func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author, traceCoinbase *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
+func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
+
+	var traceCoinbase *common.Address
+	if config.Scroll.FeeVaultEnabled() {
+		traceCoinbase = config.Scroll.FeeVaultAddress
+	} else {
+		traceCoinbase = author
+	}
+	from, _ := types.Sender(signer, tx)
+	to := tx.To()
+	sender := &types.AccountWrapper{
+		Address:          from,
+		Nonce:            statedb.GetNonce(from),
+		Balance:          (*hexutil.Big)(statedb.GetBalance(from)),
+		KeccakCodeHash:   statedb.GetKeccakCodeHash(from),
+		PoseidonCodeHash: statedb.GetPoseidonCodeHash(from),
+		CodeSize:         statedb.GetCodeSize(from),
+	}
+	var receiver *types.AccountWrapper
+	if to != nil {
+		receiver = &types.AccountWrapper{
+			Address:          *to,
+			Nonce:            statedb.GetNonce(*to),
+			Balance:          (*hexutil.Big)(statedb.GetBalance(*to)),
+			KeccakCodeHash:   statedb.GetKeccakCodeHash(*to),
+			PoseidonCodeHash: statedb.GetPoseidonCodeHash(*to),
+			CodeSize:         statedb.GetCodeSize(*to),
+		}
+	}
+	panic(traceCoinbase)
+	panic(sender)
+	panic(receiver)
 
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
@@ -227,12 +259,5 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	tracer := cfg.Tracer.(*vm.StructLogger)
 	tracer.Reset()
 
-	var traceCoinbase *common.Address
-	if config.Scroll.FeeVaultEnabled() {
-		traceCoinbase = config.Scroll.FeeVaultAddress
-	} else {
-		traceCoinbase = author
-	}
-
-	return applyTransactionWithCircuitCheck(msg, config, bc, author,traceCoinbase, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv)
+	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv)
 }

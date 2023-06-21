@@ -827,7 +827,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		}
 	}
 
-	receipt, err := core.ApplyTransactionWithCircuitCheck(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+	receipt, err := core.ApplyTransactionWithCircuitCheck(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, w.current.signer, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err

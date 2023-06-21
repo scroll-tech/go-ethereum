@@ -3,9 +3,9 @@ package circuitcapacitychecker
 import (
 	"errors"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/state"
-	"github.com/scroll-tech/go-ethereum/common"
 )
 
 var (

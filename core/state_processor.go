@@ -222,5 +222,10 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
+
+	// reset StructLogger to avoid OOM
+	tracer := cfg.Tracer.(*vm.StructLogger)
+	tracer.Reset()
+
 	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
 }

@@ -793,8 +793,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	tracer := w.chain.GetVMConfig().Tracer.(*vm.StructLogger)
 	tracer.Reset()
 
+	// TODO: clean up
 	proofCaches := w.current.proofCaches
 
+	// TODO: clean up
 	var traceCoinbase common.Address
 	if w.chainConfig.Scroll.FeeVaultEnabled() {
 		traceCoinbase = *w.chainConfig.Scroll.FeeVaultAddress

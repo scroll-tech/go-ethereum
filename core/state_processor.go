@@ -159,7 +159,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 
-func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
+func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author, traceCoinbase *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
@@ -227,5 +227,12 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	tracer := cfg.Tracer.(*vm.StructLogger)
 	tracer.Reset()
 
-	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
+	var traceCoinbase *common.Address
+	if config.Scroll.FeeVaultEnabled() {
+		traceCoinbase = config.Scroll.FeeVaultAddress
+	} else {
+		traceCoinbase = author
+	}
+
+	return applyTransactionWithCircuitCheck(msg, config, bc, author,traceCoinbase, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
 }

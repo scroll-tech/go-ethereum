@@ -34,8 +34,6 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) er
 		return ErrUnknown
 	}
 
-	log.Error("trace", "string(tracesByt)", string(tracesByt))
-
 	tracesStr := C.CString(string(tracesByt))
 	defer func() {
 		C.free(unsafe.Pointer(tracesStr))

@@ -84,30 +84,6 @@ const (
 	staleThreshold = 7
 )
 
-// proofCache is cached in environment and holds data required for trace's storageProof and deletionProof
-type proofCache struct {
-	accountProof []hexutil.Bytes
-	storageProof map[string][]hexutil.Bytes
-	storageTrie  state.Trie
-	trieTracer   state.ZktrieProofTracer
-}
-
-func newProofCache(stateDb *state.StateDB, addr common.Address) *proofCache {
-	var zktrieTracer state.ZktrieProofTracer
-	trie, err := stateDb.GetStorageTrieForProof(addr)
-	// notice storage trie can be non-existed if the account is not existed
-	// we just use empty trie and Non-available tracer
-	if err == nil {
-		zktrieTracer = stateDb.NewProofTracer(trie)
-	}
-
-	return &proofCache{
-		storageProof: make(map[string][]hexutil.Bytes),
-		storageTrie:  trie,
-		trieTracer:   zktrieTracer,
-	}
-}
-
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
 	signer types.Signer
@@ -124,7 +100,7 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 
-	proofCaches map[string]*proofCache
+	proofCaches map[string]*circuitcapacitychecker.ProofCache
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -733,7 +709,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		family:      mapset.NewSet(),
 		uncles:      mapset.NewSet(),
 		header:      header,
-		proofCaches: make(map[string]*proofCache),
+		proofCaches: make(map[string]*circuitcapacitychecker.ProofCache),
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -867,17 +843,17 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		addrStr := addr.String()
 		proofCache, existed := proofCaches[addrStr]
 		if !existed {
-			proofCache = newProofCache(w.current.state, addr)
+			proofCache = circuitcapacitychecker.NewProofCache(w.current.state, addr)
 			proof, err := w.current.state.GetProof(addr)
 			if err != nil {
 				log.Error("Proof not available", "address", addrStr, "error", err)
 				// but we still mark the proofs map with nil array
 			}
-			proofCache.accountProof = types.WrapProof(proof)
+			proofCache.AccountProof = types.WrapProof(proof)
 			proofCaches[addrStr] = proofCache
 
 		}
-		txStorageTrace.Proofs[addrStr] = proofCache.accountProof
+		txStorageTrace.Proofs[addrStr] = proofCache.AccountProof
 	}
 
 	proofStorages := tracer.UpdatedStorages()
@@ -895,7 +871,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 			panic("any storage proof under an account must come along with account proof")
 		}
 
-		if proofCache.storageTrie == nil {
+		if proofCache.StorageTrie == nil {
 			// we have no storage proof available (maybe the account is not existed yet)
 			// , just continue to next address
 			log.Info("Storage trie not available", "address", addr)
@@ -906,32 +882,32 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 			keyStr := key.String()
 
-			stgProof, existed := proofCache.storageProof[keyStr]
+			stgProof, existed := proofCache.StorageProof[keyStr]
 			if !existed {
 				var proof [][]byte
 				var err error
-				if proofCache.trieTracer.Available() {
-					proof, err = w.current.state.GetSecureTrieProof(proofCache.trieTracer, key)
+				if proofCache.TrieTracer.Available() {
+					proof, err = w.current.state.GetSecureTrieProof(proofCache.TrieTracer, key)
 				} else {
-					proof, err = w.current.state.GetSecureTrieProof(proofCache.storageTrie, key)
+					proof, err = w.current.state.GetSecureTrieProof(proofCache.StorageTrie, key)
 				}
 				if err != nil {
 					log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 					// but we still mark the proofs map with nil array
 				}
 				stgProof = types.WrapProof(proof)
-				proofCache.storageProof[keyStr] = stgProof
+				proofCache.StorageProof[keyStr] = stgProof
 			}
 			// isDelete
-			if proofCache.trieTracer.Available() && bytes.Equal(values.Bytes(), common.Hash{}.Bytes()) {
-				proofCache.trieTracer.MarkDeletion(key)
+			if proofCache.TrieTracer.Available() && bytes.Equal(values.Bytes(), common.Hash{}.Bytes()) {
+				proofCache.TrieTracer.MarkDeletion(key)
 			}
 			txStorageTrace.StorageProofs[addrStr][keyStr] = stgProof
 		}
 
 		// build dummy per-tx deletion proof
-		if proofCache.trieTracer.Available() {
-			delProofs, err := proofCache.trieTracer.GetDeletionProofs()
+		if proofCache.TrieTracer.Available() {
+			delProofs, err := proofCache.TrieTracer.GetDeletionProofs()
 			if err != nil {
 				log.Error("deletion proof failure", "error", err)
 			} else {

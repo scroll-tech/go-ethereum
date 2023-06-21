@@ -30,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -161,7 +162,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 
-func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM, tracer *vm.StructLogger) (*types.Receipt, error) {
+func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM, tracer *vm.StructLogger, proofCaches map[string]*circuitcapacitychecker.ProofCache) (*types.Receipt, error) {
 	// reset StructLogger to avoid OOM
 	tracer.Reset()
 
@@ -271,7 +272,7 @@ func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainCon
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer,tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, error) {
+func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer,tx *types.Transaction, usedGas *uint64, cfg vm.Config, proofCaches map[string]*circuitcapacitychecker.ProofCache) (*types.Receipt, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee)
 	if err != nil {
 		return nil, err
@@ -279,5 +280,5 @@ func ApplyTransactionWithCircuitCheck(config *params.ChainConfig, bc ChainContex
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger))
+	return applyTransactionWithCircuitCheck(msg, config, bc, author, gp, statedb, header.Number, header.Hash(),signer, tx, usedGas, vmenv, cfg.Tracer.(*vm.StructLogger), proofCaches)
 }

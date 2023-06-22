@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -255,7 +256,6 @@ var (
 	}
 
 	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
-	ScrollFeeVaultAddress           = common.HexToAddress("0x5300000000000000000000000000000000000005")
 	ScrollMaxTxPerBlock             = 44
 	ScrollMaxTxPayloadBytesPerBlock = 120 * 1024
 
@@ -275,7 +275,8 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   nil,
-		ArchimedesBlock:     nil,
+		ArchimedesBlock:     big.NewInt(2646311),
+		ShanghaiBlock:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -284,9 +285,14 @@ var (
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
-			FeeVaultAddress:           &ScrollFeeVaultAddress,
+			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			EnableEIP2718:             false,
 			EnableEIP1559:             false,
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: common.HexToAddress("0x79DB48002Aa861C8cb189cabc21c6B1468BC83BB"),
+				NumL1MessagesPerBlock: 0,
+			},
 		},
 	}
 
@@ -295,7 +301,7 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
 		ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
@@ -303,6 +309,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -310,7 +317,7 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000},
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000},
 		ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
@@ -318,9 +325,10 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
 		ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           &common.Address{123},
@@ -328,10 +336,11 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
-	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
+	TestNoL1DataFeeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
 		ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
@@ -339,6 +348,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 )
 
@@ -418,7 +428,9 @@ type ChainConfig struct {
 	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
 	LondonBlock         *big.Int `json:"londonBlock,omitempty"`         // London switch block (nil = no fork, 0 = already on london)
 	ArrowGlacierBlock   *big.Int `json:"arrowGlacierBlock,omitempty"`   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
-	ArchimedesBlock     *big.Int `json:"ArchimedesBlock,omitempty"`     // Archimedes switch block (nil = no fork, 0 = already on archimedes)
+	ArchimedesBlock     *big.Int `json:"archimedesBlock,omitempty"`     // Archimedes switch block (nil = no fork, 0 = already on archimedes)
+	ShanghaiBlock       *big.Int `json:"shanghaiBlock,omitempty"`       // Shanghai switch block (nil = no fork, 0 = already on shanghai)
+
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
 	TerminalTotalDifficulty *big.Int `json:"terminalTotalDifficulty,omitempty"`
@@ -449,6 +461,25 @@ type ScrollConfig struct {
 
 	// Enable EIP-1559 in tx pool, EnableEIP2718 should be true too [optional]
 	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
+
+	// L1 config
+	L1Config *L1Config `json:"l1Config,omitempty"`
+}
+
+// L1Config contains the l1 parameters needed to collect l1 messages in the sequencer
+type L1Config struct {
+	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
+	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
+	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+}
+
+func (c *L1Config) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, numL1MessagesPerBlock: %v}",
+		c.L1ChainId, c.L1MessageQueueAddress, c.NumL1MessagesPerBlock)
 }
 
 func (s ScrollConfig) BaseFeeEnabled() bool {
@@ -463,6 +494,10 @@ func (s ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
 }
 
+func (s ScrollConfig) ShouldIncludeL1Messages() bool {
+	return s.L1Config != nil && s.L1Config.NumL1MessagesPerBlock > 0
+}
+
 func (s ScrollConfig) String() string {
 	maxTxPerBlock := "<nil>"
 	if s.MaxTxPerBlock != nil {
@@ -474,12 +509,13 @@ func (s ScrollConfig) String() string {
 		maxTxPayloadBytesPerBlock = fmt.Sprintf("%v", *s.MaxTxPayloadBytesPerBlock)
 	}
 
-	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
-		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
+	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, enableEIP2718: %v, enableEIP1559: %v, l1Config: %v}",
+		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559, s.L1Config.String())
 }
 
-// IsValidTxCount returns whether the given block's transaction count is below the limit.
-func (s ScrollConfig) IsValidTxCount(count int) bool {
+// IsValidL2TxCount returns whether the given block's L2 transaction count is below the limit.
+// This limit corresponds to the number of ECDSA signature checks that we can fit into the zkEVM.
+func (s ScrollConfig) IsValidL2TxCount(count int) bool {
 	return s.MaxTxPerBlock == nil || count <= *s.MaxTxPerBlock
 }
 
@@ -518,7 +554,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v,Engine: %v, Scroll config: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -535,6 +571,7 @@ func (c *ChainConfig) String() string {
 		c.LondonBlock,
 		c.ArrowGlacierBlock,
 		c.ArchimedesBlock,
+		c.ShanghaiBlock,
 		engine,
 		c.Scroll,
 	)
@@ -607,8 +644,14 @@ func (c *ChainConfig) IsArrowGlacier(num *big.Int) bool {
 	return isForked(c.ArrowGlacierBlock, num)
 }
 
+// IsArchimedes returns whether num is either equal to the Archimedes fork block or greater.
 func (c *ChainConfig) IsArchimedes(num *big.Int) bool {
 	return isForked(c.ArchimedesBlock, num)
+}
+
+// IsShanghai returns whether num is either equal to the Shanghai fork block or greater.
+func (c *ChainConfig) IsShanghai(num *big.Int) bool {
+	return isForked(c.ShanghaiBlock, num)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
@@ -660,7 +703,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "berlinBlock", block: c.BerlinBlock},
 		{name: "londonBlock", block: c.LondonBlock},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
-		{name: "ArchimedesBlock", block: c.ArchimedesBlock, optional: true},
+		{name: "archimedesBlock", block: c.ArchimedesBlock, optional: true},
+		{name: "shanghaiBlock", block: c.ShanghaiBlock, optional: true},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -736,6 +780,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.ArchimedesBlock, newcfg.ArchimedesBlock, head) {
 		return newCompatError("Archimedes fork block", c.ArchimedesBlock, newcfg.ArchimedesBlock)
 	}
+	if isForkIncompatible(c.ShanghaiBlock, newcfg.ShanghaiBlock, head) {
+		return newCompatError("Shanghai fork block", c.ShanghaiBlock, newcfg.ShanghaiBlock)
+	}
 	return nil
 }
 
@@ -803,7 +850,7 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsLondon, IsArchimedes                        bool
+	IsBerlin, IsLondon, IsArchimedes, IsShanghai            bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -825,5 +872,6 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
 		IsArchimedes:     c.IsArchimedes(num),
+		IsShanghai:       c.IsShanghai(num),
 	}
 }

@@ -28,7 +28,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
 
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
@@ -63,8 +62,7 @@ type StateTransition struct {
 	state      vm.StateDB
 	evm        *vm.EVM
 
-	// l1 rollup fee
-	l1Fee *big.Int
+	l1DataFee *big.Int
 }
 
 // Message represents a message sent to a contract.
@@ -82,12 +80,13 @@ type Message interface {
 	IsFake() bool
 	Data() []byte
 	AccessList() types.AccessList
+	IsL1MessageTx() bool
 }
 
 // ExecutionResult includes all output after executing given evm
 // message no matter the execution itself is successful or not.
 type ExecutionResult struct {
-	L1Fee      *big.Int
+	L1DataFee  *big.Int
 	UsedGas    uint64 // Total used gas but include the refunded gas
 	Err        error  // Any error encountered during the execution(listed in core/vm/errors.go)
 	ReturnData []byte // Returned data from evm(function result or data supplied with revert opcode)
@@ -121,7 +120,7 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool) (uint64, error) {
+func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if isContractCreation && isHomestead {
@@ -129,8 +128,9 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 	} else {
 		gas = params.TxGas
 	}
+	dataLen := uint64(len(data))
 	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
+	if dataLen > 0 {
 		// Zero and non-zero bytes are priced differently
 		var nz uint64
 		for _, byt := range data {
@@ -148,11 +148,19 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 		}
 		gas += nz * nonZeroGas
 
-		z := uint64(len(data)) - nz
+		z := dataLen - nz
 		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
 			return 0, ErrGasUintOverflow
 		}
 		gas += z * params.TxDataZeroGas
+
+		if isContractCreation && isEIP3860 {
+			lenWords := toWordSize(dataLen)
+			if (math.MaxUint64-gas)/params.InitCodeWordGas < lenWords {
+				return 0, ErrGasUintOverflow
+			}
+			gas += lenWords * params.InitCodeWordGas
+		}
 	}
 	if accessList != nil {
 		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
@@ -161,13 +169,17 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 	return gas, nil
 }
 
-// NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
-	l1Fee := new(big.Int)
-	if evm.ChainConfig().Scroll.FeeVaultEnabled() {
-		l1Fee, _ = fees.CalculateL1MsgFee(msg, evm.StateDB)
+// toWordSize returns the ceiled word size required for init code payment calculation.
+func toWordSize(size uint64) uint64 {
+	if size > math.MaxUint64-31 {
+		return math.MaxUint64/32 + 1
 	}
 
+	return (size + 31) / 32
+}
+
+// NewStateTransition initialises and returns a new state transition object.
+func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) *StateTransition {
 	return &StateTransition{
 		gp:        gp,
 		evm:       evm,
@@ -178,7 +190,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		value:     msg.Value(),
 		data:      msg.Data(),
 		state:     evm.StateDB,
-		l1Fee:     l1Fee,
+		l1DataFee: l1DataFee,
 	}
 }
 
@@ -189,8 +201,8 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb()
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) (*ExecutionResult, error) {
+	return NewStateTransition(evm, msg, gp, l1DataFee).TransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -206,9 +218,12 @@ func (st *StateTransition) buyGas() error {
 	mgval = mgval.Mul(mgval, st.gasPrice)
 
 	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
-		// always add l1fee, because all tx are L2-to-L1 ATM
-		log.Debug("Adding L1 fee", "l1_fee", st.l1Fee)
-		mgval = mgval.Add(mgval, st.l1Fee)
+		// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
+		// but double check to make sure
+		if !st.msg.IsL1MessageTx() {
+			log.Debug("Adding L1DataFee", "l1DataFee", st.l1DataFee)
+			mgval = mgval.Add(mgval, st.l1DataFee)
+		}
 	}
 
 	balanceCheck := mgval
@@ -217,8 +232,11 @@ func (st *StateTransition) buyGas() error {
 		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
 		balanceCheck.Add(balanceCheck, st.value)
 		if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
-			// always add l1fee, because all tx are L2-to-L1 ATM
-			balanceCheck.Add(balanceCheck, st.l1Fee)
+			// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
+			// but double check to make sure
+			if !st.msg.IsL1MessageTx() {
+				balanceCheck.Add(balanceCheck, st.l1DataFee)
+			}
 		}
 	}
 	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
@@ -235,6 +253,14 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
+	if st.msg.IsL1MessageTx() {
+		// No fee fields to check, no nonce to check, and no need to check if EOA (L1 already verified it for us)
+		// Gas is free, but no refunds!
+		st.gas += st.msg.Gas()
+		st.initialGas = st.msg.Gas()
+		return st.gp.SubGas(st.msg.Gas()) // gas used by deposits may not be used by other txs
+	}
+
 	// Only check transactions that are not fake
 	if !st.msg.IsFake() {
 		// Make sure this transaction's nonce is correct.
@@ -318,11 +344,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.Context.BlockNumber)
 	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.BlockNumber)
+	shanghai := st.evm.ChainConfig().IsShanghai(st.evm.Context.BlockNumber)
 	london := st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber)
 	contractCreation := msg.To() == nil
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)
+	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul, shanghai)
 	if err != nil {
 		return nil, err
 	}
@@ -336,10 +363,18 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
 
-	// Set up the initial access list.
-	if rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber); rules.IsBerlin {
-		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+	rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber)
+
+	// Check whether the init code size has been exceeded.
+	if rules.IsShanghai && contractCreation && len(st.data) > params.MaxInitCodeSize {
+		return nil, fmt.Errorf("%w: code size %v limit %v", ErrMaxInitCodeSizeExceeded, len(st.data), params.MaxInitCodeSize)
 	}
+
+	// Set up the initial access list.
+	if rules.IsBerlin {
+		st.state.PrepareAccessList(rules, msg.From(), st.evm.Context.Coinbase, msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+	}
+
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
@@ -350,6 +385,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+	}
+
+	// no refunds for l1 messages
+	if st.msg.IsL1MessageTx() {
+		return &ExecutionResult{
+			L1DataFee:  big.NewInt(0),
+			UsedGas:    st.gasUsed(),
+			Err:        vmerr,
+			ReturnData: ret,
+		}, nil
 	}
 
 	if !london {
@@ -370,17 +415,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		// The L2 Fee is the same as the fee that is charged in the normal geth
-		// codepath. Add the L1 fee to the L2 fee for the total fee that is sent
+		// codepath. Add the L1DataFee to the L2 fee for the total fee that is sent
 		// to the sequencer.
 		l2Fee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip)
-		fee := new(big.Int).Add(st.l1Fee, l2Fee)
+		fee := new(big.Int).Add(st.l1DataFee, l2Fee)
 		st.state.AddBalance(st.evm.FeeRecipient(), fee)
 	} else {
 		st.state.AddBalance(st.evm.FeeRecipient(), new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
 	}
 
 	return &ExecutionResult{
-		L1Fee:      st.l1Fee,
+		L1DataFee:  st.l1DataFee,
 		UsedGas:    st.gasUsed(),
 		Err:        vmerr,
 		ReturnData: ret,

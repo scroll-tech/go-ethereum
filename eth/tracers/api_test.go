@@ -42,6 +42,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -172,7 +173,11 @@ func (b *testBackend) StateAtTransaction(ctx context.Context, block *types.Block
 			return msg, context, statedb, nil
 		}
 		vmenv := vm.NewEVM(context, txContext, statedb, b.chainConfig, vm.Config{})
-		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas())); err != nil {
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
+		if err != nil {
+			return nil, vm.BlockContext{}, nil, err
+		}
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()), l1DataFee); err != nil {
 			return nil, vm.BlockContext{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}
 		statedb.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
@@ -218,6 +223,7 @@ func TestTraceCall(t *testing.T) {
 			config:    nil,
 			expectErr: nil,
 			expect: &types.ExecutionResult{
+				L1DataFee:   (*hexutil.Big)(big.NewInt(0)),
 				Gas:         params.TxGas,
 				Failed:      false,
 				ReturnValue: "",
@@ -235,6 +241,7 @@ func TestTraceCall(t *testing.T) {
 			config:    nil,
 			expectErr: nil,
 			expect: &types.ExecutionResult{
+				L1DataFee:   (*hexutil.Big)(big.NewInt(0)),
 				Gas:         params.TxGas,
 				Failed:      false,
 				ReturnValue: "",
@@ -264,6 +271,7 @@ func TestTraceCall(t *testing.T) {
 			config:    nil,
 			expectErr: nil,
 			expect: &types.ExecutionResult{
+				L1DataFee:   (*hexutil.Big)(big.NewInt(0)),
 				Gas:         params.TxGas,
 				Failed:      false,
 				ReturnValue: "",
@@ -281,6 +289,7 @@ func TestTraceCall(t *testing.T) {
 			config:    nil,
 			expectErr: nil,
 			expect: &types.ExecutionResult{
+				L1DataFee:   (*hexutil.Big)(big.NewInt(0)),
 				Gas:         params.TxGas,
 				Failed:      false,
 				ReturnValue: "",
@@ -334,6 +343,7 @@ func TestTraceTransaction(t *testing.T) {
 		t.Errorf("Failed to trace transaction %v", err)
 	}
 	if !reflect.DeepEqual(result, &types.ExecutionResult{
+		L1DataFee:   (*hexutil.Big)(big.NewInt(0)),
 		Gas:         params.TxGas,
 		Failed:      false,
 		ReturnValue: "",

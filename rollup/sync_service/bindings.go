@@ -130,7 +130,7 @@ type L1MessageQueueQueueTransaction struct {
 
 // FilterQueueTransaction is a free log retrieval operation binding the contract event 0xbdcc7517f8fe3db6506dfd910942d0bbecaf3d6a506dadea65b0d988e75b9439.
 //
-// Solidity: event QueueTransaction(address indexed sender, address indexed target, uint256 value, uint256 queueIndex, uint256 gasLimit, bytes data)
+// Solidity: event QueueTransaction(address indexed sender, address indexed target, uint256 value, uint64 queueIndex, uint256 gasLimit, bytes data)
 func (_L1MessageQueue *L1MessageQueueFilterer) FilterQueueTransaction(opts *bind.FilterOpts, sender []common.Address, target []common.Address) (*L1MessageQueueQueueTransactionIterator, error) {
 
 	var senderRule []interface{}

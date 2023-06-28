@@ -136,6 +136,9 @@ func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing
 	gas := p.RequiredGas(in)
 	t.Run(test.Name, func(t *testing.T) {
 		_, _, err := RunPrecompiledContract(p, in, gas)
+		if err == nil {
+			t.Errorf("Expected error [%v], got nil", test.ExpectedError)
+		}
 		if err.Error() != test.ExpectedError {
 			t.Errorf("Expected error [%v], got [%v]", test.ExpectedError, err)
 		}
@@ -323,6 +326,7 @@ func BenchmarkPrecompiledBLS12381MapG1(b *testing.B)      { benchJson("blsMapG1"
 func BenchmarkPrecompiledBLS12381MapG2(b *testing.B)      { benchJson("blsMapG2", "12", b) }
 
 // Failure tests
+func TestPrecompiledBn256PairingFail(t *testing.T)       { testJsonFail("bn256Pairing", "08", t) }
 func TestPrecompiledBLS12381G1AddFail(t *testing.T)      { testJsonFail("blsG1Add", "0a", t) }
 func TestPrecompiledBLS12381G1MulFail(t *testing.T)      { testJsonFail("blsG1Mul", "0b", t) }
 func TestPrecompiledBLS12381G1MultiExpFail(t *testing.T) { testJsonFail("blsG1MultiExp", "0c", t) }

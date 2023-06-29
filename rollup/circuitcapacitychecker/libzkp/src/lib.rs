@@ -4,31 +4,34 @@ pub mod checker {
     use crate::utils::{bool_to_int, c_char_to_vec};
     use libc::c_char;
     use std::cell::OnceCell;
+    use std::collections::HashMap;
     use std::panic;
     use types::eth::BlockTrace;
     use zkevm::capacity_checker::CircuitCapacityChecker;
 
-    static mut CHECKER: OnceCell<CircuitCapacityChecker> = OnceCell::new();
+    static mut CHECKERS: OnceCell<HashMap<u8, CircuitCapacityChecker>> = OnceCell::new();
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn init_logger() {
+    pub unsafe extern "C" fn init() {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
             .format_timestamp_millis()
             .init();
+        let checkers = HashMap::new();
+        CHECKERS.set(checkers).unwrap();
     }
 
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn new_circuit_capacity_checker(id: u8) {
-        let c = CircuitCapacityChecker::new();
-        CHECKER.set(c).unwrap();
+        let checker = CircuitCapacityChecker::new();
+        CHECKERS.get_mut().unwrap().insert(id, checker);
     }
 
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn reset_circuit_capacity_checker(id: u8) {
-        CHECKER.get_mut().unwrap().reset()
+        CHECKERS.get_mut().unwrap().get_mut(&id).unwrap().reset()
     }
 
     /// # Safety
@@ -37,8 +40,10 @@ pub mod checker {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
-            CHECKER
+            CHECKERS
                 .get_mut()
+                .unwrap()
+                .get_mut(&id)
                 .unwrap()
                 .estimate_circuit_capacity(&[traces])
                 .unwrap()

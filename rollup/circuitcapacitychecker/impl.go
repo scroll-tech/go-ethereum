@@ -21,7 +21,7 @@ import (
 var cnt uint8
 
 func init() {
-	C.init_logger()
+	C.init()
 }
 
 type CircuitCapacityChecker struct {

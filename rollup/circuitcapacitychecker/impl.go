@@ -17,6 +17,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 )
 
+func init() {
+	C.init_logger()
+}
+
 type CircuitCapacityChecker struct{}
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {

@@ -12,11 +12,15 @@ pub mod checker {
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn new_circuit_capacity_checker() {
+    pub unsafe extern "C" fn init_logger() {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
             .format_timestamp_millis()
             .init();
+    }
 
+    /// # Safety
+    #[no_mangle]
+    pub unsafe extern "C" fn new_circuit_capacity_checker() {
         let c = CircuitCapacityChecker::new();
         CHECKER.set(c).unwrap();
     }

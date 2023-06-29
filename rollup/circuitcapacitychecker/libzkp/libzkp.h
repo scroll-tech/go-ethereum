@@ -1,4 +1,5 @@
-init_logger();
-new_circuit_capacity_checker();
-reset_circuit_capacity_checker();
-char apply_tx(char *tx_traces);
+#include<stdint.h>
+void init_logger();
+void new_circuit_capacity_checker(uint8_t id);
+void reset_circuit_capacity_checker(uint8_t id);
+char apply_tx(uint8_t id, char *tx_traces);

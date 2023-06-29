@@ -20,20 +20,20 @@ pub mod checker {
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn new_circuit_capacity_checker() {
+    pub unsafe extern "C" fn new_circuit_capacity_checker(id: u8) {
         let c = CircuitCapacityChecker::new();
         CHECKER.set(c).unwrap();
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn reset_circuit_capacity_checker() {
+    pub unsafe extern "C" fn reset_circuit_capacity_checker(id: u8) {
         CHECKER.get_mut().unwrap().reset()
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_tx(tx_traces: *const c_char) -> c_char {
+    pub unsafe extern "C" fn apply_tx(id: u8, tx_traces: *const c_char) -> c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {

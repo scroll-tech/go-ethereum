@@ -17,26 +17,21 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 )
 
-// global count for total CircuitCapacityChecker
-var cnt uint8
-
 func init() {
 	C.init()
 }
 
 type CircuitCapacityChecker struct {
-	id uint8
+	id uint64
 }
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
-	checker := &CircuitCapacityChecker{id: cnt}
-	C.new_circuit_capacity_checker(C.uchar(checker.id))
-	cnt++
-	return checker
+	id := C.new_circuit_capacity_checker()
+	return &CircuitCapacityChecker{id: uint64(id)}
 }
 
 func (ccc *CircuitCapacityChecker) Reset() {
-	C.reset_circuit_capacity_checker(C.uchar(ccc.id))
+	C.reset_circuit_capacity_checker(C.uint64_t(ccc.id))
 }
 
 func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) error {
@@ -51,7 +46,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) er
 	}()
 
 	log.Info("start to check circuit capacity")
-	result := C.apply_tx(C.uchar(ccc.id), tracesStr)
+	result := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
 	log.Info("check circuit capacity done")
 
 	switch result {

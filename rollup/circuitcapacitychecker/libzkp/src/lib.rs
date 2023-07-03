@@ -9,7 +9,7 @@ pub mod checker {
     use types::eth::BlockTrace;
     use zkevm::capacity_checker::CircuitCapacityChecker;
 
-    static mut CHECKERS: OnceCell<HashMap<u8, CircuitCapacityChecker>> = OnceCell::new();
+    static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
 
     /// # Safety
     #[no_mangle]
@@ -23,20 +23,22 @@ pub mod checker {
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn new_circuit_capacity_checker(id: u8) {
+    pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
+        let id = CHECKERS.get_mut().unwrap().len() as u64;
         let checker = CircuitCapacityChecker::new();
         CHECKERS.get_mut().unwrap().insert(id, checker);
+        id
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn reset_circuit_capacity_checker(id: u8) {
+    pub unsafe extern "C" fn reset_circuit_capacity_checker(id: u64) {
         CHECKERS.get_mut().unwrap().get_mut(&id).unwrap().reset()
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_tx(id: u8, tx_traces: *const c_char) -> c_char {
+    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {

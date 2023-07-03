@@ -1,5 +1,5 @@
 #include<stdint.h>
 void init();
-void new_circuit_capacity_checker(uint8_t id);
-void reset_circuit_capacity_checker(uint8_t id);
-char apply_tx(uint8_t id, char *tx_traces);
+uint64_t new_circuit_capacity_checker();
+void reset_circuit_capacity_checker(uint64_t id);
+char apply_tx(uint64_t id, char *tx_traces);

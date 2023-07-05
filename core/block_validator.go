@@ -24,8 +24,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/trie"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -82,7 +82,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
-	return v.ValidateL1Messages(block)
+	if err := v.ValidateL1Messages(block); err != nil {
+		return err
+	}
+	return v.validateCircuitRowUsage(block)
 }
 
 // ValidateL1Messages validates L1 messages contained in a block.
@@ -204,4 +207,12 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 		}
 	}
 	return limit
+}
+
+func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
+	if v.circuitCapacityChecker == nil {
+		return nil
+	}
+
+	return nil
 }

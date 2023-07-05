@@ -25,6 +25,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -35,6 +36,8 @@ type BlockValidator struct {
 	config *params.ChainConfig // Chain configuration options
 	bc     *BlockChain         // Canonical block chain
 	engine consensus.Engine    // Consensus engine used for validating
+
+	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use

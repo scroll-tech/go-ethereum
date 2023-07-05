@@ -144,10 +144,10 @@ func (e *GenesisMismatchError) Error() string {
 // SetupGenesisBlock writes or updates the genesis block in db.
 // The block that will be used is:
 //
-//                          genesis == nil       genesis != nil
-//                       +------------------------------------------
-//     db has no genesis |  main-net default  |  genesis
-//     db has genesis    |  from DB           |  genesis (if compatible)
+//	                     genesis == nil       genesis != nil
+//	                  +------------------------------------------
+//	db has no genesis |  main-net default  |  genesis
+//	db has genesis    |  from DB           |  genesis (if compatible)
 //
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
@@ -445,6 +445,18 @@ func DefaultScrollAlphaGenesisBlock() *Genesis {
 		GasLimit:   8000000,
 		Difficulty: big.NewInt(1),
 		Alloc:      decodePrealloc(scrollAlphaAllocData),
+	}
+}
+
+// DefaultScrollSepoliaGenesisBlock returns the Scroll Sepolia network genesis block.
+func DefaultScrollSepoliaGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollSepoliaChainConfig,
+		Timestamp:  0x64a4213a,
+		ExtraData:  hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000004610d36C091c45F46538C185C70488D3748B0a940000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   8000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollSepoliaAllocData),
 	}
 }
 

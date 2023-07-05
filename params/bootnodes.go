@@ -83,6 +83,13 @@ var ScrollAlphaBootnodes = []string{
 	"enode://cf85bfa5828239b1f6b21758579ee8aaaba2a1fb4c658d6967c5f7ed4f040d95dee5b5cef0c77d656a191f6b0875dd03f05b30a3b2b3e15bfcf18b500d8f634c@35.155.117.77:30303",
 }
 
+// ScrollSepoliaBootnodes are the enode URLs of the P2P bootstrap nodes running on the Scroll Alpha test network.
+var ScrollSepoliaBootnodes = []string{
+	"enode://d5592edd4c807fdf19fac6d5c1c02b1062e2ff6a9db9223b0f87e1e403911231048fcd60ef2814b78a460e17257e5d860afa43e46f297441467f3a15ba3082@35.165.106.220:30303",
+	"enode://0b76af5c24a47284757f2e28b87be3ea7a7366503148050323f0738ce2eac09cb187edea272353d634bb4f69bfdd58192ffb606dda2359ab3e330f98ec9772@52.24.0.42:30303",
+	"enode://d5fdd6d9b18a11ef32bb9cf7bccd360ca99af43be33432d7eb34661c1436c8ca731c50243ec7e320925483ad5c4eb9a4fc8c502eb30ca74e5c05d3bf012aa9@35.83.208.197:30303",
+}
+
 var V5Bootnodes = []string{
 	// Teku team's bootnode
 	"enr:-KG4QOtcP9X1FbIMOe17QNMKqDxCpm14jcX5tiOE4_TyMrFqbmhPZHK_ZPG2Gxb1GE2xdtodOfx9-cgvNtxnRyHEmC0ghGV0aDKQ9aX9QgAAAAD__________4JpZIJ2NIJpcIQDE8KdiXNlY3AyNTZrMaEDhpehBDbZjM_L9ek699Y7vhUJ-eAdMyQW_Fil522Y0fODdGNwgiMog3VkcIIjKA",

@@ -90,38 +90,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 		}
 	}
 
-	env := &rollup.TraceEnv{
-		LogConfig: config.LogConfig,
-		Coinbase:  coinbase,
-		Signer:    types.MakeSigner(api.backend.ChainConfig(), block.Number()),
-		State:     statedb,
-		BlockCtx:  core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil),
-		StorageTrace: &types.StorageTrace{
-			RootBefore:    parent.Root(),
-			RootAfter:     block.Root(),
-			Proofs:        make(map[string][]hexutil.Bytes),
-			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
-		},
-		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
-		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
-		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
-	}
-
-	key := coinbase.String()
-	if _, exist := env.Proofs[key]; !exist {
-		proof, err := env.State.GetProof(coinbase)
-		if err != nil {
-			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
-			// but we still mark the proofs map with nil array
-		}
-		wrappedProof := make([]hexutil.Bytes, len(proof))
-		for i, bt := range proof {
-			wrappedProof[i] = bt
-		}
-		env.Proofs[key] = wrappedProof
-	}
-
-	return env, nil
+	return rollup.CreateTraceEnv(parent, block, coinbase, api.chainContext(ctx), statedb)
 }
 
 func (api *API) getBlockTrace(block *types.Block, env *rollup.TraceEnv) (*types.BlockTrace, error) {

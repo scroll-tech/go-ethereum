@@ -28,8 +28,6 @@ type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
 }
 
-type traceEnv rollup.TraceEnv
-
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
 func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error) {
 	var block *types.Block
@@ -67,7 +65,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 }
 
 // Make trace environment for current block.
-func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*traceEnv, error) {
+func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*rollup.TraceEnv, error) {
 	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
 	if err != nil {
 		return nil, err
@@ -92,7 +90,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 		}
 	}
 
-	env := &traceEnv{
+	env := &rollup.TraceEnv{
 		LogConfig: config.LogConfig,
 		Coinbase:  coinbase,
 		Signer:    types.MakeSigner(api.backend.ChainConfig(), block.Number()),
@@ -126,7 +124,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 	return env, nil
 }
 
-func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTrace, error) {
+func (api *API) getBlockTrace(block *types.Block, env *rollup.TraceEnv) (*types.BlockTrace, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs   = block.Transactions()
@@ -213,7 +211,7 @@ func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTr
 	return api.fillBlockTrace(env, block)
 }
 
-func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, block *types.Block) error {
+func (api *API) getTxResult(env *rollup.TraceEnv, state *state.StateDB, index int, block *types.Block) error {
 	tx := block.Transactions()[index]
 	msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
 	from, _ := types.Sender(env.Signer, tx)
@@ -422,7 +420,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 }
 
 // Fill blockTrace content after all the txs are finished running.
-func (api *API) fillBlockTrace(env *traceEnv, block *types.Block) (*types.BlockTrace, error) {
+func (api *API) fillBlockTrace(env *rollup.TraceEnv, block *types.Block) (*types.BlockTrace, error) {
 	statedb := env.State
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())

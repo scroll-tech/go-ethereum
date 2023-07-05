@@ -36,7 +36,7 @@ type TraceEnv struct {
     ExecutionResults []*types.ExecutionResult
 }
 
-func CreateTraceEnv(logConfig *vm.LogConfig,chainConfig *params.ChainConfig, parent *types.Block, block *types.Block, coinbase common.Address, chainContext core.ChainContext, statedb *state.StateDB) (*TraceEnv, error) {
+func NewTraceEnv(logConfig *vm.LogConfig,chainConfig *params.ChainConfig, parent *types.Block, block *types.Block, coinbase common.Address, chainContext core.ChainContext, statedb *state.StateDB) (*TraceEnv, error) {
     env := &TraceEnv{
         LogConfig: logConfig,
         Coinbase:  coinbase,

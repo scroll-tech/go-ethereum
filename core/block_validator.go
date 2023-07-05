@@ -27,6 +27,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -240,7 +241,8 @@ func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
 	fmt.Println(coinbase)
 
 
-	
+	traceEnv,err:=rollup.NewTraceEnv()
+
 
 
 	return nil

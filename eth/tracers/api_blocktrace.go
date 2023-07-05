@@ -90,7 +90,7 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 		}
 	}
 
-	return rollup.CreateTraceEnv(config.LogConfig, api.backend.ChainConfig(), parent, block, coinbase, api.chainContext(ctx), statedb)
+	return rollup.NewTraceEnv(config.LogConfig, api.backend.ChainConfig(), parent, block, coinbase, api.chainContext(ctx), statedb)
 }
 
 func (api *API) getBlockTrace(block *types.Block, env *rollup.TraceEnv) (*types.BlockTrace, error) {

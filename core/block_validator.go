@@ -17,8 +17,10 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -212,6 +214,26 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
 	if v.circuitCapacityChecker == nil {
 		return nil
+	}
+
+	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	if parent == nil {
+		return errors.New("validateCircuitRowUsage: no parent block found")
+	}
+
+	statedb, err := v.bc.StateAt(parent.Hash())
+	if err != nil {
+		return err
+	}
+
+	var coinbase common.Address
+	if v.config.Scroll.FeeVaultEnabled() {
+		coinbase = *v.config.Scroll.FeeVaultAddress
+	} else {
+		coinbase, err = v.engine.Author(block.Header())
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

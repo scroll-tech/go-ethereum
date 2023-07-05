@@ -136,6 +136,9 @@ func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing
 	gas := p.RequiredGas(in)
 	t.Run(test.Name, func(t *testing.T) {
 		_, _, err := RunPrecompiledContract(p, in, gas)
+		if err == nil {
+			t.Errorf("Expected error [%v], got nil", test.ExpectedError)
+		}
 		if err.Error() != test.ExpectedError {
 			t.Errorf("Expected error [%v], got [%v]", test.ExpectedError, err)
 		}
@@ -259,6 +262,7 @@ func BenchmarkPrecompiledBn256ScalarMul(b *testing.B) { benchJson("bn256ScalarMu
 
 // Tests the sample inputs from the elliptic curve pairing check EIP 197.
 func TestPrecompiledBn256Pairing(t *testing.T)      { testJson("bn256Pairing", "08", t) }
+func TestPrecompiledBn256PairingFail(t *testing.T)  { testJsonFail("bn256Pairing", "08", t) }
 func BenchmarkPrecompiledBn256Pairing(b *testing.B) { benchJson("bn256Pairing", "08", b) }
 
 func TestPrecompiledBlake2F(t *testing.T)      { testJson("blake2F", "09", t) }
@@ -332,6 +336,8 @@ func TestPrecompiledBLS12381G2MultiExpFail(t *testing.T) { testJsonFail("blsG2Mu
 func TestPrecompiledBLS12381PairingFail(t *testing.T)    { testJsonFail("blsPairing", "10", t) }
 func TestPrecompiledBLS12381MapG1Fail(t *testing.T)      { testJsonFail("blsMapG1", "11", t) }
 func TestPrecompiledBLS12381MapG2Fail(t *testing.T)      { testJsonFail("blsMapG2", "12", t) }
+func TestPrecompiledModExpFail(t *testing.T)             { testJsonFail("modexp", "05", t) }
+func TestPrecompiledModExpEip2565Fail(t *testing.T)      { testJsonFail("modexp_eip2565", "f5", t) }
 
 func loadJson(name string) ([]precompiledTest, error) {
 	data, err := ioutil.ReadFile(fmt.Sprintf("testdata/precompiles/%v.json", name))

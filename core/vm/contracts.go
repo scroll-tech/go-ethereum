@@ -35,7 +35,8 @@ import (
 )
 
 var (
-	errPrecompileDisabled = errors.New("sha256, ripemd160, blake2f precompiles temporarily disabled")
+	errPrecompileDisabled     = errors.New("sha256, ripemd160, blake2f precompiles temporarily disabled")
+	errModexpUnsupportedInput = errors.New("modexp temporarily accepts only 32-byte (256-bit) inputs")
 )
 
 // PrecompiledContract is the basic interface for native Go contracts. The implementation
@@ -410,6 +411,10 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 		expLen  = new(big.Int).SetBytes(getData(input, 32, 32)).Uint64()
 		modLen  = new(big.Int).SetBytes(getData(input, 64, 32)).Uint64()
 	)
+	// Check that all inputs are `u256` (32 - bytes), revert otherwise
+	if baseLen != 32 || expLen != 32 || modLen != 32 {
+		return nil, errModexpUnsupportedInput
+	}
 	if len(input) > 96 {
 		input = input[96:]
 	} else {
@@ -546,6 +551,10 @@ var (
 // runBn256Pairing implements the Bn256Pairing precompile, referenced by both
 // Byzantium and Istanbul operations.
 func runBn256Pairing(input []byte) ([]byte, error) {
+	// Allow at most 4 inputs
+	if len(input) > 4*192 {
+		return nil, errBadPairingInput
+	}
 	// Handle some corner cases cheaply
 	if len(input)%192 > 0 {
 		return nil, errBadPairingInput

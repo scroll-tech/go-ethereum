@@ -16,6 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
@@ -27,28 +28,7 @@ type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
 }
 
-type traceEnv struct {
-	logConfig *vm.LogConfig
-
-	coinbase common.Address
-
-	// rMu lock is used to protect txs executed in parallel.
-	signer   types.Signer
-	state    *state.StateDB
-	blockCtx vm.BlockContext
-
-	// pMu lock is used to protect Proofs' read and write mutual exclusion,
-	// since txs are executed in parallel, so this lock is required.
-	pMu sync.Mutex
-	// sMu is required because of txs are executed in parallel,
-	// this lock is used to protect StorageTrace's read and write mutual exclusion.
-	sMu sync.Mutex
-	*types.StorageTrace
-	txStorageTraces []*types.StorageTrace
-	// zktrie tracer is used for zktrie storage to build additional deletion proof
-	zkTrieTracer     map[string]state.ZktrieProofTracer
-	executionResults []*types.ExecutionResult
-}
+type traceEnv rollup.TraceEnv
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
 func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error) {

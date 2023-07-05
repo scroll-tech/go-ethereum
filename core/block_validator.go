@@ -236,5 +236,8 @@ func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
 		}
 	}
 
+	fmt.Println(statedb)
+	fmt.Println(coinbase)
+
 	return nil
 }

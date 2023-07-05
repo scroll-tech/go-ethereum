@@ -10,6 +10,7 @@ import (
     "github.com/scroll-tech/go-ethereum/core"
     "github.com/scroll-tech/go-ethereum/common/hexutil"
     "github.com/scroll-tech/go-ethereum/log"
+    "github.com/scroll-tech/go-ethereum/params"
 )
 
 type TraceEnv struct {
@@ -35,11 +36,11 @@ type TraceEnv struct {
     ExecutionResults []*types.ExecutionResult
 }
 
-func CreateTraceEnv(parent *types.Block, block *types.Block, coinbase common.Address, chainContext core.ChainContext, statedb *state.StateDB) (*TraceEnv, error) {
+func CreateTraceEnv(logConfig *vm.LogConfig,chainConfig *params.ChainConfig, parent *types.Block, block *types.Block, coinbase common.Address, chainContext core.ChainContext, statedb *state.StateDB) (*TraceEnv, error) {
     env := &TraceEnv{
-        // LogConfig: config.LogConfig,
+        LogConfig: logConfig,
         Coinbase:  coinbase,
-        // Signer:    types.MakeSigner(api.backend.ChainConfig(), block.Number()),
+        Signer:    types.MakeSigner(chainConfig, block.Number()),
         State:     statedb,
         BlockCtx:  core.NewEVMBlockContext(block.Header(), chainContext, nil),
         StorageTrace: &types.StorageTrace{

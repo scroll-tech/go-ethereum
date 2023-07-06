@@ -38,15 +38,18 @@ type BlockValidator struct {
 	bc     *BlockChain         // Canonical block chain
 	engine consensus.Engine    // Consensus engine used for validating
 
+	isAlsoAMiner           bool
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
 func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
 	validator := &BlockValidator{
-		config: config,
-		engine: engine,
-		bc:     blockchain,
+		config:                 config,
+		engine:                 engine,
+		bc:                     blockchain,
+		isAlsoAMiner:           true, // TODO:
+		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 	}
 	return validator
 }
@@ -83,10 +86,14 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
-	if err := v.ValidateL1Messages(block); err != nil {
-		return err
+
+	if v.isAlsoAMiner{
+		if err := v.ValidateL1Messages(block); err != nil {
+			return err
+		}
+		return v.validateCircuitRowUsage(block)
 	}
-	return v.validateCircuitRowUsage(block)
+	return nil
 }
 
 // ValidateL1Messages validates L1 messages contained in a block.
@@ -225,10 +232,6 @@ func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
 }
 
 func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
-	if v.circuitCapacityChecker == nil {
-		return nil
-	}
-
 	env, err := v.createTraceEnv(block)
 	if err != nil {
 		return err

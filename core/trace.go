@@ -10,17 +10,14 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
-	// "github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
-	// "github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
-	// "github.com/scroll-tech/go-ethereum/trie"
 	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
@@ -129,7 +126,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			defer pend.Done()
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
-				if err := env.GetTxResult(task.statedb, task.index, block); err != nil {
+				if err := env.getTxResult(task.statedb, task.index, block); err != nil {
 					select {
 					case errCh <- err:
 					default:
@@ -195,10 +192,10 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 		}
 	}
 
-	return env.FillBlockTrace(block)
+	return env.fillBlockTrace(block)
 }
 
-func (env *TraceEnv) GetTxResult(state *state.StateDB, index int, block *types.Block) error {
+func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.Block) error {
 	tx := block.Transactions()[index]
 	msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
 	from, _ := types.Sender(env.Signer, tx)
@@ -399,8 +396,8 @@ func (env *TraceEnv) GetTxResult(state *state.StateDB, index int, block *types.B
 	return nil
 }
 
-// FillBlockTrace content after all the txs are finished running.
-func (env *TraceEnv) FillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+// fillBlockTrace content after all the txs are finished running.
+func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
 	statedb := env.State
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())

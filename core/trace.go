@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -110,8 +111,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	return env, nil
 }
 
-
-func (env *TraceEnv) getBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs   = block.Transactions()
@@ -149,13 +149,13 @@ func (env *TraceEnv) getBlockTrace(block *types.Block) (*types.BlockTrace, error
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
 		env.State.Prepare(tx.Hash(), i)
-		vmenv := vm.NewEVM(env.BlockCtx, core.NewEVMTxContext(msg), env.State, api.backend.ChainConfig(), vm.Config{})
+		vmenv := vm.NewEVM(env.BlockCtx, NewEVMTxContext(msg), env.State, env.ChainConfig, vm.Config{})
 		l1DataFee, err := fees.CalculateL1DataFee(tx, env.State)
 		if err != nil {
 			failed = err
 			break
 		}
-		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
+		if _, err = ApplyMessage(vmenv, msg, new(GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
 			failed = err
 			break
 		}

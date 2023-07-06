@@ -90,6 +90,8 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
+	// TODO: consider moving this into `isAlsoAMiner` condition,
+	// cannot do it currently because tests fail
 	if err := v.ValidateL1Messages(block); err != nil {
 		return err
 	}

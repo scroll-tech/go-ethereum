@@ -15,7 +15,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	// "github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	// "github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
 type TraceEnv struct {
@@ -90,4 +93,101 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	}
 
 	return env, nil
+}
+
+// FillBlockTrace content after all the txs are finished running.
+func (env *TraceEnv) FillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+	statedb := env.State
+
+	txs := make([]*types.TransactionData, block.Transactions().Len())
+	for i, tx := range block.Transactions() {
+		txs[i] = types.NewTransactionData(tx, block.NumberU64(), env.ChainConfig)
+	}
+
+	intrinsicStorageProofs := map[common.Address][]common.Hash{
+		rcfg.L2MessageQueueAddress: {rcfg.WithdrawTrieRootSlot},
+		rcfg.L1GasPriceOracleAddress: {
+			rcfg.L1BaseFeeSlot,
+			rcfg.OverheadSlot,
+			rcfg.ScalarSlot,
+		},
+	}
+
+	for addr, storages := range intrinsicStorageProofs {
+		if _, existed := env.Proofs[addr.String()]; !existed {
+			if proof, err := statedb.GetProof(addr); err != nil {
+				log.Error("Proof for intrinstic address not available", "error", err, "address", addr)
+			} else {
+				wrappedProof := make([]hexutil.Bytes, len(proof))
+				for i, bt := range proof {
+					wrappedProof[i] = bt
+				}
+				env.Proofs[addr.String()] = wrappedProof
+			}
+		}
+
+		if _, existed := env.StorageProofs[addr.String()]; !existed {
+			env.StorageProofs[addr.String()] = make(map[string][]hexutil.Bytes)
+		}
+
+		for _, slot := range storages {
+			if _, existed := env.StorageProofs[addr.String()][slot.String()]; !existed {
+				if trie, err := statedb.GetStorageTrieForProof(addr); err != nil {
+					log.Error("Storage proof for intrinstic address not available", "error", err, "address", addr)
+				} else if proof, _ := statedb.GetSecureTrieProof(trie, slot); err != nil {
+					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
+				} else {
+					wrappedProof := make([]hexutil.Bytes, len(proof))
+					for i, bt := range proof {
+						wrappedProof[i] = bt
+					}
+					env.StorageProofs[addr.String()][slot.String()] = wrappedProof
+				}
+			}
+		}
+	}
+
+	blockTrace := &types.BlockTrace{
+		ChainID: env.ChainConfig.ChainID.Uint64(),
+		Version: params.ArchiveVersion(params.CommitHash),
+		Coinbase: &types.AccountWrapper{
+			Address:          env.Coinbase,
+			Nonce:            statedb.GetNonce(env.Coinbase),
+			Balance:          (*hexutil.Big)(statedb.GetBalance(env.Coinbase)),
+			KeccakCodeHash:   statedb.GetKeccakCodeHash(env.Coinbase),
+			PoseidonCodeHash: statedb.GetPoseidonCodeHash(env.Coinbase),
+			CodeSize:         statedb.GetCodeSize(env.Coinbase),
+		},
+		Header:           block.Header(),
+		StorageTrace:     env.StorageTrace,
+		ExecutionResults: env.ExecutionResults,
+		TxStorageTraces:  env.TxStorageTraces,
+		Transactions:     txs,
+	}
+
+	for i, tx := range block.Transactions() {
+		evmTrace := env.ExecutionResults[i]
+		// probably a Contract Call
+		if len(tx.Data()) != 0 && tx.To() != nil {
+			evmTrace.ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
+			// Get tx.to address's code hash.
+			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
+			evmTrace.PoseidonCodeHash = &codeHash
+		} else if tx.To() == nil { // Contract is created.
+			evmTrace.ByteCode = hexutil.Encode(tx.Data())
+		}
+	}
+
+	// only zktrie model has the ability to get `mptwitness`.
+	if env.ChainConfig.Scroll.ZktrieEnabled() {
+		// we use MPTWitnessNothing by default and do not allow switch among MPTWitnessType atm.
+		// MPTWitness will be removed from traces in the future.
+		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessNothing, blockTrace); err != nil {
+			log.Error("fill mpt witness fail", "error", err)
+		}
+	}
+
+	blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.State)
+
+	return blockTrace, nil
 }

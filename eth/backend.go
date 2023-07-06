@@ -461,6 +461,10 @@ func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 // is already running, this method adjust the number of threads allowed to use
 // and updates the minimum price required by the transaction pool.
 func (s *Ethereum) StartMining(threads int) error {
+	// only enable ValidateL1Messages&validateCircuitRowUsage for a BlockValidator
+	// when it's also a miner
+	s.blockchain.Validator().(*core.BlockValidator).SetIsAlsoAMiner(true)
+
 	// Update the thread count within the consensus engine
 	type threaded interface {
 		SetThreads(threads int)
@@ -506,6 +510,10 @@ func (s *Ethereum) StartMining(threads int) error {
 // StopMining terminates the miner, both at the consensus engine level as well as
 // at the block creation level.
 func (s *Ethereum) StopMining() {
+	// only enable ValidateL1Messages&validateCircuitRowUsage for a BlockValidator
+	// when it's also a miner
+	s.blockchain.Validator().(*core.BlockValidator).SetIsAlsoAMiner(false)
+
 	// Update the thread count within the consensus engine
 	type threaded interface {
 		SetThreads(threads int)

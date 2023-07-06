@@ -48,10 +48,14 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 		config:                 config,
 		engine:                 engine,
 		bc:                     blockchain,
-		isAlsoAMiner:           true, // TODO:
+		isAlsoAMiner:           false,
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 	}
 	return validator
+}
+
+func (v *BlockValidator) SetIsAlsoAMiner(isAlsoAMiner bool) {
+	v.isAlsoAMiner = isAlsoAMiner
 }
 
 // ValidateBody validates the given block's uncles and verifies the block
@@ -86,8 +90,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
-
-	if v.isAlsoAMiner{
+	if v.isAlsoAMiner {
 		if err := v.ValidateL1Messages(block); err != nil {
 			return err
 		}

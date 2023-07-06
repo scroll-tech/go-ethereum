@@ -83,7 +83,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 		return nil, err
 	}
 
-	return api.getBlockTrace(block, env)
+	return env.GetBlockTrace(block)
 }
 
 // Make trace environment for current block.
@@ -147,92 +147,92 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 	// return env, nil
 }
 
-func (api *API) getBlockTrace(block *types.Block, env *core.TraceEnv) (*types.BlockTrace, error) {
-	// Execute all the transaction contained within the block concurrently
-	var (
-		txs   = block.Transactions()
-		pend  = new(sync.WaitGroup)
-		jobs  = make(chan *txTraceTask, len(txs))
-		errCh = make(chan error, 1)
-	)
-	threads := runtime.NumCPU()
-	if threads > len(txs) {
-		threads = len(txs)
-	}
-	for th := 0; th < threads; th++ {
-		pend.Add(1)
-		go func() {
-			defer pend.Done()
-			// Fetch and execute the next transaction trace tasks
-			for task := range jobs {
-				if err := env.GetTxResult(task.statedb, task.index, block); err != nil {
-					select {
-					case errCh <- err:
-					default:
-					}
-					log.Error("failed to trace tx", "txHash", txs[task.index].Hash().String())
-				}
-			}
-		}()
-	}
+// func (api *API) getBlockTrace(block *types.Block, env *core.TraceEnv) (*types.BlockTrace, error) {
+// 	// Execute all the transaction contained within the block concurrently
+// 	var (
+// 		txs   = block.Transactions()
+// 		pend  = new(sync.WaitGroup)
+// 		jobs  = make(chan *txTraceTask, len(txs))
+// 		errCh = make(chan error, 1)
+// 	)
+// 	threads := runtime.NumCPU()
+// 	if threads > len(txs) {
+// 		threads = len(txs)
+// 	}
+// 	for th := 0; th < threads; th++ {
+// 		pend.Add(1)
+// 		go func() {
+// 			defer pend.Done()
+// 			// Fetch and execute the next transaction trace tasks
+// 			for task := range jobs {
+// 				if err := env.GetTxResult(task.statedb, task.index, block); err != nil {
+// 					select {
+// 					case errCh <- err:
+// 					default:
+// 					}
+// 					log.Error("failed to trace tx", "txHash", txs[task.index].Hash().String())
+// 				}
+// 			}
+// 		}()
+// 	}
 
-	// Feed the transactions into the tracers and return
-	var failed error
-	for i, tx := range txs {
-		// Send the trace task over for execution
-		jobs <- &txTraceTask{statedb: env.State.Copy(), index: i}
+// 	// Feed the transactions into the tracers and return
+// 	var failed error
+// 	for i, tx := range txs {
+// 		// Send the trace task over for execution
+// 		jobs <- &txTraceTask{statedb: env.State.Copy(), index: i}
 
-		// Generate the next state snapshot fast without tracing
-		msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
-		env.State.Prepare(tx.Hash(), i)
-		vmenv := vm.NewEVM(env.BlockCtx, core.NewEVMTxContext(msg), env.State, api.backend.ChainConfig(), vm.Config{})
-		l1DataFee, err := fees.CalculateL1DataFee(tx, env.State)
-		if err != nil {
-			failed = err
-			break
-		}
-		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
-			failed = err
-			break
-		}
-		// Finalize the state so any modifications are written to the trie
-		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-		env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
-	}
-	close(jobs)
-	pend.Wait()
+// 		// Generate the next state snapshot fast without tracing
+// 		msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
+// 		env.State.Prepare(tx.Hash(), i)
+// 		vmenv := vm.NewEVM(env.BlockCtx, core.NewEVMTxContext(msg), env.State, api.backend.ChainConfig(), vm.Config{})
+// 		l1DataFee, err := fees.CalculateL1DataFee(tx, env.State)
+// 		if err != nil {
+// 			failed = err
+// 			break
+// 		}
+// 		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
+// 			failed = err
+// 			break
+// 		}
+// 		// Finalize the state so any modifications are written to the trie
+// 		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
+// 		env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
+// 	}
+// 	close(jobs)
+// 	pend.Wait()
 
-	// after all tx has been traced, collect "deletion proof" for zktrie
-	for _, tracer := range env.ZkTrieTracer {
-		delProofs, err := tracer.GetDeletionProofs()
-		if err != nil {
-			log.Error("deletion proof failure", "error", err)
-		} else {
-			for _, proof := range delProofs {
-				env.DeletionProofs = append(env.DeletionProofs, proof)
-			}
-		}
-	}
+// 	// after all tx has been traced, collect "deletion proof" for zktrie
+// 	for _, tracer := range env.ZkTrieTracer {
+// 		delProofs, err := tracer.GetDeletionProofs()
+// 		if err != nil {
+// 			log.Error("deletion proof failure", "error", err)
+// 		} else {
+// 			for _, proof := range delProofs {
+// 				env.DeletionProofs = append(env.DeletionProofs, proof)
+// 			}
+// 		}
+// 	}
 
-	// build dummy per-tx deletion proof
-	for _, txStorageTrace := range env.TxStorageTraces {
-		if txStorageTrace != nil {
-			txStorageTrace.DeletionProofs = env.DeletionProofs
-		}
-	}
+// 	// build dummy per-tx deletion proof
+// 	for _, txStorageTrace := range env.TxStorageTraces {
+// 		if txStorageTrace != nil {
+// 			txStorageTrace.DeletionProofs = env.DeletionProofs
+// 		}
+// 	}
 
-	// If execution failed in between, abort
-	select {
-	case err := <-errCh:
-		return nil, err
-	default:
-		if failed != nil {
-			return nil, failed
-		}
-	}
+// 	// If execution failed in between, abort
+// 	select {
+// 	case err := <-errCh:
+// 		return nil, err
+// 	default:
+// 		if failed != nil {
+// 			return nil, failed
+// 		}
+// 	}
 
-	return env.FillBlockTrace(block)
-}
+// 	return env.FillBlockTrace(block)
+// }
 
 // func (api *API) getTxResult(env *core.TraceEnv, state *state.StateDB, index int, block *types.Block) error {
 // 	tx := block.Transactions()[index]

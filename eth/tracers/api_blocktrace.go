@@ -1,17 +1,17 @@
 package tracers
 
 import (
-	"bytes"
+	// "bytes"
 	"context"
 	"errors"
-	"fmt"
+	// "fmt"
 	"runtime"
 	"sync"
 
-	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/common/hexutil"
+	// "github.com/scroll-tech/go-ethereum/common"
+	// "github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core"
-	"github.com/scroll-tech/go-ethereum/core/state"
+	// "github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/log"

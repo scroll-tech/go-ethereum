@@ -1,8 +1,9 @@
 package core
 
 import (
-	// "errors"
-	// "fmt"
+	"bytes"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -15,6 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	// "github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 	// "github.com/scroll-tech/go-ethereum/trie"
@@ -43,6 +45,13 @@ type TraceEnv struct {
 	// zktrie tracer is used for zktrie storage to build additional deletion proof
 	ZkTrieTracer     map[string]state.ZktrieProofTracer
 	ExecutionResults []*types.ExecutionResult
+}
+
+// Context is the same as Context in eth/tracers/tracers.go
+type Context struct {
+	BlockHash common.Hash
+	TxIndex   int
+	TxHash    common.Hash
 }
 
 func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block) (*TraceEnv, error) {
@@ -129,7 +138,7 @@ func (env *TraceEnv) GetTxResult(state *state.StateDB, index int, block *types.B
 
 	tracer := vm.NewStructLogger(env.LogConfig)
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(env.BlockCtx, core.NewEVMTxContext(msg), state, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
+	vmenv := vm.NewEVM(env.BlockCtx, NewEVMTxContext(msg), state, env.ChainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 
 	// Call Prepare to clear out the statedb access list
 	state.Prepare(txctx.TxHash, txctx.TxIndex)
@@ -139,7 +148,7 @@ func (env *TraceEnv) GetTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("tracing failed: %w", err)
 	}
-	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+	result, err := ApplyMessage(vmenv, msg, new(GasPool).AddGas(msg.Gas()), l1DataFee)
 	if err != nil {
 		return fmt.Errorf("tracing failed: %w", err)
 	}
@@ -295,7 +304,6 @@ func (env *TraceEnv) GetTxResult(state *state.StateDB, index int, block *types.B
 
 	return nil
 }
-
 
 // FillBlockTrace content after all the txs are finished running.
 func (env *TraceEnv) FillBlockTrace(block *types.Block) (*types.BlockTrace, error) {

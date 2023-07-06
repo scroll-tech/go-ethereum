@@ -215,7 +215,7 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 	return limit
 }
 
-func (v *BlockValidator) createTraceEnv(block *types.Block) (*traceEnv, error) {
+func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
 	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, errors.New("validateCircuitRowUsage: no parent block found")
@@ -236,29 +236,29 @@ func (v *BlockValidator) createTraceEnv(block *types.Block) (*traceEnv, error) {
 		}
 	}
 
-	env := &traceEnv{
-		logConfig: &vm.LogConfig{
+	env := &TraceEnv{
+		LogConfig: &vm.LogConfig{
 			EnableMemory:     false,
 			EnableReturnData: true,
 		},
-		coinbase: coinbase,
-		signer:   types.MakeSigner(v.config, block.Number()),
-		state:    statedb,
-		blockCtx: NewEVMBlockContext(block.Header(), v.bc, nil),
+		Coinbase: coinbase,
+		Signer:   types.MakeSigner(v.config, block.Number()),
+		State:    statedb,
+		BlockCtx: NewEVMBlockContext(block.Header(), v.bc, nil),
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    parent.Root(),
 			RootAfter:     block.Root(),
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		},
-		zkTrieTracer:     make(map[string]state.ZktrieProofTracer),
-		executionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
-		txStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
+		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
+		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
+		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
 	}
 
 	key := coinbase.String()
 	if _, exist := env.Proofs[key]; !exist {
-		proof, err := env.state.GetProof(coinbase)
+		proof, err := env.State.GetProof(coinbase)
 		if err != nil {
 			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
 			// but we still mark the proofs map with nil array
@@ -286,6 +286,6 @@ func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
 	return getBlockTrace(env, block)
 }
 
-func getBlockTrace(env *traceEnv, block *types.Block) error {
+func getBlockTrace(env *TraceEnv, block *types.Block) error {
 	return nil
 }

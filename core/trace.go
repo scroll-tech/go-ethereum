@@ -18,25 +18,25 @@ import (
     // "github.com/scroll-tech/go-ethereum/trie"
 )
 
-type traceEnv struct {
-    logConfig *vm.LogConfig
+type TraceEnv struct {
+    LogConfig *vm.LogConfig
 
-    coinbase common.Address
+    Coinbase common.Address
 
     // rMu lock is used to protect txs executed in parallel.
-    signer   types.Signer
-    state    *state.StateDB
-    blockCtx vm.BlockContext
+    Signer   types.Signer
+    State    *state.StateDB
+    BlockCtx vm.BlockContext
 
     // pMu lock is used to protect Proofs' read and write mutual exclusion,
     // since txs are executed in parallel, so this lock is required.
-    pMu sync.Mutex
+    PMu sync.Mutex
     // sMu is required because of txs are executed in parallel,
     // this lock is used to protect StorageTrace's read and write mutual exclusion.
-    sMu sync.Mutex
+    SMu sync.Mutex
     *types.StorageTrace
-    txStorageTraces []*types.StorageTrace
+    TxStorageTraces []*types.StorageTrace
     // zktrie tracer is used for zktrie storage to build additional deletion proof
-    zkTrieTracer     map[string]state.ZktrieProofTracer
-    executionResults []*types.ExecutionResult
+    ZkTrieTracer     map[string]state.ZktrieProofTracer
+    ExecutionResults []*types.ExecutionResult
 }

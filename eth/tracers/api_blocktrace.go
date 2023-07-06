@@ -28,7 +28,7 @@ type TraceBlock interface {
 }
 
 type traceEnv struct {
-	config *TraceConfig
+	logConfig *vm.LogConfig
 
 	coinbase common.Address
 
@@ -113,11 +113,11 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 	}
 
 	env := &traceEnv{
-		config:   config,
-		coinbase: coinbase,
-		signer:   types.MakeSigner(api.backend.ChainConfig(), block.Number()),
-		state:    statedb,
-		blockCtx: core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil),
+		logConfig: config.LogConfig,
+		coinbase:  coinbase,
+		signer:    types.MakeSigner(api.backend.ChainConfig(), block.Number()),
+		state:     statedb,
+		blockCtx:  core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil),
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    parent.Root(),
 			RootAfter:     block.Root(),
@@ -265,7 +265,7 @@ func (api *API) getTxResult(env *traceEnv, state *state.StateDB, index int, bloc
 		}
 	}
 
-	tracer := vm.NewStructLogger(env.config.LogConfig)
+	tracer := vm.NewStructLogger(env.logConfig)
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 

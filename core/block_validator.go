@@ -90,10 +90,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
+	if err := v.ValidateL1Messages(block); err != nil {
+		return err
+	}
 	if v.isAlsoAMiner {
-		if err := v.ValidateL1Messages(block); err != nil {
-			return err
-		}
 		return v.validateCircuitRowUsage(block)
 	}
 	return nil

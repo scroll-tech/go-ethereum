@@ -42,7 +42,7 @@ type TraceEnv struct {
 	ExecutionResults []*types.ExecutionResult
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, bc *BlockChain, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block) (*TraceEnv, error) {
 	var coinbase common.Address
 	var err error
 	if chainConfig.Scroll.FeeVaultEnabled() {
@@ -63,7 +63,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, bc *BlockChain, engine cons
 		Coinbase:    coinbase,
 		Signer:      types.MakeSigner(chainConfig, block.Number()),
 		State:       statedb,
-		BlockCtx:    NewEVMBlockContext(block.Header(), bc, nil),
+		BlockCtx:    NewEVMBlockContext(block.Header(), chainContext, nil),
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    parent.Root(),
 			RootAfter:     block.Root(),

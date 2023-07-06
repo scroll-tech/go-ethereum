@@ -19,12 +19,16 @@ package core
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -212,87 +216,64 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 }
 
 type traceEnv struct {
-	// 	config *vm.LogConfig
+	logConfig *vm.LogConfig
 
-	// 	coinbase common.Address
+	coinbase common.Address
 
-	// 	// rMu lock is used to protect txs executed in parallel.
-	// 	signer   types.Signer
-	// 	state    *state.StateDB
-	// 	blockCtx vm.BlockContext
+	// rMu lock is used to protect txs executed in parallel.
+	signer   types.Signer
+	state    *state.StateDB
+	blockCtx vm.BlockContext
 
-	// 	// pMu lock is used to protect Proofs' read and write mutual exclusion,
-	// 	// since txs are executed in parallel, so this lock is required.
-	// 	pMu sync.Mutex
-	// 	// sMu is required because of txs are executed in parallel,
-	// 	// this lock is used to protect StorageTrace's read and write mutual exclusion.
-	// 	sMu sync.Mutex
-	// 	*types.StorageTrace
-	// 	txStorageTraces []*types.StorageTrace
-	// 	// zktrie tracer is used for zktrie storage to build additional deletion proof
-	// 	zkTrieTracer     map[string]state.ZktrieProofTracer
-	// 	executionResults []*types.ExecutionResult
+	// pMu lock is used to protect Proofs' read and write mutual exclusion,
+	// since txs are executed in parallel, so this lock is required.
+	pMu sync.Mutex
+	// sMu is required because of txs are executed in parallel,
+	// this lock is used to protect StorageTrace's read and write mutual exclusion.
+	sMu sync.Mutex
+	*types.StorageTrace
+	txStorageTraces []*types.StorageTrace
+	// zktrie tracer is used for zktrie storage to build additional deletion proof
+	zkTrieTracer     map[string]state.ZktrieProofTracer
+	executionResults []*types.ExecutionResult
 }
 
-func createTraceEnv(parent *types.Block, statedb *state.StateDB, coinbase common.Address) (*traceEnv, error) {
-	// parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// reexec := defaultTraceReexec
-	// if config != nil && config.Reexec != nil {
-	// 	reexec = *config.Reexec
-	// }
-	// statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, true)
-	// if err != nil {
-	// 	return nil, err
-	// }
+func (v *BlockValidator) createTraceEnv(parent *types.Block, statedb *state.StateDB, coinbase common.Address, block *types.Block) (*traceEnv, error) {
+	env := &traceEnv{
+		logConfig: &vm.LogConfig{
+			EnableMemory:     false,
+			EnableReturnData: true,
+		},
+		coinbase: coinbase,
+		signer:   types.MakeSigner(v.config, block.Number()),
+		state:    statedb,
+		blockCtx: NewEVMBlockContext(block.Header(), v.bc, nil),
+		StorageTrace: &types.StorageTrace{
+			RootBefore:    parent.Root(),
+			RootAfter:     block.Root(),
+			Proofs:        make(map[string][]hexutil.Bytes),
+			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+		},
+		zkTrieTracer:     make(map[string]state.ZktrieProofTracer),
+		executionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
+		txStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
+	}
 
-	// // get coinbase
-	// var coinbase common.Address
-	// if api.backend.ChainConfig().Scroll.FeeVaultEnabled() {
-	// 	coinbase = *api.backend.ChainConfig().Scroll.FeeVaultAddress
-	// } else {
-	// 	coinbase, err = api.backend.Engine().Author(block.Header())
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
+	key := coinbase.String()
+	if _, exist := env.Proofs[key]; !exist {
+		proof, err := env.state.GetProof(coinbase)
+		if err != nil {
+			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
+			// but we still mark the proofs map with nil array
+		}
+		wrappedProof := make([]hexutil.Bytes, len(proof))
+		for i, bt := range proof {
+			wrappedProof[i] = bt
+		}
+		env.Proofs[key] = wrappedProof
+	}
 
-	// env := &traceEnv{
-	// 	config:   config,
-	// 	coinbase: coinbase,
-	// 	signer:   types.MakeSigner(api.backend.ChainConfig(), block.Number()),
-	// 	state:    statedb,
-	// 	blockCtx: core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil),
-	// 	StorageTrace: &types.StorageTrace{
-	// 		RootBefore:    parent.Root(),
-	// 		RootAfter:     block.Root(),
-	// 		Proofs:        make(map[string][]hexutil.Bytes),
-	// 		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
-	// 	},
-	// 	zkTrieTracer:     make(map[string]state.ZktrieProofTracer),
-	// 	executionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
-	// 	txStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
-	// }
-
-	// key := coinbase.String()
-	// if _, exist := env.Proofs[key]; !exist {
-	// 	proof, err := env.state.GetProof(coinbase)
-	// 	if err != nil {
-	// 		log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
-	// 		// but we still mark the proofs map with nil array
-	// 	}
-	// 	wrappedProof := make([]hexutil.Bytes, len(proof))
-	// 	for i, bt := range proof {
-	// 		wrappedProof[i] = bt
-	// 	}
-	// 	env.Proofs[key] = wrappedProof
-	// }
-
-	// return env, nil
-
-	return nil, nil
+	return env, nil
 }
 
 func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
@@ -320,7 +301,7 @@ func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
 		}
 	}
 
-	createTraceEnv(parent, statedb, coinbase)
+	v.createTraceEnv(parent, statedb, coinbase, block)
 
 	return nil
 }

@@ -238,7 +238,27 @@ type traceEnv struct {
 	executionResults []*types.ExecutionResult
 }
 
-func (v *BlockValidator) createTraceEnv(parent *types.Block, statedb *state.StateDB, coinbase common.Address, block *types.Block) (*traceEnv, error) {
+func (v *BlockValidator) createTraceEnv(block *types.Block) (*traceEnv, error) {
+	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	if parent == nil {
+		return nil, errors.New("validateCircuitRowUsage: no parent block found")
+	}
+
+	statedb, err := v.bc.StateAt(parent.Hash())
+	if err != nil {
+		return nil, err
+	}
+
+	var coinbase common.Address
+	if v.config.Scroll.FeeVaultEnabled() {
+		coinbase = *v.config.Scroll.FeeVaultAddress
+	} else {
+		coinbase, err = v.engine.Author(block.Header())
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	env := &traceEnv{
 		logConfig: &vm.LogConfig{
 			EnableMemory:     false,
@@ -281,27 +301,14 @@ func (v *BlockValidator) validateCircuitRowUsage(block *types.Block) error {
 		return nil
 	}
 
-	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
-	if parent == nil {
-		return errors.New("validateCircuitRowUsage: no parent block found")
-	}
-
-	statedb, err := v.bc.StateAt(parent.Hash())
+	env, err := v.createTraceEnv(block)
 	if err != nil {
 		return err
 	}
 
-	var coinbase common.Address
-	if v.config.Scroll.FeeVaultEnabled() {
-		coinbase = *v.config.Scroll.FeeVaultAddress
-	} else {
-		coinbase, err = v.engine.Author(block.Header())
-		if err != nil {
-			return err
-		}
-	}
+	return getBlockTrace(env, block)
+}
 
-	v.createTraceEnv(parent, statedb, coinbase, block)
-
+func getBlockTrace(env *traceEnv, block *types.Block) error {
 	return nil
 }

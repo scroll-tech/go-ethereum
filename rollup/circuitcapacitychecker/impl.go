@@ -27,6 +27,7 @@ type CircuitCapacityChecker struct {
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
 	id := C.new_circuit_capacity_checker()
+	log.Error("msgmsgmsgmsgmsgmsgmsgmsgmsgmsg", "id", id)
 	return &CircuitCapacityChecker{id: uint64(id)}
 }
 

@@ -819,7 +819,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	traceEnvStateCopy := w.current.traceEnv.State.Copy()
 
 	// has to check circuit capacity before `core.ApplyTransaction`,
-	// because if the tx can be sucessfully executed but circuit capacity overflows, it will be inconvenient to revert
+	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert
 	traces, err := w.current.traceEnv.GetBlockTrace(
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 	)

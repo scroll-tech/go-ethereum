@@ -98,6 +98,7 @@ type environment struct {
 	receipts []*types.Receipt
 
 	proofCaches map[string]*circuitcapacitychecker.ProofCache
+	traceEnv    *core.TraceEnv
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -723,6 +724,12 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 	state.StartPrefetcher("miner")
 
+	// TODO: state.Copy()???
+	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state, parent, types.NewBlockWithHeader(header))
+	if err != nil {
+		return err
+	}
+
 	env := &environment{
 		signer:      types.MakeSigner(w.chainConfig, header.Number),
 		state:       state,
@@ -731,6 +738,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		uncles:      mapset.NewSet(),
 		header:      header,
 		proofCaches: make(map[string]*circuitcapacitychecker.ProofCache),
+		traceEnv:    traceEnv,
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {

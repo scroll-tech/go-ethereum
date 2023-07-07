@@ -52,6 +52,7 @@ pub mod checker {
         });
         match result {
             Ok((acc_row_usage, tx_row_usage)) => {
+                log::debug!("acc_row_usage: {:?}, tx_row_usage {:?}", acc_row_usage.row_number, tx_row_usage.row_number);
                 if acc_row_usage.is_ok {
                     return 0u8; // row usage ok
                 } else if tx_row_usage.is_ok {
@@ -69,6 +70,7 @@ pub mod checker {
     pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) -> i64 {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
+        // TODO: switch to correct API when zkevm team gets it ready
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
@@ -80,6 +82,7 @@ pub mod checker {
         });
         match result {
             Ok((acc_row_usage, tx_row_usage)) => {
+                log::debug!("acc_row_usage: {:?}, tx_row_usage {:?}", acc_row_usage.row_number, tx_row_usage.row_number);
                 if acc_row_usage.is_ok {
                     return acc_row_usage.row_number as i64; // row usage ok
                 } else {

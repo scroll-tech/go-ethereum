@@ -193,7 +193,6 @@ type worker struct {
 	// External functions
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
-	// TODO: add comments
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 
 	// Test hooks
@@ -724,7 +723,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	state.StartPrefetcher("miner")
 
 	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state.Copy(), parent,
-		// new block with a placeholder tx, for ExecutionResults length & TxStorageTraces length
+		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
 	)
 	if err != nil {
@@ -819,16 +818,18 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	snap := w.current.state.Snapshot()
 	traceEnvStateCopy := w.current.traceEnv.State.Copy()
 
+	// has to check circuit capacity before `core.ApplyTransaction`,
+	// because if the tx can be sucessfully executed but circuit capacity overflows, it will be inconvenient to revert
 	traces, err := w.current.traceEnv.GetBlockTrace(
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 	)
 	if err != nil {
-		// revert to previous state, but not necessary here
+		// revert to previous state, can also be achieved by `RevertToSnapshot`, since traceEnv.State is not committed yet
 		w.current.traceEnv.State = traceEnvStateCopy
 		return nil, err
 	}
 	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
-		// revert to previous state
+		// revert to previous state, has to do it this way, since traceEnv.State has been committed
 		w.current.traceEnv.State = traceEnvStateCopy
 		return nil, err
 	}

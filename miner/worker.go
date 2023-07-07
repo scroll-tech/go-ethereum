@@ -816,14 +816,10 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
+
+	// has to do check circuit capacity before core.ApplyTransaction,
+	// otherwise if the tx can be excuted but circuit capacity exceeds, it will be hard to revert
 	w.current.traceEnv.State = w.current.state.Copy()
-
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
-	if err != nil {
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
-
 	traces, err := w.current.traceEnv.GetBlockTrace(
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 	)
@@ -832,6 +828,12 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		return nil, err
 	}
 	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
+
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}

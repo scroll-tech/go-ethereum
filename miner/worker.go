@@ -97,7 +97,7 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 
-	traceEnv    *core.TraceEnv
+	traceEnv *core.TraceEnv
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -731,13 +731,13 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 
 	env := &environment{
-		signer:      types.MakeSigner(w.chainConfig, header.Number),
-		state:       state,
-		ancestors:   mapset.NewSet(),
-		family:      mapset.NewSet(),
-		uncles:      mapset.NewSet(),
-		header:      header,
-		traceEnv:    traceEnv,
+		signer:    types.MakeSigner(w.chainConfig, header.Number),
+		state:     state,
+		ancestors: mapset.NewSet(),
+		family:    mapset.NewSet(),
+		uncles:    mapset.NewSet(),
+		header:    header,
+		traceEnv:  traceEnv,
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {

@@ -721,14 +721,6 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		return err
 	}
 
-	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state, parent,
-		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
-		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
-	)
-	if err != nil {
-		return err
-	}
-
 	state.StartPrefetcher("miner")
 
 	env := &environment{
@@ -738,7 +730,6 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		family:    mapset.NewSet(),
 		uncles:    mapset.NewSet(),
 		header:    header,
-		traceEnv:  traceEnv,
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -1138,6 +1129,17 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
+
+	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.current.state, parent,
+		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
+		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
+	)
+	if err != nil {
+		log.Error("CreateTraceEnv", "err", err)
+		return
+	}
+	w.current.traceEnv = traceEnv
+
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Txs) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", pendingL1Txs)
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)

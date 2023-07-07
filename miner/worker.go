@@ -724,8 +724,10 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 	state.StartPrefetcher("miner")
 
-	// TODO: state.Copy()???
-	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state, parent, types.NewBlockWithHeader(header))
+	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state.Copy(), parent,
+		// new block with a placeholder tx, for ExecutionResults length & TxStorageTraces length
+		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
+	)
 	if err != nil {
 		return err
 	}
@@ -817,6 +819,21 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
+	traceEnvStateCopy := w.current.traceEnv.State.Copy()
+
+	traces, err := w.current.traceEnv.GetBlockTrace(
+		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
+	)
+	if err != nil {
+		// revert to previous state, but not necessary here
+		w.current.traceEnv.State = traceEnvStateCopy
+		return nil, err
+	}
+	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
+		// revert to previous state
+		w.current.traceEnv.State = traceEnvStateCopy
+		return nil, err
+	}
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {

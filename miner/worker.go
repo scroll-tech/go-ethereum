@@ -97,7 +97,6 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 
-	proofCaches map[string]*circuitcapacitychecker.ProofCache
 	traceEnv    *core.TraceEnv
 }
 
@@ -205,9 +204,6 @@ type worker struct {
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
-	circuitcapacitychecker.NewCircuitCapacityChecker()
-	circuitcapacitychecker.NewCircuitCapacityChecker()
-	circuitcapacitychecker.NewCircuitCapacityChecker()
 	worker := &worker{
 		config:                 config,
 		chainConfig:            chainConfig,
@@ -742,7 +738,6 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		family:      mapset.NewSet(),
 		uncles:      mapset.NewSet(),
 		header:      header,
-		proofCaches: make(map[string]*circuitcapacitychecker.ProofCache),
 		traceEnv:    traceEnv,
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
@@ -843,12 +838,6 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
-
-	// receipt, err := core.ApplyTransactionWithCircuitCheck(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, w.current.signer, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig(), w.current.proofCaches, w.circuitCapacityChecker)
-	// if err != nil {
-	// 	w.current.state.RevertToSnapshot(snap)
-	// 	return nil, err
-	// }
 
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)

@@ -177,12 +177,12 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	var (
 		vmConfig = vm.Config{
-			Debug:                   true,
+			// Debug:                   true,
 			EnablePreimageRecording: config.EnablePreimageRecording,
-			Tracer: vm.NewStructLogger(&vm.LogConfig{
-				EnableMemory:     false,
-				EnableReturnData: true,
-			}),
+			// Tracer: vm.NewStructLogger(&vm.LogConfig{
+			// 	EnableMemory:     false,
+			// 	EnableReturnData: true,
+			// }),
 		}
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:      config.TrieCleanCache,

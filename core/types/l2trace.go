@@ -17,7 +17,7 @@ type BlockTrace struct {
 	Header           *Header            `json:"header"`
 	Transactions     []*TransactionData `json:"transactions"`
 	StorageTrace     *StorageTrace      `json:"storageTrace"`
-	TxStorageTraces  []*StorageTrace    `json:"txStorageTraces,omitempty"`
+	TxStorageTraces  []*StorageTrace    `json:"txStorageTrace,omitempty"`
 	ExecutionResults []*ExecutionResult `json:"executionResults"`
 	MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
 	WithdrawTrieRoot common.Hash        `json:"withdraw_trie_root,omitempty"`

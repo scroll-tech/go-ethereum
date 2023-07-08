@@ -22,22 +22,22 @@ import (
 )
 
 type TraceEnv struct {
-	LogConfig   *vm.LogConfig
-	ChainConfig *params.ChainConfig
+	logConfig   *vm.LogConfig
+	chainConfig *params.ChainConfig
 
-	Coinbase common.Address
+	coinbase common.Address
 
 	// rMu lock is used to protect txs executed in parallel.
-	Signer   types.Signer
-	State    *state.StateDB
-	BlockCtx vm.BlockContext
+	signer   types.Signer
+	state    *state.StateDB
+	blockCtx vm.BlockContext
 
 	// pMu lock is used to protect Proofs' read and write mutual exclusion,
 	// since txs are executed in parallel, so this lock is required.
-	PMu sync.Mutex
+	pMu sync.Mutex
 	// sMu is required because of txs are executed in parallel,
 	// this lock is used to protect StorageTrace's read and write mutual exclusion.
-	SMu sync.Mutex
+	sMu sync.Mutex
 	*types.StorageTrace
 	TxStorageTraces []*types.StorageTrace
 	// zktrie tracer is used for zktrie storage to build additional deletion proof
@@ -47,9 +47,9 @@ type TraceEnv struct {
 
 // Context is the same as Context in eth/tracers/tracers.go
 type Context struct {
-	BlockHash common.Hash
-	TxIndex   int
-	TxHash    common.Hash
+	blockHash common.Hash
+	txIndex   int
+	txHash    common.Hash
 }
 
 // txTraceTask is the same as txTraceTask in eth/tracers/api.go
@@ -71,15 +71,15 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	}
 
 	env := &TraceEnv{
-		LogConfig: &vm.LogConfig{
+		logConfig: &vm.LogConfig{
 			EnableMemory:     false,
 			EnableReturnData: true,
 		},
-		ChainConfig: chainConfig,
-		Coinbase:    coinbase,
-		Signer:      types.MakeSigner(chainConfig, block.Number()),
-		State:       statedb,
-		BlockCtx:    NewEVMBlockContext(block.Header(), chainContext, nil),
+		chainConfig: chainConfig,
+		coinbase:    coinbase,
+		signer:      types.MakeSigner(chainConfig, block.Number()),
+		state:       statedb,
+		blockCtx:    NewEVMBlockContext(block.Header(), chainContext, nil),
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    parent.Root(),
 			RootAfter:     block.Root(),
@@ -93,7 +93,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 
 	key := coinbase.String()
 	if _, exist := env.Proofs[key]; !exist {
-		proof, err := env.State.GetProof(coinbase)
+		proof, err := env.state.GetProof(coinbase)
 		if err != nil {
 			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
 			// but we still mark the proofs map with nil array
@@ -141,13 +141,13 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	var failed error
 	for i, tx := range txs {
 		// Send the trace task over for execution
-		jobs <- &txTraceTask{statedb: env.State.Copy(), index: i}
+		jobs <- &txTraceTask{statedb: env.state.Copy(), index: i}
 
 		// Generate the next state snapshot fast without tracing
-		msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
-		env.State.Prepare(tx.Hash(), i)
-		vmenv := vm.NewEVM(env.BlockCtx, NewEVMTxContext(msg), env.State, env.ChainConfig, vm.Config{})
-		l1DataFee, err := fees.CalculateL1DataFee(tx, env.State)
+		msg, _ := tx.AsMessage(env.signer, block.BaseFee())
+		env.state.Prepare(tx.Hash(), i)
+		vmenv := vm.NewEVM(env.blockCtx, NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{})
+		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
 		if err != nil {
 			failed = err
 			break
@@ -157,7 +157,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			break
 		}
 		// we'd better don't finalise
-		// env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
+		// env.state.Finalise(vmenv.chainConfig().IsEIP158(block.Number()))
 	}
 	close(jobs)
 	pend.Wait()
@@ -196,14 +196,14 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 
 func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.Block) error {
 	tx := block.Transactions()[index]
-	msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
-	from, _ := types.Sender(env.Signer, tx)
+	msg, _ := tx.AsMessage(env.signer, block.BaseFee())
+	from, _ := types.Sender(env.signer, tx)
 	to := tx.To()
 
 	txctx := &Context{
-		BlockHash: block.TxHash(),
-		TxIndex:   index,
-		TxHash:    tx.Hash(),
+		blockHash: block.TxHash(),
+		txIndex:   index,
+		txHash:    tx.Hash(),
 	}
 
 	sender := &types.AccountWrapper{
@@ -226,12 +226,12 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		}
 	}
 
-	tracer := vm.NewStructLogger(env.LogConfig)
+	tracer := vm.NewStructLogger(env.logConfig)
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(env.BlockCtx, NewEVMTxContext(msg), state, env.ChainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
+	vmenv := vm.NewEVM(env.blockCtx, NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 
 	// Call Prepare to clear out the statedb access list
-	state.Prepare(txctx.TxHash, txctx.TxIndex)
+	state.Prepare(txctx.txHash, txctx.txIndex)
 
 	// Computes the new state by applying the given message.
 	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
@@ -257,7 +257,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		to = &createdAcc.Address
 	}
 	// collect affected account after tx being applied
-	for _, acc := range []common.Address{from, *to, env.Coinbase} {
+	for _, acc := range []common.Address{from, *to, env.coinbase} {
 		after = append(after, &types.AccountWrapper{
 			Address:          acc,
 			Nonce:            state.GetNonce(acc),
@@ -285,12 +285,12 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	for addr := range proofAccounts {
 		addrStr := addr.String()
 
-		env.PMu.Lock()
+		env.pMu.Lock()
 		checkedProof, existed := env.Proofs[addrStr]
 		if existed {
 			txStorageTrace.Proofs[addrStr] = checkedProof
 		}
-		env.PMu.Unlock()
+		env.pMu.Unlock()
 		if existed {
 			continue
 		}
@@ -303,10 +303,10 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		for i, bt := range proof {
 			wrappedProof[i] = bt
 		}
-		env.PMu.Lock()
+		env.pMu.Lock()
 		env.Proofs[addrStr] = wrappedProof
 		txStorageTrace.Proofs[addrStr] = wrappedProof
-		env.PMu.Unlock()
+		env.pMu.Unlock()
 	}
 
 	proofStorages := tracer.UpdatedStorages()
@@ -315,16 +315,16 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			txStorageTrace.StorageProofs[addr.String()] = make(map[string][]hexutil.Bytes)
 		}
 
-		env.SMu.Lock()
+		env.sMu.Lock()
 		trie, err := state.GetStorageTrieForProof(addr)
 		if err != nil {
 			// but we still continue to next address
 			log.Error("Storage trie not available", "error", err, "address", addr)
-			env.SMu.Unlock()
+			env.sMu.Unlock()
 			continue
 		}
 		zktrieTracer := state.NewProofTracer(trie)
-		env.SMu.Unlock()
+		env.sMu.Unlock()
 
 		for key, values := range keys {
 			addrStr := addr.String()
@@ -332,7 +332,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			isDelete := bytes.Equal(values.Bytes(), common.Hash{}.Bytes())
 
 			txm := txStorageTrace.StorageProofs[addrStr]
-			env.SMu.Lock()
+			env.sMu.Lock()
 			m, existed := env.StorageProofs[addrStr]
 			if !existed {
 				m = make(map[string][]hexutil.Bytes)
@@ -346,10 +346,10 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 				if isDelete && zktrieTracer.Available() {
 					env.ZkTrieTracer[addrStr].MarkDeletion(key)
 				}
-				env.SMu.Unlock()
+				env.sMu.Unlock()
 				continue
 			}
-			env.SMu.Unlock()
+			env.sMu.Unlock()
 
 			var proof [][]byte
 			var err error
@@ -366,7 +366,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			for i, bt := range proof {
 				wrappedProof[i] = bt
 			}
-			env.SMu.Lock()
+			env.sMu.Lock()
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
 			if zktrieTracer.Available() {
@@ -375,7 +375,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 				}
 				env.ZkTrieTracer[addrStr].Merge(zktrieTracer)
 			}
-			env.SMu.Unlock()
+			env.sMu.Unlock()
 		}
 	}
 
@@ -397,11 +397,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 
 // fillBlockTrace content after all the txs are finished running.
 func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
-	statedb := env.State
+	statedb := env.state
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())
 	for i, tx := range block.Transactions() {
-		txs[i] = types.NewTransactionData(tx, block.NumberU64(), env.ChainConfig)
+		txs[i] = types.NewTransactionData(tx, block.NumberU64(), env.chainConfig)
 	}
 
 	intrinsicStorageProofs := map[common.Address][]common.Hash{
@@ -448,15 +448,15 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 	}
 
 	blockTrace := &types.BlockTrace{
-		ChainID: env.ChainConfig.ChainID.Uint64(),
+		ChainID: env.chainConfig.ChainID.Uint64(),
 		Version: params.ArchiveVersion(params.CommitHash),
 		Coinbase: &types.AccountWrapper{
-			Address:          env.Coinbase,
-			Nonce:            statedb.GetNonce(env.Coinbase),
-			Balance:          (*hexutil.Big)(statedb.GetBalance(env.Coinbase)),
-			KeccakCodeHash:   statedb.GetKeccakCodeHash(env.Coinbase),
-			PoseidonCodeHash: statedb.GetPoseidonCodeHash(env.Coinbase),
-			CodeSize:         statedb.GetCodeSize(env.Coinbase),
+			Address:          env.coinbase,
+			Nonce:            statedb.GetNonce(env.coinbase),
+			Balance:          (*hexutil.Big)(statedb.GetBalance(env.coinbase)),
+			KeccakCodeHash:   statedb.GetKeccakCodeHash(env.coinbase),
+			PoseidonCodeHash: statedb.GetPoseidonCodeHash(env.coinbase),
+			CodeSize:         statedb.GetCodeSize(env.coinbase),
 		},
 		Header:           block.Header(),
 		StorageTrace:     env.StorageTrace,
@@ -479,7 +479,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 	}
 
 	// only zktrie model has the ability to get `mptwitness`.
-	if env.ChainConfig.Scroll.ZktrieEnabled() {
+	if env.chainConfig.Scroll.ZktrieEnabled() {
 		// we use MPTWitnessNothing by default and do not allow switch among MPTWitnessType atm.
 		// MPTWitness will be removed from traces in the future.
 		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessNothing, blockTrace); err != nil {
@@ -487,7 +487,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 		}
 	}
 
-	blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.State)
+	blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.state)
 
 	return blockTrace, nil
 }

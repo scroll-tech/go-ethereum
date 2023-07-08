@@ -47,9 +47,9 @@ type TraceEnv struct {
 
 // Context is the same as Context in eth/tracers/tracers.go
 type Context struct {
-	blockHash common.Hash
-	txIndex   int
-	txHash    common.Hash
+	BlockHash common.Hash
+	TxIndex   int
+	TxHash    common.Hash
 }
 
 // txTraceTask is the same as txTraceTask in eth/tracers/api.go
@@ -201,9 +201,9 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	to := tx.To()
 
 	txctx := &Context{
-		blockHash: block.TxHash(),
-		txIndex:   index,
-		txHash:    tx.Hash(),
+		BlockHash: block.TxHash(),
+		TxIndex:   index,
+		TxHash:    tx.Hash(),
 	}
 
 	sender := &types.AccountWrapper{

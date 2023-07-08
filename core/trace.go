@@ -231,7 +231,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	vmenv := vm.NewEVM(env.blockCtx, NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 
 	// Call Prepare to clear out the statedb access list
-	state.Prepare(txctx.txHash, txctx.txIndex)
+	state.Prepare(txctx.TxHash, txctx.TxIndex)
 
 	// Computes the new state by applying the given message.
 	l1DataFee, err := fees.CalculateL1DataFee(tx, state)

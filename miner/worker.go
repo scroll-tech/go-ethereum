@@ -721,7 +721,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		return err
 	}
 
-	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, parent,
+	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
 	)

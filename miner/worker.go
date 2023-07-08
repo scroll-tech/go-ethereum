@@ -834,7 +834,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		return nil, err
 	}
 
-	// revert to snapshot to ApplyMessage again
+	// revert to snapshot to core.ApplyMessage (in core.ApplyTransaction) again
 	w.current.state.RevertToSnapshot(snap)
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {

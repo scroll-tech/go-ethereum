@@ -685,6 +685,8 @@ func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, inclT
 	rc := rawdb.ReadBlockRowConsumption(api.eth.ChainDb(), b.Hash())
 	if rc != nil {
 		fields["rowConsumption"] = hexutil.Uint64(rc.Rows)
+	} else {
+		fields["rowConsumption"] = nil
 	}
 	return fields, err
 }

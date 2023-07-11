@@ -7,7 +7,7 @@ pub mod checker {
     use std::collections::HashMap;
     use std::panic;
     use types::eth::BlockTrace;
-    use zkevm::capacity_checker::CircuitCapacityChecker;
+    use prover::zkevm::CircuitCapacityChecker;
 
     static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
 

@@ -38,24 +38,20 @@ type BlockValidator struct {
 	bc     *BlockChain         // Canonical block chain
 	engine consensus.Engine    // Consensus engine used for validating
 
-	isAlsoAMiner           bool
+	checkCircuitCapacity   bool
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
+func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine, checkCircuitCapacity bool) *BlockValidator {
 	validator := &BlockValidator{
 		config:                 config,
 		engine:                 engine,
 		bc:                     blockchain,
-		isAlsoAMiner:           false,
+		checkCircuitCapacity:   checkCircuitCapacity,
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 	}
 	return validator
-}
-
-func (v *BlockValidator) SetIsAlsoAMiner(isAlsoAMiner bool) {
-	v.isAlsoAMiner = isAlsoAMiner
 }
 
 // ValidateBody validates the given block's uncles and verifies the block
@@ -90,12 +86,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
-	// TODO: consider moving this into `isAlsoAMiner` condition,
-	// cannot do it currently because tests fail
 	if err := v.ValidateL1Messages(block); err != nil {
 		return err
 	}
-	if v.isAlsoAMiner {
+	if v.checkCircuitCapacity {
 		return v.validateCircuitRowUsage(block)
 	}
 	return nil

@@ -674,14 +674,12 @@ func (api *ScrollAPI) GetLatestRelayedQueueIndex(ctx context.Context) (queueInde
 
 // rpcMarshalBlock uses the generalized output filler, then adds the total difficulty field, which requires
 // a `ScrollAPI`.
-func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
-	fields, err := ethapi.RPCMarshalBlock(b, inclTx, fullTx, api.eth.APIBackend.ChainConfig())
+func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, fullTx bool) (map[string]interface{}, error) {
+	fields, err := ethapi.RPCMarshalBlock(b, true, fullTx, api.eth.APIBackend.ChainConfig())
 	if err != nil {
 		return nil, err
 	}
-	if inclTx {
-		fields["totalDifficulty"] = (*hexutil.Big)(api.eth.APIBackend.GetTd(ctx, b.Hash()))
-	}
+	fields["totalDifficulty"] = (*hexutil.Big)(api.eth.APIBackend.GetTd(ctx, b.Hash()))
 	rc := rawdb.ReadBlockRowConsumption(api.eth.ChainDb(), b.Hash())
 	if rc != nil {
 		fields["rowConsumption"] = hexutil.Uint64(rc.Rows)
@@ -696,7 +694,7 @@ func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, inclT
 func (api *ScrollAPI) GetBlockByHash(ctx context.Context, hash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := api.eth.APIBackend.BlockByHash(ctx, hash)
 	if block != nil {
-		return api.rpcMarshalBlock(ctx, block, true, fullTx)
+		return api.rpcMarshalBlock(ctx, block, fullTx)
 	}
 	return nil, err
 }

@@ -21,8 +21,8 @@ halo2-ecc = { git = "https://github.com/scroll-tech/halo2-lib", branch = "halo2-
 halo2curves = { git = "https://github.com/scroll-tech/halo2curves.git", branch = "0.3.1-derive-serde" }
 
 [dependencies]
-zkevm = { git = "https://github.com/scroll-tech/scroll-zkevm", rev="66d021e" }
-types = { git = "https://github.com/scroll-tech/scroll-zkevm", rev="66d021e" }
+zkevm = { git = "https://github.com/scroll-tech/scroll-prover", rev="795894c" }
+types = { git = "https://github.com/scroll-tech/scroll-prover", rev="795894c" }
 
 log = "0.4"
 env_logger = "0.9.0"

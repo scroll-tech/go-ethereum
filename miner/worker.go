@@ -951,11 +951,11 @@ loop:
 			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
 			txs.Pop()
 
-		case errors.Is(err, circuitcapacitychecker.ErrBlockRowUsageOverflow):
+		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
 			log.Trace("Circuit capacity limit reached in a block") // TODO: add more logs
 			break loop
 
-		case errors.Is(err, circuitcapacitychecker.ErrTxRowUsageOverflow):
+		case errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow):
 			// Tx row usage too high, drop the tx
 			log.Trace("Circuit capacity limit reached for a single tx") // TODO: add more logs
 			txs.Shift()

@@ -64,9 +64,9 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) er
 	case 0:
 		return nil
 	case 1:
-		return ErrBlockRowUsageOverflow
+		return ErrBlockRowConsumptionOverflow
 	case 2:
-		return ErrTxRowUsageOverflow
+		return ErrTxRowConsumptionOverflow
 	default:
 		return ErrUnknown
 	}
@@ -94,7 +94,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64,
 		return 0, ErrUnknown
 	}
 	if result < 0 {
-		return 0, ErrBlockRowUsageOverflow
+		return 0, ErrBlockRowConsumptionOverflow
 	}
 	return uint64(result), nil
 }

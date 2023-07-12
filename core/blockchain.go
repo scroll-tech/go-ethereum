@@ -263,7 +263,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		engine:         engine,
 		vmConfig:       vmConfig,
 	}
-	bc.validator = NewBlockValidator(chainConfig, bc, engine, checkCircuitCapacity)
+	bc.validator = NewBlockValidator(chainConfig, bc, engine, db, checkCircuitCapacity)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 

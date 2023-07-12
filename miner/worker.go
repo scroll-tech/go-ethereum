@@ -956,7 +956,7 @@ loop:
 			break loop
 
 		case errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow):
-			// Tx row usage too high, drop the tx
+			// Tx row consumption too high, drop the tx
 			log.Trace("Circuit capacity limit reached for a single tx") // TODO: add more logs
 			txs.Shift()
 

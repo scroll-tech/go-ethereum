@@ -108,6 +108,7 @@ type task struct {
 	state     *state.StateDB
 	block     *types.Block
 	createdAt time.Time
+	accRows   uint64 // accumulated row consumption in the circuit side
 }
 
 const (
@@ -633,6 +634,8 @@ func (w *worker) taskLoop() {
 				w.pendingMu.Lock()
 				delete(w.pendingTasks, sealHash)
 				w.pendingMu.Unlock()
+			} else {
+				rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), sealHash, types.RowConsumption{Rows: task.accRows})
 			}
 		case <-w.exitCh:
 			interrupt()
@@ -1189,7 +1192,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			interval()
 		}
 		select {
-		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now()}:
+		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: accRows}:
 			w.unconfirmed.Shift(block.NumberU64() - 1)
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"uncles", len(uncles), "txs", w.current.tcount,

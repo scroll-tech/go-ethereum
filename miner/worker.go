@@ -97,7 +97,9 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 
-	traceEnv *core.TraceEnv
+	// circuit capacity check related fields
+	traceEnv *core.TraceEnv // env for tracing
+	accRows  uint64         // accumulated row consumption for a block
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -528,7 +530,7 @@ func (w *worker) mainLoop() {
 						uncles = append(uncles, uncle.Header())
 						return false
 					})
-					w.commit(uncles, nil, true, start)
+					w.commit(uncles, nil, true, start, w.current.accRows)
 				}
 			}
 
@@ -828,7 +830,8 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
-	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
+	accRows, err := w.circuitCapacityChecker.ApplyTransaction(traces)
+	if err != nil {
 		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
@@ -844,6 +847,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+	w.current.accRows = accRows
 
 	return receipt.Logs, nil
 }
@@ -1105,7 +1109,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Create an empty block based on temporary copied state for
 	// sealing in advance without waiting block execution finished.
 	if !noempty && atomic.LoadUint32(&w.noempty) == 0 {
-		w.commit(uncles, nil, false, tstart)
+		w.commit(uncles, nil, false, tstart, 0)
 	}
 	// fetch l1Txs
 	l1Txs := make(map[common.Address]types.Transactions)
@@ -1167,12 +1171,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		return
 	}
 
-	w.commit(uncles, w.fullTaskHook, true, tstart)
+	w.commit(uncles, w.fullTaskHook, true, tstart, w.current.accRows)
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
-func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time) error {
+func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time, accRows uint64) error {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(w.current.receipts)
 	s := w.current.state.Copy()

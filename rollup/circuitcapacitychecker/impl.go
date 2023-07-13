@@ -39,13 +39,13 @@ func (ccc *CircuitCapacityChecker) Reset() {
 	C.reset_circuit_capacity_checker(C.uint64_t(ccc.id))
 }
 
-func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) error {
+func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (uint64, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		return ErrUnknown
+		return 0, ErrUnknown
 	}
 
 	tracesStr := C.CString(string(tracesByt))
@@ -59,13 +59,13 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) er
 
 	switch result {
 	case 0:
-		return nil
-	case 1:
+		return 0, ErrUnknown
+	case -1:
 		return ErrBlockRowConsumptionOverflow
-	case 2:
+	case -2:
 		return ErrTxRowConsumptionOverflow
 	default:
-		return ErrUnknown
+		return result, nil
 	}
 }
 

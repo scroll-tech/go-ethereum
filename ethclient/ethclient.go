@@ -358,6 +358,8 @@ func (ec *Client) GetBlockByHash(ctx context.Context, blockHash common.Hash) (*t
 		return nil, err
 	}
 	if err := json.Unmarshal(raw, &rc); err != nil {
+		// don't return error here if there is no RowConsumption data, because many l2geth nodes will not have this data
+		// instead of error l2_watcher and other services that require RowConsumption should check it
 		rc = nil
 	}
 	// Quick-verify transaction and uncle lists. This mostly helps with debugging the server.

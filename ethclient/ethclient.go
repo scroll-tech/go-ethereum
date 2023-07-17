@@ -358,7 +358,7 @@ func (ec *Client) GetBlockByHash(ctx context.Context, blockHash common.Hash) (*t
 		return nil, err
 	}
 	if err := json.Unmarshal(raw, &rc); err != nil {
-		return nil, err
+		rc = nil
 	}
 	// Quick-verify transaction and uncle lists. This mostly helps with debugging the server.
 	if head.UncleHash == types.EmptyUncleHash && len(body.UncleHashes) > 0 {

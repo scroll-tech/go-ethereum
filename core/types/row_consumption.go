@@ -16,5 +16,3 @@ type RowConsumption []RowConsumptionEntry
 type rowConsumptionEntryMarshaling struct {
 	Rows hexutil.Uint64
 }
-
-

@@ -337,6 +337,26 @@ func (ec *Client) GetBlockTraceByNumber(ctx context.Context, number *big.Int) (*
 	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", toBlockNumArg(number))
 }
 
+type rpcRowConsumption struct {
+	RowConsumption types.RowConsumption `json:"rowConsumption"`
+}
+
+// UnmarshalJSON unmarshals from JSON.
+func (r *rpcRowConsumption) UnmarshalJSON(input []byte) error {
+	type rpcRowConsumption struct {
+		RowConsumption types.RowConsumption `json:"rowConsumption"`
+	}
+	var dec rpcRowConsumption
+	if err := json.Unmarshal(input, &dec); err != nil {
+		return err
+	}
+	if dec.RowConsumption == nil {
+		return errors.New("missing required field 'RowConsumption' for rpcRowConsumption")
+	}
+	r.RowConsumption = dec.RowConsumption
+	return nil
+}
+
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned.
 func (ec *Client) GetBlockByHash(ctx context.Context, blockHash common.Hash) (*types.BlockWithRowConsumption, error) {
@@ -350,6 +370,7 @@ func (ec *Client) GetBlockByHash(ctx context.Context, blockHash common.Hash) (*t
 	// Decode header and transactions.
 	var head *types.Header
 	var body rpcBlock
+	var rpcRc rpcRowConsumption
 	var rc *types.RowConsumption
 	if err := json.Unmarshal(raw, &head); err != nil {
 		return nil, err
@@ -357,10 +378,12 @@ func (ec *Client) GetBlockByHash(ctx context.Context, blockHash common.Hash) (*t
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(raw, &rc); err != nil {
+	if err := json.Unmarshal(raw, &rpcRc); err != nil {
 		// don't return error here if there is no RowConsumption data, because many l2geth nodes will not have this data
 		// instead of error l2_watcher and other services that require RowConsumption should check it
 		rc = nil
+	} else {
+		rc = &rpcRc.RowConsumption
 	}
 	// Quick-verify transaction and uncle lists. This mostly helps with debugging the server.
 	if head.UncleHash == types.EmptyUncleHash && len(body.UncleHashes) > 0 {

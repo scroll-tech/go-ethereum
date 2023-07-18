@@ -9,29 +9,36 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
-var _ = (*rowConsumptionMarshaling)(nil)
+var _ = (*rowConsumptionEntryMarshaling)(nil)
 
 // MarshalJSON marshals as JSON.
-func (r RowConsumption) MarshalJSON() ([]byte, error) {
-	type RowConsumption struct {
-		Rows hexutil.Uint64 `json:"rowConsumption" gencodec:"required"`
+func (r RowConsumptionEntry) MarshalJSON() ([]byte, error) {
+	type RowConsumptionEntry struct {
+		Key  string         `json:"key" gencodec:"required"`
+		Rows hexutil.Uint64 `json:"rows" gencodec:"required"`
 	}
-	var enc RowConsumption
+	var enc RowConsumptionEntry
+	enc.Key = r.Key
 	enc.Rows = hexutil.Uint64(r.Rows)
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
-func (r *RowConsumption) UnmarshalJSON(input []byte) error {
-	type RowConsumption struct {
-		Rows *hexutil.Uint64 `json:"rowConsumption" gencodec:"required"`
+func (r *RowConsumptionEntry) UnmarshalJSON(input []byte) error {
+	type RowConsumptionEntry struct {
+		Key  *string         `json:"key" gencodec:"required"`
+		Rows *hexutil.Uint64 `json:"rows" gencodec:"required"`
 	}
-	var dec RowConsumption
+	var dec RowConsumptionEntry
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
+	if dec.Key == nil {
+		return errors.New("missing required field 'key' for RowConsumptionEntry")
+	}
+	r.Key = *dec.Key
 	if dec.Rows == nil {
-		return errors.New("missing required field 'rowConsumption' for RowConsumption")
+		return errors.New("missing required field 'rows' for RowConsumptionEntry")
 	}
 	r.Rows = uint64(*dec.Rows)
 	return nil

@@ -134,3 +134,13 @@ pub(crate) mod utils {
         }
     }
 }
+
+// let proof_result = panic::catch_unwind(|| {
+//     let proof = PROVER
+//         .get_mut()
+//         .unwrap()
+//         .create_agg_circuit_proof(&trace)
+//         .unwrap();
+//     serde_json::to_vec(&proof).unwrap()
+// });
+// proof_result.map_or(null(), vec_to_c_char)

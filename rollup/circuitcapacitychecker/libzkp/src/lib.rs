@@ -38,7 +38,7 @@ pub mod checker {
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> i64 {
+    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) ->  *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
@@ -57,24 +57,25 @@ pub mod checker {
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
-                if acc_row_usage.is_ok {
-                    // block row usage ok
-                    // if row usage ok, row_number must < 2^30 due to our circuit size,
-                    // so using i64 for return type won't overflow
-                    return acc_row_usage.row_number as i64;
-                } else if tx_row_usage.is_ok {
-                    return -1i64; // block row usage overflow, but tx row usage ok
-                } else {
-                    return -2i64; // tx row usage overflow
-                }
+                // if acc_row_usage.is_ok {
+                //     // block row usage ok
+                //     // if row usage ok, row_number must < 2^30 due to our circuit size,
+                //     // so using i64 for return type won't overflow
+                //     return acc_row_usage.row_number as i64;
+                // } else if tx_row_usage.is_ok {
+                //     return -1i64; // block row usage overflow, but tx row usage ok
+                // } else {
+                //     return -2i64; // tx row usage overflow
+                // }
             }
-            Err(_) => return 0i64, // other errors than circuit capacity overflow
+
+            // Err(_) => return 0i64, // other errors than circuit capacity overflow
         }
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) -> i64 {
+    pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) ->  *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
@@ -93,16 +94,17 @@ pub mod checker {
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
-                if acc_row_usage.is_ok {
-                    // row usage ok
-                    // if row usage ok, row_number must < 2^30 due to our circuit size,
-                    // so using i64 for return type won't overflow
-                    return acc_row_usage.row_number as i64;
-                } else {
-                    return -1i64; // block row usage overflow
-                }
+                // if acc_row_usage.is_ok {
+                //     // row usage ok
+                //     // if row usage ok, row_number must < 2^30 due to our circuit size,
+                //     // so using i64 for return type won't overflow
+                //     return acc_row_usage.row_number as i64;
+                // } else {
+                //     return -1i64; // block row usage overflow
+                // }
             }
-            Err(_) => return 0i64, // other errors than circuit capacity overflow
+            
+            // Err(_) => return 0i64, // other errors than circuit capacity overflow
         }
     }
 }

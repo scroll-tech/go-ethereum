@@ -38,7 +38,7 @@ pub mod checker {
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) ->  *const c_char {
+    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
@@ -67,15 +67,13 @@ pub mod checker {
                 // } else {
                 //     return -2i64; // tx row usage overflow
                 // }
-            }
-
-            // Err(_) => return 0i64, // other errors than circuit capacity overflow
+            } // Err(_) => return 0i64, // other errors than circuit capacity overflow
         }
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) ->  *const c_char {
+    pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
@@ -102,9 +100,7 @@ pub mod checker {
                 // } else {
                 //     return -1i64; // block row usage overflow
                 // }
-            }
-            
-            // Err(_) => return 0i64, // other errors than circuit capacity overflow
+            } // Err(_) => return 0i64, // other errors than circuit capacity overflow
         }
     }
 }

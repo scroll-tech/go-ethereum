@@ -20,4 +20,5 @@ type RowUsage struct {
 type WrappedRowUsage struct {
 	AccRowUsage RowUsage
 	TxRowUsages []RowUsage
+	Err error
 }

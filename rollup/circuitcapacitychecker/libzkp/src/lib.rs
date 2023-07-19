@@ -6,6 +6,7 @@ pub mod checker {
     use prover::zkevm::CircuitCapacityChecker;
     use std::cell::OnceCell;
     use std::collections::HashMap;
+    use std::error::Error
     use std::panic;
     use std::ptr::null;
     use serde_derive::{Deserialize, Serialize};

@@ -96,12 +96,13 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		return err
 	}
 	if v.checkCircuitCapacity {
-		rows, err := v.validateCircuitRowConsumption(block)
+		subCircuitRows, err := v.validateCircuitRowConsumption(block)
 		if err != nil {
 			return err
 		}
 
-		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), types.RowConsumption{Rows: rows})
+		rowConsumption:=types.RowConsumption{Detail: subCircuitRows}
+		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), rowConsumption)
 	}
 	return nil
 }
@@ -241,15 +242,15 @@ func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
 	return CreateTraceEnv(v.config, v.bc, v.engine, statedb, parent, block)
 }
 
-func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (uint64, error) {
+func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) ([]types.SubCircuitRowUsage, error) {
 	env, err := v.createTraceEnv(block)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	traces, err := env.GetBlockTrace(block)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	v.cMu.Lock()

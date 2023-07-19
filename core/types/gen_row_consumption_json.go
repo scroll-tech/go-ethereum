@@ -9,37 +9,37 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
-var _ = (*rowConsumptionEntryMarshaling)(nil)
+var _ = (*subCircuitRowConsumptionMarshaling)(nil)
 
 // MarshalJSON marshals as JSON.
-func (r RowConsumptionEntry) MarshalJSON() ([]byte, error) {
-	type RowConsumptionEntry struct {
-		Key  string         `json:"key" gencodec:"required"`
-		Rows hexutil.Uint64 `json:"rows" gencodec:"required"`
+func (s SubCircuitRowConsumption) MarshalJSON() ([]byte, error) {
+	type SubCircuitRowConsumption struct {
+		CircuitName string         `json:"circuitName" gencodec:"required"`
+		Rows        hexutil.Uint64 `json:"rows" gencodec:"required"`
 	}
-	var enc RowConsumptionEntry
-	enc.Key = r.Key
-	enc.Rows = hexutil.Uint64(r.Rows)
+	var enc SubCircuitRowConsumption
+	enc.CircuitName = s.CircuitName
+	enc.Rows = hexutil.Uint64(s.Rows)
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
-func (r *RowConsumptionEntry) UnmarshalJSON(input []byte) error {
-	type RowConsumptionEntry struct {
-		Key  *string         `json:"key" gencodec:"required"`
-		Rows *hexutil.Uint64 `json:"rows" gencodec:"required"`
+func (s *SubCircuitRowConsumption) UnmarshalJSON(input []byte) error {
+	type SubCircuitRowConsumption struct {
+		CircuitName *string         `json:"circuitName" gencodec:"required"`
+		Rows        *hexutil.Uint64 `json:"rows" gencodec:"required"`
 	}
-	var dec RowConsumptionEntry
+	var dec SubCircuitRowConsumption
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
-	if dec.Key == nil {
-		return errors.New("missing required field 'key' for RowConsumptionEntry")
+	if dec.CircuitName == nil {
+		return errors.New("missing required field 'circuitName' for SubCircuitRowConsumption")
 	}
-	r.Key = *dec.Key
+	s.CircuitName = *dec.CircuitName
 	if dec.Rows == nil {
-		return errors.New("missing required field 'rows' for RowConsumptionEntry")
+		return errors.New("missing required field 'rows' for SubCircuitRowConsumption")
 	}
-	r.Rows = uint64(*dec.Rows)
+	s.Rows = uint64(*dec.Rows)
 	return nil
 }

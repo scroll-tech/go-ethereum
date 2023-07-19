@@ -2,6 +2,8 @@ package circuitcapacitychecker
 
 import (
 	"errors"
+
+	"github.com/scroll-tech/go-ethereum/types"
 )
 
 var (
@@ -10,19 +12,8 @@ var (
 	ErrBlockRowConsumptionOverflow = errors.New("block row consumption oveflow")
 )
 
-type SubCircuitRowUsage struct {
-	Name      string `json:"name"`
-	RowNumber uint64 `json:"row_number"`
-}
-
-type RowUsage struct {
-	IsOk            bool                 `json:"is_ok"`
-	RowNumber       uint64               `json:"row_number"`
-	RowUsageDetails []SubCircuitRowUsage `json:"row_usage_details"`
-}
-
 type WrappedRowUsage struct {
-	AccRowUsage RowUsage `json:"acc_row_usage"`
-	TxRowUsage  RowUsage `json:"tx_row_usage"`
-	Error       string   `json:"error"`
+	AccRowUsage types.RowUsage `json:"acc_row_usage"`
+	TxRowUsage  types.RowUsage `json:"tx_row_usage"`
+	Error       string         `json:"error"`
 }

@@ -40,7 +40,7 @@ func (ccc *CircuitCapacityChecker) Reset() {
 	C.reset_circuit_capacity_checker(C.uint64_t(ccc.id))
 }
 
-func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([]SubCircuitRowUsage, error) {
+func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([]types.SubCircuitRowUsage, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
@@ -75,7 +75,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([
 	return result.AccRowUsage.RowUsageDetails, nil
 }
 
-func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]SubCircuitRowUsage, error) {
+func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]types.SubCircuitRowUsage, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 

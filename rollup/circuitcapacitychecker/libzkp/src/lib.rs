@@ -81,9 +81,7 @@ pub mod checker {
                 error: Some(format!("{:?}", e)),
             },
         };
-        serde_json::to_vec(&r)
-            .unwrap_or_else(null())
-            .map(vec_to_c_char)
+        serde_json::to_vec(&r).unwrap().map(null(), vec_to_c_char)
     }
 
     /// # Safety
@@ -121,9 +119,7 @@ pub mod checker {
                 error: Some(format!("{:?}", e)),
             },
         };
-        serde_json::to_vec(&r)
-            .unwrap_or_else(null())
-            .map(vec_to_c_char)
+        serde_json::to_vec(&r).unwrap().map(null(), vec_to_c_char)
     }
 }
 

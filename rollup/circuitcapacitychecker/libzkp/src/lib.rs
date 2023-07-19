@@ -3,7 +3,7 @@
 pub mod checker {
     use crate::utils::{c_char_to_vec, vec_to_c_char};
     use libc::c_char;
-    use prover::zkevm::CircuitCapacityChecker;
+    use prover::zkevm::{CircuitCapacityChecker, RowUsage};
     use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;
     use std::collections::HashMap;
@@ -13,6 +13,8 @@ pub mod checker {
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RowUsageResult {
+        pub acc_row_usage: Option<RowUsage>,
+        pub tx_row_usage: Option<RowUsage>,
         pub error: Option<String>,
     }
 

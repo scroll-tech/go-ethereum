@@ -22,7 +22,7 @@ type RowUsage struct {
 }
 
 type WrappedRowUsage struct {
-	AccRowUsage RowUsage   `json:"acc_row_usage"`
-	TxRowUsages []RowUsage `json:"tx_row_usages"`
-	Error       string     `json:"error"`
+	AccRowUsage RowUsage `json:"acc_row_usage"`
+	TxRowUsage  RowUsage `json:"tx_row_usage"`
+	Error       string   `json:"error"`
 }

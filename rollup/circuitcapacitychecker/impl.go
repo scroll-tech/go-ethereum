@@ -39,7 +39,7 @@ func (ccc *CircuitCapacityChecker) Reset() {
 	C.reset_circuit_capacity_checker(C.uint64_t(ccc.id))
 }
 
-func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (uint64, error) {
+func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([]SubCircuitRowUsage, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
@@ -54,22 +54,27 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (u
 	}()
 
 	log.Info("start to check circuit capacity for tx")
-	result := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
+	rawResult := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
 	log.Info("check circuit capacity for tx done")
 
-	switch result {
-	case 0:
-		return 0, ErrUnknown
-	case -1:
-		return 0, ErrBlockRowConsumptionOverflow
-	case -2:
-		return 0, ErrTxRowConsumptionOverflow
-	default:
-		return uint64(result), nil
+	result := &WrappedRowUsage{}
+	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
+		return nil, err
 	}
+
+	if result.Error != "" {
+		return nil, errors.New(result.Error)
+	}
+	if !result.TxRowUsage.IsOk {
+		return nil, ErrTxRowConsumptionOverflow
+	}
+	if !result.AccRowUsage.IsOk {
+		return nil, ErrBlockRowConsumptionOverflow
+	}
+	return result.AccRowUsage.RowUsageDetails, nil
 }
 
-func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64, error) {
+func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]SubCircuitRowUsage, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
@@ -84,14 +89,19 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64,
 	}()
 
 	log.Info("start to check circuit capacity for block")
-	result := C.apply_block(C.uint64_t(ccc.id), tracesStr)
+	rawResult := C.apply_block(C.uint64_t(ccc.id), tracesStr)
 	log.Info("check circuit capacity for block done")
 
-	if result == 0 {
-		return 0, ErrUnknown
+	result := &WrappedRowUsage{}
+	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
+		return nil, err
 	}
-	if result < 0 {
-		return 0, ErrBlockRowConsumptionOverflow
+
+	if result.Error != "" {
+		return nil, errors.New(result.Error)
 	}
-	return uint64(result), nil
+	if !result.AccRowUsage.IsOk {
+		return nil, ErrBlockRowConsumptionOverflow
+	}
+	return result.AccRowUsage.RowUsageDetails, nil
 }

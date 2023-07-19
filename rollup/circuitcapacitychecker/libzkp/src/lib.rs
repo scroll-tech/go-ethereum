@@ -12,7 +12,7 @@ pub mod checker {
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RowUsageResult {
-        pub error Option<Error>
+        pub error: Option<Error>
     }
 
     static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();

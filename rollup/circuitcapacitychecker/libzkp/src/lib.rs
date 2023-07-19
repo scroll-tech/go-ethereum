@@ -14,7 +14,7 @@ pub mod checker {
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RowUsageResult {
-        pub error: Option<Error>
+        pub error: Option<String>
     }
 
     static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
@@ -77,7 +77,7 @@ pub mod checker {
                 // }
                 RowUsageResult{error: None}
             }
-            e => RowUsageResult{error: Some(e)}
+            Err(e) => RowUsageResult{error: Some(e.into())}
         };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }
@@ -113,7 +113,7 @@ pub mod checker {
                 // }
                 RowUsageResult{error: None}
             }
-            e => RowUsageResult{error: Some(e)}
+            Err(e) => RowUsageResult{error: Some(e.into())}
         };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }

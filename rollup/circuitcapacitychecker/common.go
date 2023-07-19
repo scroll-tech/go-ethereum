@@ -19,5 +19,5 @@ type RowUsage struct {
 type WrappedRowUsage struct {
 	AccRowUsage RowUsage   `json:"acc_row_usage"`
 	TxRowUsages []RowUsage `json:"tx_row_usages"`
-	Err         string     `json:"error"`
+	Error         string     `json:"error"`
 }

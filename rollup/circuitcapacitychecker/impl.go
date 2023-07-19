@@ -66,6 +66,9 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	if result.Error != "" {
 		return nil, errors.New(result.Error)
 	}
+	if result.TxRowUsage == nil || result.AccRowUsage == nil {
+		return nil, ErrUnknown
+	}
 	if !result.TxRowUsage.IsOk {
 		return nil, ErrTxRowConsumptionOverflow
 	}
@@ -100,6 +103,9 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 
 	if result.Error != "" {
 		return nil, errors.New(result.Error)
+	}
+	if result.AccRowUsage == nil {
+		return nil, ErrUnknown
 	}
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow

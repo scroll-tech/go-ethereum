@@ -4,17 +4,17 @@ pub mod checker {
     use crate::utils::{c_char_to_vec, vec_to_c_char};
     use libc::c_char;
     use prover::zkevm::CircuitCapacityChecker;
+    use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;
     use std::collections::HashMap;
     use std::error::Error;
     use std::panic;
     use std::ptr::null;
-    use serde_derive::{Deserialize, Serialize};
     use types::eth::BlockTrace;
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RowUsageResult {
-        pub error: Option<String>
+        pub error: Option<String>,
     }
 
     static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
@@ -75,11 +75,15 @@ pub mod checker {
                 // } else {
                 //     return -2i64; // tx row usage overflow
                 // }
-                RowUsageResult{error: None}
+                RowUsageResult { error: None }
             }
-            Err(e) => RowUsageResult{error: Some(format!("{}",e))}
+            Err(e) => RowUsageResult {
+                error: Some(format!("{:?}", e)),
+            },
         };
-        serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
+        serde_json::to_vec(&r)
+            .unwrap_or_else(null())
+            .map(vec_to_c_char)
     }
 
     /// # Safety
@@ -111,11 +115,15 @@ pub mod checker {
                 // } else {
                 //     return -1i64; // block row usage overflow
                 // }
-                RowUsageResult{error: None}
+                RowUsageResult { error: None }
             }
-            Err(e) => RowUsageResult{error: Some(format!("{}",e))}
+            Err(e) => RowUsageResult {
+                error: Some(format!("{:?}", e)),
+            },
         };
-        serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
+        serde_json::to_vec(&r)
+            .unwrap_or_else(null())
+            .map(vec_to_c_char)
     }
 }
 

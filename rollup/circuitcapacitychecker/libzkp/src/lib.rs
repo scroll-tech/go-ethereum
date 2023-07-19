@@ -1,7 +1,7 @@
 #![feature(once_cell)]
 
 pub mod checker {
-    use crate::utils::c_char_to_vec;
+    use crate::utils::{c_char_to_vec, vec_to_c_char};
     use libc::c_char;
     use prover::zkevm::CircuitCapacityChecker;
     use std::cell::OnceCell;

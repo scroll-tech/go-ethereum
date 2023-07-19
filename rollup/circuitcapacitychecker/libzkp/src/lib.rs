@@ -67,8 +67,8 @@ pub mod checker {
                     tx_row_usage.row_number
                 );
                 RowUsageResult {
-                    acc_row_usage: acc_row_usage,
-                    tx_row_usage: tx_row_usage,
+                    acc_row_usage: Some(acc_row_usage),
+                    tx_row_usage: Some(tx_row_usage),
                     error: None,
                 }
             }
@@ -103,8 +103,8 @@ pub mod checker {
                     tx_row_usage.row_number
                 );
                 RowUsageResult {
-                    acc_row_usage: acc_row_usage,
-                    tx_row_usage: tx_row_usage,
+                    acc_row_usage: Some(acc_row_usage),
+                    tx_row_usage: Some(tx_row_usage),
                     error: None,
                 }
             }

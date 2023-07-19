@@ -7,7 +7,6 @@ pub mod checker {
     use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;
     use std::collections::HashMap;
-    use std::error::Error;
     use std::panic;
     use std::ptr::null;
     use types::eth::BlockTrace;
@@ -152,13 +151,3 @@ pub(crate) mod utils {
         }
     }
 }
-
-// let proof_result = panic::catch_unwind(|| {
-//     let proof = PROVER
-//         .get_mut()
-//         .unwrap()
-//         .create_agg_circuit_proof(&trace)
-//         .unwrap();
-//     serde_json::to_vec(&proof).unwrap()
-// });
-// proof_result.map_or(null(), vec_to_c_char)

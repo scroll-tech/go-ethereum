@@ -11,6 +11,7 @@ import "C" //nolint:typecheck
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 	"unsafe"
 

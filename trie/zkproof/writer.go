@@ -328,7 +328,7 @@ func verifyAccount(addr common.Address, data *types.StateAccount, leaf *SMTPathN
 		}
 	} else if data != nil {
 		arr, flag := data.MarshalFields()
-		h, err := zkt.PreHandlingElems(flag, arr)
+		h, err := zkt.HandlingElemsAndByte32(flag, arr)
 		//log.Info("sanity check acc before", "addr", addr.String(), "key", leaf.Sibling.Text(16), "hash", h.Text(16))
 
 		if err != nil {

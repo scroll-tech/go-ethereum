@@ -38,7 +38,7 @@ type ZkTrie struct {
 }
 
 func init() {
-	zkt.InitHashScheme(poseidon.HashFixed)
+	zkt.InitHashScheme(poseidon.HashFixedWithDomain)
 }
 
 func sanityCheckByte32Key(b []byte) {

@@ -72,107 +72,108 @@ func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 // Note the collected sibling node has no key along with it since witness generator would
 // always decode the node for its purpose
 func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
+	return nil, nil
+	// retMap := map[zkt.Hash][]byte{}
 
-	retMap := map[zkt.Hash][]byte{}
+	// // check each path: reversively, skip the final leaf node
+	// for _, path := range t.rawPaths {
 
-	// check each path: reversively, skip the final leaf node
-	for _, path := range t.rawPaths {
+	// 	checkPath := path[:len(path)-1]
+	// 	for i := len(checkPath); i > 0; i-- {
+	// 		n := checkPath[i-1]
+	// 		_, deletedL := t.deletionTracer[*n.ChildL]
+	// 		_, deletedR := t.deletionTracer[*n.ChildR]
+	// 		if deletedL && deletedR {
+	// 			nodeHash, _ := n.NodeHash()
+	// 			t.deletionTracer[*nodeHash] = struct{}{}
+	// 		} else {
+	// 			var siblingHash *zkt.Hash
+	// 			if deletedL {
+	// 				siblingHash = n.ChildR
+	// 			} else if deletedR {
+	// 				siblingHash = n.ChildL
+	// 			}
+	// 			if siblingHash != nil {
+	// 				sibling, err := t.TryGetNode(siblingHash)
+	// 				if err != nil {
+	// 					return nil, err
+	// 				}
+	// 				if sibling.Type != zktrie.NodeTypeEmpty {
+	// 					retMap[*siblingHash] = sibling.Value()
+	// 				}
+	// 			}
+	// 			break
+	// 		}
+	// 	}
+	// }
 
-		checkPath := path[:len(path)-1]
-		for i := len(checkPath); i > 0; i-- {
-			n := checkPath[i-1]
-			_, deletedL := t.deletionTracer[*n.ChildL]
-			_, deletedR := t.deletionTracer[*n.ChildR]
-			if deletedL && deletedR {
-				nodeHash, _ := n.NodeHash()
-				t.deletionTracer[*nodeHash] = struct{}{}
-			} else {
-				var siblingHash *zkt.Hash
-				if deletedL {
-					siblingHash = n.ChildR
-				} else if deletedR {
-					siblingHash = n.ChildL
-				}
-				if siblingHash != nil {
-					sibling, err := t.TryGetNode(siblingHash)
-					if err != nil {
-						return nil, err
-					}
-					if sibling.Type != zktrie.NodeTypeEmpty {
-						retMap[*siblingHash] = sibling.Value()
-					}
-				}
-				break
-			}
-		}
-	}
+	// var ret [][]byte
+	// for _, bt := range retMap {
+	// 	ret = append(ret, bt)
+	// }
 
-	var ret [][]byte
-	for _, bt := range retMap {
-		ret = append(ret, bt)
-	}
-
-	return ret, nil
+	// return ret, nil
 
 }
 
 // MarkDeletion mark a key has been involved into deletion
 func (t *ProofTracer) MarkDeletion(key []byte) {
-	if path, existed := t.emptyTermPaths[string(key)]; existed {
-		// copy empty node terminated path for final scanning
-		t.rawPaths[string(key)] = path
-	} else if path, existed = t.rawPaths[string(key)]; existed {
-		// sanity check
-		leafNode := path[len(path)-1]
+	// if path, existed := t.emptyTermPaths[string(key)]; existed {
+	// 	// copy empty node terminated path for final scanning
+	// 	t.rawPaths[string(key)] = path
+	// } else if path, existed = t.rawPaths[string(key)]; existed {
+	// 	// sanity check
+	// 	leafNode := path[len(path)-1]
 
-		if leafNode.Type != zktrie.NodeTypeLeaf {
-			panic("all path recorded in proofTrace should be ended with leafNode")
-		}
+	// 	if leafNode.Type != zktrie.NodeTypeLeaf {
+	// 		panic("all path recorded in proofTrace should be ended with leafNode")
+	// 	}
 
-		nodeHash, _ := leafNode.NodeHash()
-		t.deletionTracer[*nodeHash] = struct{}{}
-	}
+	// 	nodeHash, _ := leafNode.NodeHash()
+	// 	t.deletionTracer[*nodeHash] = struct{}{}
+	// }
 }
 
 // Prove act the same as zktrie.Prove, while also collect the raw path
 // for collecting deletion proofs in a post-work
 func (t *ProofTracer) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
-	var mptPath []*zktrie.Node
-	err := t.ZkTrie.ProveWithDeletion(key, fromLevel,
-		func(n *zktrie.Node) error {
-			nodeHash, err := n.NodeHash()
-			if err != nil {
-				return err
-			}
+	return t.ZkTrie.Prove(key, fromLevel, proofDb)
+	// var mptPath []*zktrie.Node
+	// err := t.ZkTrie.ProveWithDeletion(key, fromLevel,
+	// 	func(n *zktrie.Node) error {
+	// 		nodeHash, err := n.NodeHash()
+	// 		if err != nil {
+	// 			return err
+	// 		}
 
-			if n.Type == zktrie.NodeTypeLeaf {
-				preImage := t.GetKey(n.NodeKey.Bytes())
-				if len(preImage) > 0 {
-					n.KeyPreimage = &zkt.Byte32{}
-					copy(n.KeyPreimage[:], preImage)
-				}
-			} else if n.Type == zktrie.NodeTypeParent {
-				mptPath = append(mptPath, n)
-			} else if n.Type == zktrie.NodeTypeEmpty {
-				// empty node is considered as "unhit" but it should be also being added
-				// into a temporary slot for possibly being marked as deletion later
-				mptPath = append(mptPath, n)
-				t.emptyTermPaths[string(key)] = mptPath
-			}
+	// 		if n.Type == zktrie.NodeTypeLeaf {
+	// 			preImage := t.GetKey(n.NodeKey.Bytes())
+	// 			if len(preImage) > 0 {
+	// 				n.KeyPreimage = &zkt.Byte32{}
+	// 				copy(n.KeyPreimage[:], preImage)
+	// 			}
+	// 		} else if n.Type == zktrie.NodeTypeParent {
+	// 			mptPath = append(mptPath, n)
+	// 		} else if n.Type == zktrie.NodeTypeEmpty {
+	// 			// empty node is considered as "unhit" but it should be also being added
+	// 			// into a temporary slot for possibly being marked as deletion later
+	// 			mptPath = append(mptPath, n)
+	// 			t.emptyTermPaths[string(key)] = mptPath
+	// 		}
 
-			return proofDb.Put(nodeHash[:], n.Value())
-		},
-		func(n *zktrie.Node, _ *zktrie.Node) {
-			// only "hit" path (i.e. the leaf node corresponding the input key can be found)
-			// would be add into tracer
-			mptPath = append(mptPath, n)
-			t.rawPaths[string(key)] = mptPath
-		},
-	)
-	if err != nil {
-		return err
-	}
-	// we put this special kv pair in db so we can distinguish the type and
-	// make suitable Proof
-	return proofDb.Put(magicHash, zktrie.ProofMagicBytes())
+	// 		return proofDb.Put(nodeHash[:], n.Value())
+	// 	},
+	// 	func(n *zktrie.Node, _ *zktrie.Node) {
+	// 		// only "hit" path (i.e. the leaf node corresponding the input key can be found)
+	// 		// would be add into tracer
+	// 		mptPath = append(mptPath, n)
+	// 		t.rawPaths[string(key)] = mptPath
+	// 	},
+	// )
+	// if err != nil {
+	// 	return err
+	// }
+	// // we put this special kv pair in db so we can distinguish the type and
+	// // make suitable Proof
+	// return proofDb.Put(magicHash, zktrie.ProofMagicBytes())
 }

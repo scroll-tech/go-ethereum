@@ -66,19 +66,15 @@ pub mod checker {
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
-                // if acc_row_usage.is_ok {
-                //     // block row usage ok
-                //     // if row usage ok, row_number must < 2^30 due to our circuit size,
-                //     // so using i64 for return type won't overflow
-                //     return acc_row_usage.row_number as i64;
-                // } else if tx_row_usage.is_ok {
-                //     return -1i64; // block row usage overflow, but tx row usage ok
-                // } else {
-                //     return -2i64; // tx row usage overflow
-                // }
-                RowUsageResult { error: None }
+                RowUsageResult {
+                    acc_row_usage: acc_row_usage,
+                    tx_row_usage: tx_row_usage,
+                    error: None,
+                }
             }
             Err(e) => RowUsageResult {
+                acc_row_usage: None,
+                tx_row_usage: None,
                 error: Some(format!("{:?}", e)),
             },
         };
@@ -106,17 +102,15 @@ pub mod checker {
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
-                // if acc_row_usage.is_ok {
-                //     // row usage ok
-                //     // if row usage ok, row_number must < 2^30 due to our circuit size,
-                //     // so using i64 for return type won't overflow
-                //     return acc_row_usage.row_number as i64;
-                // } else {
-                //     return -1i64; // block row usage overflow
-                // }
-                RowUsageResult { error: None }
+                RowUsageResult {
+                    acc_row_usage: acc_row_usage,
+                    tx_row_usage: tx_row_usage,
+                    error: None,
+                }
             }
             Err(e) => RowUsageResult {
+                acc_row_usage: None,
+                tx_row_usage: None,
                 error: Some(format!("{:?}", e)),
             },
         };

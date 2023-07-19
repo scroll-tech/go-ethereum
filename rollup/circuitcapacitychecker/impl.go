@@ -61,11 +61,11 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (u
 	case 0:
 		return 0, ErrUnknown
 	case -1:
-		return ErrBlockRowConsumptionOverflow
+		return 0, ErrBlockRowConsumptionOverflow
 	case -2:
-		return ErrTxRowConsumptionOverflow
+		return 0, ErrTxRowConsumptionOverflow
 	default:
-		return result, nil
+		return uint64(result), nil
 	}
 }
 

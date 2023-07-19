@@ -53,7 +53,7 @@ pub mod checker {
         match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
-                    "acc_row_usage: {:?}, tx_row_usage {:?}",
+                    "acc_row_usage: {:?}, tx_row_usage: {:?}",
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
@@ -89,7 +89,7 @@ pub mod checker {
         match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
-                    "acc_row_usage: {:?}, tx_row_usage {:?}",
+                    "acc_row_usage: {:?}, tx_row_usage: {:?}",
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );

@@ -8,6 +8,7 @@ pub mod checker {
     use std::collections::HashMap;
     use std::panic;
     use std::ptr::null;
+    use serde_derive::{Deserialize, Serialize};
     use types::eth::BlockTrace;
 
     #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -113,7 +113,7 @@ pub mod checker {
                 // }
                 RowUsageResult{error: None}
             }
-            Err(e) => RowUsageResult{error: Some(e.to_string())}
+            Err(e) => RowUsageResult{error: Some(e.ToString())}
         };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }

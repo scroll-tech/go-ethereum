@@ -98,8 +98,8 @@ type environment struct {
 	receipts []*types.Receipt
 
 	// circuit capacity check related fields
-	traceEnv *core.TraceEnv // env for tracing
-	accRows  uint64         // accumulated row consumption for a block
+	traceEnv *core.TraceEnv        // env for tracing
+	accRows  *types.RowConsumption // accumulated row consumption for a block
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -108,7 +108,7 @@ type task struct {
 	state     *state.StateDB
 	block     *types.Block
 	createdAt time.Time
-	accRows   uint64 // accumulated row consumption in the circuit side
+	accRows   *types.RowConsumption // accumulated row consumption in the circuit side
 }
 
 const (
@@ -635,7 +635,7 @@ func (w *worker) taskLoop() {
 				delete(w.pendingTasks, sealHash)
 				w.pendingMu.Unlock()
 			} else {
-				rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), sealHash, types.RowConsumption{Rows: task.accRows})
+				rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), sealHash, task.accRows)
 			}
 		case <-w.exitCh:
 			interrupt()
@@ -1114,7 +1114,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Create an empty block based on temporary copied state for
 	// sealing in advance without waiting block execution finished.
 	if !noempty && atomic.LoadUint32(&w.noempty) == 0 {
-		w.commit(uncles, nil, false, tstart, 0)
+		w.commit(uncles, nil, false, tstart, nil)
 	}
 	// fetch l1Txs
 	l1Txs := make(map[common.Address]types.Transactions)
@@ -1181,7 +1181,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
-func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time, accRows uint64) error {
+func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time, accRows *types.RowConsumption) error {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(w.current.receipts)
 	s := w.current.state.Copy()

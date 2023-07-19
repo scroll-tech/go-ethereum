@@ -40,7 +40,7 @@ func (ccc *CircuitCapacityChecker) Reset() {
 	C.reset_circuit_capacity_checker(C.uint64_t(ccc.id))
 }
 
-func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([]types.SubCircuitRowUsage, error) {
+func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
@@ -72,10 +72,10 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow
 	}
-	return result.AccRowUsage.RowUsageDetails, nil
+	return &types.RowConsumption{Detail: result.AccRowUsage.RowUsageDetails}, nil
 }
 
-func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]types.SubCircuitRowUsage, error) {
+func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
@@ -104,5 +104,5 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]types
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow
 	}
-	return result.AccRowUsage.RowUsageDetails, nil
+	return &types.RowConsumption{Detail: result.AccRowUsage.RowUsageDetails}, nil
 }

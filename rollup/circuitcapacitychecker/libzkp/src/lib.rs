@@ -77,7 +77,7 @@ pub mod checker {
                 // }
                 RowUsageResult{error: None}
             }
-            e => RowUsageResult{error: Some(e.ToString())}
+            Err(e) => RowUsageResult{error: Some(format!("{}",e))}
         };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }
@@ -113,7 +113,7 @@ pub mod checker {
                 // }
                 RowUsageResult{error: None}
             }
-            e => RowUsageResult{error: Some(e.ToString())}
+            Err(e) => RowUsageResult{error: Some(format!("{}",e))}
         };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }

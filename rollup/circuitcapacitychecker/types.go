@@ -3,7 +3,7 @@ package circuitcapacitychecker
 import (
 	"errors"
 
-	"github.com/scroll-tech/go-ethereum/types"
+	"github.com/scroll-tech/go-ethereum/core/types"
 )
 
 var (

@@ -6,7 +6,7 @@ pub mod checker {
     use prover::zkevm::CircuitCapacityChecker;
     use std::cell::OnceCell;
     use std::collections::HashMap;
-    use std::error::Error
+    use std::error::Error;
     use std::panic;
     use std::ptr::null;
     use serde_derive::{Deserialize, Serialize};
@@ -78,7 +78,7 @@ pub mod checker {
                 RowUsageResult{error: None}
             }
             Err(e) => RowUsageResult{error: Some(e)}
-        }
+        };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }
 
@@ -96,7 +96,7 @@ pub mod checker {
                 .estimate_circuit_capacity(&[traces])
                 .unwrap()
         });
-        match result {
+        let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
                     "acc_row_usage: {:?}, tx_row_usage: {:?}",
@@ -114,7 +114,7 @@ pub mod checker {
                 RowUsageResult{error: None}
             }
             Err(e) => RowUsageResult{error: Some(e)}
-        }
+        };
         serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }
 }

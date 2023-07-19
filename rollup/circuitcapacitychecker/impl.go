@@ -45,7 +45,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		return 0, ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	tracesStr := C.CString(string(tracesByt))
@@ -80,7 +80,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]SubCi
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		return 0, ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	tracesStr := C.CString(string(tracesByt))

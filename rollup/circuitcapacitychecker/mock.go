@@ -16,9 +16,9 @@ func (ccc *CircuitCapacityChecker) Reset() {
 }
 
 func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) ([]SubCircuitRowUsage, error) {
-	return 0, nil
+	return nil, nil
 }
 
 func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) ([]SubCircuitRowUsage, error) {
-	return 0, nil
+	return nil, nil
 }

@@ -7,7 +7,13 @@ pub mod checker {
     use std::cell::OnceCell;
     use std::collections::HashMap;
     use std::panic;
+    use std::ptr::null;
     use types::eth::BlockTrace;
+
+    #[derive(Debug, Clone, Deserialize, Serialize)]
+    pub struct RowUsageResult {
+        pub error Option<Error>
+    }
 
     static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
 
@@ -50,7 +56,7 @@ pub mod checker {
                 .estimate_circuit_capacity(&[traces])
                 .unwrap()
         });
-        match result {
+        let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
                     "acc_row_usage: {:?}, tx_row_usage: {:?}",
@@ -67,8 +73,11 @@ pub mod checker {
                 // } else {
                 //     return -2i64; // tx row usage overflow
                 // }
-            } // Err(_) => return 0i64, // other errors than circuit capacity overflow
+                RowUsageResult{error: None}
+            }
+            Err(e) => RowUsageResult{error: Some(e)}
         }
+        serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }
 
     /// # Safety
@@ -100,8 +109,11 @@ pub mod checker {
                 // } else {
                 //     return -1i64; // block row usage overflow
                 // }
-            } // Err(_) => return 0i64, // other errors than circuit capacity overflow
+                RowUsageResult{error: None}
+            }
+            Err(e) => RowUsageResult{error: Some(e)}
         }
+        serde_json::to_vec(&r).unwrap_or_else(null()).map(vec_to_c_char)
     }
 }
 

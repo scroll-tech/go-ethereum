@@ -10,14 +10,19 @@ var (
 	ErrBlockRowConsumptionOverflow = errors.New("block row consumption oveflow")
 )
 
-type RowUsage struct {
-	IsOk      bool   `json:"is_ok"`
+type SubCircuitRowUsage struct {
+	Name      string `json:"name"`
 	RowNumber uint64 `json:"row_number"`
-	// pub row_usage_details: Vec<(String, usize)>,
+}
+
+type RowUsage struct {
+	IsOk            bool                 `json:"is_ok"`
+	RowNumber       uint64               `json:"row_number"`
+	RowUsageDetails []SubCircuitRowUsage `json:"row_usage_details"`
 }
 
 type WrappedRowUsage struct {
 	AccRowUsage RowUsage   `json:"acc_row_usage"`
 	TxRowUsages []RowUsage `json:"tx_row_usages"`
-	Error         string     `json:"error"`
+	Error       string     `json:"error"`
 }

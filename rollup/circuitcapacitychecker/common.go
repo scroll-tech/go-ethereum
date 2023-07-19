@@ -11,13 +11,13 @@ var (
 )
 
 type RowUsage struct {
-	// pub is_ok: bool,
-	// pub row_number: usize,
+	IsOk      bool   `json:"is_ok"`
+	RowNumber uint64 `json:"row_number"`
 	// pub row_usage_details: Vec<(String, usize)>,
 }
 
 type WrappedRowUsage struct {
 	AccRowUsage RowUsage   `json:"acc_row_usage"`
 	TxRowUsages []RowUsage `json:"tx_row_usages"`
-	Err         error      `json:"error"`
+	Err         string     `json:"error"`
 }

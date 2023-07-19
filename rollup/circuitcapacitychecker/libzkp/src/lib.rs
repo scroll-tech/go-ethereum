@@ -3,7 +3,8 @@
 pub mod checker {
     use crate::utils::{c_char_to_vec, vec_to_c_char};
     use libc::c_char;
-    use prover::zkevm::{CircuitCapacityChecker, RowUsage};
+    use prover::zkevm::capacity_checker::RowUsage;
+    use prover::zkevm::CircuitCapacityChecker;
     use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;
     use std::collections::HashMap;

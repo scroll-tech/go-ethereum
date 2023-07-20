@@ -180,7 +180,7 @@ func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter)
 			return err
 		}
 
-		if n.Type == zktrie.NodeTypeLeaf {
+		if n.Type == zktrie.NodeTypeLeaf_New {
 			preImage := t.GetKey(n.NodeKey.Bytes())
 			if len(preImage) > 0 {
 				n.KeyPreimage = &zkt.Byte32{}

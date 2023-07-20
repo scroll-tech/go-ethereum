@@ -200,7 +200,7 @@ func randomZktrie(t *testing.T, n int) (*ZkTrie, map[string]*kv) {
 func TestProofWithDeletion(t *testing.T) {
 	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase((memorydb.New())))
 	mt := &zkTrieImplTestWrapper{tr.Tree()}
-	key1 := bytes.Repeat([]byte("k"), 32)
+	key1 := bytes.Repeat([]byte("l"), 32)
 	key2 := bytes.Repeat([]byte("m"), 32)
 	err := mt.UpdateWord(
 		zkt.NewByte32FromBytesPaddingZero(key1),
@@ -221,63 +221,63 @@ func TestProofWithDeletion(t *testing.T) {
 
 	err = proofTracer.Prove(s_key1.Bytes(), 0, proof)
 	assert.NoError(t, err)
-	//nd, err := tr.TryGet(key2)
-	//assert.NoError(t, err)
+	nd, err := tr.TryGet(key2)
+	assert.NoError(t, err)
 
 	s_key2, err := zkt.ToSecureKeyBytes(bytes.Repeat([]byte("x"), 32))
 	assert.NoError(t, err)
 
 	err = proofTracer.Prove(s_key2.Bytes(), 0, proof)
 	assert.NoError(t, err)
-	// assert.Equal(t, len(sibling1), len(delTracer.GetProofs()))
+	//assert.Equal(t, len(sibling1), len(delTracer.GetProofs()))
 
-	// siblings, err := proofTracer.GetDeletionProofs()
-	// assert.NoError(t, err)
-	// assert.Equal(t, 0, len(siblings))
+	siblings, err := proofTracer.GetDeletionProofs()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(siblings))
 
-	// proofTracer.MarkDeletion(s_key1.Bytes())
-	// siblings, err = proofTracer.GetDeletionProofs()
-	// assert.NoError(t, err)
-	// assert.Equal(t, 1, len(siblings))
-	// l := len(siblings[0])
-	// // a hacking to grep the value part directly from the encoded leaf node,
-	// // notice the sibling of key `k*32`` is just the leaf of key `m*32`
-	// assert.Equal(t, siblings[0][l-33:l-1], nd)
+	proofTracer.MarkDeletion(s_key1.Bytes())
+	siblings, err = proofTracer.GetDeletionProofs()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(siblings))
+	l := len(siblings[0])
+	// a hacking to grep the value part directly from the encoded leaf node,
+	// notice the sibling of key `k*32`` is just the leaf of key `m*32`
+	assert.Equal(t, siblings[0][l-33:l-1], nd)
 
-	// // Marking a key that is currently not hit (but terminated by an empty node)
-	// // also causes it to be added to the deletion proof
-	// proofTracer.MarkDeletion(s_key2.Bytes())
-	// siblings, err = proofTracer.GetDeletionProofs()
-	// assert.NoError(t, err)
-	// assert.Equal(t, 2, len(siblings))
+	// Marking a key that is currently not hit (but terminated by an empty node)
+	// also causes it to be added to the deletion proof
+	proofTracer.MarkDeletion(s_key2.Bytes())
+	siblings, err = proofTracer.GetDeletionProofs()
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(siblings))
 
-	// key3 := bytes.Repeat([]byte("x"), 32)
-	// err = mt.UpdateWord(
-	// 	zkt.NewByte32FromBytesPaddingZero(key3),
-	// 	zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("z"), 32)),
-	// )
-	// assert.NoError(t, err)
+	key3 := bytes.Repeat([]byte("x"), 32)
+	err = mt.UpdateWord(
+		zkt.NewByte32FromBytesPaddingZero(key3),
+		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("z"), 32)),
+	)
+	assert.NoError(t, err)
 
-	// proofTracer = tr.NewProofTracer()
-	// err = proofTracer.Prove(s_key1.Bytes(), 0, proof)
-	// assert.NoError(t, err)
-	// err = proofTracer.Prove(s_key2.Bytes(), 0, proof)
-	// assert.NoError(t, err)
+	proofTracer = tr.NewProofTracer()
+	err = proofTracer.Prove(s_key1.Bytes(), 0, proof)
+	assert.NoError(t, err)
+	err = proofTracer.Prove(s_key2.Bytes(), 0, proof)
+	assert.NoError(t, err)
 
-	// proofTracer.MarkDeletion(s_key1.Bytes())
-	// siblings, err = proofTracer.GetDeletionProofs()
-	// assert.NoError(t, err)
-	// assert.Equal(t, 1, len(siblings))
+	proofTracer.MarkDeletion(s_key1.Bytes())
+	siblings, err = proofTracer.GetDeletionProofs()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(siblings))
 
-	// proofTracer.MarkDeletion(s_key2.Bytes())
-	// siblings, err = proofTracer.GetDeletionProofs()
-	// assert.NoError(t, err)
-	// assert.Equal(t, 2, len(siblings))
+	proofTracer.MarkDeletion(s_key2.Bytes())
+	siblings, err = proofTracer.GetDeletionProofs()
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(siblings))
 
-	// // one of the siblings is just leaf for key2, while
-	// // another one must be a middle node
-	// match1 := bytes.Equal(siblings[0][l-33:l-1], nd)
-	// match2 := bytes.Equal(siblings[1][l-33:l-1], nd)
-	// assert.True(t, match1 || match2)
-	// assert.False(t, match1 && match2)
+	// one of the siblings is just leaf for key2, while
+	// another one must be a middle node
+	match1 := bytes.Equal(siblings[0][l-33:l-1], nd)
+	match2 := bytes.Equal(siblings[1][l-33:l-1], nd)
+	assert.True(t, match1 || match2)
+	assert.False(t, match1 && match2)
 }

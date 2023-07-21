@@ -11,7 +11,6 @@ import "C" //nolint:typecheck
 
 import (
 	"encoding/json"
-	"errors"
 	"sync"
 	"unsafe"
 
@@ -64,9 +63,11 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	}
 
 	if result.Error != "" {
-		return nil, errors.New(result.Error)
+		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error)
+		return nil, ErrUnknown
 	}
 	if result.TxRowUsage == nil || result.AccRowUsage == nil {
+		log.Error("apply_tx in CircuitCapacityChecker", "err", "TxRowUsage or AccRowUsage is empty unexpectedly")
 		return nil, ErrUnknown
 	}
 	if !result.TxRowUsage.IsOk {
@@ -102,9 +103,11 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	}
 
 	if result.Error != "" {
-		return nil, errors.New(result.Error)
+		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error)
+		return nil, ErrUnknown
 	}
 	if result.AccRowUsage == nil {
+		log.Error("apply_block in CircuitCapacityChecker", "err", "AccRowUsage is empty unexpectedly")
 		return nil, ErrUnknown
 	}
 	if !result.AccRowUsage.IsOk {

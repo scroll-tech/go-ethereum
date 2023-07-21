@@ -39,13 +39,13 @@ func (ccc *CircuitCapacityChecker) Reset() {
 	C.reset_circuit_capacity_checker(C.uint64_t(ccc.id))
 }
 
-func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (uint64, error) {
+func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		return 0, ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	tracesStr := C.CString(string(tracesByt))
@@ -54,28 +54,38 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (u
 	}()
 
 	log.Info("start to check circuit capacity for tx")
-	result := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
+	rawResult := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
 	log.Info("check circuit capacity for tx done")
 
-	switch result {
-	case 0:
-		return 0, ErrUnknown
-	case -1:
-		return 0, ErrBlockRowConsumptionOverflow
-	case -2:
-		return 0, ErrTxRowConsumptionOverflow
-	default:
-		return uint64(result), nil
+	result := &WrappedRowUsage{}
+	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
+		return nil, err
 	}
+
+	if result.Error != "" {
+		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error)
+		return nil, ErrUnknown
+	}
+	if result.TxRowUsage == nil || result.AccRowUsage == nil {
+		log.Error("apply_tx in CircuitCapacityChecker", "err", "TxRowUsage or AccRowUsage is empty unexpectedly")
+		return nil, ErrUnknown
+	}
+	if !result.TxRowUsage.IsOk {
+		return nil, ErrTxRowConsumptionOverflow
+	}
+	if !result.AccRowUsage.IsOk {
+		return nil, ErrBlockRowConsumptionOverflow
+	}
+	return &types.RowConsumption{Detail: result.AccRowUsage.RowUsageDetails}, nil
 }
 
-func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64, error) {
+func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		return 0, ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	tracesStr := C.CString(string(tracesByt))
@@ -84,14 +94,24 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64,
 	}()
 
 	log.Info("start to check circuit capacity for block")
-	result := C.apply_block(C.uint64_t(ccc.id), tracesStr)
+	rawResult := C.apply_block(C.uint64_t(ccc.id), tracesStr)
 	log.Info("check circuit capacity for block done")
 
-	if result == 0 {
-		return 0, ErrUnknown
+	result := &WrappedRowUsage{}
+	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
+		return nil, err
 	}
-	if result < 0 {
-		return 0, ErrBlockRowConsumptionOverflow
+
+	if result.Error != "" {
+		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error)
+		return nil, ErrUnknown
 	}
-	return uint64(result), nil
+	if result.AccRowUsage == nil {
+		log.Error("apply_block in CircuitCapacityChecker", "err", "AccRowUsage is empty unexpectedly")
+		return nil, ErrUnknown
+	}
+	if !result.AccRowUsage.IsOk {
+		return nil, ErrBlockRowConsumptionOverflow
+	}
+	return &types.RowConsumption{Detail: result.AccRowUsage.RowUsageDetails}, nil
 }

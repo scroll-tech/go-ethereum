@@ -1,13 +1,22 @@
 #![feature(once_cell)]
 
 pub mod checker {
-    use crate::utils::c_char_to_vec;
+    use crate::utils::{c_char_to_vec, vec_to_c_char};
     use libc::c_char;
-    use prover::zkevm::CircuitCapacityChecker;
+    use prover::zkevm::{CircuitCapacityChecker, RowUsage};
+    use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;
     use std::collections::HashMap;
     use std::panic;
+    use std::ptr::null;
     use types::eth::BlockTrace;
+
+    #[derive(Debug, Clone, Deserialize, Serialize)]
+    pub struct RowUsageResult {
+        pub acc_row_usage: Option<RowUsage>,
+        pub tx_row_usage: Option<RowUsage>,
+        pub error: Option<String>,
+    }
 
     static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
 
@@ -38,7 +47,7 @@ pub mod checker {
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> i64 {
+    pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
@@ -50,31 +59,31 @@ pub mod checker {
                 .estimate_circuit_capacity(&[traces])
                 .unwrap()
         });
-        match result {
+        let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
                     "acc_row_usage: {:?}, tx_row_usage: {:?}",
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
-                if acc_row_usage.is_ok {
-                    // block row usage ok
-                    // if row usage ok, row_number must < 2^30 due to our circuit size,
-                    // so using i64 for return type won't overflow
-                    return acc_row_usage.row_number as i64;
-                } else if tx_row_usage.is_ok {
-                    return -1i64; // block row usage overflow, but tx row usage ok
-                } else {
-                    return -2i64; // tx row usage overflow
+                RowUsageResult {
+                    acc_row_usage: Some(acc_row_usage),
+                    tx_row_usage: Some(tx_row_usage),
+                    error: None,
                 }
             }
-            Err(_) => return 0i64, // other errors than circuit capacity overflow
-        }
+            Err(e) => RowUsageResult {
+                acc_row_usage: None,
+                tx_row_usage: None,
+                error: Some(format!("{:?}", e)),
+            },
+        };
+        serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
     }
 
     /// # Safety
     #[no_mangle]
-    pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) -> i64 {
+    pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
         let result = panic::catch_unwind(|| {
@@ -86,24 +95,26 @@ pub mod checker {
                 .estimate_circuit_capacity(&[traces])
                 .unwrap()
         });
-        match result {
+        let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
                     "acc_row_usage: {:?}, tx_row_usage: {:?}",
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
-                if acc_row_usage.is_ok {
-                    // row usage ok
-                    // if row usage ok, row_number must < 2^30 due to our circuit size,
-                    // so using i64 for return type won't overflow
-                    return acc_row_usage.row_number as i64;
-                } else {
-                    return -1i64; // block row usage overflow
+                RowUsageResult {
+                    acc_row_usage: Some(acc_row_usage),
+                    tx_row_usage: Some(tx_row_usage),
+                    error: None,
                 }
             }
-            Err(_) => return 0i64, // other errors than circuit capacity overflow
-        }
+            Err(e) => RowUsageResult {
+                acc_row_usage: None,
+                tx_row_usage: None,
+                error: Some(format!("{:?}", e)),
+            },
+        };
+        serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
     }
 }
 

@@ -2748,7 +2748,7 @@ dependencies = [
 [[package]]
 name = "prover"
 version = "0.4.0"
-source = "git+https://github.com/scroll-tech/scroll-prover?rev=2664f08#2664f08152834ddcc2f2ebbb87c79a13b4dcb57c"
+source = "git+https://github.com/scroll-tech/scroll-prover?rev=26e9cf7#26e9cf7a0bc76f5559bbbab5ac28a3e850ddce92"
 dependencies = [
  "aggregator",
  "anyhow",
@@ -3972,7 +3972,7 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 [[package]]
 name = "types"
 version = "0.4.0"
-source = "git+https://github.com/scroll-tech/scroll-prover?rev=2664f08#2664f08152834ddcc2f2ebbb87c79a13b4dcb57c"
+source = "git+https://github.com/scroll-tech/scroll-prover?rev=26e9cf7#26e9cf7a0bc76f5559bbbab5ac28a3e850ddce92"
 dependencies = [
  "base64 0.13.1",
  "blake2",

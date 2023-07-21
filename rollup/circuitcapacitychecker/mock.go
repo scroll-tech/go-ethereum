@@ -15,10 +15,10 @@ func NewCircuitCapacityChecker() *CircuitCapacityChecker {
 func (ccc *CircuitCapacityChecker) Reset() {
 }
 
-func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (uint64, error) {
-	return 0, nil
+func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*types.RowConsumption, error) {
+	return nil, nil
 }
 
-func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64, error) {
-	return 0, nil
+func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.RowConsumption, error) {
+	return nil, nil
 }

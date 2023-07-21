@@ -1,16 +1,8 @@
 package types
 
 import (
-	"fmt"
-	"io"
-
-	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
-
-type SubCircuitRowUsage struct {
-	Name      string `json:"name"`
-	RowNumber uint64 `json:"row_number"`
-}
 
 type RowUsage struct {
 	IsOk            bool                 `json:"is_ok"`
@@ -18,25 +10,15 @@ type RowUsage struct {
 	RowUsageDetails []SubCircuitRowUsage `json:"row_usage_details"`
 }
 
-type RowConsumption struct {
-	Rows uint64
-
-	// tmp workaround. will only keep `Detail` and remove `Rows` later
-	Detail []SubCircuitRowUsage
+//go:generate gencodec -type SubCircuitRowUsage -field-override subCircuitRowUsageMarshaling -out gen_row_consumption_json.go
+type SubCircuitRowUsage struct {
+	Name      string `json:"name" gencodec:"required"`
+	RowNumber uint64 `json:"row_number" gencodec:"required"`
 }
 
-func (rc *RowConsumption) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, rc.Rows)
-}
+type RowConsumption []SubCircuitRowUsage
 
-func (rc *RowConsumption) DecodeRLP(s *rlp.Stream) error {
-	_, size, err := s.Kind()
-	if err != nil {
-		return err
-	}
-	if size <= 8 {
-		return s.Decode(&rc.Rows)
-	} else {
-		return fmt.Errorf("invalid input size %d for origin", size)
-	}
+// field type overrides for gencodec
+type subCircuitRowUsageMarshaling struct {
+	RowNumber hexutil.Uint64
 }

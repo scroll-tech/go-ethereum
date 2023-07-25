@@ -26,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -110,7 +111,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // We check the following conditions:
 // - L1 messages are in a contiguous section at the front of the block.
 // - The first L1 message's QueueIndex is right after the last L1 message included in the chain.
-// - L1 messages follow the QueueIndex order. No L1 message is skipped.
+// - L1 messages follow the QueueIndex order.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	// no further processing if the block contains no L1 messages
@@ -144,16 +145,33 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 			return consensus.ErrInvalidL1MessageOrder
 		}
 
-		// check queue index
-		// TODO: account for skipped messages here
-		if tx.AsL1MessageTx().QueueIndex != queueIndex {
+		// queue index cannot decrease
+		txQueueIndex := tx.AsL1MessageTx().QueueIndex
+
+		if txQueueIndex < queueIndex {
 			return consensus.ErrInvalidL1MessageOrder
+		}
+
+		// skipped messages
+		if txQueueIndex > queueIndex {
+			for index := queueIndex; index < txQueueIndex; index++ {
+				log.Debug("Skipped L1 message", "block", block.Hash().String(), "queueIndex", index)
+
+				if exists := it.Next(); !exists {
+					// the message in this block is not available in our local db.
+					// we'll reprocess this block at a later time.
+					return consensus.ErrMissingL1MessageData
+				}
+			}
+
+			queueIndex = txQueueIndex
 		}
 
 		queueIndex += 1
 
 		if exists := it.Next(); !exists {
-			// we'll reprocess this block at a later time
+			// the message in this block is not available in our local db.
+			// we'll reprocess this block at a later time.
 			return consensus.ErrMissingL1MessageData
 		}
 

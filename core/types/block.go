@@ -398,15 +398,31 @@ func (b *Block) Hash() common.Hash {
 }
 
 // L1MessageCount returns the number of L1 messages in this block.
+// This count also includes skipped messages.
 func (b *Block) L1MessageCount() int {
 	if l1MsgCount := b.l1MsgCount.Load(); l1MsgCount != nil {
 		return l1MsgCount.(int)
 	}
-	count := 0
-	for _, tx := range b.transactions {
-		if tx.IsL1MessageTx() {
-			count += 1
+
+	// find first and last queue index in block
+	var firstQueueIndex *uint64
+	var lastQueueIndex *uint64
+
+	for ii, tx := range b.transactions {
+		if !tx.IsL1MessageTx() {
+			break
 		}
+		if ii == 0 {
+			firstQueueIndex = &b.transactions[ii].AsL1MessageTx().QueueIndex
+		}
+		lastQueueIndex = &b.transactions[ii].AsL1MessageTx().QueueIndex
+	}
+
+	// calculate and cache L1 message count
+	count := 0
+	if firstQueueIndex != nil {
+		// lastQueueIndex is guaranteed to be non-nil in this case
+		count = int(*lastQueueIndex - *firstQueueIndex + 1)
 	}
 	b.l1MsgCount.Store(count)
 	return count
@@ -414,7 +430,13 @@ func (b *Block) L1MessageCount() int {
 
 // CountL2Tx returns the number of L2 transactions in this block.
 func (b *Block) CountL2Tx() int {
-	return len(b.transactions) - b.L1MessageCount()
+	count := 0
+	for _, tx := range b.transactions {
+		if !tx.IsL1MessageTx() {
+			count += 1
+		}
+	}
+	return count
 }
 
 type Blocks []*Block

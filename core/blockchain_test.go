@@ -3302,6 +3302,42 @@ func TestInsertBlocksWithL1Messages(t *testing.T) {
 	queueIndex = rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[len(blocks)-1].Hash())
 	assert.NotNil(t, queueIndex)
 	assert.Equal(t, uint64(len(msgs)), *queueIndex)
+
+	// generate block with messages #1 and #2 skipped
+	blocks, _ = GenerateChain(config, genesis, engine, db, 1, func(_ int, b *BlockGen) {
+		tx := types.NewTx(&msgs[0])
+		b.AddTxWithChain(blockchain, tx)
+		tx = types.NewTx(&msgs[3])
+		b.AddTxWithChain(blockchain, tx)
+	})
+
+	// insert blocks, validation should pass
+	index, err = blockchain.InsertChain(blocks)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, index)
+
+	// L1 message DB should be updated
+	queueIndex = rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[0].Hash())
+	assert.NotNil(t, queueIndex)
+	assert.Equal(t, uint64(len(msgs)), *queueIndex)
+
+	// generate block with messages #0 and #1 skipped
+	blocks, _ = GenerateChain(config, genesis, engine, db, 1, func(_ int, b *BlockGen) {
+		tx := types.NewTx(&msgs[2])
+		b.AddTxWithChain(blockchain, tx)
+		tx = types.NewTx(&msgs[3])
+		b.AddTxWithChain(blockchain, tx)
+	})
+
+	// insert blocks, validation should pass
+	index, err = blockchain.InsertChain(blocks)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, index)
+
+	// L1 message DB should be updated
+	queueIndex = rawdb.ReadFirstQueueIndexNotInL2Block(db, blocks[0].Hash())
+	assert.NotNil(t, queueIndex)
+	assert.Equal(t, uint64(len(msgs)), *queueIndex)
 }
 
 // TestL1MessageValidationFailure tests that the chain rejects blocks with incorrect L1MessageTx transactions.
@@ -3347,24 +3383,10 @@ func TestL1MessageValidationFailure(t *testing.T) {
 		})
 	}
 
-	// skip #0
-	blocks, _ := generateBlock([]*types.Transaction{types.NewTx(&msgs[1])})
-	index, err := blockchain.InsertChain(blocks)
-	assert.Equal(t, 0, index)
-	assert.Equal(t, consensus.ErrInvalidL1MessageOrder, err)
-	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
-
-	// skip #1
-	blocks, _ = generateBlock([]*types.Transaction{types.NewTx(&msgs[0]), types.NewTx(&msgs[2])})
-	index, err = blockchain.InsertChain(blocks)
-	assert.Equal(t, 0, index)
-	assert.Equal(t, consensus.ErrInvalidL1MessageOrder, err)
-	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())
-
 	// L2 tx precedes L1 message tx
 	tx, _ := types.SignTx(types.NewTransaction(0, common.Address{0x00}, new(big.Int), params.TxGas, genspec.BaseFee, nil), signer, key)
-	blocks, _ = generateBlock([]*types.Transaction{tx, types.NewTx(&msgs[0])})
-	index, err = blockchain.InsertChain(blocks)
+	blocks, _ := generateBlock([]*types.Transaction{tx, types.NewTx(&msgs[0])})
+	index, err := blockchain.InsertChain(blocks)
 	assert.Equal(t, 0, index)
 	assert.Equal(t, consensus.ErrInvalidL1MessageOrder, err)
 	assert.Equal(t, big.NewInt(0), blockchain.CurrentBlock().Number())

@@ -1185,7 +1185,7 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	if queueIndex != nil {
 		// note: we can insert blocks with header-only ancestors here,
 		// so queueIndex might not yet be available in DB.
-		rawdb.WriteFirstQueueIndexNotInL2Block(batch, block.Hash(), *queueIndex+uint64(block.L1MessageCount()))
+		rawdb.WriteFirstQueueIndexNotInL2Block(batch, block.Hash(), *queueIndex+uint64(block.NumL1MessagesProcessed(*queueIndex)))
 	}
 
 	if err := batch.Write(); err != nil {
@@ -1249,7 +1249,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		// so the parent will always be inserted first.
 		log.Crit("Queue index in DB is nil", "parent", block.ParentHash(), "hash", block.Hash())
 	}
-	rawdb.WriteFirstQueueIndexNotInL2Block(blockBatch, block.Hash(), *queueIndex+uint64(block.L1MessageCount()))
+	rawdb.WriteFirstQueueIndexNotInL2Block(blockBatch, block.Hash(), *queueIndex+uint64(block.NumL1MessagesProcessed(*queueIndex)))
 
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)

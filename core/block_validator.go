@@ -114,8 +114,8 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - L1 messages follow the QueueIndex order.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
-	// no further processing if the block contains no L1 messages
-	if block.L1MessageCount() == 0 {
+	// skip DB read if the block contains no L1 messages
+	if !block.ContainsL1Messages() {
 		return nil
 	}
 

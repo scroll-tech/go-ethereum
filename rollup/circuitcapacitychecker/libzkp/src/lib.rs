@@ -37,7 +37,7 @@ pub mod checker {
     pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
         let mut checkers = CHECKERS
             .get_mut()
-            .expect("circuit capacity checker used before initialization");
+            .expect("fail to get circuit capacity checkers map in new_circuit_capacity_checker");
         let id = checkers.len() as u64;
         let checker = CircuitCapacityChecker::new();
         checkers.insert(id, checker);
@@ -51,7 +51,7 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in reset_circuit_capacity_checker")
             .get_mut(&id)
-            .unwrap()
+            .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in reset_circuit_capacity_checker", id))
             .reset()
     }
 
@@ -66,7 +66,7 @@ pub mod checker {
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
-                .unwrap()
+                .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in apply_tx", id))
                 .estimate_circuit_capacity(&[traces])
                 .expect("fail to estimate_circuit_capacity in apply_tx")
         });
@@ -104,7 +104,7 @@ pub mod checker {
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_block")
                 .get_mut(&id)
-                .unwrap()
+                .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in apply_block", id))
                 .estimate_circuit_capacity(&[traces])
                 .expect("fail to estimate_circuit_capacity in apply_block")
         });

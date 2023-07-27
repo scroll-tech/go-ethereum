@@ -76,7 +76,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow
 	}
-	return &types.RowConsumption{Detail: result.AccRowUsage.RowUsageDetails}, nil
+	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }
 
 func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.RowConsumption, error) {
@@ -113,5 +113,5 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow
 	}
-	return &types.RowConsumption{Detail: result.AccRowUsage.RowUsageDetails}, nil
+	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }

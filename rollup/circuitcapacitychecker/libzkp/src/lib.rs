@@ -37,7 +37,9 @@ pub mod checker {
     pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
         let id = CHECKERS
             .get_mut()
-            .expect("fail to get circuit capacity checkers map before CircuitCapacityChecker::new()")
+            .expect(
+                "fail to get circuit capacity checkers map before CircuitCapacityChecker::new()",
+            )
             .len() as u64;
         let checker = CircuitCapacityChecker::new();
         CHECKERS
@@ -140,7 +142,7 @@ pub(crate) mod utils {
     #[allow(dead_code)]
     pub(crate) fn c_char_to_str(c: *const c_char) -> &'static str {
         let cstr = unsafe { CStr::from_ptr(c) };
-        cstr.to_str().unwrap()
+        cstr.to_str().expect("fail to cast cstr to str")
     }
 
     #[allow(dead_code)]
@@ -151,7 +153,9 @@ pub(crate) mod utils {
 
     #[allow(dead_code)]
     pub(crate) fn vec_to_c_char(bytes: Vec<u8>) -> *const c_char {
-        CString::new(bytes).unwrap().into_raw()
+        CString::new(bytes)
+            .expect("fail to create new CString from bytes")
+            .into_raw()
     }
 
     #[allow(dead_code)]

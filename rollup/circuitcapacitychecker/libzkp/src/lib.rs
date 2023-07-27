@@ -37,12 +37,12 @@ pub mod checker {
     pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
         let id = CHECKERS
             .get_mut()
-            .expect("get circuit capacity checkers map before CircuitCapacityChecker::new()")
+            .expect("fail to get circuit capacity checkers map before CircuitCapacityChecker::new()")
             .len() as u64;
         let checker = CircuitCapacityChecker::new();
         CHECKERS
             .get_mut()
-            .expect("get circuit capacity checkers map after CircuitCapacityChecker::new()")
+            .expect("fail to get circuit capacity checkers map after CircuitCapacityChecker::new()")
             .insert(id, checker);
         id
     }
@@ -52,7 +52,7 @@ pub mod checker {
     pub unsafe extern "C" fn reset_circuit_capacity_checker(id: u64) {
         CHECKERS
             .get_mut()
-            .expect("get circuit capacity checkers map in reset_circuit_capacity_checker")
+            .expect("fail to get circuit capacity checkers map in reset_circuit_capacity_checker")
             .get_mut(&id)
             .unwrap()
             .reset()
@@ -66,11 +66,11 @@ pub mod checker {
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
-                .expect("get circuit capacity checkers map in apply_tx")
+                .expect("fail to get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
                 .unwrap()
                 .estimate_circuit_capacity(&[traces])
-                .unwrap()
+                .expect("fail to estimate_circuit_capacity in apply_tx")
         });
         let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
@@ -103,11 +103,11 @@ pub mod checker {
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
-                .expect("get circuit capacity checkers map in apply_block")
+                .expect("fail to get circuit capacity checkers map in apply_block")
                 .get_mut(&id)
                 .unwrap()
                 .estimate_circuit_capacity(&[traces])
-                .unwrap()
+                .expect("fail to estimate_circuit_capacity in apply_block")
         });
         let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {

@@ -65,19 +65,19 @@ pub mod checker {
             RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some("traces.transactions.len() != 1"),
+                error: Some("traces.transactions.len() != 1".to_string()),
             }
         } else if traces.execution_results.len() != 1 {
             RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some("traces.execution_results.len() != 1"),
+                error: Some("traces.execution_results.len() != 1".to_string()),
             }
         } else if traces.tx_storage_trace.len() != 1 {
             RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some("traces.tx_storage_trace.len() != 1"),
+                error: Some("traces.tx_storage_trace.len() != 1".to_string()),
             }
         }
 
@@ -96,7 +96,7 @@ pub mod checker {
                 .unwrap_or_else(|_| {
                     panic!(
                         "id: {:?}, fail to estimate_circuit_capacity in apply_tx, block_hash: {:?}, tx_hash: {:?}",
-                        id, traces.header.hash(), traces.transactions[0].tx_hash
+                        id, traces.header.hash, traces.transactions[0].tx_hash
                     )
                 })
         });
@@ -144,7 +144,7 @@ pub mod checker {
                 .unwrap_or_else(|_| {
                     panic!(
                         "id: {:?}, fail to estimate_circuit_capacity in apply_block, block_hash: {:?}",
-                        id, traces.header.hash()
+                        id, traces.header.hash
                     )
                 })
         });

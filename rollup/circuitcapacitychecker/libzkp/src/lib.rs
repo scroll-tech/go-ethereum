@@ -27,22 +27,35 @@ pub mod checker {
             .format_timestamp_millis()
             .init();
         let checkers = HashMap::new();
-        CHECKERS.set(checkers).unwrap();
+        CHECKERS
+            .set(checkers)
+            .expect("circuit capacity checker initialized twice");
     }
 
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
-        let id = CHECKERS.get_mut().unwrap().len() as u64;
+        let id = CHECKERS
+            .get_mut()
+            .expect("get circuit capacity checkers map before CircuitCapacityChecker::new()")
+            .len() as u64;
         let checker = CircuitCapacityChecker::new();
-        CHECKERS.get_mut().unwrap().insert(id, checker);
+        CHECKERS
+            .get_mut()
+            .expect("get circuit capacity checkers map after CircuitCapacityChecker::new()")
+            .insert(id, checker);
         id
     }
 
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn reset_circuit_capacity_checker(id: u64) {
-        CHECKERS.get_mut().unwrap().get_mut(&id).unwrap().reset()
+        CHECKERS
+            .get_mut()
+            .expect("get circuit capacity checkers map in reset_circuit_capacity_checker")
+            .get_mut(&id)
+            .unwrap()
+            .reset()
     }
 
     /// # Safety
@@ -53,7 +66,7 @@ pub mod checker {
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
-                .unwrap()
+                .expect("get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
                 .unwrap()
                 .estimate_circuit_capacity(&[traces])
@@ -62,7 +75,8 @@ pub mod checker {
         let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
-                    "acc_row_usage: {:?}, tx_row_usage: {:?}",
+                    "id: {:?}, acc_row_usage: {:?}, tx_row_usage: {:?}",
+                    id,
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );
@@ -89,7 +103,7 @@ pub mod checker {
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
-                .unwrap()
+                .expect("get circuit capacity checkers map in apply_block")
                 .get_mut(&id)
                 .unwrap()
                 .estimate_circuit_capacity(&[traces])
@@ -98,7 +112,8 @@ pub mod checker {
         let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
                 log::debug!(
-                    "acc_row_usage: {:?}, tx_row_usage: {:?}",
+                    "id: {:?}, acc_row_usage: {:?}, tx_row_usage: {:?}",
+                    id,
                     acc_row_usage.row_number,
                     tx_row_usage.row_number
                 );

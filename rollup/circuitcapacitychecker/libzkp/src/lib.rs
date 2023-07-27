@@ -60,15 +60,26 @@ pub mod checker {
     pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
-            .expect("fail to deserialize tx_traces");
+            .unwrap_or_else(|| panic!("id: {:?}, fail to deserialize tx_traces", id));
+
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
-                .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in apply_tx", id))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "fail to get circuit capacity checker (id: {:?}) in apply_tx",
+                        id
+                    )
+                })
                 .estimate_circuit_capacity(&[traces])
-                .expect("fail to estimate_circuit_capacity in apply_tx")
+                .unwrap_or_else(|| {
+                    panic!(
+                        "id: {:?}, fail to estimate_circuit_capacity in apply_tx",
+                        id
+                    )
+                })
         });
         let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {
@@ -98,15 +109,31 @@ pub mod checker {
     pub unsafe extern "C" fn apply_block(id: u64, block_trace: *const c_char) -> *const c_char {
         let block_trace = c_char_to_vec(block_trace);
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
-            .expect("fail to deserialize block_trace");
+            .unwrap_or_else(|| panic!("id: {:?}, fail to deserialize block_trace", id));
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_block")
+                .unwrap_or_else(|| {
+                    panic!(
+                        "id: {:?}, fail to estimate_circuit_capacity in apply_block",
+                        id
+                    )
+                })
                 .get_mut(&id)
-                .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in apply_block", id))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "fail to get circuit capacity checker (id: {:?}) in apply_block",
+                        id
+                    )
+                })
                 .estimate_circuit_capacity(&[traces])
-                .expect("fail to estimate_circuit_capacity in apply_block")
+                .unwrap_or_else(|| {
+                    panic!(
+                        "id: {:?}, fail to estimate_circuit_capacity in apply_block",
+                        id
+                    )
+                })
         });
         let r = match result {
             Ok((acc_row_usage, tx_row_usage)) => {

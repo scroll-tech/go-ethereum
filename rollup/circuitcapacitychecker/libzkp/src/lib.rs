@@ -35,7 +35,9 @@ pub mod checker {
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
-        let mut checkers = CHECKERS.get_mut().expect("circuit capacity checker used before initialization");
+        let mut checkers = CHECKERS
+            .get_mut()
+            .expect("circuit capacity checker used before initialization");
         let id = checkers.len() as u64;
         let checker = CircuitCapacityChecker::new();
         checkers.insert(id, checker);
@@ -57,7 +59,8 @@ pub mod checker {
     #[no_mangle]
     pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
-        let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).expect("fail to deserialize tx_traces");
+        let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
+            .expect("fail to deserialize tx_traces");
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
@@ -94,7 +97,8 @@ pub mod checker {
     #[no_mangle]
     pub unsafe extern "C" fn apply_block(id: u64, block_trace: *const c_char) -> *const c_char {
         let block_trace = c_char_to_vec(block_trace);
-        let traces = serde_json::from_slice::<BlockTrace>(&block_trace).expect("fail to deserialize block_trace");
+        let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
+            .expect("fail to deserialize block_trace");
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()

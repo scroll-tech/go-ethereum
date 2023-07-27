@@ -51,7 +51,7 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in reset_circuit_capacity_checker")
             .get_mut(&id)
-            .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in reset_circuit_capacity_checker", id))
+            .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {id:?}) in reset_circuit_capacity_checker"))
             .reset()
     }
 
@@ -60,7 +60,7 @@ pub mod checker {
     pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
-            .unwrap_or_else(|_| panic!("id: {:?}, fail to deserialize tx_traces", id));
+            .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize tx_traces"));
         if traces.transactions.len() != 1 {
             let r = RowUsageResult {
                 acc_row_usage: None,
@@ -91,8 +91,7 @@ pub mod checker {
                 .get_mut(&id)
                 .unwrap_or_else(|| {
                     panic!(
-                        "fail to get circuit capacity checker (id: {:?}) in apply_tx",
-                        id
+                        "fail to get circuit capacity checker (id: {id:?}) in apply_tx"
                     )
                 })
                 .estimate_circuit_capacity(&[traces.clone()])
@@ -120,7 +119,7 @@ pub mod checker {
             Err(e) => RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some(format!("{:?}", e)),
+                error: Some(format!("{e:?}")),
             },
         };
         serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
@@ -131,7 +130,7 @@ pub mod checker {
     pub unsafe extern "C" fn apply_block(id: u64, block_trace: *const c_char) -> *const c_char {
         let block_trace = c_char_to_vec(block_trace);
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
-            .unwrap_or_else(|_| panic!("id: {:?}, fail to deserialize block_trace", id));
+            .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize block_trace"));
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
@@ -139,8 +138,7 @@ pub mod checker {
                 .get_mut(&id)
                 .unwrap_or_else(|| {
                     panic!(
-                        "fail to get circuit capacity checker (id: {:?}) in apply_block",
-                        id
+                        "fail to get circuit capacity checker (id: {id:?}) in apply_block"
                     )
                 })
                 .estimate_circuit_capacity(&[traces.clone()])
@@ -168,7 +166,7 @@ pub mod checker {
             Err(e) => RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some(format!("{:?}", e)),
+                error: Some(format!("{e:?}")),
             },
         };
         serde_json::to_vec(&r).map_or(null(), vec_to_c_char)

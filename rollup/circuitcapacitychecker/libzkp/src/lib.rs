@@ -67,21 +67,21 @@ pub mod checker {
                 tx_row_usage: None,
                 error: Some("traces.transactions.len() != 1".to_string()),
             };
-            serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
+            return serde_json::to_vec(&r).map_or(null(), vec_to_c_char);
         } else if traces.execution_results.len() != 1 {
             let r = RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
                 error: Some("traces.execution_results.len() != 1".to_string()),
             };
-            serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
+            return serde_json::to_vec(&r).map_or(null(), vec_to_c_char);
         } else if traces.tx_storage_trace.len() != 1 {
             let r = RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
                 error: Some("traces.tx_storage_trace.len() != 1".to_string()),
             };
-            serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
+            return serde_json::to_vec(&r).map_or(null(), vec_to_c_char);
         }
 
         let result = panic::catch_unwind(|| {

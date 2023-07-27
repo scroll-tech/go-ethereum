@@ -51,7 +51,7 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in reset_circuit_capacity_checker")
             .get_mut(&id)
-            .unwrap_or_else(|_| panic!("fail to get circuit capacity checker (id: {:?}) in reset_circuit_capacity_checker", id))
+            .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in reset_circuit_capacity_checker", id))
             .reset()
     }
 
@@ -89,7 +89,7 @@ pub mod checker {
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
-                .unwrap_or_else(|_| {
+                .unwrap_or_else(|| {
                     panic!(
                         "fail to get circuit capacity checker (id: {:?}) in apply_tx",
                         id
@@ -137,7 +137,7 @@ pub mod checker {
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_block")
                 .get_mut(&id)
-                .unwrap_or_else(|_| {
+                .unwrap_or_else(|| {
                     panic!(
                         "fail to get circuit capacity checker (id: {:?}) in apply_block",
                         id

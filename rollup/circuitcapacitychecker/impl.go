@@ -18,16 +18,23 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 )
 
+// mutex for concurrent CircuitCapacityChecker creations
+var creationMu sync.Mutex
+
 func init() {
 	C.init()
 }
 
 type CircuitCapacityChecker struct {
+	// mutex for each CircuitCapacityChecker itself
 	sync.Mutex
 	id uint64
 }
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
+	creationMu.Lock()
+	defer creationMu.Unlock()
+
 	id := C.new_circuit_capacity_checker()
 	return &CircuitCapacityChecker{id: uint64(id)}
 }

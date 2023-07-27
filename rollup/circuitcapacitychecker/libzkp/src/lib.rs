@@ -63,11 +63,11 @@ pub mod checker {
             let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
                 .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize tx_traces"));
             if traces.transactions.len() != 1 {
-                panic!("traces.transactions.len() != 1".to_string())
+                panic!("traces.transactions.len() != 1")
             } else if traces.execution_results.len() != 1 {
-                panic!("traces.execution_results.len() != 1".to_string())
+                panic!("traces.execution_results.len() != 1")
             } else if traces.tx_storage_trace.len() != 1 {
-                panic!("traces.tx_storage_trace.len() != 1".to_string())
+                panic!("traces.tx_storage_trace.len() != 1")
             }
             CHECKERS
                 .get_mut()

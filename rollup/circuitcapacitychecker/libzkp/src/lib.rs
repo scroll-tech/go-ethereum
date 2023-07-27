@@ -62,23 +62,26 @@ pub mod checker {
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
             .unwrap_or_else(|_| panic!("id: {:?}, fail to deserialize tx_traces", id));
         if traces.transactions.len() != 1 {
-            RowUsageResult {
+            let r = RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
                 error: Some("traces.transactions.len() != 1".to_string()),
-            }
+            };
+            serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
         } else if traces.execution_results.len() != 1 {
-            RowUsageResult {
+            let r = RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
                 error: Some("traces.execution_results.len() != 1".to_string()),
-            }
+            };
+            serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
         } else if traces.tx_storage_trace.len() != 1 {
-            RowUsageResult {
+            let r = RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
                 error: Some("traces.tx_storage_trace.len() != 1".to_string()),
-            }
+            };
+            serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
         }
 
         let result = panic::catch_unwind(|| {

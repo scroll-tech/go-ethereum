@@ -51,7 +51,7 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in reset_circuit_capacity_checker")
             .get_mut(&id)
-            .unwrap_or_else(|| panic!("fail to get circuit capacity checker (id: {:?}) in reset_circuit_capacity_checker", id))
+            .unwrap_or_else(|_| panic!("fail to get circuit capacity checker (id: {:?}) in reset_circuit_capacity_checker", id))
             .reset()
     }
 
@@ -60,24 +60,24 @@ pub mod checker {
     pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
-            .unwrap_or_else(|| panic!("id: {:?}, fail to deserialize tx_traces", id));
-        if len(traces.transactions) != 1 {
+            .unwrap_or_else(|_| panic!("id: {:?}, fail to deserialize tx_traces", id));
+        if traces.transactions.len() != 1 {
             RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some("len(traces.transactions) != 1"),
+                error: Some("traces.transactions.len() != 1"),
             }
-        } else if len(traces.execution_results) != 1 {
+        } else if traces.execution_results.len() != 1 {
             RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some("len(traces.execution_results) != 1"),
+                error: Some("traces.execution_results.len() != 1"),
             }
-        } else if len(traces.tx_storage_trace) != 1 {
+        } else if traces.tx_storage_trace.len() != 1 {
             RowUsageResult {
                 acc_row_usage: None,
                 tx_row_usage: None,
-                error: Some("len(traces.tx_storage_trace) != 1"),
+                error: Some("traces.tx_storage_trace.len() != 1"),
             }
         }
 
@@ -86,14 +86,14 @@ pub mod checker {
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
-                .unwrap_or_else(|| {
+                .unwrap_or_else(|_| {
                     panic!(
                         "fail to get circuit capacity checker (id: {:?}) in apply_tx",
                         id
                     )
                 })
                 .estimate_circuit_capacity(&[traces])
-                .unwrap_or_else(|| {
+                .unwrap_or_else(|_| {
                     panic!(
                         "id: {:?}, fail to estimate_circuit_capacity in apply_tx, block_hash: {:?}, tx_hash: {:?}",
                         id, traces.header.hash(), traces.transactions[0].tx_hash
@@ -128,20 +128,20 @@ pub mod checker {
     pub unsafe extern "C" fn apply_block(id: u64, block_trace: *const c_char) -> *const c_char {
         let block_trace = c_char_to_vec(block_trace);
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
-            .unwrap_or_else(|| panic!("id: {:?}, fail to deserialize block_trace", id));
+            .unwrap_or_else(|_| panic!("id: {:?}, fail to deserialize block_trace", id));
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_block")
                 .get_mut(&id)
-                .unwrap_or_else(|| {
+                .unwrap_or_else(|_| {
                     panic!(
                         "fail to get circuit capacity checker (id: {:?}) in apply_block",
                         id
                     )
                 })
                 .estimate_circuit_capacity(&[traces])
-                .unwrap_or_else(|| {
+                .unwrap_or_else(|_| {
                     panic!(
                         "id: {:?}, fail to estimate_circuit_capacity in apply_block, block_hash: {:?}",
                         id, traces.header.hash()

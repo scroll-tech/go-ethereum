@@ -95,11 +95,11 @@ pub mod checker {
                         id
                     )
                 })
-                .estimate_circuit_capacity(&[traces])
+                .estimate_circuit_capacity(&[traces.clone()])
                 .unwrap_or_else(|_| {
                     panic!(
                         "id: {:?}, fail to estimate_circuit_capacity in apply_tx, block_hash: {:?}, tx_hash: {:?}",
-                        id, traces.header.hash, traces.clone().transactions[0].tx_hash
+                        id, traces.header.hash, traces.transactions[0].tx_hash
                     )
                 })
         });
@@ -143,11 +143,11 @@ pub mod checker {
                         id
                     )
                 })
-                .estimate_circuit_capacity(&[traces])
+                .estimate_circuit_capacity(&[traces.clone()])
                 .unwrap_or_else(|_| {
                     panic!(
                         "id: {:?}, fail to estimate_circuit_capacity in apply_block, block_hash: {:?}",
-                        id, traces.clone().header.hash
+                        id, traces.header.hash
                     )
                 })
         });

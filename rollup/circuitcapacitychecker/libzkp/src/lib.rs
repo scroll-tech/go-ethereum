@@ -35,17 +35,10 @@ pub mod checker {
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn new_circuit_capacity_checker() -> u64 {
-        let id = CHECKERS
-            .get_mut()
-            .expect(
-                "fail to get circuit capacity checkers map before CircuitCapacityChecker::new()",
-            )
-            .len() as u64;
+        let mut checkers = CHECKERS.get_mut().expect("circuit capacity checker used before initialization");
+        let id = checkers.len() as u64;
         let checker = CircuitCapacityChecker::new();
-        CHECKERS
-            .get_mut()
-            .expect("fail to get circuit capacity checkers map after CircuitCapacityChecker::new()")
-            .insert(id, checker);
+        checkers.insert(id, checker);
         id
     }
 

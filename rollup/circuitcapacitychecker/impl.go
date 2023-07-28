@@ -50,9 +50,22 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	ccc.Lock()
 	defer ccc.Unlock()
 
+	if len(traces.Transactions) != 1 {
+		log.Error("len(traces.Transactions) != 1", "id", ccc.id)
+		return nil, ErrUnknown
+	}
+	if len(traces.ExecutionResults) != 1 {
+		log.Error("len(traces.ExecutionResults) != 1", "id", ccc.id)
+		return nil, ErrUnknown
+	}
+	if len(traces.TxStorageTraces) != 1 {
+		log.Error("len(traces.TxStorageTraces) != 1", "id", ccc.id)
+		return nil, ErrUnknown
+	}
+
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		log.Error("json marshal traces fail in ApplyTransaction", "id", ccc.id)
+		log.Error("json marshal traces fail in ApplyTransaction", "id", ccc.id, "TxHash", traces.Transactions[1].TxHash)
 		return nil, ErrUnknown
 	}
 
@@ -61,22 +74,22 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
-	log.Debug("start to check circuit capacity for tx", "id", ccc.id)
+	log.Debug("start to check circuit capacity for tx", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 	rawResult := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
-	log.Debug("check circuit capacity for tx done", "id", ccc.id)
+	log.Debug("check circuit capacity for tx done", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 
 	result := &WrappedRowUsage{}
 	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
-		log.Error("json unmarshal apply_tx invocation result fail", "id", ccc.id)
+		log.Error("json unmarshal apply_tx invocation result fail", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 		return nil, ErrUnknown
 	}
 
 	if result.Error != "" {
-		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error, "id", ccc.id)
+		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error, "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 		return nil, ErrUnknown
 	}
 	if result.TxRowUsage == nil || result.AccRowUsage == nil {
-		log.Error("apply_tx in CircuitCapacityChecker", "err", "TxRowUsage or AccRowUsage is empty unexpectedly", "id", ccc.id)
+		log.Error("apply_tx in CircuitCapacityChecker", "err", "TxRowUsage or AccRowUsage is empty unexpectedly", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 		return nil, ErrUnknown
 	}
 	if !result.TxRowUsage.IsOk {

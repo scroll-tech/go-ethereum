@@ -65,7 +65,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		log.Error("json marshal traces fail in ApplyTransaction", "id", ccc.id, "TxHash", traces.Transactions[1].TxHash)
+		log.Error("json marshal traces fail in ApplyTransaction", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 		return nil, ErrUnknown
 	}
 

@@ -94,7 +94,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
-		log.Error("json marshal traces fail in ApplyBlock", "id", ccc.id)
+		log.Error("json marshal traces fail in ApplyBlock", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 		return nil, ErrUnknown
 	}
 
@@ -109,16 +109,16 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 
 	result := &WrappedRowUsage{}
 	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
-		log.Error("json unmarshal apply_tx invocation result fail", "id", ccc.id)
+		log.Error("json unmarshal apply_tx invocation result fail", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 		return nil, ErrUnknown
 	}
 
 	if result.Error != "" {
-		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error, "id", ccc.id)
+		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error, "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 		return nil, ErrUnknown
 	}
 	if result.AccRowUsage == nil {
-		log.Error("apply_block in CircuitCapacityChecker", "err", "AccRowUsage is empty unexpectedly", "id", ccc.id)
+		log.Error("apply_block in CircuitCapacityChecker", "err", "AccRowUsage is empty unexpectedly", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 		return nil, ErrUnknown
 	}
 	if !result.AccRowUsage.IsOk {

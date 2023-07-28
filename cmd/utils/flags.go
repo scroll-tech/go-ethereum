@@ -815,8 +815,8 @@ var (
 
 	// Circuit capacity check settings
 	CircuitCapacityCheckEnabledFlag = cli.BoolFlag{
-		Name:  "checkcircuitcapacity",
-		Usage: "Enable circuitcapacity check in block validation",
+		Name:  "ccc",
+		Usage: "Enable circuit capacity check during block validation",
 	}
 )
 

@@ -43,9 +43,7 @@ func TestBitReverse(t *testing.T) {
 		reverseBitInPlace(testBytes)
 		reverseBytesInPlace(testBytes)
 		if !bytes.Equal(b1, testBytes) {
-			{
-				t.Errorf("unexpected bit reversed %x vs %x", b1, testBytes)
-			}
+			t.Errorf("unexpected bit reversed %x vs %x", b1, testBytes)
 		}
 	}
 
@@ -64,9 +62,7 @@ func TestBitDoubleReverse(t *testing.T) {
 
 		b := bitReverse(bitReverse(testBytes))
 		if !bytes.Equal(b, testBytes) {
-			{
-				t.Errorf("unexpected double bit reversed %x vs %x", b, testBytes)
-			}
+			t.Errorf("unexpected double bit reversed %x vs %x", b, testBytes)
 		}
 	}
 

@@ -11,7 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 )
 
-// ZktrieDatabase Database adaptor imply zktrie.ZktrieDatbase
+// ZktrieDatabase Database adaptor implements zktrie.ZktrieDatbase
 // It also reverses the bit order of the key being persisted.
 // This ensures that the adjacent leaf in zktrie maintains minimal
 // distance when persisted with dictionary order in LevelDB.
@@ -118,7 +118,7 @@ func (l *ZktrieDatabase) List(limit int) ([]KV, error) {
 	return ret, err
 }
 
-func bitReverseForLimb(b byte) byte {
+func bitReverseForNibble(b byte) byte {
 	switch b {
 	case 0:
 		return 0
@@ -163,7 +163,7 @@ func bitReverse(inp []byte) (out []byte) {
 	out = make([]byte, l)
 
 	for i, b := range inp {
-		out[l-i-1] = bitReverseForLimb(b&15)<<4 + bitReverseForLimb(b>>4)
+		out[l-i-1] = bitReverseForNibble(b&15)<<4 + bitReverseForNibble(b>>4)
 	}
 
 	return

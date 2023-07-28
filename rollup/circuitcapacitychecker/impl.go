@@ -50,8 +50,18 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	ccc.Lock()
 	defer ccc.Unlock()
 
+	if len(traces.Transactions) != 1 || len(traces.ExecutionResults) != 1 || len(traces.TxStorageTraces) != 1 {
+		log.Error("malformatted BlockTrace in ApplyTransaction", "id", ccc.id,
+			"len(traces.Transactions)", len(traces.Transactions),
+			"len(traces.ExecutionResults)", len(traces.ExecutionResults),
+			"len(traces.TxStorageTraces)", len(traces.TxStorageTraces),
+			"err", "length of Transactions, or ExecutionResults, or TxStorageTraces, is not equal to 1")
+		return nil, ErrUnknown
+	}
+
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
+		log.Error("fail to json marshal traces in ApplyTransaction", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash, "err", err)
 		return nil, ErrUnknown
 	}
 
@@ -60,21 +70,26 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
-	log.Info("start to check circuit capacity for tx")
+	log.Debug("start to check circuit capacity for tx", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 	rawResult := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
-	log.Info("check circuit capacity for tx done")
+	log.Debug("check circuit capacity for tx done", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash)
 
 	result := &WrappedRowUsage{}
 	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
-		return nil, err
+		log.Error("fail to json unmarshal apply_tx result", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash, "err", err)
+		return nil, ErrUnknown
 	}
 
 	if result.Error != "" {
-		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error)
+		log.Error("fail to apply_tx in CircuitCapacityChecker", "id", ccc.id, "TxHash", traces.Transactions[0].TxHash, "err", result.Error)
 		return nil, ErrUnknown
 	}
 	if result.TxRowUsage == nil || result.AccRowUsage == nil {
-		log.Error("apply_tx in CircuitCapacityChecker", "err", "TxRowUsage or AccRowUsage is empty unexpectedly")
+		log.Error("fail to apply_tx in CircuitCapacityChecker",
+			"id", ccc.id, "TxHash", traces.Transactions[0].TxHash,
+			"len(result.TxRowUsage)", len(result.TxRowUsage),
+			"len(result.AccRowUsage)", len(result.AccRowUsage),
+			"err", "TxRowUsage or AccRowUsage is empty unexpectedly")
 		return nil, ErrUnknown
 	}
 	if !result.TxRowUsage.IsOk {
@@ -92,6 +107,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
+		log.Error("fail to json marshal traces in ApplyBlock", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash(), "err", err)
 		return nil, ErrUnknown
 	}
 
@@ -100,21 +116,22 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
-	log.Info("start to check circuit capacity for block")
+	log.Debug("start to check circuit capacity for block", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 	rawResult := C.apply_block(C.uint64_t(ccc.id), tracesStr)
-	log.Info("check circuit capacity for block done")
+	log.Debug("check circuit capacity for block done", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 
 	result := &WrappedRowUsage{}
 	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
-		return nil, err
+		log.Error("fail to json unmarshal apply_block result", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash(), "err", err)
+		return nil, ErrUnknown
 	}
 
 	if result.Error != "" {
-		log.Error("apply_tx in CircuitCapacityChecker", "err", result.Error)
+		log.Error("fail to apply_block in CircuitCapacityChecker", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash(), "err", result.Error)
 		return nil, ErrUnknown
 	}
 	if result.AccRowUsage == nil {
-		log.Error("apply_block in CircuitCapacityChecker", "err", "AccRowUsage is empty unexpectedly")
+		log.Error("fail to apply_block in CircuitCapacityChecker", "id", ccc.id, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash(), "err", "AccRowUsage is empty unexpectedly")
 		return nil, ErrUnknown
 	}
 	if !result.AccRowUsage.IsOk {

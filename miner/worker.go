@@ -959,7 +959,9 @@ loop:
 			txs.Pop()
 
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
-			// Circuit capacity check: circuit capacity limit reached in a block, don't pop or shift, just quit the loop immediately
+			// Circuit capacity check: circuit capacity limit reached in a block,
+			// don't pop or shift, just quit the loop immediately;
+			// though it might still be possible to add some "smaller" txs, but it's a trade-off between tracing overhead & block usage rate
 			log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash())
 			break loop
 

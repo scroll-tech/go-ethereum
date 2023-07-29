@@ -1175,7 +1175,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	if len(remoteTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs, header.BaseFee)
-		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		// don't need to get `circuitCapacityReached` here because we don't have further `commitTransactions`
+		// after this one, and if we assign it won't take effect (`ineffassign`)
+		skipCommit, _ = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
 			return
 		}

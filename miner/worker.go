@@ -962,21 +962,35 @@ loop:
 
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
 			// Circuit capacity check: circuit capacity limit reached in a block,
-			// don't pop or shift, just quit the loop immediately; though it might still be possible to add some "smaller" txs,
+			// don't pop or shift, just quit the loop immediately;
+			// though it might still be possible to add some "smaller" txs,
 			// but it's a trade-off between tracing overhead & block usage rate
 			log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash())
 			circuitCapacityReached = true
 			break loop
 
-		case errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow):
-			// Circuit capacity check: tx row consumption too high, discard the tx.
-			// This is also useful for skipping "problematic" L1/L2 messages.
+		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && tx.IsL1MessageTx()):
+			// Circuit capacity check: L1MessageTx row consumption too high, shift to the next from the account,
+			// because we shouldn't skip the entire txs from the same account.
+			// This is also useful for skipping "problematic" L1MessageTxs.
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
 			txs.Shift()
 
-		case errors.Is(err, circuitcapacitychecker.ErrUnknown):
-			// Circuit capacity check: unknown circuit capacity checker error, pop, and keep it instead of discard it
-			log.Trace("Unknown circuit capacity checker error", "tx", tx.Hash())
+		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
+			// Circuit capacity check: L2MessageTx row consumption too high, skip the account.
+			// This is also useful for skipping "problematic" L2MessageTxs.
+			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
+			txs.Pop()
+
+		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
+			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
+			// shift to the next from the account because we shouldn't skip the entire txs from the same account
+			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash())
+			txs.Shift()
+
+		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
+			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
+			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash())
 			txs.Pop()
 
 		default:

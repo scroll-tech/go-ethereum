@@ -855,10 +855,12 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
+func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, bool) {
+	var circuitCapacityReached bool
+
 	// Short circuit if current is nil
 	if w.current == nil {
-		return true
+		return true, circuitCapacityReached
 	}
 
 	gasLimit := w.current.header.GasLimit
@@ -888,7 +890,7 @@ loop:
 					inc:   true,
 				}
 			}
-			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
+			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, circuitCapacityReached
 		}
 		// If we have collected enough transactions then we're done
 		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1TxCount + 1) {
@@ -960,9 +962,10 @@ loop:
 
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
 			// Circuit capacity check: circuit capacity limit reached in a block,
-			// don't pop or shift, just quit the loop immediately;
-			// though it might still be possible to add some "smaller" txs, but it's a trade-off between tracing overhead & block usage rate
+			// don't pop or shift, just quit the loop immediately; though it might still be possible to add some "smaller" txs,
+			// but it's a trade-off between tracing overhead & block usage rate
 			log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash())
+			circuitCapacityReached = true
 			break loop
 
 		case errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow):
@@ -1003,7 +1006,7 @@ loop:
 	if interrupt != nil {
 		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 	}
-	return false
+	return false, circuitCapacityReached
 }
 
 func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
@@ -1153,22 +1156,26 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
+	var skipCommit, circuitCapacityReached bool
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Txs) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", pendingL1Txs)
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
-		if w.commitTransactions(txs, w.coinbase, interrupt) {
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
 			return
 		}
 	}
-	if len(localTxs) > 0 {
+	if len(localTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)
-		if w.commitTransactions(txs, w.coinbase, interrupt) {
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
 			return
 		}
 	}
-	if len(remoteTxs) > 0 {
+	if len(remoteTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs, header.BaseFee)
-		if w.commitTransactions(txs, w.coinbase, interrupt) {
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
 			return
 		}
 	}

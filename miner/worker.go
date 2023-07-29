@@ -855,10 +855,12 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
+func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, bool) {
+	var circuitCapacityReached bool
+
 	// Short circuit if current is nil
 	if w.current == nil {
-		return true
+		return true, circuitCapacityReached
 	}
 
 	gasLimit := w.current.header.GasLimit
@@ -888,7 +890,7 @@ loop:
 					inc:   true,
 				}
 			}
-			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
+			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, circuitCapacityReached
 		}
 		// If we have collected enough transactions then we're done
 		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1TxCount + 1) {
@@ -959,18 +961,36 @@ loop:
 			txs.Pop()
 
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
-			// Circuit capacity limit reached in a block, don't pop or shift, just quit the loop immediately
+			// Circuit capacity check: circuit capacity limit reached in a block,
+			// don't pop or shift, just quit the loop immediately;
+			// though it might still be possible to add some "smaller" txs,
+			// but it's a trade-off between tracing overhead & block usage rate
 			log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash())
+			circuitCapacityReached = true
 			break loop
 
-		case errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow):
-			// Tx row consumption too high, discard the tx
+		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && tx.IsL1MessageTx()):
+			// Circuit capacity check: L1MessageTx row consumption too high, shift to the next from the account,
+			// because we shouldn't skip the entire txs from the same account.
+			// This is also useful for skipping "problematic" L1MessageTxs.
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
 			txs.Shift()
 
-		case errors.Is(err, circuitcapacitychecker.ErrUnknown):
-			// Unknown circuit capacity checker error, pop, and keep it instead of discard it
-			log.Trace("Unknown circuit capacity checker error", "tx", tx.Hash())
+		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
+			// Circuit capacity check: L2MessageTx row consumption too high, skip the account.
+			// This is also useful for skipping "problematic" L2MessageTxs.
+			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
+			txs.Pop()
+
+		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
+			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
+			// shift to the next from the account because we shouldn't skip the entire txs from the same account
+			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash())
+			txs.Shift()
+
+		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
+			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
+			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash())
 			txs.Pop()
 
 		default:
@@ -1001,7 +1021,7 @@ loop:
 	if interrupt != nil {
 		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 	}
-	return false
+	return false, circuitCapacityReached
 }
 
 func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
@@ -1151,22 +1171,28 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
+	var skipCommit, circuitCapacityReached bool
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Txs) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", pendingL1Txs)
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
-		if w.commitTransactions(txs, w.coinbase, interrupt) {
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
 			return
 		}
 	}
-	if len(localTxs) > 0 {
+	if len(localTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)
-		if w.commitTransactions(txs, w.coinbase, interrupt) {
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
 			return
 		}
 	}
-	if len(remoteTxs) > 0 {
+	if len(remoteTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs, header.BaseFee)
-		if w.commitTransactions(txs, w.coinbase, interrupt) {
+		// don't need to get `circuitCapacityReached` here because we don't have further `commitTransactions`
+		// after this one, and if we assign it won't take effect (`ineffassign`)
+		skipCommit, _ = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
 			return
 		}
 	}

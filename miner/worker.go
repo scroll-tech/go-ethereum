@@ -196,7 +196,9 @@ type worker struct {
 	// External functions
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
+	// skip_msg helpers
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
+	maxSkippedL1MsgIndex   uint64
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -230,6 +232,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh:     make(chan time.Duration),
 		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
+		maxSkippedL1MsgIndex:   0,
 	}
 
 	// Subscribe NewTxsEvent for tx pool
@@ -973,19 +976,27 @@ loop:
 			// Circuit capacity check: L1MessageTx row consumption too high, shift to the next from the account,
 			// because we shouldn't skip the entire txs from the same account.
 			// This is also useful for skipping "problematic" L1MessageTxs.
-			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
+			log.Trace("Circuit capacity limit reached for a single L1MessageTx", "tx", tx.Hash())
+			L1MsgIndex := tx.AsL1MessageTx().QueueIndex
+			if L1MsgIndex > w.maxSkippedL1MsgIndex {
+				w.maxSkippedL1MsgIndex = L1MsgIndex
+			}
 			txs.Shift()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: L2MessageTx row consumption too high, skip the account.
 			// This is also useful for skipping "problematic" L2MessageTxs.
-			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
+			log.Trace("Circuit capacity limit reached for a single L2MessageTx", "tx", tx.Hash())
 			txs.Pop()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
 			// shift to the next from the account because we shouldn't skip the entire txs from the same account
 			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash())
+			L1MsgIndex := tx.AsL1MessageTx().QueueIndex
+			if L1MsgIndex > w.maxSkippedL1MsgIndex {
+				w.maxSkippedL1MsgIndex = L1MsgIndex
+			}
 			txs.Shift()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
@@ -1031,6 +1042,10 @@ func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
 		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash())
 	}
 	startIndex := *nextQueueIndex
+	// w.maxSkippedL1MsgIndex is initialized as 0 by default, but we probably should not skip it
+	if (w.maxSkippedL1MsgIndex != 0) && (w.maxSkippedL1MsgIndex >= startIndex) {
+		startIndex = w.maxSkippedL1MsgIndex + 1
+	}
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
 }

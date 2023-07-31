@@ -1044,7 +1044,6 @@ func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
 		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash())
 	}
 	startIndex := *nextQueueIndex
-	// w.maxSkippedL1MsgIndex is initialized as 0 by default, but we probably should not skip it
 	if (w.maxSkippedL1MsgIndex != nil) && (*w.maxSkippedL1MsgIndex >= startIndex) {
 		startIndex = *w.maxSkippedL1MsgIndex + 1
 	}

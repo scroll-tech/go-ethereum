@@ -12,6 +12,37 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
+// WriteMaxSkippedL1MsgIndex writes the max skipped L1 message's index to the database.
+func WriteMaxSkippedL1MsgIndex(db ethdb.KeyValueWriter, index uint64) {
+	value := big.NewInt(0).SetUint64(index).Bytes()
+
+	if err := db.Put(maxSkippedL1MsgIndexKey, value); err != nil {
+		log.Crit("Failed to update synced L1 block number", "err", err)
+	}
+}
+
+// ReadMaxSkippedL1MsgIndex retrieves the max skipped L1 message's index.
+func ReadMaxSkippedL1MsgIndex(db ethdb.Reader) *uint64 {
+	data, err := db.Get(maxSkippedL1MsgIndexKey)
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("Failed to read the max skipped synced L1 Message index from database", "err", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+	index := new(big.Int).SetBytes(data)
+	if !index.IsUint64() {
+		log.Crit("Unexpected max skipped synced L1 Message index", "index", index)
+	}
+
+	value := index.Uint64()
+	return &value
+}
+
 // WriteSyncedL1BlockNumber writes the highest synced L1 block number to the database.
 func WriteSyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
 	value := big.NewInt(0).SetUint64(L1BlockNumber).Bytes()

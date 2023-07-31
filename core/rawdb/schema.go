@@ -105,6 +105,7 @@ var (
 
 	// Scroll L1 message store
 	syncedL1BlockNumberKey            = []byte("LastSyncedL1BlockNumber")
+	maxSkippedL1MsgIndexKey           = []byte("MaxSkippedL1MsgIndex")
 	l1MessagePrefix                   = []byte("l1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
 	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
 

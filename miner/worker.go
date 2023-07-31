@@ -198,7 +198,7 @@ type worker struct {
 
 	// skip_msg helpers
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
-	maxSkippedL1MsgIndex   uint64
+	maxSkippedL1MsgIndex   *uint64
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -232,7 +232,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh:     make(chan time.Duration),
 		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
-		maxSkippedL1MsgIndex:   0,
+		maxSkippedL1MsgIndex:   rawdb.ReadMaxSkippedL1MsgIndex(eth.ChainDb()),
 	}
 
 	// Subscribe NewTxsEvent for tx pool
@@ -977,9 +977,10 @@ loop:
 			// because we shouldn't skip the entire txs from the same account.
 			// This is also useful for skipping "problematic" L1MessageTxs.
 			log.Trace("Circuit capacity limit reached for a single L1MessageTx", "tx", tx.Hash())
-			L1MsgIndex := tx.AsL1MessageTx().QueueIndex
-			if L1MsgIndex > w.maxSkippedL1MsgIndex {
-				w.maxSkippedL1MsgIndex = L1MsgIndex
+			l1MsgIndex := tx.AsL1MessageTx().QueueIndex
+			if (w.maxSkippedL1MsgIndex == nil) || (l1MsgIndex > *w.maxSkippedL1MsgIndex) {
+				w.maxSkippedL1MsgIndex = &l1MsgIndex
+				rawdb.WriteMaxSkippedL1MsgIndex(w.eth.ChainDb(), l1MsgIndex)
 			}
 			txs.Shift()
 
@@ -993,9 +994,10 @@ loop:
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
 			// shift to the next from the account because we shouldn't skip the entire txs from the same account
 			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash())
-			L1MsgIndex := tx.AsL1MessageTx().QueueIndex
-			if L1MsgIndex > w.maxSkippedL1MsgIndex {
-				w.maxSkippedL1MsgIndex = L1MsgIndex
+			l1MsgIndex := tx.AsL1MessageTx().QueueIndex
+			if (w.maxSkippedL1MsgIndex == nil) || (l1MsgIndex > *w.maxSkippedL1MsgIndex) {
+				w.maxSkippedL1MsgIndex = &l1MsgIndex
+				rawdb.WriteMaxSkippedL1MsgIndex(w.eth.ChainDb(), l1MsgIndex)
 			}
 			txs.Shift()
 
@@ -1043,8 +1045,8 @@ func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
 	}
 	startIndex := *nextQueueIndex
 	// w.maxSkippedL1MsgIndex is initialized as 0 by default, but we probably should not skip it
-	if (w.maxSkippedL1MsgIndex != 0) && (w.maxSkippedL1MsgIndex >= startIndex) {
-		startIndex = w.maxSkippedL1MsgIndex + 1
+	if (w.maxSkippedL1MsgIndex != nil) && (*w.maxSkippedL1MsgIndex >= startIndex) {
+		startIndex = *w.maxSkippedL1MsgIndex + 1
 	}
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)

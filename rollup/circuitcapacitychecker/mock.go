@@ -3,13 +3,17 @@
 package circuitcapacitychecker
 
 import (
+	"math/rand"
+
 	"github.com/scroll-tech/go-ethereum/core/types"
 )
 
-type CircuitCapacityChecker struct{}
+type CircuitCapacityChecker struct {
+	ID uint64
+}
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
-	return &CircuitCapacityChecker{}
+	return &CircuitCapacityChecker{ID: rand.Uint64()}
 }
 
 func (ccc *CircuitCapacityChecker) Reset() {

@@ -234,6 +234,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 		maxSkippedL1MsgIndex:   rawdb.ReadMaxSkippedL1MsgIndex(eth.ChainDb()),
 	}
+	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)

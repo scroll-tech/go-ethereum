@@ -98,17 +98,19 @@ type environment struct {
 	receipts []*types.Receipt
 
 	// circuit capacity check related fields
-	traceEnv *core.TraceEnv        // env for tracing
-	accRows  *types.RowConsumption // accumulated row consumption for a block
+	traceEnv   *core.TraceEnv        // env for tracing
+	accRows    *types.RowConsumption // accumulated row consumption for a block
+	maxL1Index uint64                // maximum L1 index included or skipped
 }
 
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
-	receipts  []*types.Receipt
-	state     *state.StateDB
-	block     *types.Block
-	createdAt time.Time
-	accRows   *types.RowConsumption // accumulated row consumption in the circuit side
+	receipts   []*types.Receipt
+	state      *state.StateDB
+	block      *types.Block
+	createdAt  time.Time
+	accRows    *types.RowConsumption // accumulated row consumption in the circuit side
+	maxL1Index uint64                // maximum L1 index included or skipped
 }
 
 const (
@@ -636,6 +638,12 @@ func (w *worker) taskLoop() {
 				delete(w.pendingTasks, sealHash)
 				w.pendingMu.Unlock()
 			} else {
+				// Store highest L1 queue index processed by this block. This includes both
+				// included and skipped messages. This way, if a block only skips messages,
+				// we won't reprocess the same messages from the next block.
+				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), sealHash, task.maxL1Index+1)
+
+				// Store circuit row consumption.
 				rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), sealHash, task.accRows)
 			}
 		case <-w.exitCh:
@@ -758,6 +766,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	env.tcount = 0
 	env.blockSize = 0
 	env.l1TxCount = 0
+	env.maxL1Index = 0
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
 	// processes in the mean time and starting a new one.
@@ -951,6 +960,7 @@ loop:
 			coalescedLogs = append(coalescedLogs, logs...)
 			if tx.IsL1MessageTx() {
 				w.current.l1TxCount++
+				w.current.maxL1Index = tx.AsL1MessageTx().QueueIndex
 			}
 			w.current.tcount++
 			w.current.blockSize += tx.Size()
@@ -974,7 +984,9 @@ loop:
 			// Circuit capacity check: L1MessageTx row consumption too high, shift to the next from the account,
 			// because we shouldn't skip the entire txs from the same account.
 			// This is also useful for skipping "problematic" L1MessageTxs.
-			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash())
+			queueIndex := tx.AsL1MessageTx().QueueIndex
+			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash(), "queueIndex", queueIndex)
+			w.current.maxL1Index = queueIndex
 			txs.Shift()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
@@ -986,7 +998,9 @@ loop:
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
 			// shift to the next from the account because we shouldn't skip the entire txs from the same account
-			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash())
+			queueIndex := tx.AsL1MessageTx().QueueIndex
+			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash(), "queueIndex", queueIndex)
+			w.current.maxL1Index = queueIndex
 			txs.Shift()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
@@ -1221,7 +1235,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			interval()
 		}
 		select {
-		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: w.current.accRows}:
+		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: w.current.accRows, maxL1Index: w.current.maxL1Index}:
 			w.unconfirmed.Shift(block.NumberU64() - 1)
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"uncles", len(uncles), "txs", w.current.tcount,

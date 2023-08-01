@@ -87,8 +87,8 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	if result.TxRowUsage == nil || result.AccRowUsage == nil {
 		log.Error("fail to apply_tx in CircuitCapacityChecker",
 			"id", ccc.ID, "TxHash", traces.Transactions[0].TxHash,
-			"len(result.TxRowUsage)", len(result.TxRowUsage),
-			"len(result.AccRowUsage)", len(result.AccRowUsage),
+			"result.TxRowUsage", result.TxRowUsage,
+			"result.AccRowUsage", result.AccRowUsage,
 			"err", "TxRowUsage or AccRowUsage is empty unexpectedly")
 		return nil, ErrUnknown
 	}

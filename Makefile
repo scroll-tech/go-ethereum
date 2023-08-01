@@ -18,8 +18,8 @@ nccc_geth: ## geth without circuit capacity checker
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
 geth: libzkp
-# 	export LD_LIBRARY_PATH = ${LD_LIBRARY_PATH}:$(PWD)/rollup/circuitcapacitychecker/libzkp/target/release/
-	export LD_LIBRARY_PATH = $(PWD)/rollup/circuitcapacitychecker/libzkp/target/release/
+# 	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD)/rollup/circuitcapacitychecker/libzkp/target/release/
+	export LD_LIBRARY_PATH=$(PWD)/rollup/circuitcapacitychecker/libzkp/target/release/
 	echo ${LD_LIBRARY_PATH}
 	$(GORUN) build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 	@echo "Done building."

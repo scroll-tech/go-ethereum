@@ -977,8 +977,8 @@ loop:
 			// Circuit capacity check: L1MessageTx row consumption too high, shift to the next from the account,
 			// because we shouldn't skip the entire txs from the same account.
 			// This is also useful for skipping "problematic" L1MessageTxs.
-			log.Trace("Circuit capacity limit reached for a single L1MessageTx", "tx", tx.Hash())
 			l1MsgIndex := tx.AsL1MessageTx().QueueIndex
+			log.Trace("Circuit capacity limit reached for a single L1MessageTx", "tx", tx.Hash(), "queueIndex", l1MsgIndex)
 			if (w.maxSkippedL1MsgIndex == nil) || (l1MsgIndex > *w.maxSkippedL1MsgIndex) {
 				w.maxSkippedL1MsgIndex = &l1MsgIndex
 				rawdb.WriteMaxSkippedL1MsgIndex(w.eth.ChainDb(), l1MsgIndex)
@@ -994,8 +994,8 @@ loop:
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
 			// shift to the next from the account because we shouldn't skip the entire txs from the same account
-			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash())
 			l1MsgIndex := tx.AsL1MessageTx().QueueIndex
+			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash(), "queueIndex", l1MsgIndex)
 			if (w.maxSkippedL1MsgIndex == nil) || (l1MsgIndex > *w.maxSkippedL1MsgIndex) {
 				w.maxSkippedL1MsgIndex = &l1MsgIndex
 				rawdb.WriteMaxSkippedL1MsgIndex(w.eth.ChainDb(), l1MsgIndex)

@@ -231,6 +231,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 	}
+	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)

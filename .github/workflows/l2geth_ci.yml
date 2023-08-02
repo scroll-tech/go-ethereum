@@ -27,7 +27,7 @@ jobs:
       run: |
         make nccc_geth
   build-geth: # build geth with circuit capacity checker
-    if: github.event_name == 'push' # will only be triggered when pushing to main & staging & develop & alpha
+    # if: github.event_name == 'push' # will only be triggered when pushing to main & staging & develop & alpha
     runs-on: ubuntu-latest
     steps:
     - name: Install Go

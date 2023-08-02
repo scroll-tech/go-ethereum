@@ -6,5 +6,5 @@ clean:
 
 libzkp:
 	cargo build --release
-	cp $(PWD)/target/release/libzkp.so $(PWD)/
-	find $(PWD)/target | grep libzktrie.so | xargs -I{} cp {} $(PWD)/
+	sudo cp $(PWD)/target/release/libzkp.so /usr/local/lib/
+	find $(PWD)/target | grep libzktrie.so | xargs -I{} sudo cp {} /usr/local/lib/

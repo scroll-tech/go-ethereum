@@ -10,7 +10,7 @@ GORUN = env GO111MODULE=on go run
 
 .EXPORT_ALL_VARIABLES:
 
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(PWD)/rollup/circuitcapacitychecker/libzkp
 
 libzkp:
 	cd $(PWD)/rollup/circuitcapacitychecker/libzkp && make libzkp

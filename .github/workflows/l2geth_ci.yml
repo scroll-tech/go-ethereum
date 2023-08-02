@@ -26,6 +26,7 @@ jobs:
     - name: Build
       run: |
         sudo mkdir -p /111/
+        sudo touch /111/11.txt
         sudo ls /111/
         ls /111/
         make nccc_geth

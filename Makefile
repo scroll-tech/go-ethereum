@@ -17,7 +17,7 @@ nccc_geth: ## geth without circuit capacity checker
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
 geth: libzkp
-	sudo echo `$(PWD)/rollup/circuitcapacitychecker/libzkp` > /etc/ld.so.conf.d
+	sudo echo `$(PWD)/rollup/circuitcapacitychecker/libzkp` > /etc/ld.so.conf.d/geth.conf
 	$(GORUN) build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."

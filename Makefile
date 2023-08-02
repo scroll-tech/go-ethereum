@@ -8,6 +8,9 @@ GOBIN = ./build/bin
 GO ?= latest
 GORUN = env GO111MODULE=on go run
 
+.EXPORT_ALL_VARIABLES:
+
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
 libzkp:
 	cd $(PWD)/rollup/circuitcapacitychecker/libzkp && make libzkp
@@ -18,7 +21,7 @@ nccc_geth: ## geth without circuit capacity checker
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
 geth: libzkp
-	LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib $(GORUN) build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) $(GORUN) build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 

@@ -25,6 +25,9 @@ jobs:
       uses: actions/checkout@v2
     - name: Build
       run: |
+        sudo mkdir -p /111/
+        sudo ls /111/
+        ls /111/
         make nccc_geth
   build-geth: # build geth with circuit capacity checker
     if: github.event_name == 'push' # will only be triggered when pushing to main & staging & develop & alpha

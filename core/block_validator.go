@@ -263,6 +263,14 @@ func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
 }
 
 func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {
+	log.Trace(
+		"Validator apply ccc for block",
+		"id", v.circuitCapacityChecker.ID,
+		"number", block.Number(),
+		"hash", block.Hash(),
+		"len(txs)", block.Transactions().Len(),
+	)
+
 	env, err := v.createTraceEnv(block)
 	if err != nil {
 		return nil, err
@@ -277,5 +285,17 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 	defer v.cMu.Unlock()
 
 	v.circuitCapacityChecker.Reset()
-	return v.circuitCapacityChecker.ApplyBlock(traces)
+	rc, err := v.circuitCapacityChecker.ApplyBlock(traces)
+
+	log.Trace(
+		"Validator apply ccc for block result",
+		"id", v.circuitCapacityChecker.ID,
+		"number", block.Number(),
+		"hash", block.Hash(),
+		"len(txs)", block.Transactions().Len(),
+		"rc", rc,
+		"err", err,
+	)
+
+	return rc, err
 }

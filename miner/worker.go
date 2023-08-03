@@ -645,7 +645,7 @@ func (w *worker) taskLoop() {
 
 				// Store circuit row consumption.
 				log.Trace(
-					"Worker writing block row consumption",
+					"Worker write block row consumption",
 					"id", w.circuitCapacityChecker.ID,
 					"sealHash", sealHash.String(),
 					"accRows", task.accRows,

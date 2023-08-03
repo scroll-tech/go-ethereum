@@ -108,6 +108,12 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		if err != nil {
 			return err
 		}
+		log.Trace(
+			"Validator write block row consumption",
+			"id", v.circuitCapacityChecker.ID,
+			"sealHash", block.Hash().String(),
+			"rowConsumption", rowConsumption,
+		)
 		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), rowConsumption)
 	}
 	return nil

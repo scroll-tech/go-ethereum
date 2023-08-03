@@ -1227,6 +1227,10 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	// set w.current.accRows for empty-but-not-genesis block
 	if (w.current.header.Number.Uint64() != 0) &&
 		(w.current.accRows == nil || len(*w.current.accRows) == 0) {
+		// clean up traceEnv's ExecutionResults&TxStorageTraces because we put a placeholder tx before (for applying a tx),
+		// however, this won't be true if we have an empty block
+		w.current.traceEnv.ExecutionResults = make([]*types.ExecutionResult, 0)
+		w.current.traceEnv.TxStorageTraces = make([]*types.StorageTrace, 0)
 		traces, err := w.current.traceEnv.GetBlockTrace(types.NewBlockWithHeader(w.current.header))
 		if err != nil {
 			return err

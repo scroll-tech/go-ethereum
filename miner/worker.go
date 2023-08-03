@@ -1229,7 +1229,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 		if err != nil {
 			return err
 		}
-		accRows, err := w.circuitCapacityChecker.ApplyTransaction(traces)
+		accRows, err := w.circuitCapacityChecker.ApplyBlock(traces)
 		if err != nil {
 			return err
 		}

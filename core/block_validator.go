@@ -267,7 +267,7 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 		"Validator apply ccc for block",
 		"id", v.circuitCapacityChecker.ID,
 		"number", block.Number(),
-		"hash", block.Hash(),
+		"hash", block.Hash().String(),
 		"len(txs)", block.Transactions().Len(),
 	)
 
@@ -285,13 +285,14 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 	defer v.cMu.Unlock()
 
 	v.circuitCapacityChecker.Reset()
+	log.Trace("Validator reset ccc")
 	rc, err := v.circuitCapacityChecker.ApplyBlock(traces)
 
 	log.Trace(
 		"Validator apply ccc for block result",
 		"id", v.circuitCapacityChecker.ID,
 		"number", block.Number(),
-		"hash", block.Hash(),
+		"hash", block.Hash().String(),
 		"len(txs)", block.Transactions().Len(),
 		"rc", rc,
 		"err", err,

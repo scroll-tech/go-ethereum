@@ -647,7 +647,7 @@ func (w *worker) taskLoop() {
 				log.Trace(
 					"Worker writing block row consumption",
 					"id", w.circuitCapacityChecker.ID,
-					"sealHash", sealHash,
+					"sealHash", sealHash.String(),
 					"accRows", task.accRows,
 				)
 				rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), sealHash, task.accRows)

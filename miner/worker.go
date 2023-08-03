@@ -840,6 +840,12 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
+	log.Trace(
+		"Worker apply ccc for tx",
+		"id", w.circuitCapacityChecker.ID,
+		"txhash", tx.Hash(),
+	)
+
 	// has to check circuit capacity before `core.ApplyTransaction`,
 	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert
 	traces, err := w.current.traceEnv.GetBlockTrace(
@@ -857,7 +863,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		return nil, err
 	}
 	log.Trace(
-		"Worker tx ccc result",
+		"Worker apply ccc for tx result",
 		"id", w.circuitCapacityChecker.ID,
 		"txhash", tx.Hash(),
 		"accRows", accRows,

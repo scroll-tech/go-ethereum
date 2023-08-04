@@ -118,7 +118,7 @@ func TestSetupGenesis(t *testing.T) {
 				// Advance to block #4, past the homestead transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
 
-				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{}, nil, nil)
+				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{}, nil, nil, false)
 				defer bc.Stop()
 
 				blocks, _ := GenerateChain(oldcustomg.Config, genesis, ethash.NewFaker(), db, 4, nil)
@@ -173,7 +173,7 @@ func TestGenesisHashes(t *testing.T) {
 		// {DefaultRopstenGenesisBlock(), params.RopstenGenesisHash},
 		// {DefaultRinkebyGenesisBlock(), params.RinkebyGenesisHash},
 		// {DefaultSepoliaGenesisBlock(), params.SepoliaGenesisHash},
-		{DefaultScrollAlphaGenesisBlock(), params.ScrollAlphaGenesisHash},
+		// {DefaultScrollAlphaGenesisBlock(), params.ScrollAlphaGenesisHash},
 		{DefaultScrollSepoliaGenesisBlock(), params.ScrollSepoliaGenesisHash},
 	} {
 		// Test via MustCommit

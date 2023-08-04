@@ -1736,8 +1736,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		}
 		cfg.Genesis = core.DefaultScrollSepoliaGenesisBlock()
 		// forced for sepolia
+		log.Info("Setting flag", "--l1.confirmations", "finalized")
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
-		stack.Config().L1DeploymentBlock = 0 // TODO adjust this when the contracts are deployed
+		log.Info("Setting flag", "--l1.sync.startblock", "4025746")
+		stack.Config().L1DeploymentBlock = 4025746
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337

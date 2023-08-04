@@ -35,7 +35,7 @@ var (
 	RinkebyGenesisHash       = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
 	GoerliGenesisHash        = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
 	ScrollAlphaGenesisHash   = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
-	ScrollSepoliaGenesisHash = common.HexToHash("0x8deefb75edbf59fbff1cd9ffd6ebcd42dced646a1487ef369e0a64ccfc8b1fa2")
+	ScrollSepoliaGenesisHash = common.HexToHash("0x82f79483ba08c0411b4cb52031b57695eebecebf4169d777740cd069959b0ba1")
 )
 
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
@@ -257,7 +257,7 @@ var (
 	}
 
 	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
-	ScrollMaxTxPerBlock             = 44
+	ScrollMaxTxPerBlock             = 100
 	ScrollMaxTxPayloadBytesPerBlock = 120 * 1024
 
 	ScrollAlphaChainConfig = &ChainConfig{
@@ -329,7 +329,7 @@ var (
 			EnableEIP1559:             false,
 			L1Config: &L1Config{
 				L1ChainId:             11155111,
-				L1MessageQueueAddress: common.HexToAddress("0x290e1f14766453a30968D7b9e8C265d1aFB7FB24"),
+				L1MessageQueueAddress: common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
 				NumL1MessagesPerBlock: 10,
 			},
 		},

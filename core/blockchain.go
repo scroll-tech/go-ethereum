@@ -1186,10 +1186,10 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	// note: we can insert blocks with header-only ancestors here,
 	// so queueIndex might not yet be available in DB.
 	if queueIndex != nil {
-		numProcessed := block.NumL1MessagesProcessed(*queueIndex)
+		numProcessed := uint64(block.NumL1MessagesProcessed(*queueIndex))
 		// do not overwrite the index written by the miner worker
 		if index := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.Hash()); index == nil {
-			newIndex := *queueIndex + uint64(block.NumL1MessagesProcessed(*queueIndex))
+			newIndex := *queueIndex + numProcessed
 			log.Trace(
 				"Blockchain.writeBlockWithoutState WriteFirstQueueIndexNotInL2Block",
 				"number", block.Number(),
@@ -1272,10 +1272,10 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		// so the parent will always be inserted first.
 		log.Crit("Queue index in DB is nil", "parent", block.ParentHash(), "hash", block.Hash())
 	}
-	numProcessed := block.NumL1MessagesProcessed(*queueIndex)
+	numProcessed := uint64(block.NumL1MessagesProcessed(*queueIndex))
 	// do not overwrite the index written by the miner worker
 	if index := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.Hash()); index == nil {
-		newIndex := *queueIndex + uint64(block.NumL1MessagesProcessed(*queueIndex))
+		newIndex := *queueIndex + numProcessed
 		log.Trace(
 			"Blockchain.writeBlockWithState WriteFirstQueueIndexNotInL2Block",
 			"number", block.Number(),

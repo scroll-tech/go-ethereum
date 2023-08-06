@@ -705,7 +705,21 @@ func (w *worker) resultLoop() {
 				// Note: This accounts for both included and skipped messages. This
 				// way, if a block only skips messages, we won't reprocess the same
 				// messages from the next block.
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"task.nextL1MsgIndex", task.nextL1MsgIndex,
+				)
 				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
+			} else {
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"index", *index,
+					"task.nextL1MsgIndex", task.nextL1MsgIndex,
+				)
 			}
 			// Store circuit row consumption.
 			log.Trace(

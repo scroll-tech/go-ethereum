@@ -698,11 +698,15 @@ func (w *worker) resultLoop() {
 				}
 				logs = append(logs, receipt.Logs...)
 			}
-			// Store first L1 queue index not processed by this block.
-			// Note: This accounts for both included and skipped messages. This
-			// way, if a block only skips messages, we won't reprocess the same
-			// messages from the next block.
-			rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
+			// It's possible that we've stored L1 queue index for this block previously,
+			// in this case do not overwrite it.
+			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
+				// Store first L1 queue index not processed by this block.
+				// Note: This accounts for both included and skipped messages. This
+				// way, if a block only skips messages, we won't reprocess the same
+				// messages from the next block.
+				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
+			}
 			// Store circuit row consumption.
 			log.Trace(
 				"Worker write block row consumption",

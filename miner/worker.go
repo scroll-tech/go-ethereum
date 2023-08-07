@@ -880,7 +880,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
 	// the `refund` value will still be correct, because:
 	// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
-	// 2.2 after tracing, the state is either commited in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
+	// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 	// 2.3 when starting handling the following txs, `state.refund` comes as 0
 	traces, err := w.current.traceEnv.GetBlockTrace(
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),

@@ -1002,7 +1002,12 @@ loop:
 
 		logs, err := w.commitTransaction(tx, coinbase)
 		switch {
-		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx() && w.current.l1TxCount == 0:
+		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
+			// If this block already contains some L1 messages,
+			// terminate here and try again in the next block.
+			if w.current.l1TxCount > 0 {
+				break loop
+			}
 			// A single L1 message leads to out-of-gas. Skip it.
 			queueIndex := tx.AsL1MessageTx().QueueIndex
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")

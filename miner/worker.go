@@ -760,11 +760,13 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		return err
 	}
 
-	commitAfterApply := false // don't commit during tracing for circuit capacity checker, otherwise we cannot revert
+	// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
+	// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
+	commitStateAfterApply := false
 	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
-		commitAfterApply)
+		commitStateAfterApply)
 	if err != nil {
 		return err
 	}
@@ -873,8 +875,13 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		"txhash", tx.Hash(),
 	)
 
-	// has to check circuit capacity before `core.ApplyTransaction`,
-	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert
+	// 1. we have to check circuit capacity before `core.ApplyTransaction`,
+	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert.
+	// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
+	// the `refund` value will still be correct, because:
+	// 2.1 the first tx comes with a state an intial refund value of 0,
+	// 2.2 after tracing, the state is either commited in , or reverted, 
+	// 2.3 the following txs c
 	traces, err := w.current.traceEnv.GetBlockTrace(
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 	)

@@ -59,6 +59,30 @@ type txTraceTask struct {
 	index   int
 }
 
+func CreateTraceEnvDirect(chainConfig *params.ChainConfig, blockCtx vm.BlockContext, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+	return &TraceEnv{
+		logConfig: &vm.LogConfig{
+			EnableMemory:     false,
+			EnableReturnData: true,
+		},
+		commitAfterApply: commitAfterApply,
+		chainConfig:      chainConfig,
+		coinbase:         coinbase,
+		signer:           types.MakeSigner(chainConfig, block.Number()),
+		state:            statedb,
+		blockCtx:         blockCtx,
+		StorageTrace: &types.StorageTrace{
+			RootBefore:    rootBefore,
+			RootAfter:     block.Root(),
+			Proofs:        make(map[string][]hexutil.Bytes),
+			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+		},
+		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
+		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
+		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
+	}
+}
+
 func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 	var err error
@@ -71,27 +95,15 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		}
 	}
 
-	env := &TraceEnv{
-		logConfig: &vm.LogConfig{
-			EnableMemory:     false,
-			EnableReturnData: true,
-		},
-		commitAfterApply: commitAfterApply,
-		chainConfig:      chainConfig,
-		coinbase:         coinbase,
-		signer:           types.MakeSigner(chainConfig, block.Number()),
-		state:            statedb,
-		blockCtx:         NewEVMBlockContext(block.Header(), chainContext, nil),
-		StorageTrace: &types.StorageTrace{
-			RootBefore:    parent.Root(),
-			RootAfter:     block.Root(),
-			Proofs:        make(map[string][]hexutil.Bytes),
-			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
-		},
-		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
-		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
-		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
-	}
+	env := CreateTraceEnvDirect(
+		chainConfig,
+		NewEVMBlockContext(block.Header(), chainContext, nil),
+		coinbase,
+		statedb,
+		parent.Root(),
+		block,
+		commitAfterApply,
+	)
 
 	key := coinbase.String()
 	if _, exist := env.Proofs[key]; !exist {

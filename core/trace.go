@@ -59,12 +59,9 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvDirect(chainConfig *params.ChainConfig, blockCtx vm.BlockContext, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func CreateTraceEnvDirect(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
 	return &TraceEnv{
-		logConfig: &vm.LogConfig{
-			EnableMemory:     false,
-			EnableReturnData: true,
-		},
+		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
 		chainConfig:      chainConfig,
 		coinbase:         coinbase,
@@ -97,6 +94,10 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 
 	env := CreateTraceEnvDirect(
 		chainConfig,
+		&vm.LogConfig{
+			EnableMemory:     false,
+			EnableReturnData: true,
+		},
 		NewEVMBlockContext(block.Header(), chainContext, nil),
 		coinbase,
 		statedb,

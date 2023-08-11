@@ -1093,6 +1093,7 @@ loop:
 			if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
+				w.current.nextL1MsgIndex = queueIndex + 1
 			}
 			txs.Shift()
 		}

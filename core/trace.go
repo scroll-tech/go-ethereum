@@ -10,9 +10,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
@@ -44,6 +46,11 @@ type TraceEnv struct {
 	// zktrie tracer is used for zktrie storage to build additional deletion proof
 	ZkTrieTracer     map[string]state.ZktrieProofTracer
 	ExecutionResults []*types.ExecutionResult
+
+	// StartL1QueueIndex is the next L1 message queue index that this block can process.
+	// Example: If the parent block included QueueIndex=10, then StartL1QueueIndex will
+	// be 11.
+	StartL1QueueIndex uint64
 }
 
 // Context is the same as Context in eth/tracers/tracers.go
@@ -59,7 +66,7 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 	var err error
 	if chainConfig.Scroll.FeeVaultEnabled() {
@@ -69,6 +76,14 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		if err != nil {
 			log.Warn("recover coinbase in CreateTraceEnv fail. using zero-address", "err", err, "blockNumber", block.Header().Number, "headerHash", block.Header().Hash())
 		}
+	}
+
+	// collect start queue index,
+	// we should always have this value for blocks that have been executed
+	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, block.Hash())
+	if startL1QueueIndex == nil {
+		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", block.NumberU64(), "hash", block.Hash())
+		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v", block.Hash())
 	}
 
 	env := &TraceEnv{
@@ -88,9 +103,10 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		},
-		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
-		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
-		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
+		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
+		ExecutionResults:  make([]*types.ExecutionResult, block.Transactions().Len()),
+		TxStorageTraces:   make([]*types.StorageTrace, block.Transactions().Len()),
+		StartL1QueueIndex: *startL1QueueIndex,
 	}
 
 	key := coinbase.String()
@@ -467,11 +483,12 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			PoseidonCodeHash: statedb.GetPoseidonCodeHash(env.coinbase),
 			CodeSize:         statedb.GetCodeSize(env.coinbase),
 		},
-		Header:           block.Header(),
-		StorageTrace:     env.StorageTrace,
-		ExecutionResults: env.ExecutionResults,
-		TxStorageTraces:  env.TxStorageTraces,
-		Transactions:     txs,
+		Header:            block.Header(),
+		StorageTrace:      env.StorageTrace,
+		ExecutionResults:  env.ExecutionResults,
+		TxStorageTraces:   env.TxStorageTraces,
+		Transactions:      txs,
+		StartL1QueueIndex: env.StartL1QueueIndex,
 	}
 
 	for i, tx := range block.Transactions() {

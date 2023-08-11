@@ -978,6 +978,7 @@ loop:
 				"expected", w.current.nextL1MsgIndex,
 				"got", tx.AsL1MessageTx().QueueIndex,
 			)
+			break
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())

@@ -902,6 +902,36 @@ func TestLargeL1MessageSkipPayloadCheck(t *testing.T) {
 	})
 }
 
+func TestSkipMessageWithStrangeError(t *testing.T) {
+	assert := assert.New(t)
+
+	// message #0 is skipped because of `Value`
+	// TODO: trigger skipping in some other way after this behaviour is changed
+	msgs := []types.L1MessageTx{
+		{QueueIndex: 0, Gas: 25100, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}, Value: big.NewInt(1)},
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}},
+	}
+
+	l1MessageTest(t, msgs, false, func(blockNum int, block *types.Block, db ethdb.Database) bool {
+		// skip #0, include #1 and #2
+		assert.Equal(2, len(block.Transactions()))
+		assert.True(block.Transactions()[0].IsL1MessageTx())
+
+		assert.True(block.Transactions()[0].IsL1MessageTx())
+		assert.Equal(uint64(1), block.Transactions()[0].AsL1MessageTx().QueueIndex)
+		assert.True(block.Transactions()[1].IsL1MessageTx())
+		assert.Equal(uint64(2), block.Transactions()[1].AsL1MessageTx().QueueIndex)
+
+		// db is updated correctly
+		queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
+		assert.NotNil(queueIndex)
+		assert.Equal(uint64(3), *queueIndex)
+
+		return true
+	})
+}
+
 func TestSkipAllL1MessagesInBlock(t *testing.T) {
 	assert := assert.New(t)
 

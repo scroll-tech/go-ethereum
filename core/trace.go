@@ -78,12 +78,21 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		}
 	}
 
-	// collect start queue index,
-	// we should always have this value for blocks that have been executed
-	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, block.Hash())
+	// Collect start queue index, we should always have this value for blocks
+	// that have been executed.
+	// FIXME: This value will be incorrect on the signer, since we reuse this
+	// DB entry to signal which index the worker should continue from.
+	// Example: Ledger A <-- B <-- C. Block `A` contains up to `QueueIndex=9`.
+	// For block `B`, the worker skips 10 messages and includes 0.
+	// `ReadFirstQueueIndexNotInL2Block(B)` will then return `20` on the
+	// signer to avoid re-processing the same 10 transactions again for
+	// block `C`.
+	// `ReadFirstQueueIndexNotInL1Block(B)` will return the correct value
+	// `10` on follower nodes.
+	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, parent.Hash())
 	if startL1QueueIndex == nil {
-		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", block.NumberU64(), "hash", block.Hash())
-		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v", block.Hash())
+		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parent.NumberU64(), "hash", parent.Hash())
+		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
 	}
 
 	env := &TraceEnv{

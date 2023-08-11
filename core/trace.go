@@ -48,8 +48,8 @@ type TraceEnv struct {
 	ExecutionResults []*types.ExecutionResult
 
 	// StartL1QueueIndex is the next L1 message queue index that this block can process.
-	// Example: If the parent block included QueueIndex=10, then StartL1QueueIndex will
-	// be 11.
+	// Example: If the parent block included QueueIndex=9, then StartL1QueueIndex will
+	// be 10.
 	StartL1QueueIndex uint64
 }
 

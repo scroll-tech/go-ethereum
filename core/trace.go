@@ -10,9 +10,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
@@ -44,6 +46,11 @@ type TraceEnv struct {
 	// zktrie tracer is used for zktrie storage to build additional deletion proof
 	ZkTrieTracer     map[string]state.ZktrieProofTracer
 	ExecutionResults []*types.ExecutionResult
+
+	// StartL1QueueIndex is the next L1 message queue index that this block can process.
+	// Example: If the parent block included QueueIndex=9, then StartL1QueueIndex will
+	// be 10.
+	StartL1QueueIndex uint64
 }
 
 // Context is the same as Context in eth/tracers/tracers.go
@@ -59,7 +66,7 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvDirect(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func CreateTraceEnvDirect(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
 	return &TraceEnv{
 		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
@@ -74,13 +81,14 @@ func CreateTraceEnvDirect(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		},
-		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
-		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
-		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
+		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
+		ExecutionResults:  make([]*types.ExecutionResult, block.Transactions().Len()),
+		TxStorageTraces:   make([]*types.StorageTrace, block.Transactions().Len()),
+		StartL1QueueIndex: startL1QueueIndex,
 	}
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 	var err error
 	if chainConfig.Scroll.FeeVaultEnabled() {
@@ -92,6 +100,22 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		}
 	}
 
+	// Collect start queue index, we should always have this value for blocks
+	// that have been executed.
+	// FIXME: This value will be incorrect on the signer, since we reuse this
+	// DB entry to signal which index the worker should continue from.
+	// Example: Ledger A <-- B <-- C. Block `A` contains up to `QueueIndex=9`.
+	// For block `B`, the worker skips 10 messages and includes 0.
+	// `ReadFirstQueueIndexNotInL2Block(B)` will then return `20` on the
+	// signer to avoid re-processing the same 10 transactions again for
+	// block `C`.
+	// `ReadFirstQueueIndexNotInL1Block(B)` will return the correct value
+	// `10` on follower nodes.
+	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, parent.Hash())
+	if startL1QueueIndex == nil {
+		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parent.NumberU64(), "hash", parent.Hash())
+		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
+	}
 	env := CreateTraceEnvDirect(
 		chainConfig,
 		&vm.LogConfig{
@@ -99,6 +123,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 			EnableReturnData: true,
 		},
 		NewEVMBlockContext(block.Header(), chainContext, nil),
+		*startL1QueueIndex,
 		coinbase,
 		statedb,
 		parent.Root(),
@@ -480,23 +505,24 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			PoseidonCodeHash: statedb.GetPoseidonCodeHash(env.coinbase),
 			CodeSize:         statedb.GetCodeSize(env.coinbase),
 		},
-		Header:           block.Header(),
-		StorageTrace:     env.StorageTrace,
-		ExecutionResults: env.ExecutionResults,
-		TxStorageTraces:  env.TxStorageTraces,
-		Transactions:     txs,
+		Header:            block.Header(),
+		StorageTrace:      env.StorageTrace,
+		ExecutionResults:  env.ExecutionResults,
+		TxStorageTraces:   env.TxStorageTraces,
+		Transactions:      txs,
+		StartL1QueueIndex: env.StartL1QueueIndex,
 	}
 
 	for i, tx := range block.Transactions() {
 		evmTrace := env.ExecutionResults[i]
-		// probably a Contract Call
-		if len(tx.Data()) != 0 && tx.To() != nil {
+		// Contract is created.
+		if tx.To() == nil {
+			evmTrace.ByteCode = hexutil.Encode(tx.Data())
+		} else { // contract call be included at this case, specially fallback call's data is empty.
 			evmTrace.ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
 			// Get tx.to address's code hash.
 			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
 			evmTrace.PoseidonCodeHash = &codeHash
-		} else if tx.To() == nil { // Contract is created.
-			evmTrace.ByteCode = hexutil.Encode(tx.Data())
 		}
 	}
 

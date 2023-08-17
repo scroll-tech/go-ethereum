@@ -8,8 +8,8 @@ import (
 
 var (
 	ErrUnknown                     = errors.New("unknown circuit capacity checker error")
-	ErrTxRowConsumptionOverflow    = errors.New("tx row consumption oveflow")
-	ErrBlockRowConsumptionOverflow = errors.New("block row consumption oveflow")
+	ErrTxRowConsumptionOverflow    = errors.New("tx row consumption overflow")
+	ErrBlockRowConsumptionOverflow = errors.New("block row consumption overflow")
 )
 
 type WrappedRowUsage struct {

@@ -887,6 +887,16 @@ web3._extend({
 			params: 2,
 			inputFormatter: [null, function (val) { return !!val; }]
 		}),
+		new web3._extend.Method({
+			name: 'getSkippedTransaction',
+			call: 'scroll_getSkippedTransaction',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getSkippedL1MessageHashes',
+			call: 'scroll_getSkippedL1MessageHashes',
+			params: 2
+		}),
 	],
 	properties:
 	[
@@ -897,7 +907,11 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'latestRelayedQueueIndex',
 			getter: 'scroll_getLatestRelayedQueueIndex'
-		})
+		}),
+		new web3._extend.Property({
+			name: 'numSkippedL1Messages',
+			getter: 'scroll_getNumSkippedL1Messages'
+		}),
 	]
 });
 `

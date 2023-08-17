@@ -979,6 +979,7 @@ loop:
 				"expected", w.current.nextL1MsgIndex,
 				"got", tx.AsL1MessageTx().QueueIndex,
 			)
+			break
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
@@ -1102,6 +1103,7 @@ loop:
 			if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
+				w.current.nextL1MsgIndex = queueIndex + 1
 				rawdb.WriteSkippedL1Message(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
 			}
 			txs.Shift()

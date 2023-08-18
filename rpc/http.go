@@ -231,7 +231,7 @@ func newEncodeCompression(encoding string, w io.Writer) io.Writer {
 
 func newDecodeCompression(decoding string, rc io.ReadCloser) (io.ReadCloser, error) {
 	tps := strings.Split(strings.TrimSpace(strings.ToLower(decoding)), ",")
-	var res = rc
+	var res io.ReadCloser
 	switch tps[0] {
 	case "gzip":
 		gz, err := gzip.NewReader(rc)

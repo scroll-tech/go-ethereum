@@ -43,8 +43,10 @@ The state transitioning model does all the necessary work to work out a valid ne
 3) Create a new state object if the recipient is \0*32
 4) Value transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+
+	4a) Attempt to run transaction data
+	4b) If valid, use result as code for the new state object
+
 == end ==
 5) Run Script section
 6) Derive new state root
@@ -315,13 +317,13 @@ func (st *StateTransition) preCheck() error {
 // TransitionDb will transition the state by applying the current message and
 // returning the evm execution result with following fields.
 //
-// - used gas:
-//      total gas used (including gas being refunded)
-// - returndata:
-//      the returned data from evm
-// - concrete execution error:
-//      various **EVM** error which aborts the execution,
-//      e.g. ErrOutOfGas, ErrExecutionReverted
+//   - used gas:
+//     total gas used (including gas being refunded)
+//   - returndata:
+//     the returned data from evm
+//   - concrete execution error:
+//     various **EVM** error which aborts the execution,
+//     e.g. ErrOutOfGas, ErrExecutionReverted
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
@@ -413,16 +415,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		}
 	}
 
-	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
-		// The L2 Fee is the same as the fee that is charged in the normal geth
-		// codepath. Add the L1DataFee to the L2 fee for the total fee that is sent
-		// to the sequencer.
-		l2Fee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip)
-		fee := new(big.Int).Add(st.l1DataFee, l2Fee)
-		st.state.AddBalance(st.evm.FeeRecipient(), fee)
-	} else {
-		st.state.AddBalance(st.evm.FeeRecipient(), new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
-	}
+	// The L2 Fee is the same as the fee that is charged in the normal geth
+	// codepath. Add the L1DataFee to the L2 fee for the total fee that is sent
+	// to the sequencer.
+	l2Fee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip)
+	fee := new(big.Int).Add(st.l1DataFee, l2Fee)
+	st.state.AddBalance(st.evm.FeeRecipient(), fee)
 
 	return &ExecutionResult{
 		L1DataFee:  st.l1DataFee,

@@ -914,9 +914,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
 		w.current.state.RevertToSnapshot(snap)
-		// create new snapshot for `core.ApplyTransaction`
-		snap = w.current.state.Snapshot()
 	}
+
+	// create new snapshot for `core.ApplyTransaction`
+	snap = w.current.state.Snapshot()
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {

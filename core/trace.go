@@ -66,7 +66,7 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvDirect(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func createTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
 	return &TraceEnv{
 		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
@@ -116,13 +116,13 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parent.NumberU64(), "hash", parent.Hash())
 		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
 	}
-	env := CreateTraceEnvDirect(
+	env := createTraceEnvHelper(
 		chainConfig,
 		&vm.LogConfig{
 			EnableMemory:     false,
 			EnableReturnData: true,
 		},
-		NewEVMBlockContext(block.Header(), chainContext, nil),
+		NewEVMBlockContext(block.Header(), chainContext, chainConfig, nil),
 		*startL1QueueIndex,
 		coinbase,
 		statedb,

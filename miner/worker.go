@@ -273,6 +273,12 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	return worker
 }
 
+// getCCC returns a pointer to this worker's CCC instance.
+// Only used in tests.
+func (w *worker) getCCC() *circuitcapacitychecker.CircuitCapacityChecker {
+	return w.circuitCapacityChecker
+}
+
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.mu.Lock()
@@ -867,46 +873,53 @@ func (w *worker) updateSnapshot() {
 }
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
+	var accRows *types.RowConsumption
+
+	// do not do CCC checks on follower nodes
+	if w.isRunning() {
+		snap := w.current.state.Snapshot()
+
+		log.Trace(
+			"Worker apply ccc for tx",
+			"id", w.circuitCapacityChecker.ID,
+			"txhash", tx.Hash(),
+		)
+
+		// 1. we have to check circuit capacity before `core.ApplyTransaction`,
+		// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert.
+		// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
+		// the `refund` value will still be correct, because:
+		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
+		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
+		// 2.3 when starting handling the following txs, `state.refund` comes as 0
+		traces, err := w.current.traceEnv.GetBlockTrace(
+			types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
+		)
+		if err != nil {
+			// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
+			w.current.state.RevertToSnapshot(snap)
+			return nil, err
+		}
+		accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
+		if err != nil {
+			// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
+			w.current.state.RevertToSnapshot(snap)
+			return nil, err
+		}
+		log.Trace(
+			"Worker apply ccc for tx result",
+			"id", w.circuitCapacityChecker.ID,
+			"txhash", tx.Hash(),
+			"accRows", accRows,
+		)
+
+		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
+		w.current.state.RevertToSnapshot(snap)
+	}
+
+	// create new snapshot for `core.ApplyTransaction`
 	snap := w.current.state.Snapshot()
 
-	log.Trace(
-		"Worker apply ccc for tx",
-		"id", w.circuitCapacityChecker.ID,
-		"txhash", tx.Hash(),
-	)
-
-	// 1. we have to check circuit capacity before `core.ApplyTransaction`,
-	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert.
-	// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
-	// the `refund` value will still be correct, because:
-	// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
-	// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
-	// 2.3 when starting handling the following txs, `state.refund` comes as 0
-	traces, err := w.current.traceEnv.GetBlockTrace(
-		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
-	)
-	if err != nil {
-		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
-	accRows, err := w.circuitCapacityChecker.ApplyTransaction(traces)
-	if err != nil {
-		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
-	log.Trace(
-		"Worker apply ccc for tx result",
-		"id", w.circuitCapacityChecker.ID,
-		"txhash", tx.Hash(),
-		"accRows", accRows,
-	)
-
-	// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
-	w.current.state.RevertToSnapshot(snap)
-	// create new snapshot for `core.ApplyTransaction`
-	snap = w.current.state.Snapshot()
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
@@ -978,6 +991,7 @@ loop:
 				"expected", w.current.nextL1MsgIndex,
 				"got", tx.AsL1MessageTx().QueueIndex,
 			)
+			break
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
@@ -1064,13 +1078,23 @@ loop:
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
 			w.current.nextL1MsgIndex = queueIndex + 1
-			txs.Shift()
+
+			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
+			// associated with this transaction so we cannot pack more transactions.
+			// TODO: fix this in ccc and change these lines back to `txs.Shift()`
+			circuitCapacityReached = true
+			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: L2MessageTx row consumption too high, skip the account.
 			// This is also useful for skipping "problematic" L2MessageTxs.
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
-			txs.Pop()
+
+			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
+			// associated with this transaction so we cannot pack more transactions.
+			// TODO: fix this in ccc and change these lines back to `txs.Pop()`
+			circuitCapacityReached = true
+			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
@@ -1079,12 +1103,22 @@ loop:
 			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			w.current.nextL1MsgIndex = queueIndex + 1
-			txs.Shift()
+
+			// after `ErrUnknown`, ccc might not revert updates associated
+			// with this transaction so we cannot pack more transactions.
+			// TODO: fix this in ccc and change these lines back to `txs.Shift()`
+			circuitCapacityReached = true
+			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
-			txs.Pop()
+
+			// after `ErrUnknown`, ccc might not revert updates associated
+			// with this transaction so we cannot pack more transactions.
+			// TODO: fix this in ccc and change these lines back to `txs.Pop()`
+			circuitCapacityReached = true
+			break loop
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
@@ -1093,6 +1127,7 @@ loop:
 			if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
+				w.current.nextL1MsgIndex = queueIndex + 1
 			}
 			txs.Shift()
 		}
@@ -1302,7 +1337,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time) error {
 	// set w.current.accRows for empty-but-not-genesis block
 	if (w.current.header.Number.Uint64() != 0) &&
-		(w.current.accRows == nil || len(*w.current.accRows) == 0) {
+		(w.current.accRows == nil || len(*w.current.accRows) == 0) && w.isRunning() {
 		log.Trace(
 			"Worker apply ccc for empty block",
 			"id", w.circuitCapacityChecker.ID,

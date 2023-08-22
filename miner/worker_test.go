@@ -1006,7 +1006,7 @@ func TestOversizedTxThenNormal(t *testing.T) {
 		switch blockNum {
 		case 0:
 			// schedule to skip 2nd call to ccc
-			w.getCCC().ScheduleError(2, circuitcapacitychecker.ErrTxRowConsumptionOverflow)
+			w.getCCC().ScheduleError(2, circuitcapacitychecker.ErrBlockRowConsumptionOverflow)
 			return false
 		case 1:
 			// include #0, skip #1, then terminate

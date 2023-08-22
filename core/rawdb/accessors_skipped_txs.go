@@ -16,12 +16,12 @@ import (
 // mutex used to avoid concurrent updates of NumSkippedTransactions
 var mu sync.Mutex
 
-// writeNumSkippedTransactions writes the number of skipped L1 transactions to the database.
+// writeNumSkippedTransactions writes the number of skipped transactions to the database.
 func writeNumSkippedTransactions(db ethdb.KeyValueWriter, numSkipped uint64) {
 	value := big.NewInt(0).SetUint64(numSkipped).Bytes()
 
 	if err := db.Put(numSkippedTransactionsKey, value); err != nil {
-		log.Crit("Failed to update the number of skipped L1 transactions", "err", err)
+		log.Crit("Failed to update the number of skipped transactions", "err", err)
 	}
 }
 
@@ -32,7 +32,7 @@ func ReadNumSkippedTransactions(db ethdb.Reader) uint64 {
 		return 0
 	}
 	if err != nil {
-		log.Crit("Failed to read number of skipped L1 transactions from database", "err", err)
+		log.Crit("Failed to read number of skipped transactions from database", "err", err)
 	}
 	if len(data) == 0 {
 		return 0
@@ -40,7 +40,7 @@ func ReadNumSkippedTransactions(db ethdb.Reader) uint64 {
 
 	number := new(big.Int).SetBytes(data)
 	if !number.IsUint64() {
-		log.Crit("Unexpected number of skipped L1 transactions in database", "number", number)
+		log.Crit("Unexpected number of skipped transactions in database", "number", number)
 	}
 	return number.Uint64()
 }

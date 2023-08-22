@@ -114,7 +114,7 @@ var (
 	// Skipped transactions
 	numSkippedTransactionsKey    = []byte("NumberOfSkippedTransactions")
 	skippedTransactionPrefix     = []byte("skip") // skippedTransactionPrefix + tx hash -> skipped transaction
-	skippedTransactionHashPrefix = []byte("sh")   // skippedL1MessageHashPrefix + index -> tx hash
+	skippedTransactionHashPrefix = []byte("sh")   // skippedTransactionHashPrefix + index -> tx hash
 )
 
 const (

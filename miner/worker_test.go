@@ -1027,7 +1027,7 @@ func TestOversizedTxThenNormal(t *testing.T) {
 	})
 }
 
-func TestSkippedL1MessageDatabaseEntries(t *testing.T) {
+func TestSkippedTransactionDatabaseEntries(t *testing.T) {
 	assert := assert.New(t)
 
 	msgs := []types.L1MessageTx{

@@ -893,8 +893,8 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'getSkippedL1MessageHashes',
-			call: 'scroll_getSkippedL1MessageHashes',
+			name: 'getSkippedTransactionHashes',
+			call: 'scroll_getSkippedTransactionHashes',
 			params: 2
 		}),
 	],
@@ -909,8 +909,8 @@ web3._extend({
 			getter: 'scroll_getLatestRelayedQueueIndex'
 		}),
 		new web3._extend.Property({
-			name: 'numSkippedL1Messages',
-			getter: 'scroll_getNumSkippedL1Messages'
+			name: 'numSkippedTransactions',
+			getter: 'scroll_getNumSkippedTransactions'
 		}),
 	]
 });

@@ -112,9 +112,9 @@ var (
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
 
 	// Skipped transactions
-	numSkippedTransactionsKey    = []byte("NumberOfSkippedL1Messages")
-	skippedTransactionPrefix   = []byte("skip") // skippedTransactionPrefix + tx hash -> skipped transaction
-	skippedL1MessageHashPrefix = []byte("sh")   // skippedL1MessageHashPrefix + index -> tx hash
+	numSkippedTransactionsKey    = []byte("NumberOfSkippedTransactions")
+	skippedTransactionPrefix     = []byte("skip") // skippedTransactionPrefix + tx hash -> skipped transaction
+	skippedTransactionHashPrefix = []byte("sh")   // skippedL1MessageHashPrefix + index -> tx hash
 )
 
 const (
@@ -279,7 +279,7 @@ func SkippedTransactionKey(txHash common.Hash) []byte {
 	return append(skippedTransactionPrefix, txHash.Bytes()...)
 }
 
-// SkippedTransactionHashKey = skippedL1MessageHashPrefix + index (uint64 big endian)
+// SkippedTransactionHashKey = skippedTransactionHashPrefix + index (uint64 big endian)
 func SkippedTransactionHashKey(index uint64) []byte {
-	return append(skippedL1MessageHashPrefix, encodeBigEndian(index)...)
+	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
 }

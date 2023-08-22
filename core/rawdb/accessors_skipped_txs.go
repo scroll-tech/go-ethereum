@@ -159,8 +159,8 @@ type SkippedTransactionIterator struct {
 // over all skipped transaction hashes in the database starting at the provided index.
 func IterateSkippedTransactionsFrom(db ethdb.Database, index uint64) SkippedTransactionIterator {
 	start := encodeBigEndian(index)
-	it := db.NewIterator(skippedL1MessageHashPrefix, start)
-	keyLength := len(skippedL1MessageHashPrefix) + 8
+	it := db.NewIterator(skippedTransactionHashPrefix, start)
+	keyLength := len(skippedTransactionHashPrefix) + 8
 
 	return SkippedTransactionIterator{
 		inner:     it,
@@ -185,7 +185,7 @@ func (it *SkippedTransactionIterator) Next() bool {
 // Index returns the index of the current skipped transaction hash.
 func (it *SkippedTransactionIterator) Index() uint64 {
 	key := it.inner.Key()
-	raw := key[len(skippedL1MessageHashPrefix) : len(skippedL1MessageHashPrefix)+8]
+	raw := key[len(skippedTransactionHashPrefix) : len(skippedTransactionHashPrefix)+8]
 	index := binary.BigEndian.Uint64(raw)
 	return index
 }

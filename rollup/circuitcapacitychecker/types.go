@@ -14,6 +14,5 @@ var (
 
 type WrappedRowUsage struct {
 	AccRowUsage *types.RowUsage `json:"acc_row_usage,omitempty"`
-	TxRowUsage  *types.RowUsage `json:"tx_row_usage,omitempty"`
 	Error       string          `json:"error,omitempty"`
 }

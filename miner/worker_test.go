@@ -1067,7 +1067,7 @@ func TestSkippedL1MessageDatabaseEntries(t *testing.T) {
 			numSkipped := rawdb.ReadNumSkippedTransactions(db)
 			assert.Equal(uint64(1), numSkipped)
 
-			hash2 := rawdb.ReadSkippedL1MessageHash(db, 0)
+			hash2 := rawdb.ReadSkippedTransactionHash(db, 0)
 			assert.NotNil(hash2)
 			assert.Equal(&hash, hash2)
 

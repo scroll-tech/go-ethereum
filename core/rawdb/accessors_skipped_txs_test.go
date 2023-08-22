@@ -9,7 +9,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 )
 
-func TestReadWriteNumSkippedL1Messages(t *testing.T) {
+func TestReadWriteNumSkippedTransactions(t *testing.T) {
 	blockNumbers := []uint64{
 		1,
 		1 << 2,
@@ -24,7 +24,7 @@ func TestReadWriteNumSkippedL1Messages(t *testing.T) {
 		got := ReadNumSkippedTransactions(db)
 
 		if got != num {
-			t.Fatal("Num L1 messages mismatch", "expected", num, "got", got)
+			t.Fatal("Num skipped transactions mismatch", "expected", num, "got", got)
 		}
 	}
 }
@@ -41,7 +41,7 @@ func newTestTransaction(queueIndex uint64) *types.Transaction {
 	return types.NewTx(&l1msg)
 }
 
-func TestReadWriteSkippedTransaction(t *testing.T) {
+func TestReadWriteSkippedTransactionNoIndex(t *testing.T) {
 	tx := newTestTransaction(123)
 	db := NewMemoryDatabase()
 	writeSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
@@ -51,7 +51,7 @@ func TestReadWriteSkippedTransaction(t *testing.T) {
 	}
 }
 
-func TestReadWriteSkippedL1Message(t *testing.T) {
+func TestReadWriteSkippedTransaction(t *testing.T) {
 	tx := newTestTransaction(123)
 	db := NewMemoryDatabase()
 	WriteSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
@@ -63,13 +63,13 @@ func TestReadWriteSkippedL1Message(t *testing.T) {
 	if count != 1 {
 		t.Fatal("Skipped transaction count mismatch", "expected", 1, "got", count)
 	}
-	hash := ReadSkippedL1MessageHash(db, 0)
+	hash := ReadSkippedTransactionHash(db, 0)
 	if hash == nil || *hash != tx.Hash() {
 		t.Fatal("Skipped L1 message hash mismatch", "expected", tx.Hash(), "got", hash)
 	}
 }
 
-func TestSkippedL1MessageConcurrentUpdate(t *testing.T) {
+func TestSkippedTransactionConcurrentUpdate(t *testing.T) {
 	count := 20
 	tx := newTestTransaction(123)
 	db := NewMemoryDatabase()
@@ -88,7 +88,7 @@ func TestSkippedL1MessageConcurrentUpdate(t *testing.T) {
 	}
 }
 
-func TestIterateSkippedL1Messages(t *testing.T) {
+func TestIterateSkippedTransactions(t *testing.T) {
 	db := NewMemoryDatabase()
 
 	txs := []*types.Transaction{
@@ -118,12 +118,12 @@ func TestIterateSkippedL1Messages(t *testing.T) {
 
 		index := it.Index()
 		if index != uint64(ii) {
-			t.Fatal("Invalid skipped L1 message index", "expected", ii, "got", index)
+			t.Fatal("Invalid skipped transaction index", "expected", ii, "got", index)
 		}
 
 		hash := it.TransactionHash()
 		if hash != txs[ii].Hash() {
-			t.Fatal("Invalid skipped L1 message hash", "expected", txs[ii].Hash(), "got", hash)
+			t.Fatal("Invalid skipped transaction hash", "expected", txs[ii].Hash(), "got", hash)
 		}
 	}
 

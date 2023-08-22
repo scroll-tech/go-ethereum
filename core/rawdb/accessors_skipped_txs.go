@@ -13,7 +13,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-// mutex used to avoid concurrent updates of NumSkippedL1Messages
+// mutex used to avoid concurrent updates of NumSkippedTransactions
 var mu sync.Mutex
 
 // writeNumSkippedTransactions writes the number of skipped L1 transactions to the database.
@@ -112,8 +112,8 @@ func writeSkippedTransactionHash(db ethdb.KeyValueWriter, index uint64, txHash c
 	}
 }
 
-// ReadSkippedL1MessageHash retrieves the hash of a skipped transaction by its index.
-func ReadSkippedL1MessageHash(db ethdb.Reader, index uint64) *common.Hash {
+// ReadSkippedTransactionHash retrieves the hash of a skipped transaction by its index.
+func ReadSkippedTransactionHash(db ethdb.Reader, index uint64) *common.Hash {
 	data, err := db.Get(SkippedTransactionHashKey(index))
 	if err != nil && isNotFoundErr(err) {
 		return nil

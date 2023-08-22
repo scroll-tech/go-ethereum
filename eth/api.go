@@ -709,9 +709,9 @@ func (api *ScrollAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumb
 	return nil, err
 }
 
-// GetNumSkippedL1Messages returns the number of skipped L1 messages.
-func (api *ScrollAPI) GetNumSkippedL1Messages(ctx context.Context) (uint64, error) {
-	return rawdb.ReadNumSkippedL1Messages(api.eth.ChainDb()), nil
+// GetNumSkippedTransactions returns the number of skipped transactions.
+func (api *ScrollAPI) GetNumSkippedTransactions(ctx context.Context) (uint64, error) {
+	return rawdb.ReadNumSkippedTransactions(api.eth.ChainDb()), nil
 }
 
 // RPCTransaction is the standard RPC transaction return type with some additional skip-related fields.
@@ -736,8 +736,8 @@ func (api *ScrollAPI) GetSkippedTransaction(ctx context.Context, hash common.Has
 	return &rpcTx, nil
 }
 
-// GetSkippedL1MessageHashes returns a list of skipped L1 message hashes between the two indices provided (inclusive).
-func (api *ScrollAPI) GetSkippedL1MessageHashes(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
+// GetSkippedTransactionHashes returns a list of skipped transaction hashes between the two indices provided (inclusive).
+func (api *ScrollAPI) GetSkippedTransactionHashes(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
 	it := rawdb.IterateSkippedTransactionsFrom(api.eth.ChainDb(), from)
 	defer it.Release()
 

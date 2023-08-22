@@ -1028,7 +1028,7 @@ loop:
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
 			w.current.nextL1MsgIndex = queueIndex + 1
 			txs.Shift()
-			rawdb.WriteSkippedL1Message(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
 
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -1080,7 +1080,7 @@ loop:
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
 			w.current.nextL1MsgIndex = queueIndex + 1
-			rawdb.WriteSkippedL1Message(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
 
 			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
 			// associated with this transaction so we cannot pack more transactions.
@@ -1092,9 +1092,6 @@ loop:
 			// Circuit capacity check: L2MessageTx row consumption too high, skip the account.
 			// This is also useful for skipping "problematic" L2MessageTxs.
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
-
-			// store info about overflowing L2 txs for further analysis,
-			// but do not include L2 txs in the skipped index and count
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
 
 			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
@@ -1111,7 +1108,7 @@ loop:
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
-			rawdb.WriteSkippedL1Message(w.eth.ChainDb(), tx, "unknown row consumption error", w.current.header.Number.Uint64(), nil)
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown row consumption error", w.current.header.Number.Uint64(), nil)
 
 			// after `ErrUnknown`, ccc might not revert updates associated
 			// with this transaction so we cannot pack more transactions.
@@ -1137,7 +1134,7 @@ loop:
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
-				rawdb.WriteSkippedL1Message(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
 			}
 			txs.Shift()
 		}

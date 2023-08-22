@@ -20,8 +20,8 @@ func TestReadWriteNumSkippedL1Messages(t *testing.T) {
 
 	db := NewMemoryDatabase()
 	for _, num := range blockNumbers {
-		WriteNumSkippedL1Messages(db, num)
-		got := ReadNumSkippedL1Messages(db)
+		writeNumSkippedTransactions(db, num)
+		got := ReadNumSkippedTransactions(db)
 
 		if got != num {
 			t.Fatal("Num L1 messages mismatch", "expected", num, "got", got)
@@ -44,7 +44,7 @@ func newTestTransaction(queueIndex uint64) *types.Transaction {
 func TestReadWriteSkippedTransaction(t *testing.T) {
 	tx := newTestTransaction(123)
 	db := NewMemoryDatabase()
-	WriteSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
+	writeSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
 	got := ReadSkippedTransaction(db, tx.Hash())
 	if got == nil || got.Tx.Hash() != tx.Hash() || got.Reason != "random reason" || got.BlockNumber != 1 || got.BlockHash == nil || *got.BlockHash != (common.Hash{1}) {
 		t.Fatal("Skipped transaction mismatch", "got", got)
@@ -54,12 +54,12 @@ func TestReadWriteSkippedTransaction(t *testing.T) {
 func TestReadWriteSkippedL1Message(t *testing.T) {
 	tx := newTestTransaction(123)
 	db := NewMemoryDatabase()
-	WriteSkippedL1Message(db, tx, "random reason", 1, &common.Hash{1})
+	WriteSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
 	got := ReadSkippedTransaction(db, tx.Hash())
 	if got == nil || got.Tx.Hash() != tx.Hash() || got.Reason != "random reason" || got.BlockNumber != 1 || got.BlockHash == nil || *got.BlockHash != (common.Hash{1}) {
 		t.Fatal("Skipped transaction mismatch", "got", got)
 	}
-	count := ReadNumSkippedL1Messages(db)
+	count := ReadNumSkippedTransactions(db)
 	if count != 1 {
 		t.Fatal("Skipped transaction count mismatch", "expected", 1, "got", count)
 	}
@@ -78,11 +78,11 @@ func TestSkippedL1MessageConcurrentUpdate(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			WriteSkippedL1Message(db, tx, "random reason", 1, &common.Hash{1})
+			WriteSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
 		}()
 	}
 	wg.Wait()
-	got := ReadNumSkippedL1Messages(db)
+	got := ReadNumSkippedTransactions(db)
 	if got != uint64(count) {
 		t.Fatal("Skipped transaction count mismatch", "expected", count, "got", got)
 	}
@@ -100,12 +100,12 @@ func TestIterateSkippedL1Messages(t *testing.T) {
 	}
 
 	for _, tx := range txs {
-		WriteSkippedL1Message(db, tx, "random reason", 1, &common.Hash{1})
+		WriteSkippedTransaction(db, tx, "random reason", 1, &common.Hash{1})
 	}
 
 	// simulate skipped L2 tx that's not included in the index
 	l2tx := newTestTransaction(6)
-	WriteSkippedTransaction(db, l2tx, "random reason", 1, &common.Hash{1})
+	writeSkippedTransaction(db, l2tx, "random reason", 1, &common.Hash{1})
 
 	it := IterateSkippedTransactionsFrom(db, 2)
 	defer it.Release()

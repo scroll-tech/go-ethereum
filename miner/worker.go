@@ -1061,32 +1061,38 @@ loop:
 			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
 			txs.Pop()
 
+		// Circuit capacity check
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
-			// Circuit capacity check.
-			if w.current.tcount >= 1 { // 1. circuit capacity limit reached in a block, and it's not the first tx:
+			if w.current.tcount >= 1 {
+				// 1. Circuit capacity limit reached in a block, and it's not the first tx:
 				// don't pop or shift, just quit the loop immediately;
 				// though it might still be possible to add some "smaller" txs,
 				// but it's a trade-off between tracing overhead & block usage rate
 				log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String())
 				circuitCapacityReached = true
 				break loop
-			} else { // 2. circuit capacity limit reached in a block, and it's the first tx: skip the tx.
-				circuitCapacityReached = false
-				if tx.IsL1MessageTx() { // 2.1 L1MessageTx row consumption too high, skip transaction
-					// because we shouldn't skip the entire txs from the same account.
-					// This is also useful for skipping "problematic" L1MessageTxs.
+			} else {
+				// 2. Circuit capacity limit reached in a block, and it's the first tx: skip the tx
+				log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
+
+				if tx.IsL1MessageTx() {
+					// Skip L1 message transaction,
+					// shift to the next from the account because we shouldn't skip the entire txs from the same account
+					txs.Shift()
+
 					queueIndex := tx.AsL1MessageTx().QueueIndex
-					log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
 					log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
 					w.current.nextL1MsgIndex = queueIndex + 1
-					txs.Shift()
-				} else { // 2.2 L2MessageTx row consumption too high, skip the account.
-					// This is also useful for skipping "problematic" L2MessageTxs.
-					log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
+				} else {
+					// Skip L2 transaction and all other transactions from the same sender account
 					txs.Pop()
 				}
+
+				// Reset ccc so that we can process other transactions for this block
+				w.circuitCapacityChecker.Reset()
+				log.Trace("Worker reset ccc", "id", w.circuitCapacityChecker.ID)
+				circuitCapacityReached = false
 			}
-			w.circuitCapacityChecker.Reset()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,

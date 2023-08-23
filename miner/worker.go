@@ -1077,7 +1077,7 @@ loop:
 				break loop
 			} else { // 2. circuit capacity limit reached in a block, and it's the first tx: drop the tx.
 				circuitCapacityReached = false
-				if tx.IsL1MessageTx() { // 2.1 L1MessageTx row consumption too high, shift to the next from the account,
+				if tx.IsL1MessageTx() { // 2.1 L1MessageTx row consumption too high, skip transaction
 					// because we shouldn't skip the entire txs from the same account.
 					// This is also useful for skipping "problematic" L1MessageTxs.
 					queueIndex := tx.AsL1MessageTx().QueueIndex

@@ -1101,12 +1101,22 @@ loop:
 			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			w.current.nextL1MsgIndex = queueIndex + 1
-			txs.Shift()
+
+			// Normally we would do `txs.Shift()` here.
+			// However, after `ErrUnknown`, ccc might remain in an
+			// inconsistent state, so we cannot pack more transactions.
+			circuitCapacityReached = true
+			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
-			txs.Pop()
+
+			// Normally we would do `txs.Pop()` here.
+			// However, after `ErrUnknown`, ccc might remain in an
+			// inconsistent state, so we cannot pack more transactions.
+			circuitCapacityReached = true
+			break loop
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the

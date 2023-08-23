@@ -203,7 +203,7 @@ func (hc *httpConn) doRequest(ctx context.Context, msg interface{}) (io.ReadClos
 	}
 
 	// if encoding is set use it.
-	return newDecodeCompression(req.Header.Get("Accept-Encoding"), resp.Body)
+	return newDecodeCompression(resp.Header.Get("Content-Encoding"), resp.Body)
 }
 
 // httpServerConn turns a HTTP connection into a Conn.
@@ -223,12 +223,12 @@ func newDecodeCompression(decoding string, rc io.ReadCloser) (io.ReadCloser, err
 			return nil, err
 		}
 		res = gz
-	case "zlib", "deflate":
-		zb, err := zlib.NewReader(rc)
+	case "deflate":
+		zl, err := zlib.NewReader(rc)
 		if err != nil {
 			return nil, err
 		}
-		res = zb
+		res = zl
 	default:
 		res = rc
 	}

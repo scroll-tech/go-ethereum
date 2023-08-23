@@ -1091,6 +1091,7 @@ loop:
 					txs.Pop()
 				}
 			}
+			w.circuitCapacityChecker.Reset()
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,

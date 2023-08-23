@@ -1009,7 +1009,7 @@ func TestOversizedTxThenNormal(t *testing.T) {
 			w.getCCC().ScheduleError(2, circuitcapacitychecker.ErrBlockRowConsumptionOverflow)
 			return false
 		case 1:
-			// include #0, skip #1, then terminate
+			// include #0, fail on #1, then seal the block
 			assert.Equal(1, len(block.Transactions()))
 
 			assert.True(block.Transactions()[0].IsL1MessageTx())
@@ -1018,7 +1018,23 @@ func TestOversizedTxThenNormal(t *testing.T) {
 			// db is updated correctly
 			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
 			assert.NotNil(queueIndex)
-			assert.Equal(uint64(2), *queueIndex)
+			assert.Equal(uint64(1), *queueIndex)
+
+			// schedule to skip next call to ccc
+			w.getCCC().ScheduleError(1, circuitcapacitychecker.ErrBlockRowConsumptionOverflow)
+
+			return false
+		case 2:
+			// skip #1, include #2, then seal the block
+			assert.Equal(1, len(block.Transactions()))
+
+			assert.True(block.Transactions()[0].IsL1MessageTx())
+			assert.Equal(uint64(2), block.Transactions()[0].AsL1MessageTx().QueueIndex)
+
+			// db is updated correctly
+			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
+			assert.NotNil(queueIndex)
+			assert.Equal(uint64(3), *queueIndex)
 
 			return true
 		default:

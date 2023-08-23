@@ -1069,11 +1069,6 @@ loop:
 				// but it's a trade-off between tracing overhead & block usage rate
 				log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String())
 				circuitCapacityReached = true
-				if tx.IsL1MessageTx() {
-					queueIndex := tx.AsL1MessageTx().QueueIndex
-					log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
-					w.current.nextL1MsgIndex = queueIndex + 1
-				}
 				break loop
 			} else { // 2. circuit capacity limit reached in a block, and it's the first tx: skip the tx.
 				circuitCapacityReached = false

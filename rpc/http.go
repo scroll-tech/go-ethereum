@@ -203,7 +203,7 @@ func (hc *httpConn) doRequest(ctx context.Context, msg interface{}) (io.ReadClos
 	}
 
 	// if encoding is set use it.
-	return newDecodeCompression(req.Header.Get("Content-Encoding"), resp.Body)
+	return newDecodeCompression(req.Header.Get("Accept-Encoding"), resp.Body)
 }
 
 // httpServerConn turns a HTTP connection into a Conn.
@@ -211,22 +211,6 @@ type httpServerConn struct {
 	io.Reader
 	io.Writer
 	r *http.Request
-}
-
-func newEncodeCompression(encoding string, w io.Writer) io.Writer {
-	var (
-		tps    = strings.Split(strings.ToLower(strings.TrimSpace(encoding)), ",")
-		writer io.Writer
-	)
-	switch tps[0] {
-	case "zlib", "deflate":
-		writer = zlib.NewWriter(w)
-	case "gzip":
-		writer = gzip.NewWriter(w)
-	default:
-		writer = w
-	}
-	return writer
 }
 
 func newDecodeCompression(decoding string, rc io.ReadCloser) (io.ReadCloser, error) {
@@ -253,23 +237,12 @@ func newDecodeCompression(decoding string, rc io.ReadCloser) (io.ReadCloser, err
 
 func newHTTPServerConn(r *http.Request, w http.ResponseWriter) ServerCodec {
 	body := io.LimitReader(r.Body, maxRequestContentLength)
-	writer := newEncodeCompression(r.Header.Get("Content-Encoding"), w)
-	conn := &httpServerConn{Reader: body, Writer: writer, r: r}
+	conn := &httpServerConn{Reader: body, Writer: w, r: r}
 	return NewCodec(conn)
 }
 
 // Close does nothing and always returns nil.
-func (t *httpServerConn) Close() error {
-	switch t.Writer.(type) {
-	case *gzip.Writer:
-		gp := t.Writer.(*gzip.Writer)
-		return gp.Close()
-	case *zlib.Writer:
-		zb := t.Writer.(*zlib.Writer)
-		return zb.Close()
-	}
-	return nil
-}
+func (t *httpServerConn) Close() error { return nil }
 
 // RemoteAddr returns the peer address of the underlying connection.
 func (t *httpServerConn) RemoteAddr() string {

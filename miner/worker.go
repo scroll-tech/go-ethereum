@@ -970,11 +970,6 @@ loop:
 			}
 			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, circuitCapacityReached
 		}
-		// If we have collected enough transactions then we're done
-		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1TxCount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1TxCount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
-			break
-		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", w.current.gasPool, "want", params.TxGas)
@@ -983,6 +978,15 @@ loop:
 		// Retrieve the next transaction and abort if all done
 		tx := txs.Peek()
 		if tx == nil {
+			break
+		}
+		// If we have collected enough transactions then we're done
+		l2TxCount := w.current.tcount - w.current.l1TxCount
+		if !tx.IsL1MessageTx() { // If the next tx is not L1MessageTx type then +1.
+			l2TxCount++
+		}
+		if !w.chainConfig.Scroll.IsValidL2TxCount(l2TxCount) {
+			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1TxCount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
 		if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != w.current.nextL1MsgIndex {
@@ -999,7 +1003,7 @@ loop:
 			continue
 		}
 		// Error may be ignored here. The error has already been checked
-		// during transaction acceptance is the transaction pool.
+		// during transaction acceptance in the transaction pool.
 		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(w.current.signer, tx)
@@ -1046,15 +1050,18 @@ loop:
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
+			w.current.tcount++
+			txs.Shift()
+
 			if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Debug("Including L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String())
 				w.current.l1TxCount++
 				w.current.nextL1MsgIndex = queueIndex + 1
+			} else {
+				// only consider block size limit for L2 transactions
+				w.current.blockSize += tx.Size()
 			}
-			w.current.tcount++
-			w.current.blockSize += tx.Size()
-			txs.Shift()
 
 		case errors.Is(err, core.ErrTxTypeNotSupported):
 			// Pop the unsupported transaction without shifting in the next from the account

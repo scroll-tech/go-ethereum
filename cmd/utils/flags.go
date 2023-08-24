@@ -233,7 +233,7 @@ var (
 	GCModeFlag = cli.StringFlag{
 		Name:  "gcmode",
 		Usage: `Blockchain garbage collection mode ("full", "archive")`,
-		Value: "full",
+		Value: "archive",
 	}
 	SnapshotFlag = cli.BoolTFlag{
 		Name:  "snapshot",
@@ -432,7 +432,7 @@ var (
 		Usage: "Percentage of cache memory allowance to use for snapshot caching (default = 10% full mode, 20% archive mode)",
 		Value: 10,
 	}
-	CacheNoPrefetchFlag = cli.BoolFlag{
+	CacheNoPrefetchFlag = cli.BoolTFlag{
 		Name:  "cache.noprefetch",
 		Usage: "Disable heuristic state prefetch during block import (less CPU and disk IO, more time waiting for data)",
 	}
@@ -1740,6 +1740,8 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "4038000")
 		stack.Config().L1DeploymentBlock = 4038000
+		log.Info("Using flag", "--gcmode", ctx.GlobalString(GCModeFlag.Name))
+		log.Info("Using flag", "--cache.noprefetch", ctx.GlobalBool(CacheNoPrefetchFlag.Name))
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337

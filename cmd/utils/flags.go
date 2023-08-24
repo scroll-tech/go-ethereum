@@ -1741,12 +1741,14 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Info("Setting flag", "--l1.sync.startblock", "4038000")
 		stack.Config().L1DeploymentBlock = 4038000
 		// double check correct config
-		if ctx.GlobalString(GCModeFlag.Name) != "archive" {
+		if ctx.GlobalString(GCModeFlag.Name) != "archive" { //nolint:goconst
 			log.Crit("Must use --gcmode=archive")
 		}
+		log.Info("Setting flag", "--gcmode", ctx.GlobalString(GCModeFlag.Name))
 		if !ctx.GlobalBool(CacheNoPrefetchFlag.Name) {
 			log.Crit("Must use --cache.noprefetch")
 		}
+		log.Info("Setting flag", "--cache.noprefetch", ctx.GlobalBool(CacheNoPrefetchFlag.Name))
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337

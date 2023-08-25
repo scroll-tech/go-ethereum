@@ -1110,7 +1110,7 @@ loop:
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
-			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown row consumption error", w.current.header.Number.Uint64(), nil)
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 
 			// Normally we would do `txs.Shift()` here.
 			// However, after `ErrUnknown`, ccc might remain in an

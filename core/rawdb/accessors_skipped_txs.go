@@ -25,7 +25,7 @@ func writeNumSkippedTransactions(db ethdb.KeyValueWriter, numSkipped uint64) {
 	}
 }
 
-// ReadNumSkippedTransactions retrieves the number of skipped messages.
+// ReadNumSkippedTransactions retrieves the number of skipped transactions.
 func ReadNumSkippedTransactions(db ethdb.Reader) uint64 {
 	data, err := db.Get(numSkippedTransactionsKey)
 	if err != nil && isNotFoundErr(err) {

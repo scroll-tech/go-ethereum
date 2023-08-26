@@ -743,6 +743,8 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	engine = clique.New(chainConfig.Clique, db)
 
+	maxTxPerBlock := 4
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
 	chainConfig.Scroll.L1Config = &params.L1Config{
 		NumL1MessagesPerBlock: 10,
 	}
@@ -807,6 +809,8 @@ func l1MessageTest(t *testing.T, msgs []types.L1MessageTx, withL2Tx bool, callba
 	chainConfig = params.AllCliqueProtocolChanges
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	engine = clique.New(chainConfig.Clique, db)
+	maxTxPerBlock := 4
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
 
 	maxPayload := 1024
 	chainConfig.Scroll.MaxTxPayloadBytesPerBlock = &maxPayload

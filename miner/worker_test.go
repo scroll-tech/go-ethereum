@@ -624,11 +624,11 @@ func TestAcceptableTxlimit(t *testing.T) {
 		NumL1MessagesPerBlock: 2,
 	}
 
-	// Insert 3 l1msgs, msg with QueueIndex 1 will be skipped.
+	// Insert 3 l1msgs, with one be skipped.
 	l1msgs := []types.L1MessageTx{
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
 		{QueueIndex: 1, Gas: 10000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}}, // skipped l1msg
-		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
 	rawdb.WriteL1Messages(db, l1msgs)
 
 	chainConfig.LondonBlock = big.NewInt(0)
@@ -750,12 +750,12 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 		NumL1MessagesPerBlock: 10,
 	}
 
-	// Insert 4 l1msgs, msg with QueueIndex 1 will be skipped.
+	// Insert 4 l1msgs, with one be skipped.
 	l1msgs := []types.L1MessageTx{
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
-		{QueueIndex: 1, Gas: 10000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}, // skipped l1msg
-		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
-		{QueueIndex: 3, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}}}
+		{QueueIndex: 1, Gas: 10000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}}, // skipped l1msg
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}}}
 	rawdb.WriteL1Messages(db, l1msgs)
 
 	chainConfig.LondonBlock = big.NewInt(0)
@@ -793,8 +793,8 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 		assert.Equal(4, len(block.Transactions()))
 		assert.True(block.Transactions()[0].IsL1MessageTx() && block.Transactions()[1].IsL1MessageTx() && block.Transactions()[2].IsL1MessageTx())
 		assert.Equal(uint64(0), block.Transactions()[0].AsL1MessageTx().QueueIndex)
-		assert.Equal(uint64(2), block.Transactions()[1].AsL1MessageTx().QueueIndex)
-		assert.Equal(uint64(3), block.Transactions()[2].AsL1MessageTx().QueueIndex)
+		assert.Equal(uint64(1), block.Transactions()[1].AsL1MessageTx().QueueIndex)
+		assert.Equal(uint64(2), block.Transactions()[2].AsL1MessageTx().QueueIndex)
 	case <-time.After(3 * time.Second):
 		t.Fatalf("timeout")
 	}

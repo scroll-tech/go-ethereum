@@ -202,13 +202,6 @@ func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
 	return tx
 }
 
-func (b *testWorkerBackend) newSkippedTx() *types.Transaction {
-	var tx *types.Transaction
-	gasPrice := big.NewInt(10 * params.InitialBaseFee)
-	tx, _ = types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), 10000000, gasPrice, nil), types.HomesteadSigner{}, testBankKey)
-	return tx
-}
-
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.AddLocals(pendingTxs)
@@ -624,17 +617,18 @@ func TestAcceptableTxlimit(t *testing.T) {
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	engine = clique.New(chainConfig.Clique, db)
 
-	// Set maxTxPerBlock = 4, which >= non-l1msg + l1msg txs
+	// Set maxTxPerBlock = 4, which >= non-l1msg + non-skipped l1msg txs
 	maxTxPerBlock := 4
 	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
 	chainConfig.Scroll.L1Config = &params.L1Config{
 		NumL1MessagesPerBlock: 2,
 	}
 
-	// Insert 2 l1msgs
+	// Insert 3 l1msgs, msg with QueueIndex 1 will be skipped.
 	l1msgs := []types.L1MessageTx{
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
-		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
+		{QueueIndex: 1, Gas: 10000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}}, // skipped l1msg
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
 	rawdb.WriteL1Messages(db, l1msgs)
 
 	chainConfig.LondonBlock = big.NewInt(0)
@@ -660,7 +654,6 @@ func TestAcceptableTxlimit(t *testing.T) {
 	// Insert 2 non-l1msg txs
 	b.txPool.AddLocal(b.newRandomTx(true))
 	b.txPool.AddLocal(b.newRandomTx(false))
-	b.txPool.AddLocal(b.newSkippedTx())
 
 	// Start mining!
 	w.start()
@@ -757,11 +750,12 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 		NumL1MessagesPerBlock: 10,
 	}
 
-	// Insert 3 l1msgs
+	// Insert 4 l1msgs, msg with QueueIndex 1 will be skipped.
 	l1msgs := []types.L1MessageTx{
 		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
-		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
-		{QueueIndex: 2, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}}}
+		{QueueIndex: 1, Gas: 10000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}, // skipped l1msg
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 3, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}}}
 	rawdb.WriteL1Messages(db, l1msgs)
 
 	chainConfig.LondonBlock = big.NewInt(0)
@@ -799,8 +793,8 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 		assert.Equal(4, len(block.Transactions()))
 		assert.True(block.Transactions()[0].IsL1MessageTx() && block.Transactions()[1].IsL1MessageTx() && block.Transactions()[2].IsL1MessageTx())
 		assert.Equal(uint64(0), block.Transactions()[0].AsL1MessageTx().QueueIndex)
-		assert.Equal(uint64(1), block.Transactions()[1].AsL1MessageTx().QueueIndex)
-		assert.Equal(uint64(2), block.Transactions()[2].AsL1MessageTx().QueueIndex)
+		assert.Equal(uint64(2), block.Transactions()[1].AsL1MessageTx().QueueIndex)
+		assert.Equal(uint64(3), block.Transactions()[2].AsL1MessageTx().QueueIndex)
 	case <-time.After(3 * time.Second):
 		t.Fatalf("timeout")
 	}

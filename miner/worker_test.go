@@ -202,6 +202,13 @@ func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
 	return tx
 }
 
+func (b *testWorkerBackend) newSkippedTx() *types.Transaction {
+	var tx *types.Transaction
+	gasPrice := big.NewInt(10 * params.InitialBaseFee)
+	tx, _ = types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), 10000000, gasPrice, nil), types.HomesteadSigner{}, testBankKey)
+	return tx
+}
+
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.AddLocals(pendingTxs)
@@ -653,6 +660,7 @@ func TestAcceptableTxlimit(t *testing.T) {
 	// Insert 2 non-l1msg txs
 	b.txPool.AddLocal(b.newRandomTx(true))
 	b.txPool.AddLocal(b.newRandomTx(false))
+	b.txPool.AddLocal(b.newSkippedTx())
 
 	// Start mining!
 	w.start()

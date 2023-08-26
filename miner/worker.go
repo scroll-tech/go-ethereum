@@ -980,7 +980,7 @@ loop:
 		// If we have collected enough transactions then we're done
 		// Originally we only limit l2txs count, but now strictly limit total txs number.
 		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount+1, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
 		if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != w.current.nextL1MsgIndex {

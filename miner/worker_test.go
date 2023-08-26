@@ -752,7 +752,7 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 
 	// Insert 3 l1msgs
 	l1msgs := []types.L1MessageTx{
-		{QueueIndex: 0, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{4}},
+		{QueueIndex: 0, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}},
 		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
 		{QueueIndex: 2, Gas: 21016, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}}}
 	rawdb.WriteL1Messages(db, l1msgs)

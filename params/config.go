@@ -552,7 +552,7 @@ func (s ScrollConfig) String() string {
 		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559, s.L1Config.String())
 }
 
-// IsValidTxCount returns whether the given block's L2 transaction count is below the limit.
+// IsValidTxCount returns whether the given block's transaction count is below the limit.
 // This limit corresponds to the number of ECDSA signature checks that we can fit into the zkEVM.
 func (s ScrollConfig) IsValidTxCount(count int) bool {
 	return s.MaxTxPerBlock == nil || count <= *s.MaxTxPerBlock

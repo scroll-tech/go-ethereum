@@ -274,6 +274,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 
 	tracer := vm.NewStructLogger(env.logConfig)
+	defer tracer.Reset()
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 

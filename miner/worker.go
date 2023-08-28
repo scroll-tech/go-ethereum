@@ -1121,7 +1121,7 @@ loop:
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
 			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
-			
+
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.

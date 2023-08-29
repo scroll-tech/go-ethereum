@@ -200,7 +200,6 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
-	skippedL2Txs           map[common.Hash]struct{}
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -234,7 +233,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh:     make(chan time.Duration),
 		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
-		skippedL2Txs:           make(map[common.Hash]struct{}),
 	}
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
@@ -979,15 +977,6 @@ loop:
 		if tx == nil {
 			break
 		}
-
-		// If the l2tx is skipped before (due to circuitcapacitychecker.ErrBlockRowConsumptionOverflow or circuitcapacitychecker.ErrUnknown),
-		// it actually still stays in the txpool. We need to skip it again, instead of re-processing it.
-		// And after a while, it will be removed by txpool due to being too old.
-		if _, ok := w.skippedL2Txs[tx.Hash()]; ok {
-			txs.Shift()
-			continue
-		}
-
 		// If we have collected enough transactions then we're done
 		// Originally we only limit l2txs count, but now strictly limit total txs number.
 		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount + 1) {
@@ -1101,7 +1090,7 @@ loop:
 					// Skip L2 transaction and all other transactions from the same sender account
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
-					w.skippedL2Txs[tx.Hash()] = struct{}{}
+					w.eth.TxPool().RemoveTx(tx.Hash(), true)
 				}
 
 				// Reset ccc so that we can process other transactions for this block
@@ -1137,7 +1126,7 @@ loop:
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
-			w.skippedL2Txs[tx.Hash()] = struct{}{}
+			w.eth.TxPool().RemoveTx(tx.Hash(), true)
 			circuitCapacityReached = true
 			break loop
 

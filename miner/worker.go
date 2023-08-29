@@ -980,9 +980,10 @@ loop:
 			break
 		}
 
-		// skipped before, due to circuitcapacitychecker.ErrBlockRowConsumptionOverflow or circuitcapacitychecker.ErrUnknown
+		// If the l2tx is skipped before (due to circuitcapacitychecker.ErrBlockRowConsumptionOverflow or circuitcapacitychecker.ErrUnknown),
+		// it actually still stays in the txpool. We need to skip it again, instead of re-processing it.
+		// And after a while, it will be removed by txpool due to being too old.
 		if _, ok := w.skippedL2Txs[tx.Hash()]; ok {
-			// skip again, otherwise it will stuck in mempool
 			txs.Shift()
 			continue
 		}

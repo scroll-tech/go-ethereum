@@ -20,11 +20,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/metrics"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/scroll-tech/go-ethereum/metrics"
 
 	mapset "github.com/deckarep/golang-set"
 

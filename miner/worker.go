@@ -85,10 +85,11 @@ const (
 
 var (
 	// Metrics for the skipped txs
-	gasLimitExceededCounter       = metrics.NewRegisteredCounter("miner/skipped_txs/gas_limit_exceeded", nil)
-	rowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/row_consumption_overflow", nil)
-	cccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/circuit_capacity_checker_unknown_err", nil)
-	strangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/strange_err", nil)
+	gasLimitExceededCounter           = metrics.NewRegisteredCounter("miner/skipped_txs/gas_limit_exceeded", nil)
+	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1_row_consumption_overflow", nil)
+	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2_row_consumption_overflow", nil)
+	cccUnknownErrCounter              = metrics.NewRegisteredCounter("miner/skipped_txs/circuit_capacity_checker_unknown_err", nil)
+	strangeErrCounter                 = metrics.NewRegisteredCounter("miner/skipped_txs/strange_err", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -1097,10 +1098,12 @@ loop:
 					queueIndex := tx.AsL1MessageTx().QueueIndex
 					log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					w.current.nextL1MsgIndex = queueIndex + 1
+					l1TxRowConsumptionOverflowCounter.Inc(1)
 				} else {
 					// Skip L2 transaction and all other transactions from the same sender account
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
+					l2TxRowConsumptionOverflowCounter.Inc(1)
 				}
 
 				// Reset ccc so that we can process other transactions for this block
@@ -1110,7 +1113,6 @@ loop:
 
 				// Store skipped transaction in local db
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
-				rowConsumptionOverflowCounter.Inc(1)
 			}
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):

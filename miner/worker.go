@@ -85,10 +85,10 @@ const (
 
 var (
 	// Metrics for the skipped txs
-	gasLimitExceededMeter       = metrics.NewRegisteredMeter("miner/skipped_txs/gas_limit_exceeded", nil)
-	rowConsumptionOverflowMeter = metrics.NewRegisteredMeter("miner/skipped_txs/row_consumption_overflow", nil)
-	cccUnknownErrMeter          = metrics.NewRegisteredMeter("miner/skipped_txs/circuit_capacity_checker_unknown_err", nil)
-	strangeErrMeter             = metrics.NewRegisteredMeter("miner/skipped_txs/strange_err", nil)
+	gasLimitExceededCounter       = metrics.NewRegisteredCounter("miner/skipped_txs/gas_limit_exceeded", nil)
+	rowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/row_consumption_overflow", nil)
+	cccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/circuit_capacity_checker_unknown_err", nil)
+	strangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/strange_err", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -1036,7 +1036,7 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			txs.Shift()
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
-			gasLimitExceededMeter.Mark(1)
+			gasLimitExceededCounter.Inc(1)
 
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -1110,7 +1110,7 @@ loop:
 
 				// Store skipped transaction in local db
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
-				rowConsumptionOverflowMeter.Mark(1)
+				rowConsumptionOverflowCounter.Inc(1)
 			}
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
@@ -1122,7 +1122,7 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
-			cccUnknownErrMeter.Mark(1)
+			cccUnknownErrCounter.Inc(1)
 
 			// Normally we would do `txs.Shift()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
@@ -1150,7 +1150,7 @@ loop:
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
-				strangeErrMeter.Mark(1)
+				strangeErrCounter.Inc(1)
 			}
 			txs.Shift()
 		}

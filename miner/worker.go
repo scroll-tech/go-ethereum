@@ -85,11 +85,11 @@ const (
 
 var (
 	// Metrics for the skipped txs
-	gasLimitExceededCounter           = metrics.NewRegisteredCounter("miner/skipped_txs/gas_limit_exceeded", nil)
+	gasLimitExceededCounter           = metrics.NewRegisteredCounter("miner/skipped_txs/l1_gas_limit_exceeded", nil)
 	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1_row_consumption_overflow", nil)
 	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2_row_consumption_overflow", nil)
 	cccUnknownErrCounter              = metrics.NewRegisteredCounter("miner/skipped_txs/circuit_capacity_checker_unknown_err", nil)
-	strangeErrCounter                 = metrics.NewRegisteredCounter("miner/skipped_txs/strange_err", nil)
+	strangeErrCounter                 = metrics.NewRegisteredCounter("miner/skipped_txs/l1_strange_err", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.

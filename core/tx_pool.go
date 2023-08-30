@@ -286,8 +286,6 @@ type TxPool struct {
 	spammers *prque.Prque
 
 	changesSinceReorg int // A counter for how many drops we've performed in-between reorg.
-
-	removeMu sync.RWMutex // mutex for `TxPool.RemoveTx`
 }
 
 type txpoolResetRequest struct {
@@ -1028,8 +1026,8 @@ func (pool *TxPool) Has(hash common.Hash) bool {
 // RemoveTx is similar to removeTx, but with locking to prevent concurrency.
 // Note: currently should only be called by miner/worker.go.
 func (pool *TxPool) RemoveTx(hash common.Hash, outofbound bool) {
-	pool.removeMu.Lock()
-	defer pool.removeMu.Unlock()
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 
 	pool.removeTx(hash, outofbound)
 }

@@ -1071,6 +1071,7 @@ loop:
 				// though it might still be possible to add some "smaller" txs,
 				// but it's a trade-off between tracing overhead & block usage rate
 				log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String())
+				log.Info("Skipping message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "accumulated row consumption overflow")
 				circuitCapacityReached = true
 				break loop
 			} else {
@@ -1083,11 +1084,13 @@ loop:
 					txs.Shift()
 
 					queueIndex := tx.AsL1MessageTx().QueueIndex
-					log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
+					log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					w.current.nextL1MsgIndex = queueIndex + 1
 				} else {
 					// Skip L2 transaction and all other transactions from the same sender account
+					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
+					w.eth.TxPool().RemoveTx(tx.Hash(), true)
 				}
 
 				// Reset ccc so that we can process other transactions for this block
@@ -1118,10 +1121,14 @@ loop:
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
+			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
+			// TODO: propagate more info about the error from CCC
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
+			w.eth.TxPool().RemoveTx(tx.Hash(), true)
 			circuitCapacityReached = true
 			break loop
 

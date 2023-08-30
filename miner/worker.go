@@ -1104,7 +1104,9 @@ loop:
 					// Skip L2 transaction and all other transactions from the same sender account
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
-					l2TxRowConsumptionOverflowCounter.Inc(1)
+					w.eth.TxPool().RemoveTx(tx.Hash(), true)
+          
+          l2TxRowConsumptionOverflowCounter.Inc(1)
 				}
 
 				// Reset ccc so that we can process other transactions for this block
@@ -1137,10 +1139,15 @@ loop:
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
 			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
-			l2CccUnknownErrCounter.Inc(1)
+			
+			// TODO: propagate more info about the error from CCC
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+      l2CccUnknownErrCounter.Inc(1)
+      
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
+			w.eth.TxPool().RemoveTx(tx.Hash(), true)
 			circuitCapacityReached = true
 			break loop
 

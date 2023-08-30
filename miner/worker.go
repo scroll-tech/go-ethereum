@@ -88,7 +88,8 @@ var (
 	gasLimitExceededCounter           = metrics.NewRegisteredCounter("miner/skipped_txs/l1_gas_limit_exceeded", nil)
 	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1_row_consumption_overflow", nil)
 	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2_row_consumption_overflow", nil)
-	cccUnknownErrCounter              = metrics.NewRegisteredCounter("miner/skipped_txs/circuit_capacity_checker_unknown_err", nil)
+	l1CccUnknownErrCounter            = metrics.NewRegisteredCounter("miner/skipped_txs/l1_circuit_capacity_checker_unknown_err", nil)
+	l2CccUnknownErrCounter            = metrics.NewRegisteredCounter("miner/skipped_txs/l2_circuit_capacity_checker_unknown_err", nil)
 	strangeErrCounter                 = metrics.NewRegisteredCounter("miner/skipped_txs/l1_strange_err", nil)
 )
 
@@ -1124,7 +1125,7 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
-			cccUnknownErrCounter.Inc(1)
+			l1CccUnknownErrCounter.Inc(1)
 
 			// Normally we would do `txs.Shift()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
@@ -1136,7 +1137,7 @@ loop:
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
 			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
-
+			l2CccUnknownErrCounter.Inc(1)
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.

@@ -309,9 +309,10 @@ var (
 // modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
 //
 // def mult_complexity(x):
-//    if x <= 64: return x ** 2
-//    elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-//    else: return x ** 2 // 16 + 480 * x - 199680
+//
+//	if x <= 64: return x ** 2
+//	elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//	else: return x ** 2 // 16 + 480 * x - 199680
 //
 // where is x is max(length_of_MODULUS, length_of_BASE)
 func modexpMultComplexity(x *big.Int) *big.Int {
@@ -407,12 +408,18 @@ func (c *bigModExp) RequiredGas(input []byte) uint64 {
 
 func (c *bigModExp) Run(input []byte) ([]byte, error) {
 	var (
-		baseLen = new(big.Int).SetBytes(getData(input, 0, 32)).Uint64()
-		expLen  = new(big.Int).SetBytes(getData(input, 32, 32)).Uint64()
-		modLen  = new(big.Int).SetBytes(getData(input, 64, 32)).Uint64()
+		baseLenBigInt = new(big.Int).SetBytes(getData(input, 0, 32))
+		expLenBigInt  = new(big.Int).SetBytes(getData(input, 32, 32))
+		modLenBigInt  = new(big.Int).SetBytes(getData(input, 64, 32))
+	)
+	var (
+		baseLen = baseLenBigInt.Uint64()
+		expLen  = expLenBigInt.Uint64()
+		modLen  = modLenBigInt.Uint64()
 	)
 	// Check that all inputs are `u256` (32 - bytes) or less, revert otherwise
-	if baseLen > 32 || expLen > 32 || modLen > 32 {
+	var lenLimit = new(big.Int).SetInt64(32)
+	if baseLenBigInt.Cmp(lenLimit) > 0 || expLenBigInt.Cmp(lenLimit) > 0 || modLenBigInt.Cmp(lenLimit) > 0 {
 		return nil, errModexpUnsupportedInput
 	}
 	if len(input) > 96 {

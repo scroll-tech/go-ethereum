@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/scroll-tech/go-ethereum/metrics"
-
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -38,6 +36,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -85,12 +84,12 @@ const (
 
 var (
 	// Metrics for the skipped txs
-	gasLimitExceededCounter           = metrics.NewRegisteredCounter("miner/skipped_txs/l1_gas_limit_exceeded", nil)
-	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1_row_consumption_overflow", nil)
-	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2_row_consumption_overflow", nil)
-	l1CccUnknownErrCounter            = metrics.NewRegisteredCounter("miner/skipped_txs/l1_circuit_capacity_checker_unknown_err", nil)
-	l2CccUnknownErrCounter            = metrics.NewRegisteredCounter("miner/skipped_txs/l2_circuit_capacity_checker_unknown_err", nil)
-	strangeErrCounter                 = metrics.NewRegisteredCounter("miner/skipped_txs/l1_strange_err", nil)
+	l1TxGasLimitExceededCounter       = metrics.NewRegisteredCounter("miner/skipped_txs/l1/gas_limit_exceeded", nil)
+	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1/row_consumption_overflow", nil)
+	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2/row_consumption_overflow", nil)
+	l1TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l1/ccc_unknown_err", nil)
+	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
+	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -1038,7 +1037,7 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			txs.Shift()
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
-			gasLimitExceededCounter.Inc(1)
+			l1TxGasLimitExceededCounter.Inc(1)
 
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -1105,7 +1104,6 @@ loop:
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
 					w.eth.TxPool().RemoveTx(tx.Hash(), true)
-
 					l2TxRowConsumptionOverflowCounter.Inc(1)
 				}
 
@@ -1127,7 +1125,7 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
-			l1CccUnknownErrCounter.Inc(1)
+			l1TxCccUnknownErrCounter.Inc(1)
 
 			// Normally we would do `txs.Shift()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
@@ -1142,7 +1140,7 @@ loop:
 
 			// TODO: propagate more info about the error from CCC
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
-			l2CccUnknownErrCounter.Inc(1)
+			l2TxCccUnknownErrCounter.Inc(1)
 
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
@@ -1160,7 +1158,7 @@ loop:
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
-				strangeErrCounter.Inc(1)
+				l1TxStrangeErrCounter.Inc(1)
 			}
 			txs.Shift()
 		}

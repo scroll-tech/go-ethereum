@@ -282,7 +282,9 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		offset := stack.data[stack.len()-2]
 		size := stack.data[stack.len()-3]
 		salt := stack.data[stack.len()-4]
-		code := scope.Memory.GetCopy(int64(offset.Uint64()), int64(size.Uint64()))
+		// `CaptureState` is called **before** memory resizing
+		// So sometimes we need to auto pad 0.
+		code := getData(scope.Memory.Data(), offset.Uint64(), size.Uint64())
 
 		codeAndHash := &codeAndHash{code: code}
 

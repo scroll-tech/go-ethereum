@@ -62,16 +62,16 @@ type SkippedTransaction struct {
 	BlockHash *common.Hash
 }
 
-// SkippedTransactionV2 stores the SkippedTransaction object, along with the traces serialization.
+// SkippedTransactionV2 stores the SkippedTransaction object along with serialized traces.
 type SkippedTransactionV2 struct {
 	// Tx is the skipped transaction.
-	// We store the tx itself because otherwise geth will discard it after skipping.
+	// We store the tx itself otherwise geth will discard it after skipping.
 	Tx *types.Transaction
 
-	// Traces is the wrapped traces of the skipped transaction.
+	// Traces is the serialized wrapped traces of the skipped transaction.
 	// We only store it when `MinerStoreSkippedTxTracesFlag` is enabled, so it might be empty.
-	// Note that we don't use *types.BlockTrace directly because types.BlockTrace.StorageTrace.Proofs is of
-	// type map[string][]hexutil.Bytes, and is not RLP-serializable.
+	// Note that we do not directly utilize `*types.BlockTrace` due to the fact that
+	// types.BlockTrace.StorageTrace.Proofs is of type `map[string][]hexutil.Bytes`, which is not RLP-serializable.
 	TracesBytes []byte
 
 	// Reason is the skip reason.

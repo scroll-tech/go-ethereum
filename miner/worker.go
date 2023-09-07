@@ -1145,16 +1145,7 @@ loop:
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
 			circuitCapacityReached = true
-			txNumInCcc, err := w.circuitCapacityChecker.GetTxNum()
-			if err == nil {
-				txNumInMiner := uint64(w.current.tcount)
-				if txNumInMiner == txNumInCcc {
-				} else {
-					log.Error("tx count in miner is different with CCC", "txNumInMiner", txNumInMiner, "txNumInCcc", txNumInCcc)
-				}
-			} else {
-				log.Error("failed to get_tx_num", "err", err)
-			}
+			w.checkCurrentTxNum()
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
@@ -1174,17 +1165,7 @@ loop:
 			// inconsistent state, so we cannot pack more transactions.
 			w.eth.TxPool().RemoveTx(tx.Hash(), true)
 			circuitCapacityReached = true
-			txNumInCcc, err := w.circuitCapacityChecker.GetTxNum()
-			if err == nil {
-				txNumInMiner := uint64(w.current.tcount)
-				if txNumInMiner == txNumInCcc {
-					log.Info("tx count in miner is same with CCC", "txNum", txNumInMiner)
-				} else {
-					log.Error("tx count in miner is different with CCC", "txNumInMiner", txNumInMiner, "txNumInCcc", txNumInCcc)
-				}
-			} else {
-				log.Error("failed to get_tx_num", "err", err)
-			}
+			w.checkCurrentTxNum()
 			break loop
 
 		default:
@@ -1227,6 +1208,18 @@ loop:
 		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 	}
 	return false, circuitCapacityReached
+}
+
+func (w *worker) checkCurrentTxNum() {
+	txNumInCcc, err := w.circuitCapacityChecker.GetTxNum()
+	if err == nil {
+		txNumInMiner := uint64(w.current.tcount)
+		if txNumInMiner != txNumInCcc {
+			log.Error("tx count in miner is different with CCC", "txNumInMiner", txNumInMiner, "txNumInCcc", txNumInCcc)
+		}
+	} else {
+		log.Error("failed to get_tx_num", "err", err)
+	}
 }
 
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {

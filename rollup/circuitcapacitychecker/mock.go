@@ -44,7 +44,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 }
 
 func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
-	return 0, nil
+	return uint64(ccc.countdown), nil
 }
 
 func (ccc *CircuitCapacityChecker) ScheduleError(cnt int, err error) {

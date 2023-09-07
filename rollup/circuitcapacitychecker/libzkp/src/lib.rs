@@ -22,7 +22,7 @@ pub mod checker {
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct TxNumResult {
-        pub tx_num: Option<u64>,
+        pub tx_num: u64,
         pub error: Option<String>,
     }
 
@@ -191,12 +191,12 @@ pub mod checker {
             Ok(tx_num) => {
                 log::debug!("id: {id}, tx_num: {tx_num}");
                 TxNumResult {
-                    tx_num: Some(tx_num),
+                    tx_num,
                     error: None,
                 }
             }
             Err(e) => TxNumResult {
-                tx_num: None,
+                tx_num: 0,
                 error: Some(format!("{e:?}")),
             },
         };

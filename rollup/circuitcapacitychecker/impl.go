@@ -162,10 +162,6 @@ func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
 		log.Error("fail to get_tx_num in CircuitCapacityChecker", "id", ccc.ID, "err", result.Error)
 		return nil, ErrUnknown
 	}
-	if result.TxNum == nil {
-		log.Error("fail to get_tx_num in CircuitCapacityChecker", "id", ccc.ID, "err", "TxNum is empty unexpectedly")
-		return nil, ErrUnknown
-	}
 
 	return result.TxNum, nil
 }

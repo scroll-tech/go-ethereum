@@ -17,6 +17,6 @@ type WrappedRowUsage struct {
 }
 
 type WrappedTxNum struct {
-	TxNum uint64 `json:"tx_num,omitempty"`
+	TxNum uint64 `json:"tx_num"`
 	Error string `json:"error,omitempty"`
 }

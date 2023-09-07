@@ -1147,7 +1147,7 @@ loop:
 			circuitCapacityReached = true
 			txNumInCcc, err := w.circuitCapacityChecker.GetTxNum()
 			if err == nil {
-				txNumInMiner := uint64(w.current.tcount + 1)
+				txNumInMiner := uint64(w.current.tcount)
 				if txNumInMiner == txNumInCcc {
 					log.Info("tx count in miner is same with CCC", txNumInMiner)
 				} else {
@@ -1177,7 +1177,7 @@ loop:
 			circuitCapacityReached = true
 			txNumInCcc, err := w.circuitCapacityChecker.GetTxNum()
 			if err == nil {
-				txNumInMiner := uint64(w.current.tcount + 1)
+				txNumInMiner := uint64(w.current.tcount)
 				if txNumInMiner == txNumInCcc {
 					log.Info("tx count in miner is same with CCC", txNumInMiner)
 				} else {

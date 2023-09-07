@@ -2788,7 +2788,7 @@ dependencies = [
 [[package]]
 name = "prover"
 version = "0.8.1"
-source = "git+https://github.com/scroll-tech/scroll-prover?branch=test-ccc#00b5e8feeeaab78eef5b585d8737bb22ff3b66e0"
+source = "git+https://github.com/scroll-tech/scroll-prover?tag=v0.8.2#02b68773531eec81355ee713c0155bf76aa968b6"
 dependencies = [
  "aggregator",
  "anyhow",

@@ -1149,7 +1149,6 @@ loop:
 			if err == nil {
 				txNumInMiner := uint64(w.current.tcount)
 				if txNumInMiner == txNumInCcc {
-					log.Info("tx count in miner is same with CCC", "txNum", txNumInMiner)
 				} else {
 					log.Error("tx count in miner is different with CCC", "txNumInMiner", txNumInMiner, "txNumInCcc", txNumInCcc)
 				}

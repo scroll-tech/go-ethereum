@@ -141,3 +141,31 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	}
 	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }
+
+func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
+	ccc.Lock()
+	defer ccc.Unlock()
+
+	log.Debug("ccc get_tx_num start", "id", ccc.ID)
+	rawResult := C.get_tx_num(C.uint64_t(ccc.ID))
+	defer func() {
+		C.free(unsafe.Pointer(rawResult))
+	}()
+	log.Debug("ccc get_tx_num end", "id", ccc.ID)
+
+	result := &WrappedTxNum{}
+	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
+		log.Error("fail to json unmarshal get_tx_num result", "id", ccc.ID, "err", err)
+		return nil, ErrUnknown
+	}
+	if result.Error != "" {
+		log.Error("fail to get_tx_num in CircuitCapacityChecker", "id", ccc.ID, "blockNumber", "err", result.Error)
+		return nil, ErrUnknown
+	}
+	if result.TxNum == nil {
+		log.Error("fail to get_tx_num in CircuitCapacityChecker", "id", ccc.ID, "err", "TxNum is empty unexpectedly")
+		return nil, ErrUnknown
+	}
+
+	return result.TxNum, nil
+}

@@ -10,6 +10,7 @@ import (
 
 type CircuitCapacityChecker struct {
 	ID        uint64
+	tcount    uint64
 	countdown int
 	nextError *error
 }
@@ -44,7 +45,11 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 }
 
 func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
-	return uint64(ccc.countdown), nil
+	return ccc.tcount, nil
+}
+
+func (ccc *CircuitCapacityChecker) SetTxNum(tcount uint64) {
+	ccc.tcount = tcount
 }
 
 func (ccc *CircuitCapacityChecker) ScheduleError(cnt int, err error) {

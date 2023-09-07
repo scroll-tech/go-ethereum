@@ -1149,12 +1149,12 @@ loop:
 			if err == nil {
 				txNumInMiner := uint64(w.current.tcount)
 				if txNumInMiner == txNumInCcc {
-					log.Info("tx count in miner is same with CCC", txNumInMiner)
+					log.Info("tx count in miner is same with CCC", "txNum", txNumInMiner)
 				} else {
-					log.Error("tx count in miner", txNumInMiner, "tx count in CCC", txNumInCcc)
+					log.Error("tx count in miner is different with CCC", "txNumInMiner", txNumInMiner, "txNumInCcc", txNumInCcc)
 				}
 			} else {
-					log.Error("failed to get_tx_num", err)
+				log.Error("failed to get_tx_num", "err", err)
 			}
 			break loop
 
@@ -1179,12 +1179,12 @@ loop:
 			if err == nil {
 				txNumInMiner := uint64(w.current.tcount)
 				if txNumInMiner == txNumInCcc {
-					log.Info("tx count in miner is same with CCC", txNumInMiner)
+					log.Info("tx count in miner is same with CCC", "txNum", txNumInMiner)
 				} else {
-					log.Error("tx count in miner", txNumInMiner, "tx count in CCC", txNumInCcc)
+					log.Error("tx count in miner is different with CCC", "txNumInMiner", txNumInMiner, "txNumInCcc", txNumInCcc)
 				}
 			} else {
-					log.Error("failed to get_tx_num", err)
+				log.Error("failed to get_tx_num", "err", err)
 			}
 			break loop
 

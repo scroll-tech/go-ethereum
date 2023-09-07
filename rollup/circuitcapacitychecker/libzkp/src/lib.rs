@@ -204,7 +204,7 @@ pub mod checker {
     }
 
     unsafe fn get_tx_num_inner(id: u64) -> Result<u64, Error> {
-        log::debug!("ccc get_tx_num raw input, id: {}", id);
+        log::debug!("ccc get_tx_num raw input, id: {id}");
         panic::catch_unwind(|| {
             Ok(CHECKERS
                 .get_mut()

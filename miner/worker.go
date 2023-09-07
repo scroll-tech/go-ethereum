@@ -1120,10 +1120,8 @@ loop:
 
 				// Store skipped transaction in local db
 				if w.config.StoreSkippedTxTraces {
-					log.Info("1", "traces", traces)
 					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "row consumption overflow", w.current.header.Number.Uint64(), nil)
 				} else {
-					log.Info("2", "traces", traces)
 					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "row consumption overflow", w.current.header.Number.Uint64(), nil)
 				}
 			}

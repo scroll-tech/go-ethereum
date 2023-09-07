@@ -3,6 +3,7 @@ package rawdb
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"sync"
@@ -97,6 +98,7 @@ func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, tra
 			log.Crit("Failed to json marshal skipped transaction", "hash", tx.Hash().String(), "err", err)
 		}
 	}
+	log.Info("stx.TracesBytes", "stx.TracesBytes", hex.EncodeToString(stx.TracesBytes))
 	bytes, err := rlp.EncodeToBytes(stx)
 	if err != nil {
 		log.Crit("Failed to RLP encode skipped transaction", "hash", tx.Hash().String(), "err", err)
@@ -151,6 +153,8 @@ func ReadSkippedTransaction(db ethdb.Reader, txHash common.Hash) *SkippedTransac
 		stxV2.BlockNumber = stx.BlockNumber
 		stxV2.BlockHash = stx.BlockHash
 	}
+
+	log.Info("ReadSkippedTransaction", "stxV2.TracesBytes", hex.EncodeToString(stxV2.TracesBytes))
 
 	if stxV2.BlockHash != nil && *stxV2.BlockHash == (common.Hash{}) {
 		stxV2.BlockHash = nil

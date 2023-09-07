@@ -156,11 +156,11 @@ func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
 	result := &WrappedTxNum{}
 	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
 		log.Error("fail to json unmarshal get_tx_num result", "id", ccc.ID, "err", err)
-		return nil, ErrUnknown
+		return 0, ErrUnknown
 	}
 	if result.Error != "" {
 		log.Error("fail to get_tx_num in CircuitCapacityChecker", "id", ccc.ID, "err", result.Error)
-		return nil, ErrUnknown
+		return 0, ErrUnknown
 	}
 
 	return result.TxNum, nil

@@ -31,6 +31,7 @@ type CircuitCapacityChecker struct {
 	ID uint64
 }
 
+// NewCircuitCapacityChecker creates a new CircuitCapacityChecker
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
 	creationMu.Lock()
 	defer creationMu.Unlock()
@@ -39,6 +40,7 @@ func NewCircuitCapacityChecker() *CircuitCapacityChecker {
 	return &CircuitCapacityChecker{ID: uint64(id)}
 }
 
+// Reset resets a CircuitCapacityChecker
 func (ccc *CircuitCapacityChecker) Reset() {
 	ccc.Lock()
 	defer ccc.Unlock()
@@ -46,6 +48,7 @@ func (ccc *CircuitCapacityChecker) Reset() {
 	C.reset_circuit_capacity_checker(C.uint64_t(ccc.ID))
 }
 
+// ApplyTransaction appends a tx's wrapped BlockTrace into the ccc, and return the accumulated RowConsumption
 func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
@@ -100,6 +103,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }
 
+// ApplyBlock gets a block's RowConsumption
 func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
@@ -142,6 +146,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }
 
+// CheckTxNum compares whether the tx_count in ccc match the expected
 func (ccc *CircuitCapacityChecker) CheckTxNum(expected int) (bool, unit64, error) {
 	ccc.Lock()
 	defer ccc.Unlock()

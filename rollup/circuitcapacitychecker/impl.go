@@ -167,5 +167,5 @@ func (ccc *CircuitCapacityChecker) CheckTxNum(expected int) (bool, uint64, error
 		return false, 0, fmt.Errorf("fail to get_tx_num in CircuitCapacityChecker, id: %d, err: %w", ccc.ID, result.Error)
 	}
 
-	return result.TxNum == unit64(expected), result.TxNum, nil
+	return result.TxNum == uint64(expected), result.TxNum, nil
 }

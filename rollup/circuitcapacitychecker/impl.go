@@ -142,7 +142,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }
 
-func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
+func (ccc *CircuitCapacityChecker) CheckTxNum(expected int) (bool, unit64, error) {
 	ccc.Lock()
 	defer ccc.Unlock()
 
@@ -156,12 +156,12 @@ func (ccc *CircuitCapacityChecker) GetTxNum() (uint64, error) {
 	result := &WrappedTxNum{}
 	if err = json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
 		log.Error("fail to json unmarshal get_tx_num result", "id", ccc.ID, "err", err)
-		return 0, ErrUnknown
+		return false, 0, ErrUnknown
 	}
 	if result.Error != "" {
 		log.Error("fail to get_tx_num in CircuitCapacityChecker", "id", ccc.ID, "err", result.Error)
-		return 0, ErrUnknown
+		return false, 0, ErrUnknown
 	}
 
-	return result.TxNum, nil
+	return result.TxNum == unit64(expected), result.TxNum, nil
 }

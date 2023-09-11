@@ -457,7 +457,14 @@ func traceTx(ctx *cli.Context) error {
 
 	// write traces to file
 	tracesJson, err := json.Marshal(traces)
-	os.WriteFile(tracesFile, tracesJson, 0644)
+	if err != nil {
+		log.Crit("Failed to marshal traces", "err", err)
+	}
+
+	err = os.WriteFile(tracesFile, tracesJson, 0644)
+	if err != nil {
+		log.Crit("Failed to write traces to file", "file", tracesFile, "err", err)
+	}
 
 	return nil
 }

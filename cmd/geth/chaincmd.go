@@ -426,15 +426,13 @@ func traceTx(ctx *cli.Context) error {
 	}
 
 	gasPool := new(core.GasPool).AddGas(header.GasLimit)
-	core.ApplyTransaction(config, blockchain, &common.Address{}, gasPool, state, header, tx, &header.GasUsed, *blockchain.GetVMConfig())
-
-	// optional: check transaction status (success or revert)
-	// if err != nil {
-	// 	log.Crit("Failed to execute transaction", "err", err)
-	// }
-	// if receipt.Status != types.ReceiptStatusSuccessful {
-	// 	log.Crit("Failed to execute transaction", "err", "execution reverted")
-	// }
+	receipt, err := core.ApplyTransaction(config, blockchain, &common.Address{}, gasPool, state, header, tx, &header.GasUsed, *blockchain.GetVMConfig())
+	if err != nil {
+		log.Crit("Failed to execute transaction", "err", err)
+	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		log.Warn("Transaction executed but failed")
+	}
 
 	// initialize trace env
 	header.Root = state.IntermediateRoot(false)

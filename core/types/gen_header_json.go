@@ -90,9 +90,6 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'sha3Uncles' for Header")
 	}
 	h.UncleHash = *dec.UncleHash
-	if dec.Coinbase == nil {
-		return errors.New("missing required field 'miner' for Header")
-	}
 	h.Coinbase = *dec.Coinbase
 	if dec.Root == nil {
 		return errors.New("missing required field 'stateRoot' for Header")

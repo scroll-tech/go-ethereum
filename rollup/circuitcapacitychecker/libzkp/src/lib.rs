@@ -121,7 +121,7 @@ pub mod checker {
         match r {
             Ok(result) => result,
             Err(e) => {
-                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_tx, e: {e:?}")
+                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_tx, error: {e:?}")
             }
         }
     }
@@ -174,7 +174,7 @@ pub mod checker {
         match r {
             Ok(result) => result,
             Err(e) => {
-                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_block, e: {e:?}")
+                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_block, error: {e:?}")
             }
         }
     }

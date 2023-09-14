@@ -120,8 +120,8 @@ pub mod checker {
         });
         match r {
             Ok(result) => result,
-            Err(_) => {
-                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_tx")
+            Err(e) => {
+                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_tx, e: {e:?}")
             }
         }
     }
@@ -173,8 +173,8 @@ pub mod checker {
         });
         match r {
             Ok(result) => result,
-            Err(_) => {
-                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_block")
+            Err(e) => {
+                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_block, e: {e:?}")
             }
         }
     }

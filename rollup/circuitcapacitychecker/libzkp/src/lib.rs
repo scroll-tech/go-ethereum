@@ -5,8 +5,8 @@ pub mod checker {
     use anyhow::{anyhow, Error};
     use libc::c_char;
     use prover::{
-        types::eth::BlockTrace,
         zkevm::{CircuitCapacityChecker, RowUsage},
+        BlockTrace,
     };
     use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;

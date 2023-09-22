@@ -33,6 +33,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/bloombits"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/params"
@@ -355,6 +356,50 @@ func TestInvalidGetLogsRequest(t *testing.T) {
 	for i, test := range testCases {
 		if _, err := api.GetLogs(context.Background(), test); err == nil {
 			t.Errorf("Expected Logs for case #%d to fail", i)
+		}
+	}
+}
+
+func TestGetLogsRange(t *testing.T) {
+	var (
+		db      = rawdb.NewMemoryDatabase()
+		backend = &testBackend{db: db}
+		api     = NewPublicFilterAPI(backend, false, deadline, 2)
+	)
+	(&core.Genesis{
+		Config: params.TestChainConfig,
+	}).MustCommit(db)
+	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil, false)
+	bs, _ := core.GenerateChain(params.TestChainConfig, chain.Genesis(), ethash.NewFaker(), db, 10, nil)
+	if _, err := chain.InsertChain(bs); err != nil {
+		panic(err)
+	}
+	// those test cases should fail because block range is greater then limit
+	failTestCases := []FilterCriteria{
+		// from 0 to 2 block
+		0: {FromBlock: big.NewInt(0), ToBlock: big.NewInt(2)},
+		// from 8 to latest block (10)
+		1: {FromBlock: big.NewInt(8)},
+		// from 0 to latest block (10)
+		2: {FromBlock: big.NewInt(0)},
+	}
+	for i, test := range failTestCases {
+		if _, err := api.GetLogs(context.Background(), test); err == nil {
+			t.Errorf("Expected Logs for failing case #%d to fail", i)
+		}
+	}
+
+	okTestCases := []FilterCriteria{
+		// from latest to latest block
+		0: {},
+		// from 9 to last block (10)
+		1: {FromBlock: big.NewInt(9)},
+		// from 3 to 4 block
+		2: {FromBlock: big.NewInt(3), ToBlock: big.NewInt(4)},
+	}
+	for i, test := range okTestCases {
+		if _, err := api.GetLogs(context.Background(), test); err != nil {
+			t.Errorf("Expected Logs for ok case #%d not to fail", i)
 		}
 	}
 }

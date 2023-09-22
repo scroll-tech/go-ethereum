@@ -210,6 +210,9 @@ type Config struct {
 
 	// Check circuit capacity in block validator
 	CheckCircuitCapacity bool
+
+	// Max block range for eth_getLogs api method
+	MaxBlockRange int64
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

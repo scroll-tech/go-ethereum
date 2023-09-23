@@ -169,3 +169,26 @@ func (ccc *CircuitCapacityChecker) CheckTxNum(expected int) (bool, uint64, error
 
 	return result.TxNum == uint64(expected), result.TxNum, nil
 }
+
+// SetLightMode sets to ccc light mode
+func (ccc *CircuitCapacityChecker) SetLightMode(lightMode bool) error {
+	ccc.Lock()
+	defer ccc.Unlock()
+
+	log.Debug("ccc set_light_mode start", "id", ccc.ID)
+	rawResult := C.set_light_mode(C.uint64_t(ccc.ID), C.bool(lightMode))
+	defer func() {
+		C.free(unsafe.Pointer(rawResult))
+	}()
+	log.Debug("ccc set_light_mode end", "id", ccc.ID)
+
+	result := &WrappedCommonResult{}
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), result); err != nil {
+		return fmt.Errorf("fail to json unmarshal set_light_mode result, id: %d, err: %w", ccc.ID, err)
+	}
+	if result.Error != "" {
+		return fmt.Errorf("fail to set_light_mode in CircuitCapacityChecker, id: %d, err: %w", ccc.ID, result.Error)
+	}
+
+	return nil
+}

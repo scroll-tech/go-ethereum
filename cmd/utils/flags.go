@@ -831,6 +831,12 @@ var (
 		Name:  "ccc",
 		Usage: "Enable circuit capacity check during block validation",
 	}
+
+	// Max block range for `eth_getLogs` method
+	MaxBlockRangeFlag = cli.Int64Flag{
+		Name:  "rpc.getlogs.maxrange",
+		Usage: "Limit max fetched block range for `eth_GetLogs` method",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1526,6 +1532,12 @@ func setWhitelist(ctx *cli.Context, cfg *ethconfig.Config) {
 func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(CircuitCapacityCheckEnabledFlag.Name) {
 		cfg.CheckCircuitCapacity = ctx.GlobalBool(CircuitCapacityCheckEnabledFlag.Name)
+	}
+}
+
+func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
+		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
 	}
 }
 

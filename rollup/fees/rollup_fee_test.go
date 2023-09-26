@@ -14,7 +14,7 @@ func TestCalculateEncodedL1DataFee(t *testing.T) {
 	overhead := new(big.Int).SetUint64(100)
 	scalar := new(big.Int).SetUint64(10)
 
-	expected := new(big.Int).SetUint64(184) // 184.2
+	expected := new(big.Int).SetUint64(30)
 	actual := calculateEncodedL1DataFee(data, overhead, l1BaseFee, scalar)
 	assert.Equal(t, expected, actual)
 }

@@ -33,12 +33,14 @@ type CircuitCapacityChecker struct {
 }
 
 // NewCircuitCapacityChecker creates a new CircuitCapacityChecker
-func NewCircuitCapacityChecker() *CircuitCapacityChecker {
+func NewCircuitCapacityChecker(lightMode bool) *CircuitCapacityChecker {
 	creationMu.Lock()
 	defer creationMu.Unlock()
 
 	id := C.new_circuit_capacity_checker()
-	return &CircuitCapacityChecker{ID: uint64(id)}
+	ccc := &CircuitCapacityChecker{ID: uint64(id)}
+	ccc.SetLightMode(lightMode)
+	return ccc
 }
 
 // Reset resets a CircuitCapacityChecker

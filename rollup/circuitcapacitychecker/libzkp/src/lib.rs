@@ -174,7 +174,6 @@ pub mod checker {
                 .ok_or(anyhow!(
                     "fail to get circuit capacity checker (id: {id:?}) in apply_block"
                 ))?;
-            ccc_instance.light_mode = false;
             ccc_instance.estimate_circuit_capacity(&[traces])
         });
         match r {

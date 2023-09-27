@@ -165,7 +165,7 @@ pub mod checker {
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)?;
 
         let r = panic::catch_unwind(|| {
-            let ccc_instance = CHECKERS
+            CHECKERS
                 .get_mut()
                 .ok_or(anyhow!(
                     "fail to get circuit capacity checkers map in apply_block"
@@ -173,8 +173,8 @@ pub mod checker {
                 .get_mut(&id)
                 .ok_or(anyhow!(
                     "fail to get circuit capacity checker (id: {id:?}) in apply_block"
-                ))?;
-            ccc_instance.estimate_circuit_capacity(&[traces])
+                ))?
+                .estimate_circuit_capacity(&[traces])
         });
         match r {
             Ok(result) => result,

@@ -835,7 +835,7 @@ var (
 	// Max block range for `eth_getLogs` method
 	MaxBlockRangeFlag = cli.Int64Flag{
 		Name:  "rpc.getlogs.maxrange",
-		Usage: "Limit max fetched block range for `eth_GetLogs` method",
+		Usage: "Limit max fetched block range for `eth_getLogs` method",
 	}
 )
 

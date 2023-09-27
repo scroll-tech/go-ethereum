@@ -1607,6 +1607,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setWhitelist(ctx, cfg)
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
+	setMaxBlockRange(ctx, cfg)
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()

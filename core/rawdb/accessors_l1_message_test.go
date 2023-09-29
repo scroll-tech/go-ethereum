@@ -154,6 +154,6 @@ func TestIterationStopsAtMaxQueueIndex(t *testing.T) {
 	got := ReadL1MessagesFrom(db, 100, 10)
 
 	if len(got) != 3 {
-		t.Fatal("Invalid length", "expected", 4, "got", len(got))
+		t.Fatal("Invalid length", "expected", 3, "got", len(got))
 	}
 }

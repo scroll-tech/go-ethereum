@@ -460,6 +460,18 @@ func DefaultScrollSepoliaGenesisBlock() *Genesis {
 	}
 }
 
+// DefaultScrollMainnetGenesisBlock returns the Scroll mainnet genesis block.
+func DefaultScrollMainnetGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollMainnetChainConfig,
+		Timestamp:  0x6513fa42,
+		ExtraData:  hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000069b800387f915A5fc6397f4C0e679F11360cFb880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), // TODO
+		GasLimit:   8000000,                                                                                                                                                                                                                                                            // TODO
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollMainnetAllocData), // TODO
+	}
+}
+
 // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
 func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one

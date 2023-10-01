@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math/big"
 	"time"
+	"unsafe"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -20,6 +21,7 @@ var (
 	iteratorInnerNextCalledCounter = metrics.NewRegisteredCounter("rawdb/l1_message/iterator/inner_next_called", nil)
 	iteratorLengthMismatchCounter  = metrics.NewRegisteredCounter("rawdb/l1_message/iterator/length_mismatch", nil)
 	iteratorNextDurationTimer      = metrics.NewRegisteredTimer("rawdb/l1_message/iterator/next_time", nil)
+	iteratorL1MessageSizeGauge     = metrics.NewRegisteredGauge("rawdb/l1_message/size", nil)
 )
 
 // WriteSyncedL1BlockNumber writes the highest synced L1 block number to the database.
@@ -226,6 +228,8 @@ func ReadL1MessagesFrom(db ethdb.Database, startIndex, maxCount uint64) []types.
 		msgs = append(msgs, msg)
 		index += 1
 		count -= 1
+
+		iteratorL1MessageSizeGauge.Update(int64(unsafe.Sizeof(msg) + uintptr(cap(msg.Data))))
 
 		if msg.QueueIndex == it.maxQueueIndex {
 			break

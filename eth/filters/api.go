@@ -348,18 +348,21 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 			end = crit.ToBlock.Int64()
 		}
 
-		beginBlock, err := api.backend.HeaderByNumber(ctx, rpc.BlockNumber(begin))
-		if err != nil {
-			return nil, fmt.Errorf("couldn't find fromBlock, fromBlock: %d", begin)
-		}
-		endBlock, err := api.backend.HeaderByNumber(ctx, rpc.BlockNumber(end))
-		if err != nil {
-			return nil, fmt.Errorf("couldn't find toBlock, toBlock: %d", end)
-		}
-		realBegin := beginBlock.Number.Int64()
-		realEnd := endBlock.Number.Int64()
-		if realEnd-realBegin+1 > api.maxBlockRange {
-			return nil, fmt.Errorf("block range is bigger than maxBlockRange, block range: %d, maxBlockRange: %d", realEnd-realBegin+1, api.maxBlockRange)
+		// if maxBlockRange configured then check for it
+		if api.maxBlockRange != -1 {
+			beginBlock, err := api.backend.HeaderByNumber(ctx, rpc.BlockNumber(begin))
+			if beginBlock == nil || err != nil {
+				return nil, fmt.Errorf("couldn't find fromBlock, fromBlock: %d", begin)
+			}
+			endBlock, err := api.backend.HeaderByNumber(ctx, rpc.BlockNumber(end))
+			if endBlock == nil || err != nil {
+				return nil, fmt.Errorf("couldn't find toBlock, toBlock: %d", end)
+			}
+			realBegin := beginBlock.Number.Int64()
+			realEnd := endBlock.Number.Int64()
+			if realEnd-realBegin+1 > api.maxBlockRange {
+				return nil, fmt.Errorf("block range is bigger than maxBlockRange, block range: %d, maxBlockRange: %d", realEnd-realBegin+1, api.maxBlockRange)
+			}
 		}
 		// Construct the range filter
 		filter = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics)

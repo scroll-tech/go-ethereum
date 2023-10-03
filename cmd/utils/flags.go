@@ -1538,6 +1538,8 @@ func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
 		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
+	} else {
+		cfg.MaxBlockRange = -1
 	}
 }
 

@@ -19,6 +19,7 @@ package filters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -152,7 +153,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 
 	// if maxBlockRange configured then check for
 	if f.maxBlockRange != -1 && int64(end)-f.begin+1 > f.maxBlockRange {
-		return nil, errors.New("block range is bigger than maxBlockRange")
+		return nil, fmt.Errorf("block range is larger than max block range, block range = %d, max block range = %d", int64(end)-f.begin+1, f.maxBlockRange)
 	}
 	// Gather all indexed logs, and finish with non indexed ones
 	var (

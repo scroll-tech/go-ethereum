@@ -92,7 +92,7 @@ var Defaults = Config{
 	RPCEVMTimeout: 5 * time.Second,
 	GPO:           FullNodeGPO,
 	RPCTxFeeCap:   1,  // 1 ether
-	MaxBlockRange: -1, // unconfigured
+	MaxBlockRange: -1, // Default unconfigured value: no block range limit for backward compatibility
 }
 
 func init() {

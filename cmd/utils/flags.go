@@ -835,6 +835,12 @@ var (
 		Name:  "ccc",
 		Usage: "Enable circuit capacity check during block validation",
 	}
+
+	// Max block range for `eth_getLogs` method
+	MaxBlockRangeFlag = cli.Int64Flag{
+		Name:  "rpc.getlogs.maxrange",
+		Usage: "Limit max fetched block range for `eth_getLogs` method",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1540,6 +1546,14 @@ func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
+		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
+	} else {
+		cfg.MaxBlockRange = -1
+	}
+}
+
 // CheckExclusive verifies that only a single instance of the provided flags was
 // set by the user. Each flag might optionally be followed by a string type to
 // specialize it further.
@@ -1606,6 +1620,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setWhitelist(ctx, cfg)
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
+	setMaxBlockRange(ctx, cfg)
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()
@@ -1842,6 +1857,12 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		if cfg.NetworkId == 1 {
 			SetDNSDiscoveryDefaults(cfg, params.MainnetGenesisHash)
 		}
+	}
+
+	// set db prefix for backward-compatibility
+	if cfg.NetworkId == 534351 {
+		log.Warn("Using legacy db prefix for L1 messages")
+		rawdb.SetL1MessageLegacyPrefix()
 	}
 }
 

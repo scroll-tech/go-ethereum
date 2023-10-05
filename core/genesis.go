@@ -464,9 +464,9 @@ func DefaultScrollSepoliaGenesisBlock() *Genesis {
 func DefaultScrollMainnetGenesisBlock() *Genesis {
 	return &Genesis{
 		Config:     params.ScrollMainnetChainConfig,
-		Timestamp:  0x6513fa42,
-		ExtraData:  hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000069b800387f915A5fc6397f4C0e679F11360cFb880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), // TODO
-		GasLimit:   8000000,                                                                                                                                                                                                                                                            // TODO
+		Timestamp:  0x651fb778,
+		ExtraData:  hexutil.MustDecode("0x48656c6c6f2c20776f726c64210000000000000000000000000000000000000015f197050e7A1681C70078fa4FAaB1683E54316E0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), // TODO
+		GasLimit:   10000000,                                                                                                                                                                                                                                                            // TODO
 		Difficulty: big.NewInt(1),
 		Alloc:      decodePrealloc(scrollMainnetAllocData), // TODO
 	}

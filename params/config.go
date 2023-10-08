@@ -366,7 +366,7 @@ var (
 			EnableEIP1559:             false,
 			L1Config: &L1Config{
 				L1ChainId:             1,
-				L1MessageQueueAddress: common.HexToAddress("0x72FF472b663Bb201B02258c4d2a34cD75867A6E3"), // TODO
+				L1MessageQueueAddress: common.HexToAddress("0x72FF472b663Bb201B02258c4d2a34cD75867A6E3"),
 				NumL1MessagesPerBlock: 10,
 			},
 		},

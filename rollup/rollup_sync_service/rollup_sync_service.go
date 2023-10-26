@@ -236,6 +236,10 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				log.Crit("Failed to write batch to database", "err", err)
 			}
 
+			if batchIndex%100 == 0 {
+				log.Info("finalized batch progress", "batch index", batchIndex, "finalized l2 block height", endBlock)
+			}
+
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
 		}

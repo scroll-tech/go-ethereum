@@ -26,8 +26,8 @@ const (
 	// defaultFetchBlockRange is the number of blocks that we collect in a single eth_getLogs query.
 	defaultFetchBlockRange = uint64(100)
 
-	// defaultPollInterval is the frequency at which we query for new rollup event.
-	defaultPollInterval = 60 * time.Second
+	// defaultSyncInterval is the frequency at which we query for new rollup event.
+	defaultSyncInterval = 60 * time.Second
 
 	// defaultMaxRetries is the maximum number of retries allowed when the local node is not synced up to the required block height.
 	defaultMaxRetries = 20
@@ -115,8 +115,8 @@ func (s *RollupSyncService) Start() {
 	log.Info("Starting rollup event sync background service", "latest processed block", s.latestProcessedBlock)
 
 	go func() {
-		eventTicker := time.NewTicker(defaultPollInterval)
-		defer eventTicker.Stop()
+		syncTicker := time.NewTicker(defaultSyncInterval)
+		defer syncTicker.Stop()
 
 		logTicker := time.NewTicker(defaultLogInterval)
 		defer logTicker.Stop()
@@ -125,7 +125,7 @@ func (s *RollupSyncService) Start() {
 			select {
 			case <-s.ctx.Done():
 				return
-			case <-eventTicker.C:
+			case <-syncTicker.C:
 				s.fetchRollupEvents()
 			case <-logTicker.C:
 				log.Info("Sync rollup events progress update", "latestProcessedBlock", s.latestProcessedBlock)

@@ -144,38 +144,3 @@ func ReadFinalizedL2BlockNumber(db ethdb.Reader) *uint64 {
 	finalizedL2BlockNumber := number.Uint64()
 	return &finalizedL2BlockNumber
 }
-
-// WriteBlockNumberToBatchIndex stores the mapping from a block number to a batch index in the database.
-func WriteBlockNumberToBatchIndex(db ethdb.KeyValueWriter, startBlockNumber uint64, endBlockNumber uint64, batchIndex uint64) {
-	if startBlockNumber > endBlockNumber {
-		log.Crit("Start block number cannot be greater than end block number", "startBlockNumber", startBlockNumber, "endBlockNumber", endBlockNumber)
-		return
-	}
-
-	value := big.NewInt(0).SetUint64(batchIndex).Bytes()
-	for blockNumber := startBlockNumber; blockNumber <= endBlockNumber; blockNumber++ {
-		if err := db.Put(blockNumberToBatchIndexKey(blockNumber), value); err != nil {
-			log.Crit("Failed to add block number to batch index mapping to batch", "startBlockNumber", startBlockNumber, "endBlockNumber", endBlockNumber, "batchIndex", batchIndex, "err", err)
-			return
-		}
-	}
-}
-
-// ReadBlockNumberToBatchIndex fetches the batch index associated with a block number from the database.
-func ReadBlockNumberToBatchIndex(db ethdb.Reader, blockNumber uint64) *uint64 {
-	data, err := db.Get(blockNumberToBatchIndexKey(blockNumber))
-	if err != nil && isNotFoundErr(err) {
-		return nil
-	}
-	if err != nil {
-		log.Crit("failed to read batch index for block number from database", "blockNumber", blockNumber, "err", err)
-	}
-
-	number := new(big.Int).SetBytes(data)
-	if !number.IsUint64() {
-		log.Crit("unexpected batch index for block number in database", "blockNumber", blockNumber, "number", number)
-	}
-
-	batchIndex := number.Uint64()
-	return &batchIndex
-}

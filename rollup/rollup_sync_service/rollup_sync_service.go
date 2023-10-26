@@ -223,18 +223,13 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			startBlock, endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks)
+			endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks)
 			if err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 			}
 
-			batchWriter := s.db.NewBatch()
-			rawdb.WriteFinalizedL2BlockNumber(batchWriter, endBlock)
-			rawdb.WriteBlockNumberToBatchIndex(batchWriter, startBlock, endBlock, batchIndex)
-			rawdb.WriteFinalizedBatchMeta(batchWriter, batchIndex, finalizedBatchMeta)
-			if err := batchWriter.Write(); err != nil {
-				log.Crit("Failed to write batch to database", "err", err)
-			}
+			rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock)
+			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, finalizedBatchMeta)
 
 			if batchIndex%100 == 0 {
 				log.Info("finalized batch progress", "batch index", batchIndex, "finalized l2 block height", endBlock)
@@ -363,20 +358,20 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 // validateBatch verifies the consistency between the L1 contract and L2 node data.
 // The function will terminate the node and exit if any consistency check fails.
 // It returns the number of the end block, a finalized batch meta data, and an error if any.
-func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) (uint64, uint64, *rawdb.FinalizedBatchMeta, error) {
+func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
-		return 0, 0, nil, fmt.Errorf("invalid argument: length of chunks is 0")
+		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0")
 	}
 
 	startChunk := chunks[0]
 	if len(startChunk.Blocks) == 0 {
-		return 0, 0, nil, fmt.Errorf("invalid argument: block count of start chunk is 0")
+		return 0, nil, fmt.Errorf("invalid argument: block count of start chunk is 0")
 	}
 	startBlock := startChunk.Blocks[0]
 
 	endChunk := chunks[len(chunks)-1]
 	if len(endChunk.Blocks) == 0 {
-		return 0, 0, nil, fmt.Errorf("invalid argument: block count of end chunk is 0")
+		return 0, nil, fmt.Errorf("invalid argument: block count of end chunk is 0")
 	}
 	endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
 
@@ -384,20 +379,20 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	if localStateRoot != event.StateRoot {
 		log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return 0, 0, nil, fmt.Errorf("state root mismatch")
+		return 0, nil, fmt.Errorf("state root mismatch")
 	}
 
 	localWithdrawRoot := endBlock.WithdrawRoot
 	if localWithdrawRoot != event.WithdrawRoot {
 		log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return 0, 0, nil, fmt.Errorf("withdraw root mismatch")
+		return 0, nil, fmt.Errorf("withdraw root mismatch")
 	}
 
 	// Note: All params for NewBatchHeader are calculated locally based on the block data.
 	batchHeader, err := NewBatchHeader(batchHeaderVersion, event.BatchIndex.Uint64(), parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to construct batch header, err: %w", err)
+		return 0, nil, fmt.Errorf("failed to construct batch header, err: %w", err)
 	}
 
 	// Note: If the batch headers match, this ensures the consistency of blocks and transactions
@@ -408,7 +403,7 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		chunksJson, _ := json.Marshal(chunks)
 		log.Error("Chunks", "chunks", string(chunksJson))
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return 0, 0, nil, fmt.Errorf("batch hash mismatch")
+		return 0, nil, fmt.Errorf("batch hash mismatch")
 	}
 
 	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
@@ -421,5 +416,5 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		StateRoot:            localStateRoot,
 		WithdrawRoot:         localWithdrawRoot,
 	}
-	return startBlock.Header.Number.Uint64(), endBlock.Header.Number.Uint64(), finalizedBatchMeta, nil
+	return endBlock.Header.Number.Uint64(), finalizedBatchMeta, nil
 }

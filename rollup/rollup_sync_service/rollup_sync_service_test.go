@@ -169,9 +169,8 @@ func TestValidateBatch(t *testing.T) {
 		StateRoot:    chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
-	startBlock1, endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3})
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3})
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), startBlock1)
 	assert.Equal(t, uint64(13), endBlock1)
 
 	templateBlockTrace4, err := os.ReadFile("./testdata/blockTrace_05.json")
@@ -194,9 +193,8 @@ func TestValidateBatch(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	startBlock2, endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4})
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4})
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(17), startBlock2)
 	assert.Equal(t, uint64(17), endBlock2)
 
 	parentBatchMeta3 := &rawdb.FinalizedBatchMeta{

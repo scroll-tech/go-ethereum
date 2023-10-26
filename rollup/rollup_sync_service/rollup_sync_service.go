@@ -36,6 +36,9 @@ const (
 	// The service will wait for this duration if it detects that the local node has not synced up to the block height
 	// of a specific L1 batch finalize event.
 	defaultGetBlockInRangeRetryDelay = 60 * time.Second
+
+	// defaultLogInterval is the frequency at which we print the latestProcessedBlock.
+	defaultLogInterval = 5 * time.Minute
 )
 
 // RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
@@ -112,17 +115,20 @@ func (s *RollupSyncService) Start() {
 	log.Info("Starting rollup event sync background service", "latest processed block", s.latestProcessedBlock)
 
 	go func() {
-		t := time.NewTicker(defaultPollInterval)
-		defer t.Stop()
+		eventTicker := time.NewTicker(defaultPollInterval)
+		defer eventTicker.Stop()
+
+		logTicker := time.NewTicker(defaultLogInterval)
+		defer logTicker.Stop()
 
 		for {
-			s.fetchRollupEvents()
-
 			select {
 			case <-s.ctx.Done():
 				return
-			case <-t.C:
-				continue
+			case <-eventTicker.C:
+				s.fetchRollupEvents()
+			case <-logTicker.C:
+				log.Info("Sync rollup events progress update", "latestProcessedBlock", s.latestProcessedBlock)
 			}
 		}
 	}()
@@ -227,10 +233,6 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			rawdb.WriteFinalizedBatchMeta(batchWriter, batchIndex, finalizedBatchMeta)
 			if err := batchWriter.Write(); err != nil {
 				log.Crit("Failed to write batch to database", "err", err)
-			}
-
-			if batchIndex%100 == 0 {
-				log.Info("finalized batch progress", "batch index", batchIndex, "finalized l2 block height", endBlock)
 			}
 
 		default:

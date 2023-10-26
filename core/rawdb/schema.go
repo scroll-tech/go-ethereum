@@ -111,11 +111,11 @@ var (
 	highestSyncedQueueIndexKey        = []byte("HighestSyncedQueueIndex")
 
 	// Scroll rollup event store
-	rollupEventSyncedL1BlockNumberKey = []byte("LastRollupEventSyncedL1BlockNumber")
-	batchChunkRangesPrefix            = []byte("bcr")
-	batchMetaPrefix                   = []byte("bm")
-	finalizedL2BlockNumberKey         = []byte("finalized")
-	blockNumberToBatchIndexPrefix     = []byte("bn2bi")
+	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")
+	batchChunkRangesPrefix            = []byte("R-bcr")
+	batchMetaPrefix                   = []byte("R-bm")
+	finalizedL2BlockNumberKey         = []byte("R-finalized")
+	blockNumberToBatchIndexPrefix     = []byte("R-bn2bi")
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block

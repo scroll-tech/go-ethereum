@@ -2,6 +2,7 @@ package rollup_sync_service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -377,14 +378,14 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 
 	localStateRoot := endBlock.Header.Root
 	if localStateRoot != event.StateRoot {
-		log.Error("State root mismatch", "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+		log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
 		return 0, 0, nil, fmt.Errorf("state root mismatch")
 	}
 
 	localWithdrawRoot := endBlock.WithdrawRoot
 	if localWithdrawRoot != event.WithdrawRoot {
-		log.Error("Withdraw root mismatch", "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+		log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
 		return 0, 0, nil, fmt.Errorf("withdraw root mismatch")
 	}
@@ -399,7 +400,9 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	// (including skipped transactions) between L1 and L2.
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != event.BatchHash {
-		log.Error("Batch hash mismatch", "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+		log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+		chunksJson, _ := json.Marshal(chunks)
+		log.Error("Chunks", "chunks", string(chunksJson))
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
 		return 0, 0, nil, fmt.Errorf("batch hash mismatch")
 	}

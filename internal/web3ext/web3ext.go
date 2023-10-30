@@ -897,6 +897,18 @@ web3._extend({
 			call: 'scroll_getSkippedTransactionHashes',
 			params: 2
 		}),
+		new web3._extend.Method({
+			name: 'isBlockFinalized',
+			call: 'scroll_isBlockFinalized',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'estimateL1DataFee',
+			call: 'scroll_estimateL1DataFee',
+			params: 2,
+			inputFormatter: [web3._extend.formatters.inputCallFormatter, web3._extend.formatters.inputBlockNumberFormatter],
+			outputFormatter: web3._extend.utils.toDecimal
+		}),
 	],
 	properties:
 	[
@@ -911,6 +923,14 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'numSkippedTransactions',
 			getter: 'scroll_getNumSkippedTransactions'
+		}),
+		new web3._extend.Method({
+			name: 'finalizedBlockHeight',
+			getter: 'scroll_finalizedBlockHeight',
+		}),
+		new web3._extend.Method({
+			name: 'syncStatus',
+			getter: 'scroll_syncStatus',
 		}),
 	]
 });

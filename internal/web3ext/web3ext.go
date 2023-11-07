@@ -898,11 +898,6 @@ web3._extend({
 			params: 2
 		}),
 		new web3._extend.Method({
-			name: 'isBlockFinalized',
-			call: 'scroll_isBlockFinalized',
-			params: 1
-		}),
-		new web3._extend.Method({
 			name: 'estimateL1DataFee',
 			call: 'scroll_estimateL1DataFee',
 			params: 2,
@@ -923,10 +918,6 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'numSkippedTransactions',
 			getter: 'scroll_getNumSkippedTransactions'
-		}),
-		new web3._extend.Method({
-			name: 'finalizedBlockHeight',
-			getter: 'scroll_finalizedBlockHeight',
 		}),
 		new web3._extend.Method({
 			name: 'syncStatus',

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/orcaman/concurrent-map/v2"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -200,6 +201,9 @@ type worker struct {
 	newTxs    int32 // New arrival transaction count since last sealing work submitting.
 	newL1Msgs int32 // New arrival L1 message count since last sealing work submitting.
 
+	// ccc-skipped related status
+	accountSkippedNonceHead cmap.ConcurrentMap[string, uint64]
+
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
 	// But in some special scenario the consensus engine will seal blocks instantaneously,
@@ -244,6 +248,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh:     make(chan time.Duration),
 		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
+		accountSkippedNonceHead: cmap.New[uint64](),
 	}
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
@@ -1076,6 +1081,8 @@ loop:
 
 		case errors.Is(err, core.ErrNonceTooHigh):
 			if w.isAccountLastNonceSkippedByCCC(from, tx.Nonce()) {
+				log.Info("Removing future nonce tx from ccc-skipped tx", "sender", from, "nonce", tx.Nonce())
+				w.eth.TxPool().RemoveTx(tx.Hash(), true)
 			} else {
 				// Reorg notification data race between the transaction pool and miner, skip account =
 				log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
@@ -1233,7 +1240,11 @@ loop:
 }
 
 func (w *worker) isAccountLastNonceSkippedByCCC(from common.Address, currentNonce uint64) bool {
-	return false
+	skippedNonceHead, ok := w.accountSkippedNonceHead.Get(from.Hex())
+	if !ok {
+		return false
+	}
+	return currentNonce > skippedNonceHead
 }
 
 func (w *worker) checkCurrentTxNumWithCCC(expected int) {

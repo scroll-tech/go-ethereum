@@ -1075,9 +1075,12 @@ loop:
 			txs.Shift()
 
 		case errors.Is(err, core.ErrNonceTooHigh):
-			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
-			txs.Pop()
+			if w.isAccountLastNonceSkippedByCCC(from, tx.Nonce()) {
+			} else {
+				// Reorg notification data race between the transaction pool and miner, skip account =
+				log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+				txs.Pop()
+			}
 
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
@@ -1227,6 +1230,10 @@ loop:
 		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 	}
 	return false, circuitCapacityReached
+}
+
+func (w *worker) isAccountLastNonceSkippedByCCC(from common.Address, currentNonce uint64) bool {
+	return false
 }
 
 func (w *worker) checkCurrentTxNumWithCCC(expected int) {

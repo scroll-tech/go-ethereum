@@ -26,7 +26,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/orcaman/concurrent-map/v2"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -225,29 +225,29 @@ type worker struct {
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
 	worker := &worker{
-		config:                 config,
-		chainConfig:            chainConfig,
-		engine:                 engine,
-		eth:                    eth,
-		mux:                    mux,
-		chain:                  eth.BlockChain(),
-		isLocalBlock:           isLocalBlock,
-		localUncles:            make(map[common.Hash]*types.Block),
-		remoteUncles:           make(map[common.Hash]*types.Block),
-		unconfirmed:            newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
-		pendingTasks:           make(map[common.Hash]*task),
-		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
-		l1MsgsCh:               make(chan core.NewL1MsgsEvent, txChanSize),
-		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
-		chainSideCh:            make(chan core.ChainSideEvent, chainSideChanSize),
-		newWorkCh:              make(chan *newWorkReq),
-		taskCh:                 make(chan *task),
-		resultCh:               make(chan *types.Block, resultQueueSize),
-		exitCh:                 make(chan struct{}),
-		startCh:                make(chan struct{}, 1),
-		resubmitIntervalCh:     make(chan time.Duration),
-		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
-		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
+		config:                   config,
+		chainConfig:              chainConfig,
+		engine:                   engine,
+		eth:                      eth,
+		mux:                      mux,
+		chain:                    eth.BlockChain(),
+		isLocalBlock:             isLocalBlock,
+		localUncles:              make(map[common.Hash]*types.Block),
+		remoteUncles:             make(map[common.Hash]*types.Block),
+		unconfirmed:              newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
+		pendingTasks:             make(map[common.Hash]*task),
+		txsCh:                    make(chan core.NewTxsEvent, txChanSize),
+		l1MsgsCh:                 make(chan core.NewL1MsgsEvent, txChanSize),
+		chainHeadCh:              make(chan core.ChainHeadEvent, chainHeadChanSize),
+		chainSideCh:              make(chan core.ChainSideEvent, chainSideChanSize),
+		newWorkCh:                make(chan *newWorkReq),
+		taskCh:                   make(chan *task),
+		resultCh:                 make(chan *types.Block, resultQueueSize),
+		exitCh:                   make(chan struct{}),
+		startCh:                  make(chan struct{}, 1),
+		resubmitIntervalCh:       make(chan time.Duration),
+		resubmitAdjustCh:         make(chan *intervalAdjust, resubmitAdjustChanSize),
+		circuitCapacityChecker:   circuitcapacitychecker.NewCircuitCapacityChecker(true),
 		accountsSkippedNonceHead: cmap.New[uint64](),
 	}
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)

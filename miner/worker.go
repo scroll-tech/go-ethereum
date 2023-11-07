@@ -914,7 +914,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
-		l2CommitTraceTimer.Time(func() {
+		withTimer(l2CommitTraceTimer, func() {
 			traces, err = w.current.traceEnv.GetBlockTrace(
 				types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 			)
@@ -925,7 +925,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		if err != nil {
 			return nil, nil, err
 		}
-		l2CommitCCCTimer.Time(func() {
+		withTimer(l2CommitCCCTimer, func() {
 			accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
 		})
 		if err != nil {
@@ -970,7 +970,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 }
 
 func (w *worker) commitTransactions(txs types.OrderedTransactionSet, coinbase common.Address, interrupt *int32) (r1 bool, r2 bool) {
-	l2CommitBlockTimer.Time(func() {
+	withTimer(l2CommitBlockTimer, func() {
 		r1, r2 = w.doCommitTransactions(txs, coinbase, interrupt)
 	})
 	return r1, r2
@@ -1510,4 +1510,12 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
 	}
 	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
+}
+
+func withTimer(timer metrics.Timer, f func()) {
+	if metrics.Enabled {
+		timer.Time(f)
+	} else {
+		f()
+	}
 }

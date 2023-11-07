@@ -90,6 +90,9 @@ var (
 	l1TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l1/ccc_unknown_err", nil)
 	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
 	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
+	l2CommitBlockTimer                = metrics.NewRegisteredTimer("miner/commit_txs/block", nil)
+	l2CommitTraceTimer                = metrics.NewRegisteredTimer("miner/commit_txs/trace", nil)
+	l2CommitCCCTimer                  = metrics.NewRegisteredTimer("miner/commit_txs/ccc", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -911,16 +914,20 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
-		traces, err = w.current.traceEnv.GetBlockTrace(
-			types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
-		)
+		l2CommitTraceTimer.Time(func() {
+			traces, err = w.current.traceEnv.GetBlockTrace(
+				types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
+			)
+		})
 		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
 		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
 		w.current.state.RevertToSnapshot(snap)
 		if err != nil {
 			return nil, nil, err
 		}
-		accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
+		l2CommitCCCTimer.Time(func() {
+			accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
+		})
 		if err != nil {
 			return nil, traces, err
 		}
@@ -962,7 +969,14 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, traces, nil
 }
 
-func (w *worker) commitTransactions(txs types.OrderedTransactionSet, coinbase common.Address, interrupt *int32) (bool, bool) {
+func (w *worker) commitTransactions(txs types.OrderedTransactionSet, coinbase common.Address, interrupt *int32) (r1 bool, r2 bool) {
+	l2CommitBlockTimer.Time(func() {
+		r1, r2 = w.doCommitTransactions(txs, coinbase, interrupt)
+	})
+	return r1, r2
+}
+
+func (w *worker) doCommitTransactions(txs types.OrderedTransactionSet, coinbase common.Address, interrupt *int32) (bool, bool) {
 	var circuitCapacityReached bool
 
 	// Short circuit if current is nil

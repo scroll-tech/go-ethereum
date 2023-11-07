@@ -202,7 +202,7 @@ type worker struct {
 	newL1Msgs int32 // New arrival L1 message count since last sealing work submitting.
 
 	// ccc-skipped related status
-	accountSkippedNonceHead cmap.ConcurrentMap[string, uint64]
+	accountsSkippedNonceHead cmap.ConcurrentMap[string, uint64]
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -248,7 +248,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh:     make(chan time.Duration),
 		resubmitAdjustCh:       make(chan *intervalAdjust, resubmitAdjustChanSize),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
-		accountSkippedNonceHead: cmap.New[uint64](),
+		accountsSkippedNonceHead: cmap.New[uint64](),
 	}
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
@@ -1103,6 +1103,8 @@ loop:
 			} else {
 				// only consider block size limit for L2 transactions
 				w.current.blockSize += tx.Size()
+				// reset skippedNonceHead for account
+				w.accountsSkippedNonceHead.Remove(from.Hex())
 			}
 
 		case errors.Is(err, core.ErrTxTypeNotSupported):
@@ -1139,6 +1141,7 @@ loop:
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
 					w.eth.TxPool().RemoveTx(tx.Hash(), true)
+					w.accountsSkippedNonceHead.Set(from.Hex(), tx.Nonce())
 					l2TxRowConsumptionOverflowCounter.Inc(1)
 				}
 
@@ -1193,6 +1196,7 @@ loop:
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
 			w.eth.TxPool().RemoveTx(tx.Hash(), true)
+			w.accountsSkippedNonceHead.Set(from.Hex(), tx.Nonce())
 			circuitCapacityReached = true
 			w.checkCurrentTxNumWithCCC(w.current.tcount)
 			break loop
@@ -1240,7 +1244,7 @@ loop:
 }
 
 func (w *worker) isAccountLastNonceSkippedByCCC(from common.Address, currentNonce uint64) bool {
-	skippedNonceHead, ok := w.accountSkippedNonceHead.Get(from.Hex())
+	skippedNonceHead, ok := w.accountsSkippedNonceHead.Get(from.Hex())
 	if !ok {
 		return false
 	}

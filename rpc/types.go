@@ -58,15 +58,11 @@ type jsonWriter interface {
 type BlockNumber int64
 
 const (
-	// L1
 	SafeBlockNumber      = BlockNumber(-4)
 	FinalizedBlockNumber = BlockNumber(-3)
 	PendingBlockNumber   = BlockNumber(-2)
 	LatestBlockNumber    = BlockNumber(-1)
 	EarliestBlockNumber  = BlockNumber(0)
-
-	// L2
-	L2FinalizedBlockNumber = BlockNumber(-1001)
 )
 
 // UnmarshalJSON parses the given JSON fragment into a BlockNumber. It supports:
@@ -97,9 +93,6 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "safe":
 		*bn = SafeBlockNumber
 		return nil
-	case "l2finalized":
-		*bn = L2FinalizedBlockNumber
-		return nil
 	}
 
 	blckNum, err := hexutil.DecodeUint64(input)
@@ -128,8 +121,6 @@ func (bn BlockNumber) MarshalText() ([]byte, error) {
 		return []byte("finalized"), nil
 	case SafeBlockNumber:
 		return []byte("safe"), nil
-	case L2FinalizedBlockNumber:
-		return []byte("l2finalized"), nil
 	default:
 		return hexutil.Uint64(bn).MarshalText()
 	}
@@ -182,10 +173,6 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		return nil
 	case "safe":
 		bn := SafeBlockNumber
-		bnh.BlockNumber = &bn
-		return nil
-	case "l2finalized":
-		bn := L2FinalizedBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
 	default:

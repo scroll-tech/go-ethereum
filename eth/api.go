@@ -715,24 +715,6 @@ func (api *ScrollAPI) GetNumSkippedTransactions(ctx context.Context) (uint64, er
 	return rawdb.ReadNumSkippedTransactions(api.eth.ChainDb()), nil
 }
 
-// FinalizedBlockHeight returns the L2 finalized block height.
-func (api *ScrollAPI) FinalizedBlockHeight(_ context.Context) (uint64, error) {
-	finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(api.eth.ChainDb())
-	if finalizedBlockHeightPtr == nil {
-		return 0, errors.New("L2 finalized block height not found in database")
-	}
-	return *finalizedBlockHeightPtr, nil
-}
-
-// IsBlockFinalized returns true if the provided block is finalized.
-func (api *ScrollAPI) IsBlockFinalized(ctx context.Context, blockHeight uint64) (bool, error) {
-	finalizedBlockHeight, err := api.FinalizedBlockHeight(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get L2 finalized block height: %w", err)
-	}
-	return blockHeight <= finalizedBlockHeight, nil
-}
-
 // SyncStatus includes L2 block sync height, L1 rollup sync height,
 // L1 message sync height, and L2 finalized block height.
 type SyncStatus struct {

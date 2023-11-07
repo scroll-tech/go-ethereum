@@ -76,7 +76,7 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	if number == rpc.LatestBlockNumber {
 		return b.eth.blockchain.CurrentBlock().Header(), nil
 	}
-	if number == rpc.L2FinalizedBlockNumber {
+	if number == rpc.FinalizedBlockNumber {
 		finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(b.eth.ChainDb())
 		if finalizedBlockHeightPtr == nil {
 			return nil, errors.New("L2 finalized block height not found in database")
@@ -118,7 +118,7 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	if number == rpc.LatestBlockNumber {
 		return b.eth.blockchain.CurrentBlock(), nil
 	}
-	if number == rpc.L2FinalizedBlockNumber {
+	if number == rpc.FinalizedBlockNumber {
 		finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(b.eth.ChainDb())
 		if finalizedBlockHeightPtr == nil {
 			return nil, errors.New("L2 finalized block height not found in database")

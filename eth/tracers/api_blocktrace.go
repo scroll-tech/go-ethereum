@@ -53,6 +53,25 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 }
 
 func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error){
+	// Try to retrieve the specified block
+	var (
+		err   error
+		block *types.Block
+	)
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		block, err = api.blockByHash(ctx, hash)
+	} else if number, ok := blockNrOrHash.Number(); ok {
+		block, err = api.blockByNumber(ctx, number)
+	} else {
+		return nil, errors.New("invalid arguments; neither block nor hash specified")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if block.NumberU64() == 0 {
+		return nil, errors.New("genesis is not traceable")
+	}
+
 	return nil, nil	
 }
 

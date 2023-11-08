@@ -276,9 +276,17 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 
 	txContext := core.NewEVMTxContext(msg)
-	callTracer, err := tracers.New("callTracer", new(tracers.Context))
+	tracerContext := tracers.Context{
+		BlockHash: block.Hash(),
+		TxIndex:   index,
+		TxHash:    tx.Hash(),
+	}
+	callTracer, err := tracers.New("callTracer", &tracerContext)
+	if err != nil {
+		return fmt.Errorf("failed to create callTracer: %w", err)
+	}
 	structLogger := vm.NewStructLogger(env.logConfig)
-	tracer := NewMuxTracer(structLogger)
+	tracer := NewMuxTracer(structLogger, callTracer)
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, txContext, state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 

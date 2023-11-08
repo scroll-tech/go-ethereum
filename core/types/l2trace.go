@@ -165,6 +165,7 @@ type TransactionData struct {
 // NewTransactionData returns a transaction that will serialize to the trace
 // representation, with the given location metadata set (if available).
 func NewTransactionData(tx *Transaction, blockNumber uint64, blockTime uint64, config *params.ChainConfig) *TransactionData {
+    // TODO: fix interface change for other parts 
     signer := MakeSigner(config, big.NewInt(0).SetUint64(blockNumber), blockTime)
     from, _ := Sender(signer, tx)
     v, r, s := tx.RawSignatureValues()

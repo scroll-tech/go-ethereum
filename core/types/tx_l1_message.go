@@ -1,9 +1,11 @@
 package types
 
 import (
+    "bytes"
     "math/big"
 
     "github.com/ethereum/go-ethereum/common"
+    "github.com/ethereum/go-ethereum/rlp"
 )
 
 // payload, RLP encoded
@@ -41,6 +43,7 @@ func (tx *L1MessageTx) gas() uint64            { return tx.Gas }
 func (tx *L1MessageTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (tx *L1MessageTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (tx *L1MessageTx) gasPrice() *big.Int     { return new(big.Int) }
+func (tx *L1MessageTx) effectiveGasPrice(*big.Int, *big.Int) *big.Int     { return new(big.Int) }
 func (tx *L1MessageTx) value() *big.Int        { return tx.Value }
 func (tx *L1MessageTx) nonce() uint64          { return 0 }
 func (tx *L1MessageTx) to() *common.Address    { return tx.To }

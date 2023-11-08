@@ -919,8 +919,8 @@ web3._extend({
 			name: 'numSkippedTransactions',
 			getter: 'scroll_getNumSkippedTransactions'
 		}),
-		new web3._extend.Method({
-			name: 'scroll_syncStatus',
+		new web3._extend.Property({
+			name: 'syncStatus',
 			getter: 'scroll_syncStatus',
 		}),
 	]

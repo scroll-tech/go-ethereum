@@ -205,9 +205,7 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 	case BlobTxType:
 		inner = new(BlobTx)
 	case L1MessageTxType:
-		var inner L1MessageTx
-		err := rlp.DecodeBytes(b[1:], &inner)
-		return &inner, err
+		inner = new(BlobTx)
 	default:
 		return nil, ErrTxTypeNotSupported
 	}

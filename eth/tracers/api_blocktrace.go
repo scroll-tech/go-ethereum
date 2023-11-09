@@ -7,13 +7,14 @@ import (
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
-	GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error)
+	GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error)
 }
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
@@ -43,7 +44,6 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 		log.Warn("Tracer params is unsupported")
 	}
 
-	// create current execution environment.
 	env, err := api.createTraceEnv(ctx, config, block)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return env.GetBlockTrace(block)
 }
 
-func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error){
+func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error){
 	// Try to retrieve the specified block
 	var (
 		err   error
@@ -71,8 +71,27 @@ func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.Transact
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable")
 	}
+	if config == nil {
+		config = &TraceConfig{
+			LogConfig: &vm.LogConfig{
+				EnableMemory:     false,
+				EnableReturnData: true,
+			},
+		}
+	} else if config.Tracer != nil {
+		config.Tracer = nil
+		log.Warn("Tracer params is unsupported")
+	}
 
-	return nil, nil	
+	block = types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{args.ToTransaction()}, nil)
+
+	// create current execution environment.
+	env, err := api.createTraceEnv(ctx, config, block)
+	if err != nil {
+		return nil, err
+	}
+
+	return env.GetBlockTrace(block)
 }
 
 // Make trace environment for current block.

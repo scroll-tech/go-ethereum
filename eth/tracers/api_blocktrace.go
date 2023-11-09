@@ -14,7 +14,7 @@ import (
 
 type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
-	GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error)
+	GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error)
 }
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
@@ -33,7 +33,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	env, err := api.createTraceEnv(ctx, config, block)
+	env, err := api.createTraceEnv(ctx, config, nil, block)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return env.GetBlockTrace(block)
 }
 
-func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error){
+func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error){
 	// Try to retrieve the specified block
 	var (
 		err   error
@@ -63,8 +63,20 @@ func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.Transact
 
 	block = types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{args.ToTransaction()}, nil)
 
+	var traceConfig *TraceConfig
+	var stateOverrides *ethapi.StateOverride
+	if config != nil {
+		traceConfig = &TraceConfig{
+			LogConfig: config.LogConfig,
+			Tracer:    config.Tracer,
+			Timeout:   config.Timeout,
+			Reexec:    config.Reexec,
+		}
+		stateOverrides = config.StateOverrides
+	}
+
 	// create current execution environment.
-	env, err := api.createTraceEnv(ctx, config, block)
+	env, err := api.createTraceEnv(ctx, traceConfig, stateOverrides, block)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +85,7 @@ func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.Transact
 }
 
 // Make trace environment for current block.
-func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*core.TraceEnv, error) {
+func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, stateOverrides *ethapi.StateOverride, block *types.Block) (*core.TraceEnv, error) {
 	if config == nil {
 		config = &TraceConfig{
 			LogConfig: &vm.LogConfig{
@@ -98,6 +110,14 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *
 	if err != nil {
 		return nil, err
 	}
+
+	if stateOverrides!=nil{
+		if err := stateOverrides.Apply(statedb); err != nil {
+			return nil, err
+		}
+	}
+
+
 	chaindb := api.backend.ChainDb()
 	return core.CreateTraceEnv(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
 }

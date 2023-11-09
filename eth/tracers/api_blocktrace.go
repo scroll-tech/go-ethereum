@@ -32,17 +32,6 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable")
 	}
-	if config == nil {
-		config = &TraceConfig{
-			LogConfig: &vm.LogConfig{
-				EnableMemory:     false,
-				EnableReturnData: true,
-			},
-		}
-	} else if config.Tracer != nil {
-		config.Tracer = nil
-		log.Warn("Tracer params is unsupported")
-	}
 
 	env, err := api.createTraceEnv(ctx, config, block)
 	if err != nil {
@@ -71,17 +60,6 @@ func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.Transact
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable")
 	}
-	if config == nil {
-		config = &TraceConfig{
-			LogConfig: &vm.LogConfig{
-				EnableMemory:     false,
-				EnableReturnData: true,
-			},
-		}
-	} else if config.Tracer != nil {
-		config.Tracer = nil
-		log.Warn("Tracer params is unsupported")
-	}
 
 	block = types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{args.ToTransaction()}, nil)
 
@@ -96,6 +74,18 @@ func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.Transact
 
 // Make trace environment for current block.
 func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*core.TraceEnv, error) {
+	if config == nil {
+		config = &TraceConfig{
+			LogConfig: &vm.LogConfig{
+				EnableMemory:     false,
+				EnableReturnData: true,
+			},
+		}
+	} else if config.Tracer != nil {
+		config.Tracer = nil
+		log.Warn("Tracer params is unsupported")
+	}
+
 	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
 	if err != nil {
 		return nil, err

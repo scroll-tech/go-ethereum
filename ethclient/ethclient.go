@@ -342,18 +342,6 @@ func (ec *Client) GetBlockTraceByNumber(ctx context.Context, number *big.Int) (*
 	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", toBlockNumArg(number))
 }
 
-// TODO:
-func (ec *Client) GetBlockTraceForCallAtBlockHash(ctx context.Context, blockHash common.Hash) (*types.BlockTrace, error) {
-	blockTrace := &types.BlockTrace{}
-	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", blockHash)
-}
-
-// TODO:
-func (ec *Client) GetBlockTraceForCallAtBlockHashNumber(ctx context.Context, number *big.Int) (*types.BlockTrace, error) {
-	blockTrace := &types.BlockTrace{}
-	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", toBlockNumArg(number))
-}
-
 type rpcRowConsumption struct {
 	RowConsumption types.RowConsumption `json:"rowConsumption"`
 }

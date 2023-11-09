@@ -41,7 +41,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return env.GetBlockTrace(block)
 }
 
-func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error){
+func (api *API) GetBlockTraceForCallAt(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error) {
 	// Try to retrieve the specified block
 	var (
 		err   error
@@ -111,12 +111,11 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, stateOv
 		return nil, err
 	}
 
-	if stateOverrides!=nil{
+	if stateOverrides != nil {
 		if err := stateOverrides.Apply(statedb); err != nil {
 			return nil, err
 		}
 	}
-
 
 	chaindb := api.backend.ChainDb()
 	return core.CreateTraceEnv(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)

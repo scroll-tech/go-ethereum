@@ -94,6 +94,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
+	if err := v.ValidateL1BlockHashesTx(block); err != nil {
+		return err
+	}
 	if err := v.ValidateL1Messages(block); err != nil {
 		return err
 	}
@@ -117,6 +120,47 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		)
 		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), rowConsumption)
 	}
+	return nil
+}
+
+// ValidateL1BlockHashesTx validates L1BlockHashesTx contained in a block.
+// We check the following conditions:
+// - L1BlockHashesTx is in a contiguous section at the front of the block.
+// - The L1 block hashes tx included in the block match the node's view of the L1 ledger.
+// TODO(l1BlockHashes): What if this block must not have it at all, and was included in the previous one?
+// This should be in some way written in the rawdb and changed if skipped, etc.
+// L1BlockHashesTx
+func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
+	// skip DB read if the block contains no L1 messages
+	if !block.ContainsL1BlockHashesTx() {
+		return nil
+	}
+
+	if v.config.Scroll.L1Config == nil {
+		// TODO: should we allow follower nodes to skip L1 block hashes verification?
+		panic("Running on L1BlockHashes-enabled network but no l1Config was provided")
+	}
+
+	for i, tx := range block.Transactions() {
+		if tx.IsL1BlockHashesTx() && i != 0 {
+			return consensus.ErrInvalidL1BlockHashesTxOrder
+		}
+
+		lastAppliedBlockNumber := tx.AsL1BlockHashesTx().LastAppliedL1Block
+
+		localTx := rawdb.ReadL1BlockHashesTx(v.db, lastAppliedBlockNumber)
+		if localTx == nil {
+			return consensus.ErrMissingL1BlockHashesTxData
+		}
+
+		// check that the L1BlockHashesTx in the block is the same that we collected from L1
+		expectedHash := types.NewTx(localTx).Hash()
+
+		if tx.Hash() != expectedHash {
+			return consensus.ErrUnknownL1BlockHashesTx
+		}
+	}
+
 	return nil
 }
 
@@ -150,6 +194,10 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	it := rawdb.IterateL1MessagesFrom(v.bc.db, queueIndex)
 
 	for _, tx := range block.Transactions() {
+		// L1BlockHashesTx - this should be the first transaction in the block
+		if tx.IsL1BlockHashesTx() {
+			continue
+		}
 		if !tx.IsL1MessageTx() {
 			L1SectionOver = true
 			continue // we do not verify L2 transactions here

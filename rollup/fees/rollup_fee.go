@@ -36,6 +36,8 @@ type Message interface {
 	Data() []byte
 	AccessList() types.AccessList
 	IsL1MessageTx() bool
+	// L1BlockHashesTx
+	IsL1BlockHashesTx() bool
 }
 
 // StateDB represents the StateDB interface
@@ -46,7 +48,8 @@ type StateDB interface {
 }
 
 func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer types.Signer, state StateDB) (*big.Int, error) {
-	if msg.IsL1MessageTx() {
+	// L1BlockHashesTx
+	if msg.IsL1BlockHashesTx() || msg.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}
 
@@ -176,7 +179,8 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 }
 
 func CalculateL1DataFee(tx *types.Transaction, state StateDB) (*big.Int, error) {
-	if tx.IsL1MessageTx() {
+	// L1BlockHashesTx
+	if tx.IsL1BlockHashesTx() || tx.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}
 

@@ -897,6 +897,11 @@ web3._extend({
 			call: 'scroll_getSkippedTransactionHashes',
 			params: 2
 		}),
+		new web3._extend.Method({
+			name: 'getL1BlockRangeHash',
+			call: 'scroll_getL1BlockRangeHash',
+			params: 2
+		}),
 	],
 	properties:
 	[

@@ -166,9 +166,10 @@ type Block struct {
 	transactions Transactions
 
 	// caches
-	hash       atomic.Value
-	size       atomic.Value
-	l1MsgCount atomic.Value
+	hash               atomic.Value
+	size               atomic.Value
+	l1MsgCount         atomic.Value
+	lastAppliedL1Block atomic.Value
 
 	// Td is used by package core to store the total difficulty
 	// of the chain up to and including the block.
@@ -335,7 +336,7 @@ func (b *Block) PayloadSize() common.StorageSize {
 	// add up all txs sizes
 	var totalSize common.StorageSize
 	for _, tx := range b.transactions {
-		if !tx.IsL1MessageTx() {
+		if !tx.IsL1MessageTx() && !tx.IsL1BlockHashesTx() {
 			totalSize += tx.Size()
 		}
 	}
@@ -399,6 +400,31 @@ func (b *Block) Hash() common.Hash {
 	return v
 }
 
+// ContainsL1BlockHashesTx returns true if this block contains an L1BlockHashesTx.
+func (b *Block) ContainsL1BlockHashesTx() bool {
+	for _, tx := range b.transactions {
+		if tx.IsL1BlockHashesTx() {
+			return true
+		}
+	}
+	return false
+}
+
+// LastAppliedL1Block returns the last applied block number for L1 block hashes in this block.
+func (b *Block) LastAppliedL1Block() uint64 {
+	if lastAppliedL1Block := b.lastAppliedL1Block.Load(); lastAppliedL1Block != nil {
+		return lastAppliedL1Block.(uint64)
+	}
+
+	for _, tx := range b.transactions {
+		if tx.IsL1BlockHashesTx() {
+			return tx.AsL1BlockHashesTx().LastAppliedL1Block
+		}
+	}
+
+	return 0
+}
+
 // ContainsL1Messages returns true if this block contains at least one L1 message.
 func (b *Block) ContainsL1Messages() bool {
 	for _, tx := range b.transactions {
@@ -421,6 +447,10 @@ func (b *Block) NumL1MessagesProcessed(firstQueueIndex uint64) int {
 	var lastQueueIndex *uint64
 
 	for ii, tx := range b.transactions {
+		// L1BlockHashesTx - should be first in the block
+		if tx.IsL1BlockHashesTx() {
+			continue
+		}
 		if !tx.IsL1MessageTx() {
 			break
 		}
@@ -437,11 +467,29 @@ func (b *Block) NumL1MessagesProcessed(firstQueueIndex uint64) int {
 	return count
 }
 
+func (b *Block) L1BlockHashesInfo() (uint64, *L1BlockHashesTx) {
+	lastAppliedL1Block := b.lastAppliedL1Block.Load()
+
+	for _, tx := range b.transactions {
+		if tx.IsL1BlockHashesTx() {
+			blockHashesTx := tx.AsL1BlockHashesTx()
+			b.lastAppliedL1Block.Store(blockHashesTx.LastAppliedL1Block)
+			return blockHashesTx.LastAppliedL1Block, tx.AsL1BlockHashesTx()
+		}
+	}
+
+	if lastAppliedL1Block != nil {
+		return lastAppliedL1Block.(uint64), nil
+	}
+
+	return 0, nil
+}
+
 // CountL2Tx returns the number of L2 transactions in this block.
 func (b *Block) CountL2Tx() int {
 	count := 0
 	for _, tx := range b.transactions {
-		if !tx.IsL1MessageTx() {
+		if !tx.IsL1BlockHashesTx() && !tx.IsL1MessageTx() {
 			count += 1
 		}
 	}

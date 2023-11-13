@@ -68,12 +68,13 @@ type Ethereum struct {
 	config *ethconfig.Config
 
 	// Handlers
-	txPool             *core.TxPool
-	syncService        *sync_service.SyncService
-	blockchain         *core.BlockChain
-	handler            *handler
-	ethDialCandidates  enode.Iterator
-	snapDialCandidates enode.Iterator
+	txPool                   *core.TxPool
+	syncService              *sync_service.SyncService
+	l1BlockHashesSyncService *sync_service.L1BlockHashesSyncService
+	blockchain               *core.BlockChain
+	handler                  *handler
+	ethDialCandidates        enode.Iterator
+	snapDialCandidates       enode.Iterator
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -215,6 +216,13 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
 	eth.syncService.Start()
+
+	// L1BlockHashesTx
+	eth.l1BlockHashesSyncService, err = sync_service.NewL1BlockHashesSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize L1 block hashes sync service: %w", err)
+	}
+	eth.l1BlockHashesSyncService.Start()
 
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
@@ -527,6 +535,9 @@ func (s *Ethereum) Synced() bool                           { return atomic.LoadU
 func (s *Ethereum) ArchiveMode() bool                      { return s.config.NoPruning }
 func (s *Ethereum) BloomIndexer() *core.ChainIndexer       { return s.bloomIndexer }
 func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncService }
+func (s *Ethereum) L1BlockHashesSyncService() *sync_service.L1BlockHashesSyncService {
+	return s.l1BlockHashesSyncService
+}
 
 // Protocols returns all the currently configured
 // network protocols to start.
@@ -572,6 +583,7 @@ func (s *Ethereum) Stop() error {
 	close(s.closeBloomHandler)
 	s.txPool.Stop()
 	s.syncService.Stop()
+	s.l1BlockHashesSyncService.Stop()
 	s.miner.Close()
 	s.blockchain.Stop()
 	s.engine.Close()

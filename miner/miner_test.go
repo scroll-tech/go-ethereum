@@ -62,6 +62,10 @@ func (m *mockBackend) SyncService() *sync_service.SyncService {
 	return nil
 }
 
+func (m *mockBackend) L1BlockHashesSyncService() *sync_service.L1BlockHashesSyncService {
+	return nil
+}
+
 func (m *mockBackend) ChainDb() ethdb.Database {
 	return m.chainDb
 }

@@ -407,6 +407,61 @@ func TestTransactionTimeSort(t *testing.T) {
 	}
 }
 
+func TestL1BlockHashesLastAppliedL1BlockNumSort(t *testing.T) {
+	assert := assert.New(t)
+
+	txs := []L1BlockHashesTx{
+		{LastAppliedL1Block: 3, To: &common.Address{1}, Data: []byte{0x03}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 6, To: &common.Address{1}, Data: []byte{0x06}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 1, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 2, To: &common.Address{1}, Data: []byte{0x02}, Sender: common.Address{3}},
+		{LastAppliedL1Block: 5, To: &common.Address{1}, Data: []byte{0x05}, Sender: common.Address{3}},
+		{LastAppliedL1Block: 4, To: &common.Address{1}, Data: []byte{0x04}, Sender: common.Address{3}},
+	}
+
+	txset, err := NewL1BlockHashesByLastAppliedBlockNumber(txs)
+	assert.NoError(err)
+
+	nextIndex := uint64(1)
+
+	for {
+		tx := txset.Peek()
+		if tx == nil {
+			break
+		}
+
+		assert.True(tx.IsL1BlockHashesTx())
+		assert.Equal(nextIndex, tx.AsL1BlockHashesTx().LastAppliedL1Block)
+
+		txset.Shift()
+		nextIndex++
+	}
+
+	assert.Equal(uint64(7), nextIndex)
+}
+
+func TestL1BlockHashesLastAppliedL1BlockNumInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	txs := []L1BlockHashesTx{
+		{LastAppliedL1Block: 1, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 1, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 2, To: &common.Address{1}, Data: []byte{0x02}, Sender: common.Address{2}},
+	}
+
+	_, err := NewL1BlockHashesByLastAppliedBlockNumber(txs)
+	assert.Error(err)
+
+	txs = []L1BlockHashesTx{
+		{LastAppliedL1Block: 1, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 3, To: &common.Address{1}, Data: []byte{0x03}, Sender: common.Address{2}},
+		{LastAppliedL1Block: 4, To: &common.Address{1}, Data: []byte{0x04}, Sender: common.Address{2}},
+	}
+
+	_, err = NewL1BlockHashesByLastAppliedBlockNumber(txs)
+	assert.Error(err)
+}
+
 func TestL1MessageQueueIndexSort(t *testing.T) {
 	assert := assert.New(t)
 

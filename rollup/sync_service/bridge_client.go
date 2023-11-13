@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -18,13 +19,18 @@ import (
 type BridgeClient struct {
 	client                EthClient
 	confirmations         rpc.BlockNumber
+	l1BlockHashesABI      *abi.ABI // L1BlockHashesTx
+	l1BlockHashesAddress  common.Address
 	l1MessageQueueAddress common.Address
 	filterer              *L1MessageQueueFilterer
 }
 
-func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address) (*BridgeClient, error) {
+func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address, l1blockHashesAddress common.Address) (*BridgeClient, error) {
 	if l1MessageQueueAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero l1MessageQueueAddress to BridgeClient")
+	}
+	if l1blockHashesAddress == (common.Address{}) {
+		return nil, errors.New("must pass non-zero l1BlockHashesAddress to BridgeClient")
 	}
 
 	// sanity check: compare chain IDs
@@ -36,6 +42,11 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 		return nil, fmt.Errorf("unexpected chain ID, expected = %v, got = %v", l1ChainId, got)
 	}
 
+	l1BlockHashesAbi, err := L1BlockHashesMetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get L1BlockHashesABI, err = %w", err)
+	}
+
 	filterer, err := NewL1MessageQueueFilterer(l1MessageQueueAddress, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize L1MessageQueueFilterer, err = %w", err)
@@ -44,6 +55,8 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 	client := BridgeClient{
 		client:                l1Client,
 		confirmations:         confirmations,
+		l1BlockHashesABI:      l1BlockHashesAbi,
+		l1BlockHashesAddress:  l1blockHashesAddress,
 		l1MessageQueueAddress: l1MessageQueueAddress,
 		filterer:              filterer,
 	}
@@ -87,6 +100,38 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 	}
 
 	return msgs, nil
+}
+
+// L1BlockHashesTx
+func (c *BridgeClient) fetchBlockHashesInRange(ctx context.Context, from, to uint64) (types.L1BlockHashesTx, error) {
+	log.Trace("BridgeClient fetchBlockHashesInRange", "fromBlock", from, "toBlock", to)
+
+	// TODO(l1blockhashes): fetch in parallel.
+	var blockHashes []common.Hash
+	for i := from; i <= to; i++ {
+		header, err := c.client.HeaderByNumber(ctx, new(big.Int).SetUint64(i))
+		if err != nil {
+			return types.L1BlockHashesTx{}, err
+		}
+		if header == nil {
+			return types.L1BlockHashesTx{}, fmt.Errorf("l1blockHashes: block %d not found", i)
+		}
+
+		blockHashes = append(blockHashes, header.Hash())
+	}
+
+	data, err := c.l1BlockHashesABI.Pack("appendBlockHashes", blockHashes)
+	if err != nil {
+		return types.L1BlockHashesTx{}, fmt.Errorf("l1blockHashes: failed to encode appendBlockHashes contract function, from = %d, to = %d", from, to)
+	}
+
+	return types.L1BlockHashesTx{
+		LastAppliedL1Block: to,
+		BlockHashesRange:   blockHashes,
+		To:                 &c.l1BlockHashesAddress,
+		Data:               data,
+		Sender:             common.Address{},
+	}, nil
 }
 
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {

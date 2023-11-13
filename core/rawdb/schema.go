@@ -110,6 +110,13 @@ var (
 	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
 	highestSyncedQueueIndexKey        = []byte("HighestSyncedQueueIndex")
 
+	// Scroll L1 BlockHashes store
+	syncedL1BlockHashesTxBlockNumberKey = []byte("LastSyncedL1BlockHashesTxNumber")
+	l1BlockHashesPrefix                 = []byte("L1BlockHashes")
+	l1BlockPrefix                       = []byte("L1Block")
+	includedl1BlockNumberPrefix         = []byte("bl1") // includedl1BlockNumberPrefix + L2 block hash -> l1 block number
+	includedl1BlockHashesTx             = []byte("txL1BlockHashes")
+
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
 
@@ -262,6 +269,26 @@ func encodeBigEndian(index uint64) []byte {
 	enc := make([]byte, 8)
 	binary.BigEndian.PutUint64(enc, index)
 	return enc
+}
+
+// L1BlockHashesTx
+
+func L1BlockHashesKey(blockNumber uint64) []byte {
+	return append(l1BlockHashesPrefix, encodeBigEndian(blockNumber)...)
+}
+
+func L1BlockNumberHashKey(blockNumber uint64) []byte {
+	return append(l1BlockPrefix, encodeBigEndian(blockNumber)...)
+}
+
+// L1BlockNumberForL2BlockHash = l1BlockNumber + L2 block hash
+func L1BlockNumberForL2BlockHash(l2BlockHash common.Hash) []byte {
+	return append(includedl1BlockNumberPrefix, l2BlockHash.Bytes()...)
+}
+
+// L1BlockHashesTxForL2BlockHash = l1BlockHashesTx + L2 block hash
+func L1BlockHashesTxForL2BlockHash(l2BlockHash common.Hash) []byte {
+	return append(includedl1BlockHashesTx, l2BlockHash.Bytes()...)
 }
 
 // L1MessageKey = l1MessagePrefix + queueIndex (uint64 big endian)

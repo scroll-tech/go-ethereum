@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -110,19 +111,21 @@ type environment struct {
 	receipts []*types.Receipt
 
 	// circuit capacity check related fields
-	traceEnv       *core.TraceEnv        // env for tracing
-	accRows        *types.RowConsumption // accumulated row consumption for a block
-	nextL1MsgIndex uint64                // next L1 queue index to be processed
+	traceEnv          *core.TraceEnv        // env for tracing
+	accRows           *types.RowConsumption // accumulated row consumption for a block
+	nextL1MsgIndex    uint64                // next L1 queue index to be processed
+	nextL1BlockNumber uint64                // next L1 block number to be processed to // TODO(l1blockhashes):
 }
 
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
-	receipts       []*types.Receipt
-	state          *state.StateDB
-	block          *types.Block
-	createdAt      time.Time
-	accRows        *types.RowConsumption // accumulated row consumption in the circuit side
-	nextL1MsgIndex uint64                // next L1 queue index to be processed
+	receipts          []*types.Receipt
+	state             *state.StateDB
+	block             *types.Block
+	createdAt         time.Time
+	accRows           *types.RowConsumption // accumulated row consumption in the circuit side
+	nextL1MsgIndex    uint64                // next L1 queue index to be processed
+	nextL1BlockNumber uint64                // next L1 block number to be processed
 }
 
 const (
@@ -167,6 +170,10 @@ type worker struct {
 	l1MsgsCh     chan core.NewL1MsgsEvent
 	l1MsgsSub    event.Subscription
 
+	// L1BlockhashesTx
+	l1BlockHashesCh  chan core.NewL1BlockHashesTxEvent
+	l1BlockHashesSub event.Subscription
+
 	// Channels
 	newWorkCh          chan *newWorkReq
 	taskCh             chan *task
@@ -196,9 +203,10 @@ type worker struct {
 	snapshotState    *state.StateDB
 
 	// atomic status counters
-	running   int32 // The indicator whether the consensus engine is running or not.
-	newTxs    int32 // New arrival transaction count since last sealing work submitting.
-	newL1Msgs int32 // New arrival L1 message count since last sealing work submitting.
+	running            int32 // The indicator whether the consensus engine is running or not.
+	newTxs             int32 // New arrival transaction count since last sealing work submitting.
+	newL1BlockHashesTx int32 // New L1BlockHashesTx since last sealing work submitting.
+	newL1Msgs          int32 // New arrival L1 message count since last sealing work submitting.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -233,6 +241,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		unconfirmed:            newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 		pendingTasks:           make(map[common.Hash]*task),
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
+		l1BlockHashesCh:        make(chan core.NewL1BlockHashesTxEvent, txChanSize),
 		l1MsgsCh:               make(chan core.NewL1MsgsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
 		chainSideCh:            make(chan core.ChainSideEvent, chainSideChanSize),
@@ -256,6 +265,17 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	} else {
 		// create an empty subscription so that the tests won't fail
 		worker.l1MsgsSub = event.NewSubscription(func(quit <-chan struct{}) error {
+			<-quit
+			return nil
+		})
+	}
+	// L1BlockHashesTx
+	// Subscribe NewL1BlockHashesTxEvent for L1BlockHashesSyncService
+	if s := eth.L1BlockHashesSyncService(); s != nil {
+		worker.l1BlockHashesSub = s.SubscribeNewL1BlockHashesTxEvent(worker.l1BlockHashesCh)
+	} else {
+		// create an empty subscription so that the tests won't fail
+		worker.l1BlockHashesSub = event.NewSubscription(func(quit <-chan struct{}) error {
 			<-quit
 			return nil
 		})
@@ -425,6 +445,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		}
 		timer.Reset(recommit)
 		atomic.StoreInt32(&w.newTxs, 0)
+		atomic.StoreInt32(&w.newL1BlockHashesTx, 0)
 		atomic.StoreInt32(&w.newL1Msgs, 0)
 	}
 	// clearPending cleans the stale pending tasks.
@@ -455,7 +476,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// higher priced transactions. Disable this overhead for pending blocks.
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
 				// Short circuit if no new transaction arrives.
-				if atomic.LoadInt32(&w.newTxs) == 0 && atomic.LoadInt32(&w.newL1Msgs) == 0 {
+				if atomic.LoadInt32(&w.newTxs) == 0 && atomic.LoadInt32(&w.newL1BlockHashesTx) == 0 && atomic.LoadInt32(&w.newL1Msgs) == 0 {
 					timer.Reset(recommit)
 					continue
 				}
@@ -502,6 +523,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
 	defer w.txsSub.Unsubscribe()
+	defer w.l1BlockHashesSub.Unsubscribe()
 	defer w.l1MsgsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 	defer w.chainSideSub.Unsubscribe()
@@ -594,6 +616,13 @@ func (w *worker) mainLoop() {
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
 
+		case ev := <-w.l1BlockHashesCh:
+			hasNewBlockHashesTx := 0
+			if ev.HasNewBlockHashesTx {
+				hasNewBlockHashesTx = 1
+			}
+			atomic.AddInt32(&w.newL1BlockHashesTx, int32(hasNewBlockHashesTx))
+
 		case ev := <-w.l1MsgsCh:
 			atomic.AddInt32(&w.newL1Msgs, int32(ev.Count))
 
@@ -601,6 +630,8 @@ func (w *worker) mainLoop() {
 		case <-w.exitCh:
 			return
 		case <-w.txsSub.Err():
+			return
+		case <-w.l1BlockHashesSub.Err():
 			return
 		case <-w.l1MsgsSub.Err():
 			return
@@ -716,6 +747,16 @@ func (w *worker) resultLoop() {
 				}
 				logs = append(logs, receipt.Logs...)
 			}
+
+			if lastAppliedL1Block := rawdb.ReadL1BlockNumberForL2Block(w.eth.ChainDb(), hash); lastAppliedL1Block == nil {
+				log.Trace(
+					"Worker WriteL1BlockNumberForL2Block",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"task.nextL1BlockNumber", task.nextL1BlockNumber,
+				)
+				rawdb.WriteL1BlockNumberForL2Block(w.eth.ChainDb(), hash, task.nextL1BlockNumber)
+			}
 			// It's possible that we've stored L1 queue index for this block previously,
 			// in this case do not overwrite it.
 			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
@@ -821,6 +862,15 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		log.Crit("Failed to read last L1 message in L2 block", "parent.Hash()", parent.Hash().String())
 	}
 	env.nextL1MsgIndex = *nextQueueIndex
+
+	lastAppliedL1BlockNumber := rawdb.ReadL1BlockNumberForL2Block(w.eth.ChainDb(), parent.Hash())
+	if lastAppliedL1BlockNumber == nil {
+		log.Crit("Failed to read last l1blockhashes l1 block number in l2 block")
+	}
+	env.nextL1BlockNumber = *lastAppliedL1BlockNumber
+	if *lastAppliedL1BlockNumber == parent.LastAppliedL1Block() {
+		env.nextL1BlockNumber = 0 // set to 0 as otherwise will try to commit the same transaction
+	}
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
 	// processes in the mean time and starting a new one.
@@ -1015,6 +1065,15 @@ loop:
 			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
+		if tx.IsL1BlockHashesTx() && tx.AsL1BlockHashesTx().LastAppliedL1Block != w.current.nextL1BlockNumber {
+			log.Error(
+				"Unexpected L1 block hashes tx in worker",
+				"expected", w.current.nextL1BlockNumber,
+				"got", tx.AsL1BlockHashesTx().LastAppliedL1Block,
+			)
+			break
+		}
+
 		if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != w.current.nextL1MsgIndex {
 			log.Error(
 				"Unexpected L1 message queue index in worker",
@@ -1023,7 +1082,7 @@ loop:
 			)
 			break
 		}
-		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
+		if !tx.IsL1BlockHashesTx() && !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
 			txs.Pop() // skip transactions from this account
 			continue
@@ -1046,6 +1105,20 @@ loop:
 
 		logs, traces, err := w.commitTransaction(tx, coinbase)
 		switch {
+		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1BlockHashesTx():
+			log.Warn("ErrGasLimitReached and L1BlockHashesTx")
+			// A single L1BlockHashTx leads to out-of-gas. Skip it.
+			lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
+			w.current.nextL1BlockNumber = lastAppliedL1Block
+			log.Info("Skipping L1 message", "queueIndex", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
+			txs.Shift()
+			if w.config.StoreSkippedTxTraces {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+			} else {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+			}
+			l1TxGasLimitExceededCounter.Inc(1)
+
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
 			// terminate here and try again in the next block.
@@ -1085,7 +1158,12 @@ loop:
 			w.current.tcount++
 			txs.Shift()
 
-			if tx.IsL1MessageTx() {
+			if tx.IsL1BlockHashesTx() {
+				lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
+				log.Debug("Including L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String())
+				w.current.l1TxCount++
+				w.current.nextL1BlockNumber = lastAppliedL1Block
+			} else if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Debug("Including L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String())
 				w.current.l1TxCount++
@@ -1115,7 +1193,14 @@ loop:
 				// 2. Circuit capacity limit reached in a block, and it's the first tx: skip the tx
 				log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
 
-				if tx.IsL1MessageTx() {
+				if tx.IsL1BlockHashesTx() {
+					txs.Shift() // TODO(l1BLockHashes): This should skip the L1BlockHashesTx, but it is not saved anywhere.
+					l1TxRowConsumptionOverflowCounter.Inc(1)
+					lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
+					log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
+					w.current.nextL1BlockNumber = lastAppliedL1Block
+					l1TxRowConsumptionOverflowCounter.Inc(1)
+				} else if tx.IsL1MessageTx() {
 					// Skip L1 message transaction,
 					// shift to the next from the account because we shouldn't skip the entire txs from the same account
 					txs.Shift()
@@ -1145,6 +1230,28 @@ loop:
 				}
 			}
 
+		case errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1BlockHashesTx():
+			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
+			// shift to the next from the account because we shouldn't skip the entire txs from the same account
+			lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
+			log.Trace("Unknown circuit capacity checker error for L1BlockHashesTx", "tx", tx.Hash().String(), "lastAppliedL1Block", lastAppliedL1Block)
+			log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
+			w.current.nextL1BlockNumber = lastAppliedL1Block
+			// TODO: propagate more info about the error from CCC
+			if w.config.StoreSkippedTxTraces {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+			} else {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+			}
+			l1TxCccUnknownErrCounter.Inc(1)
+
+			// Normally we would do `txs.Shift()` here.
+			// However, after `ErrUnknown`, ccc might remain in an
+			// inconsistent state, so we cannot pack more transactions.
+			circuitCapacityReached = true
+			w.checkCurrentTxNumWithCCC(w.current.tcount)
+			break loop
+
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L1MessageTx,
 			// shift to the next from the account because we shouldn't skip the entire txs from the same account
@@ -1167,7 +1274,7 @@ loop:
 			w.checkCurrentTxNumWithCCC(w.current.tcount)
 			break loop
 
-		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
+		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx() && !tx.IsL1BlockHashesTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
 			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
@@ -1191,7 +1298,17 @@ loop:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash().String(), "err", err)
-			if tx.IsL1MessageTx() {
+			if tx.IsL1BlockHashesTx() {
+				lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
+				log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
+				w.current.nextL1BlockNumber = lastAppliedL1Block
+				if w.config.StoreSkippedTxTraces {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
+				} else {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
+				}
+				l1TxStrangeErrCounter.Inc(1)
+			} else if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
@@ -1238,6 +1355,19 @@ func (w *worker) checkCurrentTxNumWithCCC(expected int) {
 	if !match {
 		log.Error("tx count in miner is different with CCC", "w.current.tcount", w.current.tcount, "got", got)
 	}
+}
+
+func (w *worker) collectPendingL1BlockHashesTx(lastAppliedL1BlockNumber uint64) types.L1BlockHashesTx {
+	if lastAppliedL1BlockNumber == 0 {
+		return types.L1BlockHashesTx{}
+	}
+
+	tx := rawdb.ReadL1BlockHashesTx(w.eth.ChainDb(), lastAppliedL1BlockNumber)
+	if tx == nil {
+		log.Crit("L1BlockHashesTx not found")
+	}
+
+	return *tx
 }
 
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
@@ -1348,6 +1478,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		w.commit(uncles, nil, false, tstart)
 	}
 	// fetch l1Txs
+	var l1BlockHashesTx types.L1BlockHashesTx
+	if w.chainConfig.Scroll.ShouldIncludeL1BlockHashesTx() {
+		l1BlockHashesTx = w.collectPendingL1BlockHashesTx(env.nextL1BlockNumber)
+	}
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
 		l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
@@ -1357,7 +1491,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Short circuit if there is no available pending transactions.
 	// But if we disable empty precommit already, ignore it. Since
 	// empty block is necessary to keep the liveness of the network.
-	if len(pending) == 0 && len(l1Messages) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
+	if len(pending) == 0 && len(l1Messages) == 0 && reflect.DeepEqual(l1BlockHashesTx, types.L1BlockHashesTx{}) && atomic.LoadUint32(&w.noempty) == 0 {
 		w.updateSnapshot()
 		return
 	}
@@ -1370,6 +1504,18 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 	}
 	var skipCommit, circuitCapacityReached bool
+	if w.chainConfig.Scroll.ShouldIncludeL1BlockHashesTx() && !reflect.DeepEqual(l1BlockHashesTx, types.L1BlockHashesTx{}) {
+		log.Trace("Processing L1BlockHashesTx for inclusion")
+		txs, err := types.NewL1BlockHashesByLastAppliedBlockNumber([]types.L1BlockHashesTx{l1BlockHashesTx})
+		if err != nil {
+			log.Error("Failed to create L1BlockHashes set", "l1BlockHashesTx", l1BlockHashesTx, "err", err)
+			return
+		}
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
+			return
+		}
+	}
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
 		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
@@ -1453,7 +1599,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			interval()
 		}
 		select {
-		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: w.current.accRows, nextL1MsgIndex: w.current.nextL1MsgIndex}:
+		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: w.current.accRows, nextL1MsgIndex: w.current.nextL1MsgIndex, nextL1BlockNumber: w.current.nextL1BlockNumber}:
 			w.unconfirmed.Shift(block.NumberU64() - 1)
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"uncles", len(uncles), "txs", w.current.tcount,

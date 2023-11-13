@@ -821,6 +821,7 @@ func (m callMsg) Value() *big.Int              { return m.CallMsg.Value }
 func (m callMsg) Data() []byte                 { return m.CallMsg.Data }
 func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 func (m callMsg) IsL1MessageTx() bool          { return false }
+func (m callMsg) IsL1BlockHashesTx() bool      { return false }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.

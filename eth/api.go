@@ -35,6 +35,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -625,6 +626,11 @@ type l1MessageTxRPC struct {
 	Hash       common.Hash     `json:"hash"`
 }
 
+// L1BlockHashesTx
+type l1BlockRangeHashesRPC struct {
+	Hash common.Hash `json:"hash"`
+}
+
 // NewScrollAPI creates a new RPC service to query the L1 message database.
 func NewScrollAPI(eth *Ethereum) *ScrollAPI {
 	return &ScrollAPI{eth: eth}
@@ -633,6 +639,14 @@ func NewScrollAPI(eth *Ethereum) *ScrollAPI {
 // GetL1SyncHeight returns the latest synced L1 block height from the local database.
 func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err error) {
 	return rawdb.ReadSyncedL1BlockNumber(api.eth.ChainDb()), nil
+}
+
+// L1BlockHashesTx
+func (api *ScrollAPI) GetL1BlockRangeHash(ctx context.Context, from uint64, to uint64) (*l1BlockRangeHashesRPC, error) {
+	blockHashes := rawdb.ReadL1BlockHashesRange(api.eth.ChainDb(), from, to)
+	hash := crypto.Keccak256(blockHashes)
+
+	return &l1BlockRangeHashesRPC{Hash: common.BytesToHash(hash)}, nil
 }
 
 // GetL1MessageByIndex queries an L1 message by its index in the local database.

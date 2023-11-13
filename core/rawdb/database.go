@@ -309,23 +309,27 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		logged = time.Now()
 
 		// Key-value store statistics
-		headers         stat
-		bodies          stat
-		receipts        stat
-		tds             stat
-		numHashPairings stat
-		hashNumPairings stat
-		tries           stat
-		codes           stat
-		txLookups       stat
-		accountSnaps    stat
-		storageSnaps    stat
-		preimages       stat
-		bloomBits       stat
-		cliqueSnaps     stat
-		l1Messages      stat
-		l1MessagesOld   stat
-		lastL1Message   stat
+		headers               stat
+		bodies                stat
+		receipts              stat
+		tds                   stat
+		numHashPairings       stat
+		hashNumPairings       stat
+		tries                 stat
+		codes                 stat
+		txLookups             stat
+		accountSnaps          stat
+		storageSnaps          stat
+		preimages             stat
+		bloomBits             stat
+		cliqueSnaps           stat
+		l1BlockHashesTx       stat
+		l1BlockHashesBlocks   stat
+		l1BlockNumL2Hash      stat
+		l1BlockHashesTxL2Hash stat
+		l1Messages            stat
+		l1MessagesOld         stat
+		lastL1Message         stat
 
 		// Ancient store statistics
 		ancientHeadersSize  common.StorageSize
@@ -385,6 +389,14 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bloomBits.Add(size)
 		case bytes.HasPrefix(key, []byte("clique-")) && len(key) == 7+common.HashLength:
 			cliqueSnaps.Add(size)
+		case bytes.HasPrefix(key, l1BlockHashesPrefix) && len(key) == len(l1BlockHashesPrefix)+8:
+			l1BlockHashesTx.Add(size)
+		case bytes.HasPrefix(key, l1BlockPrefix) && len(key) == len(l1BlockPrefix)+8: // TODO(l1blockhashes): remove once ViewOracle contract is implemented
+			l1BlockHashesBlocks.Add(size)
+		case bytes.HasPrefix(key, includedl1BlockNumberPrefix) && len(includedl1BlockNumberPrefix) == common.HashLength:
+			l1BlockNumL2Hash.Add(size)
+		case bytes.HasPrefix(key, includedl1BlockHashesTx) && len(includedl1BlockNumberPrefix) == common.HashLength:
+			l1BlockHashesTxL2Hash.Add(size)
 		case bytes.HasPrefix(key, l1MessagePrefix) && len(key) == len(l1MessagePrefix)+8:
 			l1Messages.Add(size)
 		case bytes.HasPrefix(key, l1MessageLegacyPrefix) && len(key) == len(l1MessageLegacyPrefix)+8:
@@ -405,7 +417,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 				databaseVersionKey, headHeaderKey, headBlockKey, headFastBlockKey, lastPivotKey,
 				fastTrieProgressKey, snapshotDisabledKey, SnapshotRootKey, snapshotJournalKey,
 				snapshotGeneratorKey, snapshotRecoveryKey, txIndexTailKey, fastTxLookupLimitKey,
-				uncleanShutdownKey, badBlockKey, syncedL1BlockNumberKey,
+				uncleanShutdownKey, badBlockKey, syncedL1BlockNumberKey, syncedL1BlockHashesTxBlockNumberKey,
 			} {
 				if bytes.Equal(key, meta) {
 					metadata.Add(size)
@@ -453,6 +465,10 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Storage snapshot", storageSnaps.Size(), storageSnaps.Count()},
 		{"Key-Value store", "Clique snapshots", cliqueSnaps.Size(), cliqueSnaps.Count()},
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
+		{"Key-Value store", "L1 block hashes tx", l1BlockHashesTx.Size(), l1BlockHashesTx.Count()},
+		{"Key-Value store", "L1 block hashes blocks", l1BlockHashesBlocks.Size(), l1BlockHashesBlocks.Count()},
+		{"Key-Value store", "l1 block num l2 hash", l1BlockNumL2Hash.Size(), l1BlockNumL2Hash.Count()},
+		{"Key-Value store", "l1 block hashes tx l2 hash", l1BlockHashesTxL2Hash.Size(), l1BlockHashesTxL2Hash.Count()},
 		{"Key-Value store", "L1 messages", l1Messages.Size(), l1Messages.Count()},
 		{"Key-Value store", "L1 messages (legacy prefix)", l1MessagesOld.Size(), l1MessagesOld.Count()},
 		{"Key-Value store", "Last L1 message", lastL1Message.Size(), lastL1Message.Count()},

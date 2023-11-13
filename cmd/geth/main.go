@@ -164,6 +164,7 @@ var (
 		utils.L1EndpointFlag,
 		utils.L1ConfirmationsFlag,
 		utils.L1DeploymentBlockFlag,
+		utils.L1BlockHashesBlockFlag, // L1BlockHashesTx
 		utils.CircuitCapacityCheckEnabledFlag,
 	}
 

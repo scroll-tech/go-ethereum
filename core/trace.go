@@ -51,6 +51,13 @@ type TraceEnv struct {
 	// Example: If the parent block included QueueIndex=9, then StartL1QueueIndex will
 	// be 10.
 	StartL1QueueIndex uint64
+
+	// L1BlockHashesTx
+
+	// LastAppliedL1Block is the last processed L1 block number.
+	LastAppliedL1Block uint64
+	// BlockHashesRange is the block hashes range, part of the L1BlockHashesTx
+	BlockHashesRange []common.Hash
 }
 
 // Context is the same as Context in eth/tracers/tracers.go
@@ -66,7 +73,7 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, lastAppliedL1BlockNumber uint64, blockHashesRange []common.Hash, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
 	return &TraceEnv{
 		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
@@ -81,10 +88,12 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		},
-		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
-		ExecutionResults:  make([]*types.ExecutionResult, block.Transactions().Len()),
-		TxStorageTraces:   make([]*types.StorageTrace, block.Transactions().Len()),
-		StartL1QueueIndex: startL1QueueIndex,
+		ZkTrieTracer:       make(map[string]state.ZktrieProofTracer),
+		ExecutionResults:   make([]*types.ExecutionResult, block.Transactions().Len()),
+		TxStorageTraces:    make([]*types.StorageTrace, block.Transactions().Len()),
+		StartL1QueueIndex:  startL1QueueIndex,
+		LastAppliedL1Block: lastAppliedL1BlockNumber,
+		BlockHashesRange:   blockHashesRange,
 	}
 }
 
@@ -116,6 +125,21 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parent.NumberU64(), "hash", parent.Hash())
 		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
 	}
+
+	// Collect the lastAppliedL1Block, we should always have this value for blocks that have been executed.
+	lastAppliedL1Block := rawdb.ReadL1BlockNumberForL2Block(chaindb, parent.Hash())
+	if lastAppliedL1Block == nil {
+		log.Error("missing L1BlockHashesSyncedL1BlockNumber for block during trace call", "number", block.NumberU64(), "hash", block.Hash())
+		return nil, fmt.Errorf("missing L1BlockHashesSyncedL1BlockNumber for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
+	}
+
+	var blockHashesRange []common.Hash
+	blockHashesTx := rawdb.ReadL1BlockHashesTxForL2BlockHash(chaindb, parent.Hash())
+	// This can be null, as block might not have a l1BlockHashesTx
+	if blockHashesTx != nil {
+		blockHashesRange = blockHashesTx.BlockHashesRange
+	}
+
 	env := CreateTraceEnvHelper(
 		chainConfig,
 		&vm.LogConfig{
@@ -124,6 +148,8 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		},
 		NewEVMBlockContext(block.Header(), chainContext, chainConfig, nil),
 		*startL1QueueIndex,
+		*lastAppliedL1Block,
+		blockHashesRange,
 		coinbase,
 		statedb,
 		parent.Root(),
@@ -494,12 +520,14 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			PoseidonCodeHash: statedb.GetPoseidonCodeHash(env.coinbase),
 			CodeSize:         statedb.GetCodeSize(env.coinbase),
 		},
-		Header:            block.Header(),
-		StorageTrace:      env.StorageTrace,
-		ExecutionResults:  env.ExecutionResults,
-		TxStorageTraces:   env.TxStorageTraces,
-		Transactions:      txs,
-		StartL1QueueIndex: env.StartL1QueueIndex,
+		Header:             block.Header(),
+		StorageTrace:       env.StorageTrace,
+		ExecutionResults:   env.ExecutionResults,
+		TxStorageTraces:    env.TxStorageTraces,
+		Transactions:       txs,
+		StartL1QueueIndex:  env.StartL1QueueIndex,
+		LastAppliedL1Block: env.LastAppliedL1Block,
+		L1BlockHashes:      env.BlockHashesRange,
 	}
 
 	for i, tx := range block.Transactions() {

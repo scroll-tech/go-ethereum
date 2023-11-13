@@ -182,6 +182,10 @@ func NewLondonSigner(chainId *big.Int) Signer {
 }
 
 func (s londonSigner) Sender(tx *Transaction) (common.Address, error) {
+	// L1BlockHashesTx
+	if tx.IsL1BlockHashesTx() {
+		return tx.AsL1BlockHashesTx().Sender, nil
+	}
 	if tx.IsL1MessageTx() {
 		return tx.AsL1MessageTx().Sender, nil
 	}
@@ -204,6 +208,10 @@ func (s londonSigner) Equal(s2 Signer) bool {
 }
 
 func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
+	// L1BlockHashesTx
+	if tx.IsL1BlockHashesTx() {
+		return nil, nil, nil, fmt.Errorf("l1 block hashes tx does not have a signature")
+	}
 	if tx.IsL1MessageTx() {
 		return nil, nil, nil, fmt.Errorf("l1 message tx do not have a signature")
 	}
@@ -224,6 +232,10 @@ func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s londonSigner) Hash(tx *Transaction) common.Hash {
+	// L1BlockHashesTx
+	if tx.IsL1BlockHashesTx() {
+		panic("l1 block hashes tx cannot be signed and does not have a signing hash")
+	}
 	if tx.IsL1MessageTx() {
 		panic("l1 message tx cannot be signed and do not have a signing hash")
 	}
@@ -276,7 +288,7 @@ func (s eip2930Signer) Sender(tx *Transaction) (common.Address, error) {
 		// id, add 27 to become equivalent to unprotected Homestead signatures.
 		V = new(big.Int).Add(V, big.NewInt(27))
 	default:
-		// L1MessageTx not supported
+		// L1BlockHashesTx and L1MessageTx not supported
 		return common.Address{}, ErrTxTypeNotSupported
 	}
 	if tx.ChainId().Cmp(s.chainId) != 0 {
@@ -298,7 +310,7 @@ func (s eip2930Signer) SignatureValues(tx *Transaction, sig []byte) (R, S, V *bi
 		R, S, _ = decodeSignature(sig)
 		V = big.NewInt(int64(sig[64]))
 	default:
-		// L1MessageTx not supported
+		// L1BlockHashesTx and L1MessageTx not supported
 		return nil, nil, nil, ErrTxTypeNotSupported
 	}
 	return R, S, V, nil

@@ -51,4 +51,16 @@ var (
 	// ErrUnknownL1Message is returned if a block contains an L1 message that does not
 	// match the corresponding message in the node's local database.
 	ErrUnknownL1Message = errors.New("unknown L1 message")
+
+	// ErrInvalidL1BlockHashesTxOrder is returned if a block contains an L1BlockHashesTx and is not first.
+	ErrInvalidL1BlockHashesTxOrder = errors.New("invalid L1BlockHashesTxOrder")
+
+	// ErrMissingL1BlockHashesTxData is returned if a block contains L1BlockHashesTx that the
+	// node has not synced yet. In this case we insert the block into the future
+	// queue and process it again later.
+	ErrMissingL1BlockHashesTxData = errors.New("missing L1BlockHashesTx data")
+
+	// ErrUnknownL1BlockHashesTx is returned if a block contains an L1BlockHashesTx that does not
+	// match the corresponding tx in the node's local database.
+	ErrUnknownL1BlockHashesTx = errors.New("unknown L1BlockHashesTx")
 )

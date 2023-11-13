@@ -741,10 +741,10 @@ func (s *PublicBlockChainAPI) GetHeaderByHash(ctx context.Context, hash common.H
 }
 
 // GetBlockByNumber returns the requested canonical block.
-// * When blockNr is -1 the chain head is returned.
-// * When blockNr is -2 the pending chain head is returned.
-// * When fullTx is true all transactions in the block are returned, otherwise
-//   only the transaction hash is returned.
+//   - When blockNr is -1 the chain head is returned.
+//   - When blockNr is -2 the pending chain head is returned.
+//   - When fullTx is true all transactions in the block are returned, otherwise
+//     only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, number)
 	if block != nil && err == nil {
@@ -1294,8 +1294,9 @@ type RPCTransaction struct {
 	S                *hexutil.Big      `json:"s"`
 
 	// L1 message transaction fields:
-	Sender     common.Address  `json:"sender,omitempty"`
-	QueueIndex *hexutil.Uint64 `json:"queueIndex,omitempty"`
+	Sender             common.Address  `json:"sender,omitempty"`
+	QueueIndex         *hexutil.Uint64 `json:"queueIndex,omitempty"`
+	LastAppliedL1Block *hexutil.Uint64 `json:"lastAppliedL1Block,omitempty"`
 }
 
 // NewRPCTransaction returns a transaction that will serialize to the RPC
@@ -1342,6 +1343,10 @@ func NewRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		} else {
 			result.GasPrice = (*hexutil.Big)(tx.GasFeeCap())
 		}
+	case types.L1BlockHashesTxType:
+		blockHashes := tx.AsL1BlockHashesTx()
+		result.Sender = blockHashes.Sender
+		result.LastAppliedL1Block = (*hexutil.Uint64)(&blockHashes.LastAppliedL1Block)
 	case types.L1MessageTxType:
 		msg := tx.AsL1MessageTx()
 		result.Sender = msg.Sender

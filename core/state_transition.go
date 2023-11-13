@@ -43,8 +43,10 @@ The state transitioning model does all the necessary work to work out a valid ne
 3) Create a new state object if the recipient is \0*32
 4) Value transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+
+	4a) Attempt to run transaction data
+	4b) If valid, use result as code for the new state object
+
 == end ==
 5) Run Script section
 6) Derive new state root
@@ -81,6 +83,7 @@ type Message interface {
 	Data() []byte
 	AccessList() types.AccessList
 	IsL1MessageTx() bool
+	IsL1BlockHashesTx() bool // L1BlockHashesTx
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -220,7 +223,7 @@ func (st *StateTransition) buyGas() error {
 	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
 		// but double check to make sure
-		if !st.msg.IsL1MessageTx() {
+		if !st.msg.IsL1MessageTx() && !st.msg.IsL1BlockHashesTx() {
 			log.Debug("Adding L1DataFee", "l1DataFee", st.l1DataFee)
 			mgval = mgval.Add(mgval, st.l1DataFee)
 		}
@@ -234,7 +237,7 @@ func (st *StateTransition) buyGas() error {
 		if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 			// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
 			// but double check to make sure
-			if !st.msg.IsL1MessageTx() {
+			if !st.msg.IsL1MessageTx() && !st.msg.IsL1BlockHashesTx() {
 				balanceCheck.Add(balanceCheck, st.l1DataFee)
 			}
 		}
@@ -253,7 +256,7 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
-	if st.msg.IsL1MessageTx() {
+	if st.msg.IsL1MessageTx() || st.msg.IsL1BlockHashesTx() {
 		// No fee fields to check, no nonce to check, and no need to check if EOA (L1 already verified it for us)
 		// Gas is free, but no refunds!
 		st.gas += st.msg.Gas()
@@ -315,13 +318,13 @@ func (st *StateTransition) preCheck() error {
 // TransitionDb will transition the state by applying the current message and
 // returning the evm execution result with following fields.
 //
-// - used gas:
-//      total gas used (including gas being refunded)
-// - returndata:
-//      the returned data from evm
-// - concrete execution error:
-//      various **EVM** error which aborts the execution,
-//      e.g. ErrOutOfGas, ErrExecutionReverted
+//   - used gas:
+//     total gas used (including gas being refunded)
+//   - returndata:
+//     the returned data from evm
+//   - concrete execution error:
+//     various **EVM** error which aborts the execution,
+//     e.g. ErrOutOfGas, ErrExecutionReverted
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
@@ -388,7 +391,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	// no refunds for l1 messages
-	if st.msg.IsL1MessageTx() {
+	if st.msg.IsL1MessageTx() || st.msg.IsL1BlockHashesTx() {
 		return &ExecutionResult{
 			L1DataFee:  big.NewInt(0),
 			UsedGas:    st.gasUsed(),

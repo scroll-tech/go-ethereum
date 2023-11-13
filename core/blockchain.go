@@ -279,6 +279,9 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 
 	// initialize L1 message index for genesis block
 	rawdb.WriteFirstQueueIndexNotInL2Block(db, bc.genesisBlock.Hash(), 0)
+	// L1BlockHashesTx
+	// initialize L1 Block Number for genesis block
+	rawdb.WriteL1BlockNumberForL2Block(db, bc.genesisBlock.Hash(), 0)
 
 	var nilBlock *types.Block
 	bc.currentBlock.Store(nilBlock)
@@ -699,6 +702,8 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	rawdb.WriteTd(batch, genesis.Hash(), genesis.NumberU64(), genesis.Difficulty())
 	rawdb.WriteBlock(batch, genesis)
 	rawdb.WriteFirstQueueIndexNotInL2Block(batch, genesis.Hash(), 0)
+	// L1BlockHashesTx
+	rawdb.WriteL1BlockNumberForL2Block(batch, genesis.Hash(), 0)
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to write genesis block", "err", err)
 	}
@@ -1181,6 +1186,48 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	rawdb.WriteTd(batch, block.Hash(), block.NumberU64(), td)
 	rawdb.WriteBlock(batch, block)
 
+	// L1BlockHashesTx
+	parentLastAppliedL1Block := rawdb.ReadL1BlockNumberForL2Block(bc.db, block.ParentHash())
+	if parentLastAppliedL1Block != nil {
+		lastAppliedL1BlockNumber, l1BlockHashesTx := block.L1BlockHashesInfo()
+		if lastAppliedL1Number := rawdb.ReadL1BlockNumberForL2Block(bc.db, block.Hash()); lastAppliedL1Number == nil {
+			log.Trace(
+				"Blockchain.writeBlockWithState WriteL1BlockNumberForL2Block",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+			)
+
+			rawdb.WriteL1BlockNumberForL2Block(bc.db, block.Hash(), lastAppliedL1BlockNumber)
+			if l1BlockHashesTx != nil {
+				log.Trace(
+					"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
+					"number", block.Number(),
+					"hash", block.Hash().String(),
+					"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+				)
+				rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1BlockHashesTx)
+			}
+		} else {
+			log.Trace(
+				"Blockchain.writeBlockWithState WriteL1BlockNumberForL2Block; not overwriting existing state",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+			)
+
+			if l1BlockHashesTx != nil {
+				log.Trace(
+					"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
+					"number", block.Number(),
+					"hash", block.Hash().String(),
+					"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+				)
+				rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1BlockHashesTx)
+			}
+		}
+	}
+
 	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())
 
 	// note: we can insert blocks with header-only ancestors here,
@@ -1265,6 +1312,51 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	rawdb.WriteBlock(blockBatch, block)
 	rawdb.WriteReceipts(blockBatch, block.Hash(), block.NumberU64(), receipts)
 	rawdb.WritePreimages(blockBatch, state.Preimages())
+
+	// L1BlockHashesTx
+	if lastAppliedL1Number := rawdb.ReadL1BlockNumberForL2Block(bc.db, block.ParentHash()); lastAppliedL1Number == nil {
+		// We expect that we only insert contiguous chain segments,
+		// so the parent will always be inserted first.
+		log.Crit("LastAppliedL1Block in DB for parent is nil", "parent", block.ParentHash(), "hash", block.Hash())
+	}
+
+	lastAppliedL1BlockNumber, l1BlockHashesTx := block.L1BlockHashesInfo()
+	if lastAppliedL1Number := rawdb.ReadL1BlockNumberForL2Block(bc.db, block.Hash()); lastAppliedL1Number == nil {
+		log.Trace(
+			"Blockchain.writeBlockWithState WriteL1BlockNumberForL2Block",
+			"number", block.Number(),
+			"hash", block.Hash().String(),
+			"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+		)
+
+		rawdb.WriteL1BlockNumberForL2Block(bc.db, block.Hash(), lastAppliedL1BlockNumber)
+		if l1BlockHashesTx != nil {
+			log.Trace(
+				"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+			)
+			rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1BlockHashesTx)
+		}
+	} else {
+		log.Trace(
+			"Blockchain.writeBlockWithState WriteL1BlockNumberForL2Block; not overwriting existing state",
+			"number", block.Number(),
+			"hash", block.Hash().String(),
+			"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+		)
+
+		if l1BlockHashesTx != nil {
+			log.Trace(
+				"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+			)
+			rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1BlockHashesTx)
+		}
+	}
 
 	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())
 	if queueIndex == nil {
@@ -1566,7 +1658,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 		return bc.insertSideChain(block, it)
 
 	// First block is future, shove it (and all children) to the future queue (unknown ancestor)
-	case errors.Is(err, consensus.ErrFutureBlock) || errors.Is(err, consensus.ErrMissingL1MessageData) || (errors.Is(err, consensus.ErrUnknownAncestor) && bc.futureBlocks.Contains(it.first().ParentHash())):
+	case errors.Is(err, consensus.ErrFutureBlock) || errors.Is(err, consensus.ErrMissingL1BlockHashesTxData) || errors.Is(err, consensus.ErrMissingL1MessageData) || (errors.Is(err, consensus.ErrUnknownAncestor) && bc.futureBlocks.Contains(it.first().ParentHash())):
 		for block != nil && (it.index == 0 || errors.Is(err, consensus.ErrUnknownAncestor)) {
 			log.Debug("Future block, postponing import", "number", block.Number(), "hash", block.Hash())
 			if err := bc.addFutureBlock(block); err != nil {

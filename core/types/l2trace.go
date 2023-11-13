@@ -11,17 +11,19 @@ import (
 
 // BlockTrace contains block execution traces and results required for rollers.
 type BlockTrace struct {
-	ChainID           uint64             `json:"chainID"`
-	Version           string             `json:"version"`
-	Coinbase          *AccountWrapper    `json:"coinbase"`
-	Header            *Header            `json:"header"`
-	Transactions      []*TransactionData `json:"transactions"`
-	StorageTrace      *StorageTrace      `json:"storageTrace"`
-	TxStorageTraces   []*StorageTrace    `json:"txStorageTraces,omitempty"`
-	ExecutionResults  []*ExecutionResult `json:"executionResults"`
-	MPTWitness        *json.RawMessage   `json:"mptwitness,omitempty"`
-	WithdrawTrieRoot  common.Hash        `json:"withdraw_trie_root,omitempty"`
-	StartL1QueueIndex uint64             `json:"startL1QueueIndex"`
+	ChainID            uint64             `json:"chainID"`
+	Version            string             `json:"version"`
+	Coinbase           *AccountWrapper    `json:"coinbase"`
+	Header             *Header            `json:"header"`
+	Transactions       []*TransactionData `json:"transactions"`
+	StorageTrace       *StorageTrace      `json:"storageTrace"`
+	TxStorageTraces    []*StorageTrace    `json:"txStorageTraces,omitempty"`
+	ExecutionResults   []*ExecutionResult `json:"executionResults"`
+	MPTWitness         *json.RawMessage   `json:"mptwitness,omitempty"`
+	WithdrawTrieRoot   common.Hash        `json:"withdraw_trie_root,omitempty"`
+	StartL1QueueIndex  uint64             `json:"startL1QueueIndex"`
+	LastAppliedL1Block uint64             `json:"lastAppliedL1Block"`
+	L1BlockHashes      []common.Hash      `json:"l1BlockHashes"`
 }
 
 // StorageTrace stores proofs of storage needed by storage circuit
@@ -170,6 +172,8 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 	v, r, s := tx.RawSignatureValues()
 
 	nonce := tx.Nonce()
+	// TODO(l1blockhashes): would it be necessary to include nonce here, currently nonce is set 0 as msg.sender is 0x0
+	// there must be a check for the address nonce incrementation somewhere.
 	if tx.IsL1MessageTx() {
 		nonce = tx.L1MessageQueueIndex()
 	}

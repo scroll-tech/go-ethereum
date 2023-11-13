@@ -58,7 +58,7 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		return nil, fmt.Errorf("missing L1 config in genesis")
 	}
 
-	client, err := newBridgeClient(ctx, l1Client, genesisConfig.Scroll.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.Scroll.L1Config.L1MessageQueueAddress)
+	client, err := newBridgeClient(ctx, l1Client, genesisConfig.Scroll.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.Scroll.L1Config.L1MessageQueueAddress, genesisConfig.Scroll.L1Config.L1BlockHashesAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bridge client: %w", err)
 	}

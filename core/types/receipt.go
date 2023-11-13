@@ -435,6 +435,9 @@ func (rs Receipts) EncodeIndex(i int, w *bytes.Buffer) {
 	case DynamicFeeTxType:
 		w.WriteByte(DynamicFeeTxType)
 		rlp.Encode(w, data)
+	case L1BlockHashesTxType:
+		w.WriteByte(L1BlockHashesTxType)
+		rlp.Encode(w, data)
 	case L1MessageTxType:
 		w.WriteByte(L1MessageTxType)
 		rlp.Encode(w, data)

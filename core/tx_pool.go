@@ -604,7 +604,7 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// No unauthenticated deposits allowed in the transaction pool.
-	if tx.IsL1MessageTx() {
+	if tx.IsL1BlockHashesTx() || tx.IsL1MessageTx() {
 		return ErrTxTypeNotSupported
 	}
 

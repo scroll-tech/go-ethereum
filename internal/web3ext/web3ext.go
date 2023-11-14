@@ -869,7 +869,7 @@ web3._extend({
 			name: 'getBlockTraceForCallAt',
 			call: 'scroll_getBlockTraceForCallAt',
 			params: 3,
-			inputFormatter: [null, null, null]
+			inputFormatter: [formatters.inputTransactionFormatter, null, null]
 		}),
 		new web3._extend.Method({
 			name: 'getL1MessageByIndex',

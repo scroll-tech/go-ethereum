@@ -21,9 +21,10 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	var block *types.Block
 	if number, ok := blockNrOrHash.Number(); ok {
 		block, err = api.blockByNumber(ctx, number)
-	}
-	if hash, ok := blockNrOrHash.Hash(); ok {
+	} else if hash, ok := blockNrOrHash.Hash(); ok {
 		block, err = api.blockByHash(ctx, hash)
+	} else {
+		return nil, errors.New("invalid arguments; neither block number nor hash specified")
 	}
 	if err != nil {
 		return nil, err
@@ -46,12 +47,12 @@ func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Trans
 		err   error
 		block *types.Block
 	)
-	if hash, ok := blockNrOrHash.Hash(); ok {
-		block, err = api.blockByHash(ctx, hash)
-	} else if number, ok := blockNrOrHash.Number(); ok {
+	if number, ok := blockNrOrHash.Number(); ok {
 		block, err = api.blockByNumber(ctx, number)
+	} else if hash, ok := blockNrOrHash.Hash(); ok {
+		block, err = api.blockByHash(ctx, hash)
 	} else {
-		return nil, errors.New("invalid arguments; neither block nor hash specified")
+		return nil, errors.New("invalid arguments; neither block number nor hash specified")
 	}
 	if err != nil {
 		return nil, err

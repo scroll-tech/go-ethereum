@@ -7,14 +7,13 @@ import (
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
-	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
-	GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error)
+	GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error)
 }
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
@@ -33,7 +32,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	env, err := api.createTraceEnv(ctx, config, nil, block)
+	env, err := api.createTraceEnv(ctx, config, block)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +40,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return env.GetBlockTrace(block)
 }
 
-func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error) {
+func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error) {
 	// Try to retrieve the specified block
 	var (
 		err   error
@@ -63,20 +62,8 @@ func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Trans
 
 	block = types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{tx}, nil)
 
-	var traceConfig *TraceConfig
-	var stateOverrides *ethapi.StateOverride
-	if config != nil {
-		traceConfig = &TraceConfig{
-			LogConfig: config.LogConfig,
-			Tracer:    config.Tracer,
-			Timeout:   config.Timeout,
-			Reexec:    config.Reexec,
-		}
-		stateOverrides = config.StateOverrides
-	}
-
 	// create current execution environment.
-	env, err := api.createTraceEnv(ctx, traceConfig, stateOverrides, block)
+	env, err := api.createTraceEnv(ctx, config, block)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +72,7 @@ func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Trans
 }
 
 // Make trace environment for current block.
-func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, stateOverrides *ethapi.StateOverride, block *types.Block) (*core.TraceEnv, error) {
+func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, block *types.Block) (*core.TraceEnv, error) {
 	if config == nil {
 		config = &TraceConfig{
 			LogConfig: &vm.LogConfig{
@@ -109,12 +96,6 @@ func (api *API) createTraceEnv(ctx context.Context, config *TraceConfig, stateOv
 	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, true)
 	if err != nil {
 		return nil, err
-	}
-
-	if stateOverrides != nil {
-		if err := stateOverrides.Apply(statedb); err != nil {
-			return nil, err
-		}
 	}
 
 	chaindb := api.backend.ChainDb()

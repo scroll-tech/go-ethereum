@@ -73,11 +73,6 @@ func (arg *TransactionArgs) data() []byte {
 	return nil
 }
 
-
-func (args *TransactionArgs) SetDefaults(ctx context.Context, b Backend) error {
-	return args.setDefaults(ctx, b)
-}
-
 // setDefaults fills in default values for unspecified tx fields.
 func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 	if args.GasPrice != nil && (args.MaxFeePerGas != nil || args.MaxPriorityFeePerGas != nil) {

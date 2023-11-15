@@ -14,7 +14,7 @@ import (
 
 type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
-	GetBlockTraceForCallAt(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error)
+	GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error)
 }
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
@@ -41,7 +41,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return env.GetBlockTrace(block)
 }
 
-func (api *API) GetBlockTraceForCallAt(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error) {
+func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (*types.BlockTrace, error) {
 	// Try to retrieve the specified block
 	var (
 		err   error

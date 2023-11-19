@@ -642,9 +642,12 @@ func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err 
 }
 
 // L1BlockHashesTx
+// GetL1BlockRangeHash returns the keccak256 of the array of block hashes
 func (api *ScrollAPI) GetL1BlockRangeHash(ctx context.Context, from uint64, to uint64) (*l1BlockRangeHashesRPC, error) {
 	blockHashes := rawdb.ReadL1BlockHashesRange(api.eth.ChainDb(), from, to)
 	hash := crypto.Keccak256(blockHashes)
+
+	// TODO: pass instance of L1ViewOracle contract
 
 	return &l1BlockRangeHashesRPC{Hash: common.BytesToHash(hash)}, nil
 }

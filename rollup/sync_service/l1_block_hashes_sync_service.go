@@ -158,19 +158,35 @@ func (s *L1BlockHashesSyncService) fetchBlockHashesTx() {
 		}
 		s.latestProcessedBlock = lastBlock
 	}
+
 	from := s.latestProcessedBlock + 1
 	to := latestConfirmed
+	if from > to {
+		log.Debug("From block ahead of to", "fromBlock", from, "toBlock", to)
+		return
+	}
 
-	tx, err := s.client.fetchBlockHashesInRange(s.ctx, from, to)
+	tx, err := s.client.fetchBlockHashesTx(s.ctx, from, to)
 	if err != nil {
-		log.Warn("Failed to fetch L1BlockHashes in range", "fromBlock", from, "toBlock", to)
+		log.Warn("Failed to fetch L1BlockHashesTx", "fromBlock", from, "toBlock", to)
 		return
 	}
 
 	if !reflect.DeepEqual(tx, types.L1BlockHashesTx{}) {
-		log.Debug("Received new L1BlockHashesTx", "from", from, "toBlock", to)
-		rawdb.WriteL1BlockHashesTx(batchWriter, tx, from)
+		log.Debug("Received new L1BlockHashesTx", "from", from, "toBlock", to, "lastAppliedL1Block", tx.LastAppliedL1Block)
+		rawdb.WriteL1BlockHashesTx(batchWriter, tx)
 	}
+
+	//hashes, err := s.client.fetchBlockHashesInRange(s.ctx, from, to)
+	//if err != nil {
+	//	log.Warn("Failed to fetch L1BlockHashes in range", "fromBlock", from, "toBlock", to)
+	//	return
+	//}
+	//
+	//if len(hashes) > 0 {
+	//	log.Debug("Received new L1 block hashes", "fromBlock", from, "toBlock", to)
+	//	rawdb.WriteL1BlockNumberHashes(batchWriter, hashes, from)
+	//}
 
 	// TODO(l1blockhashes): if it fetches a lot of block hashes, this might overflow and should be done in chunks.
 	// flush new messages to database periodically

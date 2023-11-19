@@ -103,8 +103,8 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 }
 
 // L1BlockHashesTx
-func (c *BridgeClient) fetchBlockHashesInRange(ctx context.Context, from, to uint64) (types.L1BlockHashesTx, error) {
-	log.Trace("BridgeClient fetchBlockHashesInRange", "fromBlock", from, "toBlock", to)
+func (c *BridgeClient) fetchBlockHashesTx(ctx context.Context, from, to uint64) (types.L1BlockHashesTx, error) {
+	log.Trace("BridgeClient fetchBlockHashesInRange start", "fromBlock", from, "toBlock", to)
 
 	// TODO(l1blockhashes): fetch in parallel.
 	var blockHashes []common.Hash
@@ -117,10 +117,12 @@ func (c *BridgeClient) fetchBlockHashesInRange(ctx context.Context, from, to uin
 			return types.L1BlockHashesTx{}, fmt.Errorf("l1blockHashes: block %d not found", i)
 		}
 
+		log.Trace("BridgeClient fetchBlockHashesInRange", "blockNum", i, "hash", header.Hash())
+
 		blockHashes = append(blockHashes, header.Hash())
 	}
 
-	data, err := c.l1BlockHashesABI.Pack("appendBlockHashes", blockHashes)
+	data, err := c.l1BlockHashesABI.Pack("appendBlockhashes", blockHashes)
 	if err != nil {
 		return types.L1BlockHashesTx{}, fmt.Errorf("l1blockHashes: failed to encode appendBlockHashes contract function, from = %d, to = %d", from, to)
 	}
@@ -132,6 +134,28 @@ func (c *BridgeClient) fetchBlockHashesInRange(ctx context.Context, from, to uin
 		Data:               data,
 		Sender:             common.Address{},
 	}, nil
+}
+
+func (c *BridgeClient) fetchBlockHashesInRange(ctx context.Context, from, to uint64) ([]common.Hash, error) {
+	log.Trace("BridgeClient fetchBlockHashesInRange start", "fromBlock", from, "toBlock", to)
+
+	// TODO(l1blockhashes): fetch in parallel.
+	var blockHashes []common.Hash
+	for i := from; i <= to; i++ {
+		header, err := c.client.HeaderByNumber(ctx, new(big.Int).SetUint64(i))
+		if err != nil {
+			return nil, err
+		}
+		if header == nil {
+			return nil, fmt.Errorf("l1blockHashes: block %d not found", i)
+		}
+
+		log.Trace("BridgeClient fetchBlockHashesInRange", "blockNum", i, "hash", header.Hash())
+
+		blockHashes = append(blockHashes, header.Hash())
+	}
+
+	return blockHashes, nil
 }
 
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {

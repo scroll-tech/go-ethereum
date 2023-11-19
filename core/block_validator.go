@@ -131,7 +131,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // This should be in some way written in the rawdb and changed if skipped, etc.
 // L1BlockHashesTx
 func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
-	// skip DB read if the block contains no L1 messages
+	// skip DB read if the block contains no L1 block hashes tx
 	if !block.ContainsL1BlockHashesTx() {
 		return nil
 	}
@@ -144,6 +144,10 @@ func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
 	for i, tx := range block.Transactions() {
 		if tx.IsL1BlockHashesTx() && i != 0 {
 			return consensus.ErrInvalidL1BlockHashesTxOrder
+		}
+
+		if !tx.IsL1BlockHashesTx() {
+			continue
 		}
 
 		lastAppliedBlockNumber := tx.AsL1BlockHashesTx().LastAppliedL1Block

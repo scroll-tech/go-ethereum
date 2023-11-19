@@ -44,7 +44,7 @@ func ReadL1BlockHashesSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 	return &value
 }
 
-func WriteL1BlockHashesTx(db ethdb.KeyValueWriter, l1BlockHashesTx types.L1BlockHashesTx, previousLast uint64) {
+func WriteL1BlockHashesTx(db ethdb.KeyValueWriter, l1BlockHashesTx types.L1BlockHashesTx) {
 	bytes, err := rlp.EncodeToBytes(l1BlockHashesTx)
 	if err != nil {
 		log.Crit("Failed to RLP encode L1BlockHashesTx", "err", err)
@@ -52,13 +52,88 @@ func WriteL1BlockHashesTx(db ethdb.KeyValueWriter, l1BlockHashesTx types.L1Block
 	if err := db.Put(L1BlockHashesKey(l1BlockHashesTx.LastAppliedL1Block), bytes); err != nil {
 		log.Crit("Failed to store L1BlockHashesTx", "err", err)
 	}
+}
 
-	// TODO(l1blockHashes): remove once ViewOracle is added
+func ReadL1BlockHashesTx(db ethdb.Reader, lastAppliedL1BlockNumber uint64) *types.L1BlockHashesTx {
+	data := readL1BlockHashesTxRLP(db, lastAppliedL1BlockNumber)
+	if len(data) == 0 {
+		return nil
+	}
+	l1BlockHashesTx := new(types.L1BlockHashesTx)
+	if err := rlp.Decode(bytes.NewReader(data), l1BlockHashesTx); err != nil {
+		log.Crit("Invalid L1BlockHashesTx RLP", "lastAppliedL1BlockNumber", lastAppliedL1BlockNumber, "data", data, "err", err)
+	}
+	return l1BlockHashesTx
+}
 
-	diff := int(l1BlockHashesTx.LastAppliedL1Block - previousLast)
-	for i := 0; i <= diff; i++ {
-		blockNumber := previousLast + uint64(i)
-		writeL1BlockNumberHash(db, blockNumber, l1BlockHashesTx.BlockHashesRange[i])
+func readL1BlockHashesTxRLP(db ethdb.Reader, lastAppliedL1BlockNumber uint64) rlp.RawValue {
+	data, err := db.Get(L1BlockHashesKey(lastAppliedL1BlockNumber))
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("Failed to load L1BlockHashesTx", "lastAppliedL1BlockNumber", lastAppliedL1BlockNumber, "err", err)
+	}
+	return data
+}
+
+func WriteFirstL1BlockNumberNotInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, l1BlockNumber uint64) {
+	if err := db.Put(FirstL1BlockNumberNotInL2Block(l2BlockHash), encodeBigEndian(l1BlockNumber)); err != nil {
+		log.Crit("Failed to store first L1 BlockNumber not in L2 Block", "l2BlockHash", l2BlockHash, "l1BlockNumber", l1BlockNumber, "err", err)
+	}
+}
+
+func ReadFirstL1BlockNumberNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
+	data, err := db.Get(FirstL1BlockNumberNotInL2Block(l2BlockHash))
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("Failed to read first L1 BlockNumber not in L2 Block from database", "l2BlockHash", l2BlockHash, "err", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	l1BlockNumber := binary.BigEndian.Uint64(data)
+	return &l1BlockNumber
+}
+
+func WriteL1BlockHashesTxForL2BlockHash(db ethdb.KeyValueWriter, l2BlockHash common.Hash, l1BlockHashesTx types.L1BlockHashesTx) {
+	bytes, err := rlp.EncodeToBytes(l1BlockHashesTx)
+	if err != nil {
+		log.Crit("Failed to RLP encode L1BlockHashesTx for L2BlockHash", "err", err)
+	}
+	if err := db.Put(L1BlockHashesTxForL2BlockHash(l2BlockHash), bytes); err != nil {
+		log.Crit("Failed to store L1BlockHashesTx for L2BlockHash", "err", err)
+	}
+}
+
+func ReadL1BlockHashesTxForL2BlockHash(db ethdb.Reader, l2BlockHash common.Hash) *types.L1BlockHashesTx {
+	data := readL1BlockHashRLPL2BlockHash(db, l2BlockHash)
+	if len(data) == 0 {
+		return nil
+	}
+	l1BlockHashesTx := new(types.L1BlockHashesTx)
+	if err := rlp.Decode(bytes.NewReader(data), l1BlockHashesTx); err != nil {
+		log.Crit("Invalid L1BlockHashesTx RLP", "l2BlockHash", l2BlockHash, "data", data, "err", err)
+	}
+	return l1BlockHashesTx
+}
+
+func readL1BlockHashRLPL2BlockHash(db ethdb.Reader, l2BlockHash common.Hash) rlp.RawValue {
+	data, err := db.Get(L1BlockHashesTxForL2BlockHash(l2BlockHash))
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("Failed to load L1BlockNumberHash", "l2BlockHash", l2BlockHash, "err", err)
+	}
+	return data
+}
+
+func WriteL1BlockNumberHashes(db ethdb.KeyValueWriter, l1BlockHashes []common.Hash, start uint64) {
+	for i := 0; i < len(l1BlockHashes); i++ {
+		writeL1BlockNumberHash(db, start+uint64(i), l1BlockHashes[i])
 	}
 }
 
@@ -103,81 +178,4 @@ func readL1BlockHashRLP(db ethdb.Reader, l1BlockNumber uint64) rlp.RawValue {
 		log.Crit("Failed to load L1BlockNumberHash", "l1BlockNumber", l1BlockNumber, "err", err)
 	}
 	return data
-}
-
-func ReadL1BlockHashesTx(db ethdb.Reader, lastAppliedL1BlockNumber uint64) *types.L1BlockHashesTx {
-	data := ReadL1BlockHashesTxRLP(db, lastAppliedL1BlockNumber)
-	if len(data) == 0 {
-		return nil
-	}
-	l1BlockHashesTx := new(types.L1BlockHashesTx)
-	if err := rlp.Decode(bytes.NewReader(data), l1BlockHashesTx); err != nil {
-		log.Crit("Invalid L1BlockHashesTx RLP", "lastAppliedL1BlockNumber", lastAppliedL1BlockNumber, "data", data, "err", err)
-	}
-	return l1BlockHashesTx
-}
-
-func ReadL1BlockHashesTxRLP(db ethdb.Reader, lastAppliedL1BlockNumber uint64) rlp.RawValue {
-	data, err := db.Get(L1BlockHashesKey(lastAppliedL1BlockNumber))
-	if err != nil && isNotFoundErr(err) {
-		return nil
-	}
-	if err != nil {
-		log.Crit("Failed to load L1BlockHashesTx", "lastAppliedL1BlockNumber", lastAppliedL1BlockNumber, "err", err)
-	}
-	return data
-}
-
-func WriteL1BlockNumberForL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, l1BlockNumber uint64) {
-	if err := db.Put(L1BlockNumberForL2BlockHash(l2BlockHash), encodeBigEndian(l1BlockNumber)); err != nil {
-		log.Crit("Failed to store l1BlockNumber for l2BlockHash", "l2BlockHash", l2BlockHash, "l1BlockNumber", l1BlockNumber, "err", err)
-	}
-}
-
-func ReadL1BlockNumberForL2Block(db ethdb.Reader, l2BlockHash common.Hash) *uint64 {
-	data, err := db.Get(L1BlockNumberForL2BlockHash(l2BlockHash))
-	if err != nil && isNotFoundErr(err) {
-		return nil
-	}
-	if err != nil {
-		log.Crit("Failed to read l1BlockNum for l2BlockHash", "l2BlockHash", l2BlockHash, "err", err)
-	}
-	if len(data) == 0 {
-		return nil
-	}
-	l1BlockNumber := binary.BigEndian.Uint64(data)
-	return &l1BlockNumber
-}
-
-func WriteL1BlockHashesTxForL2BlockHash(db ethdb.KeyValueWriter, l2BlockHash common.Hash, l1BlockHashesTx types.L1BlockHashesTx) {
-	bytes, err := rlp.EncodeToBytes(l1BlockHashesTx)
-	if err != nil {
-		log.Crit("Failed to RLP encode L1BlockHashesTx for L2BlockHash", "err", err)
-	}
-	if err := db.Put(L1BlockHashesTxForL2BlockHash(l2BlockHash), bytes); err != nil {
-		log.Crit("Failed to store L1BlockHashesTx for L2BlockHash", "err", err)
-	}
-}
-
-func readL1BlockHashRLPL2BlockHash(db ethdb.Reader, l2BlockHash common.Hash) rlp.RawValue {
-	data, err := db.Get(L1BlockHashesTxForL2BlockHash(l2BlockHash))
-	if err != nil && isNotFoundErr(err) {
-		return nil
-	}
-	if err != nil {
-		log.Crit("Failed to load L1BlockNumberHash", "l2BlockHash", l2BlockHash, "err", err)
-	}
-	return data
-}
-
-func ReadL1BlockHashesTxForL2BlockHash(db ethdb.Reader, l2BlockHash common.Hash) *types.L1BlockHashesTx {
-	data := readL1BlockHashRLPL2BlockHash(db, l2BlockHash)
-	if len(data) == 0 {
-		return nil
-	}
-	l1BlockHashesTx := new(types.L1BlockHashesTx)
-	if err := rlp.Decode(bytes.NewReader(data), l1BlockHashesTx); err != nil {
-		log.Crit("Invalid L1BlockHashesTx RLP", "l2BlockHash", l2BlockHash, "data", data, "err", err)
-	}
-	return l1BlockHashesTx
 }

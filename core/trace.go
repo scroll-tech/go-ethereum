@@ -126,14 +126,17 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
 	}
 
-	// Collect the lastAppliedL1Block, we should always have this value for blocks that have been executed.
-	lastAppliedL1Block := rawdb.ReadL1BlockNumberForL2Block(chaindb, parent.Hash())
-	if lastAppliedL1Block == nil {
-		log.Error("missing L1BlockHashesSyncedL1BlockNumber for block during trace call", "number", block.NumberU64(), "hash", block.Hash())
+	// Collect the startL1BlockNumber, we should always have this value for blocks that have been executed.
+	startL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(chaindb, parent.Hash())
+	if startL1BlockNumber == nil {
+		log.Error("missing FirstL1BlockNumberNotInBlock for block during trace call", "number", parent.NumberU64(), "hash", parent.Hash())
 		return nil, fmt.Errorf("missing L1BlockHashesSyncedL1BlockNumber for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
 	}
+	lastAppliedL1BlockNumber := *startL1BlockNumber - 1
 
 	var blockHashesRange []common.Hash
+	// TODO(l1blockhashes): Shouldn't it be possible to get the block hashes range by using lastAppliedL1BlockNumber?
+	// Probably not, as blocks may have the same lastAppliedL1BlockNumber and will set the same tx for > 2 blocks.
 	blockHashesTx := rawdb.ReadL1BlockHashesTxForL2BlockHash(chaindb, parent.Hash())
 	// This can be null, as block might not have a l1BlockHashesTx
 	if blockHashesTx != nil {
@@ -148,7 +151,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		},
 		NewEVMBlockContext(block.Header(), chainContext, chainConfig, nil),
 		*startL1QueueIndex,
-		*lastAppliedL1Block,
+		lastAppliedL1BlockNumber,
 		blockHashesRange,
 		coinbase,
 		statedb,

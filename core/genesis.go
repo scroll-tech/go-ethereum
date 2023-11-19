@@ -354,7 +354,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	rawdb.WriteChainConfig(db, block.Hash(), config)
 	rawdb.WriteFirstQueueIndexNotInL2Block(db, block.Hash(), 0)
 	// L1BlockHashesTx
-	rawdb.WriteL1BlockNumberForL2Block(db, block.Hash(), 0)
+	rawdb.WriteFirstL1BlockNumberNotInL2Block(db, block.Hash(), 0)
 	return block, nil
 }
 

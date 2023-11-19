@@ -35,7 +35,7 @@ func (tx *L1BlockHashesTx) txType() byte           { return L1BlockHashesTxType 
 func (tx *L1BlockHashesTx) chainID() *big.Int      { return common.Big0 }
 func (tx *L1BlockHashesTx) accessList() AccessList { return nil }
 func (tx *L1BlockHashesTx) data() []byte           { return tx.Data }
-func (tx *L1BlockHashesTx) gas() uint64            { return 0 }
+func (tx *L1BlockHashesTx) gas() uint64            { return 1_000_000 } // TODO(l1blockhashes): Benchmark it based on scenario
 func (tx *L1BlockHashesTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (tx *L1BlockHashesTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (tx *L1BlockHashesTx) gasPrice() *big.Int     { return new(big.Int) }

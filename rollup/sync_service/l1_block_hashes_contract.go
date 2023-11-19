@@ -31,7 +31,7 @@ var (
 
 // L1BlockHashesMetaData contains all meta data concerning the L1BlockHashes contract.
 var L1BlockHashesMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"blocks\",\"type\":\"bytes32[]\"}],\"name\":\"appendBlockHashes\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"l1BlockHash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"latestBlockHash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"_blocks\",\"type\":\"bytes32[]\"}],\"name\":\"appendBlockhashes\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_number\",\"type\":\"uint256\"}],\"name\":\"l1Blockhash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"hash_\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"latestBlockhash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"hash_\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // L1BlockHashesABI is the input ABI used to generate the binding from.
@@ -180,12 +180,12 @@ func (_L1BlockHashes *L1BlockHashesTransactorRaw) Transact(opts *bind.TransactOp
 	return _L1BlockHashes.Contract.contract.Transact(opts, method, params...)
 }
 
-// L1BlockHash is a free data retrieval call binding the contract method 0xb84b49b7.
+// L1Blockhash is a free data retrieval call binding the contract method 0x35c5aba3.
 //
-// Solidity: function l1BlockHash(uint256 number) view returns(bytes32)
-func (_L1BlockHashes *L1BlockHashesCaller) L1BlockHash(opts *bind.CallOpts, number *big.Int) ([32]byte, error) {
+// Solidity: function l1Blockhash(uint256 _number) view returns(bytes32 hash_)
+func (_L1BlockHashes *L1BlockHashesCaller) L1Blockhash(opts *bind.CallOpts, _number *big.Int) ([32]byte, error) {
 	var out []interface{}
-	err := _L1BlockHashes.contract.Call(opts, &out, "l1BlockHash", number)
+	err := _L1BlockHashes.contract.Call(opts, &out, "l1Blockhash", _number)
 
 	if err != nil {
 		return *new([32]byte), err
@@ -197,26 +197,26 @@ func (_L1BlockHashes *L1BlockHashesCaller) L1BlockHash(opts *bind.CallOpts, numb
 
 }
 
-// L1BlockHash is a free data retrieval call binding the contract method 0xb84b49b7.
+// L1Blockhash is a free data retrieval call binding the contract method 0x35c5aba3.
 //
-// Solidity: function l1BlockHash(uint256 number) view returns(bytes32)
-func (_L1BlockHashes *L1BlockHashesSession) L1BlockHash(number *big.Int) ([32]byte, error) {
-	return _L1BlockHashes.Contract.L1BlockHash(&_L1BlockHashes.CallOpts, number)
+// Solidity: function l1Blockhash(uint256 _number) view returns(bytes32 hash_)
+func (_L1BlockHashes *L1BlockHashesSession) L1Blockhash(_number *big.Int) ([32]byte, error) {
+	return _L1BlockHashes.Contract.L1Blockhash(&_L1BlockHashes.CallOpts, _number)
 }
 
-// L1BlockHash is a free data retrieval call binding the contract method 0xb84b49b7.
+// L1Blockhash is a free data retrieval call binding the contract method 0x35c5aba3.
 //
-// Solidity: function l1BlockHash(uint256 number) view returns(bytes32)
-func (_L1BlockHashes *L1BlockHashesCallerSession) L1BlockHash(number *big.Int) ([32]byte, error) {
-	return _L1BlockHashes.Contract.L1BlockHash(&_L1BlockHashes.CallOpts, number)
+// Solidity: function l1Blockhash(uint256 _number) view returns(bytes32 hash_)
+func (_L1BlockHashes *L1BlockHashesCallerSession) L1Blockhash(_number *big.Int) ([32]byte, error) {
+	return _L1BlockHashes.Contract.L1Blockhash(&_L1BlockHashes.CallOpts, _number)
 }
 
-// LatestBlockHash is a free data retrieval call binding the contract method 0x6c4f6ba9.
+// LatestBlockhash is a free data retrieval call binding the contract method 0xeda743d3.
 //
-// Solidity: function latestBlockHash() view returns(bytes32)
-func (_L1BlockHashes *L1BlockHashesCaller) LatestBlockHash(opts *bind.CallOpts) ([32]byte, error) {
+// Solidity: function latestBlockhash() view returns(bytes32 hash_)
+func (_L1BlockHashes *L1BlockHashesCaller) LatestBlockhash(opts *bind.CallOpts) ([32]byte, error) {
 	var out []interface{}
-	err := _L1BlockHashes.contract.Call(opts, &out, "latestBlockHash")
+	err := _L1BlockHashes.contract.Call(opts, &out, "latestBlockhash")
 
 	if err != nil {
 		return *new([32]byte), err
@@ -228,37 +228,37 @@ func (_L1BlockHashes *L1BlockHashesCaller) LatestBlockHash(opts *bind.CallOpts) 
 
 }
 
-// LatestBlockHash is a free data retrieval call binding the contract method 0x6c4f6ba9.
+// LatestBlockhash is a free data retrieval call binding the contract method 0xeda743d3.
 //
-// Solidity: function latestBlockHash() view returns(bytes32)
-func (_L1BlockHashes *L1BlockHashesSession) LatestBlockHash() ([32]byte, error) {
-	return _L1BlockHashes.Contract.LatestBlockHash(&_L1BlockHashes.CallOpts)
+// Solidity: function latestBlockhash() view returns(bytes32 hash_)
+func (_L1BlockHashes *L1BlockHashesSession) LatestBlockhash() ([32]byte, error) {
+	return _L1BlockHashes.Contract.LatestBlockhash(&_L1BlockHashes.CallOpts)
 }
 
-// LatestBlockHash is a free data retrieval call binding the contract method 0x6c4f6ba9.
+// LatestBlockhash is a free data retrieval call binding the contract method 0xeda743d3.
 //
-// Solidity: function latestBlockHash() view returns(bytes32)
-func (_L1BlockHashes *L1BlockHashesCallerSession) LatestBlockHash() ([32]byte, error) {
-	return _L1BlockHashes.Contract.LatestBlockHash(&_L1BlockHashes.CallOpts)
+// Solidity: function latestBlockhash() view returns(bytes32 hash_)
+func (_L1BlockHashes *L1BlockHashesCallerSession) LatestBlockhash() ([32]byte, error) {
+	return _L1BlockHashes.Contract.LatestBlockhash(&_L1BlockHashes.CallOpts)
 }
 
-// AppendBlockHashes is a paid mutator transaction binding the contract method 0xc4e67c53.
+// AppendBlockhashes is a paid mutator transaction binding the contract method 0x9295b80c.
 //
-// Solidity: function appendBlockHashes(bytes32[] blocks) returns()
-func (_L1BlockHashes *L1BlockHashesTransactor) AppendBlockHashes(opts *bind.TransactOpts, blocks [][32]byte) (*types.Transaction, error) {
-	return _L1BlockHashes.contract.Transact(opts, "appendBlockHashes", blocks)
+// Solidity: function appendBlockhashes(bytes32[] _blocks) returns()
+func (_L1BlockHashes *L1BlockHashesTransactor) AppendBlockhashes(opts *bind.TransactOpts, _blocks [][32]byte) (*types.Transaction, error) {
+	return _L1BlockHashes.contract.Transact(opts, "appendBlockhashes", _blocks)
 }
 
-// AppendBlockHashes is a paid mutator transaction binding the contract method 0xc4e67c53.
+// AppendBlockhashes is a paid mutator transaction binding the contract method 0x9295b80c.
 //
-// Solidity: function appendBlockHashes(bytes32[] blocks) returns()
-func (_L1BlockHashes *L1BlockHashesSession) AppendBlockHashes(blocks [][32]byte) (*types.Transaction, error) {
-	return _L1BlockHashes.Contract.AppendBlockHashes(&_L1BlockHashes.TransactOpts, blocks)
+// Solidity: function appendBlockhashes(bytes32[] _blocks) returns()
+func (_L1BlockHashes *L1BlockHashesSession) AppendBlockhashes(_blocks [][32]byte) (*types.Transaction, error) {
+	return _L1BlockHashes.Contract.AppendBlockhashes(&_L1BlockHashes.TransactOpts, _blocks)
 }
 
-// AppendBlockHashes is a paid mutator transaction binding the contract method 0xc4e67c53.
+// AppendBlockhashes is a paid mutator transaction binding the contract method 0x9295b80c.
 //
-// Solidity: function appendBlockHashes(bytes32[] blocks) returns()
-func (_L1BlockHashes *L1BlockHashesTransactorSession) AppendBlockHashes(blocks [][32]byte) (*types.Transaction, error) {
-	return _L1BlockHashes.Contract.AppendBlockHashes(&_L1BlockHashes.TransactOpts, blocks)
+// Solidity: function appendBlockhashes(bytes32[] _blocks) returns()
+func (_L1BlockHashes *L1BlockHashesTransactorSession) AppendBlockhashes(_blocks [][32]byte) (*types.Transaction, error) {
+	return _L1BlockHashes.Contract.AppendBlockhashes(&_L1BlockHashes.TransactOpts, _blocks)
 }

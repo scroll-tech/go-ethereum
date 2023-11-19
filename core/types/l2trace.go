@@ -172,8 +172,6 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 	v, r, s := tx.RawSignatureValues()
 
 	nonce := tx.Nonce()
-	// TODO(l1blockhashes): would it be necessary to include nonce here, currently nonce is set 0 as msg.sender is 0x0
-	// there must be a check for the address nonce incrementation somewhere.
 	if tx.IsL1MessageTx() {
 		nonce = tx.L1MessageQueueIndex()
 	}

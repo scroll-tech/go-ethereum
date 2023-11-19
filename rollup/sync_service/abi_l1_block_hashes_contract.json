@@ -3,11 +3,11 @@
     "inputs": [
       {
         "internalType": "bytes32[]",
-        "name": "blocks",
+        "name": "_blocks",
         "type": "bytes32[]"
       }
     ],
-    "name": "appendBlockHashes",
+    "name": "appendBlockhashes",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -16,15 +16,15 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "number",
+        "name": "_number",
         "type": "uint256"
       }
     ],
-    "name": "l1BlockHash",
+    "name": "l1Blockhash",
     "outputs": [
       {
         "internalType": "bytes32",
-        "name": "",
+        "name": "hash_",
         "type": "bytes32"
       }
     ],
@@ -33,11 +33,11 @@
   },
   {
     "inputs": [],
-    "name": "latestBlockHash",
+    "name": "latestBlockhash",
     "outputs": [
       {
         "internalType": "bytes32",
-        "name": "",
+        "name": "hash_",
         "type": "bytes32"
       }
     ],

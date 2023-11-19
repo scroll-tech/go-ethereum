@@ -391,8 +391,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			cliqueSnaps.Add(size)
 		case bytes.HasPrefix(key, l1BlockHashesPrefix) && len(key) == len(l1BlockHashesPrefix)+8:
 			l1BlockHashesTx.Add(size)
-		case bytes.HasPrefix(key, l1BlockPrefix) && len(key) == len(l1BlockPrefix)+8: // TODO(l1blockhashes): remove once ViewOracle contract is implemented
-			l1BlockHashesBlocks.Add(size)
 		case bytes.HasPrefix(key, includedl1BlockNumberPrefix) && len(includedl1BlockNumberPrefix) == common.HashLength:
 			l1BlockNumL2Hash.Add(size)
 		case bytes.HasPrefix(key, includedl1BlockHashesTx) && len(includedl1BlockNumberPrefix) == common.HashLength:

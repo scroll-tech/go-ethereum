@@ -114,7 +114,7 @@ type environment struct {
 	traceEnv          *core.TraceEnv        // env for tracing
 	accRows           *types.RowConsumption // accumulated row consumption for a block
 	nextL1MsgIndex    uint64                // next L1 queue index to be processed
-	nextL1BlockNumber uint64                // next L1 block number to be processed to // TODO(l1blockhashes):
+	nextL1BlockNumber uint64                // next L1 block number to be processed for L1BlockHashes
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -748,14 +748,22 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 
-			if lastAppliedL1Block := rawdb.ReadL1BlockNumberForL2Block(w.eth.ChainDb(), hash); lastAppliedL1Block == nil {
+			if firstL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(w.eth.ChainDb(), hash); firstL1BlockNumber == nil {
 				log.Trace(
 					"Worker WriteL1BlockNumberForL2Block",
 					"number", block.Number(),
 					"hash", hash.String(),
 					"task.nextL1BlockNumber", task.nextL1BlockNumber,
 				)
-				rawdb.WriteL1BlockNumberForL2Block(w.eth.ChainDb(), hash, task.nextL1BlockNumber)
+				rawdb.WriteFirstL1BlockNumberNotInL2Block(w.eth.ChainDb(), hash, task.nextL1BlockNumber)
+			} else {
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing first l1BlockNumber",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"index", *firstL1BlockNumber,
+					"task.nextL1BlockNumber", task.nextL1BlockNumber,
+				)
 			}
 			// It's possible that we've stored L1 queue index for this block previously,
 			// in this case do not overwrite it.
@@ -863,14 +871,13 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 	env.nextL1MsgIndex = *nextQueueIndex
 
-	lastAppliedL1BlockNumber := rawdb.ReadL1BlockNumberForL2Block(w.eth.ChainDb(), parent.Hash())
-	if lastAppliedL1BlockNumber == nil {
-		log.Crit("Failed to read last l1blockhashes l1 block number in l2 block")
+	nextL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(w.eth.ChainDb(), parent.Hash())
+	if nextL1BlockNumber == nil {
+		// the parent must have been processed before we start a new mining job.
+		log.Crit("Failed to read first l1 block number not in L2 Block", "parent.Hash()", parent.Hash().String())
 	}
-	env.nextL1BlockNumber = *lastAppliedL1BlockNumber
-	if *lastAppliedL1BlockNumber == parent.LastAppliedL1Block() {
-		env.nextL1BlockNumber = 0 // set to 0 as otherwise will try to commit the same transaction
-	}
+	env.nextL1BlockNumber = *nextL1BlockNumber
+	log.Debug("Setting nextL1BlockNumber", "nextL1BlockNumber", env.nextL1BlockNumber)
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
 	// processes in the mean time and starting a new one.
@@ -1109,8 +1116,7 @@ loop:
 			log.Warn("ErrGasLimitReached and L1BlockHashesTx")
 			// A single L1BlockHashTx leads to out-of-gas. Skip it.
 			lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
-			w.current.nextL1BlockNumber = lastAppliedL1Block
-			log.Info("Skipping L1 message", "queueIndex", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
+			log.Info("Skipping L1 tx", "queueIndex", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
 			txs.Shift()
 			if w.config.StoreSkippedTxTraces {
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
@@ -1162,7 +1168,7 @@ loop:
 				lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
 				log.Debug("Including L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String())
 				w.current.l1TxCount++
-				w.current.nextL1BlockNumber = lastAppliedL1Block
+				w.current.nextL1BlockNumber = lastAppliedL1Block + 1
 			} else if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Debug("Including L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String())
@@ -1198,7 +1204,6 @@ loop:
 					l1TxRowConsumptionOverflowCounter.Inc(1)
 					lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
 					log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
-					w.current.nextL1BlockNumber = lastAppliedL1Block
 					l1TxRowConsumptionOverflowCounter.Inc(1)
 				} else if tx.IsL1MessageTx() {
 					// Skip L1 message transaction,
@@ -1236,7 +1241,6 @@ loop:
 			lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
 			log.Trace("Unknown circuit capacity checker error for L1BlockHashesTx", "tx", tx.Hash().String(), "lastAppliedL1Block", lastAppliedL1Block)
 			log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
-			w.current.nextL1BlockNumber = lastAppliedL1Block
 			// TODO: propagate more info about the error from CCC
 			if w.config.StoreSkippedTxTraces {
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
@@ -1357,14 +1361,10 @@ func (w *worker) checkCurrentTxNumWithCCC(expected int) {
 	}
 }
 
-func (w *worker) collectPendingL1BlockHashesTx(lastAppliedL1BlockNumber uint64) types.L1BlockHashesTx {
-	if lastAppliedL1BlockNumber == 0 {
-		return types.L1BlockHashesTx{}
-	}
-
-	tx := rawdb.ReadL1BlockHashesTx(w.eth.ChainDb(), lastAppliedL1BlockNumber)
+func (w *worker) collectPendingL1BlockHashesTx(firstNonAppliedL1BlockNumber uint64) types.L1BlockHashesTx {
+	tx := rawdb.ReadL1BlockHashesTx(w.eth.ChainDb(), firstNonAppliedL1BlockNumber)
 	if tx == nil {
-		log.Crit("L1BlockHashesTx not found")
+		return types.L1BlockHashesTx{}
 	}
 
 	return *tx

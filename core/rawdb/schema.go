@@ -112,8 +112,8 @@ var (
 
 	// Scroll L1 BlockHashes store
 	syncedL1BlockHashesTxBlockNumberKey = []byte("LastSyncedL1BlockHashesTxNumber")
-	l1BlockHashesPrefix                 = []byte("L1BlockHashes")
 	l1BlockPrefix                       = []byte("L1Block")
+	l1BlockHashesPrefix                 = []byte("L1BlockHashes")
 	includedl1BlockNumberPrefix         = []byte("bl1") // includedl1BlockNumberPrefix + L2 block hash -> l1 block number
 	includedl1BlockHashesTx             = []byte("txL1BlockHashes")
 
@@ -281,8 +281,8 @@ func L1BlockNumberHashKey(blockNumber uint64) []byte {
 	return append(l1BlockPrefix, encodeBigEndian(blockNumber)...)
 }
 
-// L1BlockNumberForL2BlockHash = l1BlockNumber + L2 block hash
-func L1BlockNumberForL2BlockHash(l2BlockHash common.Hash) []byte {
+// FirstL1BlockNumberNotInL2Block = l1BlockNumber + L2 block hash
+func FirstL1BlockNumberNotInL2Block(l2BlockHash common.Hash) []byte {
 	return append(includedl1BlockNumberPrefix, l2BlockHash.Bytes()...)
 }
 

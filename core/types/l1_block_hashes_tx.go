@@ -8,11 +8,12 @@ import (
 
 // L1BlockHashesTx
 type L1BlockHashesTx struct {
-	LastAppliedL1Block uint64
-	BlockHashesRange   []common.Hash
-	To                 *common.Address // L1 block hashes contract on L2
-	Data               []byte
-	Sender             common.Address
+	FirstAppliedL1Block uint64
+	LastAppliedL1Block  uint64
+	BlockHashesRange    []common.Hash
+	To                  *common.Address // L1 block hashes contract on L2
+	Data                []byte
+	Sender              common.Address
 }
 
 // copy creates a deep copy of the transaction data and initializes all fields.
@@ -21,11 +22,12 @@ func (tx *L1BlockHashesTx) copy() TxData {
 	copy(cpyBlockHashesRange, tx.BlockHashesRange)
 
 	cpy := &L1BlockHashesTx{
-		LastAppliedL1Block: tx.LastAppliedL1Block,
-		BlockHashesRange:   cpyBlockHashesRange,
-		To:                 copyAddressPtr(tx.To),
-		Data:               common.CopyBytes(tx.Data),
-		Sender:             tx.Sender,
+		FirstAppliedL1Block: tx.FirstAppliedL1Block,
+		LastAppliedL1Block:  tx.LastAppliedL1Block,
+		BlockHashesRange:    cpyBlockHashesRange,
+		To:                  copyAddressPtr(tx.To),
+		Data:                common.CopyBytes(tx.Data),
+		Sender:              tx.Sender,
 	}
 	return cpy
 }

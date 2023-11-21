@@ -829,7 +829,6 @@ var (
 		Name:  "l1.sync.startblock",
 		Usage: "L1 block height to start syncing from. Should be set to the L1 message queue deployment block number.",
 	}
-	// L1BlockHashesTx
 	L1BlockHashesBlockFlag = cli.Int64Flag{
 		Name:  "l1.sync.l1blockhashes",
 		Usage: "L1 block height to start syncing from. Should be set to the L1BlockHashes contract, deployed on L2.",
@@ -1348,7 +1347,6 @@ func setL1(ctx *cli.Context, cfg *node.Config) {
 	if ctx.GlobalIsSet(L1DeploymentBlockFlag.Name) {
 		cfg.L1DeploymentBlock = ctx.GlobalUint64(L1DeploymentBlockFlag.Name)
 	}
-	// L1BlockHashesTx
 	if ctx.GlobalIsSet(L1BlockHashesBlockFlag.Name) {
 		cfg.L1BlockHashesBlock = ctx.GlobalUint64(L1BlockHashesBlockFlag.Name)
 	}

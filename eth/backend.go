@@ -217,7 +217,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth.syncService.Start()
 
-	// L1BlockHashesTx
 	eth.l1BlockHashesSyncService, err = sync_service.NewL1BlockHashesSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize L1 block hashes sync service: %w", err)

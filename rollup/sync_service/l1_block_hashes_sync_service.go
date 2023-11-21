@@ -8,7 +8,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
@@ -17,7 +16,6 @@ import (
 )
 
 // L1BlockHashesSyncService collects all L1 block hashes and stores them in a local database.
-// L1BlockHashesTx
 // TODO(l1blockhashes): Merge this service's block hashes logic into SyncService as it must use only 1 latestBlockNumber.
 // SyncService also represents an encapsulation of synchronising data from L1 to L2.
 // Currently, this is separate for the PoC and easier debugging.
@@ -119,9 +117,9 @@ func (s *L1BlockHashesSyncService) Stop() {
 	}
 }
 
-// SubscribeNewL1BlockHashesTxEvent registers a subscription of NewL1BlockHashesTxEvent and
+// SubscribeNewL1BlockHashesEvent registers a subscription of core.NewL1BlockHashesEvent and
 // starts sending event to the given channel.
-func (s *L1BlockHashesSyncService) SubscribeNewL1BlockHashesTxEvent(ch chan<- core.NewL1BlockHashesTxEvent) event.Subscription {
+func (s *L1BlockHashesSyncService) SubscribeNewL1BlockHashesEvent(ch chan<- core.NewL1BlockHashesEvent) event.Subscription {
 	return s.scope.Track(s.blockHashesFeed.Subscribe(ch))
 }
 
@@ -136,7 +134,7 @@ func (s *L1BlockHashesSyncService) fetchBlockHashesTx() {
 
 	batchWriter := s.db.NewBatch()
 	numBlocksPendingDbWrite := uint64(0)
-	numBlockHashesTxPendingDbWrite := 0
+	numBlockHashesPendingDbWrite := 0
 
 	// helper function to flush database writes cached in memory
 	flush := func(lastBlock uint64) {
@@ -152,9 +150,9 @@ func (s *L1BlockHashesSyncService) fetchBlockHashesTx() {
 
 		batchWriter.Reset()
 		numBlocksPendingDbWrite = 0
-		if numBlockHashesTxPendingDbWrite > 0 {
-			s.blockHashesFeed.Send(core.NewL1BlockHashesTxEvent{HasNewBlockHashesTx: true})
-			numBlockHashesTxPendingDbWrite = 0
+		if numBlockHashesPendingDbWrite > 0 {
+			s.blockHashesFeed.Send(core.NewL1BlockHashesEvent{Count: numBlockHashesPendingDbWrite})
+			numBlockHashesPendingDbWrite = 0
 		}
 		s.latestProcessedBlock = lastBlock
 	}
@@ -166,27 +164,19 @@ func (s *L1BlockHashesSyncService) fetchBlockHashesTx() {
 		return
 	}
 
-	tx, err := s.client.fetchBlockHashesTx(s.ctx, from, to)
+	hashes, err := s.client.fetchBlockHashesInRange(s.ctx, from, to)
 	if err != nil {
-		log.Warn("Failed to fetch L1BlockHashesTx", "fromBlock", from, "toBlock", to)
+		log.Warn("Failed to fetch L1BlockHashes in range", "fromBlock", from, "toBlock", to)
 		return
 	}
 
-	if !reflect.DeepEqual(tx, types.L1BlockHashesTx{}) {
-		log.Debug("Received new L1BlockHashesTx", "from", from, "toBlock", to, "lastAppliedL1Block", tx.LastAppliedL1Block)
-		rawdb.WriteL1BlockHashesTx(batchWriter, tx)
+	if len(hashes) > 0 {
+		log.Debug("Received new L1 block hashes", "fromBlock", from, "toBlock", to)
+		rawdb.WriteL1BlockNumberHashes(batchWriter, hashes, from)
 	}
 
-	//hashes, err := s.client.fetchBlockHashesInRange(s.ctx, from, to)
-	//if err != nil {
-	//	log.Warn("Failed to fetch L1BlockHashes in range", "fromBlock", from, "toBlock", to)
-	//	return
-	//}
-	//
-	//if len(hashes) > 0 {
-	//	log.Debug("Received new L1 block hashes", "fromBlock", from, "toBlock", to)
-	//	rawdb.WriteL1BlockNumberHashes(batchWriter, hashes, from)
-	//}
+	numBlocksPendingDbWrite += uint64(len(hashes))
+	numBlockHashesPendingDbWrite += len(hashes)
 
 	// TODO(l1blockhashes): if it fetches a lot of block hashes, this might overflow and should be done in chunks.
 	// flush new messages to database periodically

@@ -323,7 +323,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		preimages             stat
 		bloomBits             stat
 		cliqueSnaps           stat
-		l1BlockHashesTx       stat
 		l1BlockHashesBlocks   stat
 		l1BlockNumL2Hash      stat
 		l1BlockHashesTxL2Hash stat
@@ -389,8 +388,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bloomBits.Add(size)
 		case bytes.HasPrefix(key, []byte("clique-")) && len(key) == 7+common.HashLength:
 			cliqueSnaps.Add(size)
-		case bytes.HasPrefix(key, l1BlockHashesPrefix) && len(key) == len(l1BlockHashesPrefix)+8:
-			l1BlockHashesTx.Add(size)
+		case bytes.HasPrefix(key, l1BlockPrefix) && len(key) == len(l1BlockPrefix)+8:
+			l1BlockHashesBlocks.Add(size)
 		case bytes.HasPrefix(key, includedl1BlockNumberPrefix) && len(includedl1BlockNumberPrefix) == common.HashLength:
 			l1BlockNumL2Hash.Add(size)
 		case bytes.HasPrefix(key, includedl1BlockHashesTx) && len(includedl1BlockNumberPrefix) == common.HashLength:
@@ -463,8 +462,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Storage snapshot", storageSnaps.Size(), storageSnaps.Count()},
 		{"Key-Value store", "Clique snapshots", cliqueSnaps.Size(), cliqueSnaps.Count()},
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
-		{"Key-Value store", "L1 block hashes tx", l1BlockHashesTx.Size(), l1BlockHashesTx.Count()},
-		{"Key-Value store", "L1 block hashes blocks", l1BlockHashesBlocks.Size(), l1BlockHashesBlocks.Count()},
+		{"Key-Value store", "L1 block hashes", l1BlockHashesBlocks.Size(), l1BlockHashesBlocks.Count()},
 		{"Key-Value store", "l1 block num l2 hash", l1BlockNumL2Hash.Size(), l1BlockNumL2Hash.Count()},
 		{"Key-Value store", "l1 block hashes tx l2 hash", l1BlockHashesTxL2Hash.Size(), l1BlockHashesTxL2Hash.Count()},
 		{"Key-Value store", "L1 messages", l1Messages.Size(), l1Messages.Count()},

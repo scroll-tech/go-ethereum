@@ -385,7 +385,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, false},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0},
 		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -401,7 +401,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, false},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0},
 		}}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
@@ -412,7 +412,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, false},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0},
 		}}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
@@ -424,7 +424,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, false},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0},
 		}}
 )
 
@@ -544,11 +544,11 @@ type ScrollConfig struct {
 
 // L1Config contains the l1 parameters needed to collect l1 messages in the sequencer
 type L1Config struct {
-	L1ChainId              uint64         `json:"l1ChainId,string,omitempty"`
-	L1MessageQueueAddress  common.Address `json:"l1MessageQueueAddress,omitempty"`
-	L1BlockHashesAddress   common.Address `json:"l1BlockHashesAddress,omitempty"`
-	NumL1MessagesPerBlock  uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
-	IncludeL1BlockHashesTx bool           `json:"includeL1BlockHashesTx,omitempty"`
+	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
+	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
+	L1BlockHashesAddress  common.Address `json:"l1BlockHashesAddress,omitempty"`
+	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+	NumL1BlockHashesPerTx uint64         `json:"numL1BlockHashesPerTx,string,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -556,8 +556,8 @@ func (c *L1Config) String() string {
 		return "<nil>"
 	}
 
-	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, l1BlockHashesAddress: %v, numL1MessagesPerBlock: %v, includeL1BlockHashesTx: %v}",
-		c.L1ChainId, c.L1MessageQueueAddress, c.L1BlockHashesAddress, c.NumL1MessagesPerBlock, c.IncludeL1BlockHashesTx)
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, l1BlockHashesAddress: %v, numL1MessagesPerBlock: %v, numL1BlockHashesPerTx: %v}",
+		c.L1ChainId, c.L1MessageQueueAddress, c.L1BlockHashesAddress, c.NumL1MessagesPerBlock, c.NumL1BlockHashesPerTx)
 }
 
 func (s ScrollConfig) BaseFeeEnabled() bool {
@@ -577,7 +577,7 @@ func (s ScrollConfig) ShouldIncludeL1Messages() bool {
 }
 
 func (s ScrollConfig) ShouldIncludeL1BlockHashesTx() bool {
-	return s.L1Config != nil && s.L1Config.IncludeL1BlockHashesTx
+	return s.L1Config != nil && s.L1Config.NumL1BlockHashesPerTx > 0
 }
 
 func (s ScrollConfig) String() string {

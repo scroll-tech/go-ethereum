@@ -99,7 +99,6 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		enc.V = (*hexutil.Big)(tx.V)
 		enc.R = (*hexutil.Big)(tx.R)
 		enc.S = (*hexutil.Big)(tx.S)
-	// L1BlockHashesTx
 	case *L1BlockHashesTx:
 		enc.LastAppliedL1Block = (*hexutil.Uint64)(&tx.LastAppliedL1Block)
 		enc.To = t.To()

@@ -182,7 +182,6 @@ func NewLondonSigner(chainId *big.Int) Signer {
 }
 
 func (s londonSigner) Sender(tx *Transaction) (common.Address, error) {
-	// L1BlockHashesTx
 	if tx.IsL1BlockHashesTx() {
 		return tx.AsL1BlockHashesTx().Sender, nil
 	}
@@ -208,7 +207,6 @@ func (s londonSigner) Equal(s2 Signer) bool {
 }
 
 func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
-	// L1BlockHashesTx
 	if tx.IsL1BlockHashesTx() {
 		return nil, nil, nil, fmt.Errorf("l1 block hashes tx does not have a signature")
 	}
@@ -232,7 +230,6 @@ func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s londonSigner) Hash(tx *Transaction) common.Hash {
-	// L1BlockHashesTx
 	if tx.IsL1BlockHashesTx() {
 		panic("l1 block hashes tx cannot be signed and does not have a signing hash")
 	}

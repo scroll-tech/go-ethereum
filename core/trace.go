@@ -52,8 +52,6 @@ type TraceEnv struct {
 	// be 10.
 	StartL1QueueIndex uint64
 
-	// L1BlockHashesTx
-
 	// LastAppliedL1Block is the last processed L1 block number.
 	LastAppliedL1Block uint64
 	// BlockHashesRange is the block hashes range, part of the L1BlockHashesTx
@@ -135,11 +133,10 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	lastAppliedL1BlockNumber := *startL1BlockNumber - 1
 
 	var blockHashesRange []common.Hash
-	// TODO(l1blockhashes): Shouldn't it be possible to get the block hashes range by using lastAppliedL1BlockNumber?
-	// Probably not, as blocks may have the same lastAppliedL1BlockNumber and will set the same tx for > 2 blocks.
-	blockHashesTx := rawdb.ReadL1BlockHashesTxForL2BlockHash(chaindb, parent.Hash())
+	blockHashesTx := rawdb.ReadL1BlockHashesTxForL2BlockHash(chaindb, block.Hash())
 	// This can be null, as block might not have a l1BlockHashesTx
 	if blockHashesTx != nil {
+		lastAppliedL1BlockNumber = blockHashesTx.LastAppliedL1Block
 		blockHashesRange = blockHashesTx.BlockHashesRange
 	}
 

@@ -279,9 +279,8 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 
 	// initialize L1 message index for genesis block
 	rawdb.WriteFirstQueueIndexNotInL2Block(db, bc.genesisBlock.Hash(), 0)
-	// L1BlockHashesTx
 	// initialize L1 Block Number for genesis block
-	rawdb.WriteFirstL1BlockNumberNotInL2Block(db, bc.genesisBlock.Hash(), 31) // TODO(l1blockhashes): read from configuration. For real use, this should be set elsewhere.
+	rawdb.WriteFirstL1BlockNumberNotInL2Block(db, bc.genesisBlock.Hash(), 31) // TODO(l1blockhashes): read from configuration. For mainnet/testnet, this should be set elsewhere.
 
 	var nilBlock *types.Block
 	bc.currentBlock.Store(nilBlock)
@@ -702,7 +701,6 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	rawdb.WriteTd(batch, genesis.Hash(), genesis.NumberU64(), genesis.Difficulty())
 	rawdb.WriteBlock(batch, genesis)
 	rawdb.WriteFirstQueueIndexNotInL2Block(batch, genesis.Hash(), 0)
-	// L1BlockHashesTx
 	rawdb.WriteFirstL1BlockNumberNotInL2Block(batch, genesis.Hash(), 0)
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to write genesis block", "err", err)
@@ -1186,15 +1184,18 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	rawdb.WriteTd(batch, block.Hash(), block.NumberU64(), td)
 	rawdb.WriteBlock(batch, block)
 
-	// L1BlockHashesTx
 	firstL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(bc.db, block.ParentHash())
 	if firstL1BlockNumber != nil {
-		lastAppliedL1BlockNumber, l1BlockHashesTx := block.L1BlockHashesInfo()
-		nextStart := lastAppliedL1BlockNumber + 1
+		lastAppliedL1BlockNumber, currentL1BlockHashesTx := block.L1BlockHashesInfo()
+
+		nextStart := *firstL1BlockNumber
+		if currentL1BlockHashesTx != nil {
+			nextStart = lastAppliedL1BlockNumber + 1
+		}
 
 		if startL1Block := rawdb.ReadFirstL1BlockNumberNotInL2Block(bc.db, block.Hash()); startL1Block == nil {
 			log.Trace(
-				"Blockchain.writeBlockWithState WriteFirstL1BlockNumberNotInL2Block",
+				"Blockchain.writeBlockWithoutState WriteFirstL1BlockNumberNotInL2Block",
 				"number", block.Number(),
 				"hash", block.Hash().String(),
 				"prevStart", *firstL1BlockNumber,
@@ -1203,25 +1204,35 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 			)
 
 			rawdb.WriteFirstL1BlockNumberNotInL2Block(bc.db, block.Hash(), nextStart)
-			// TODO(l1blockhashes): Check if this is still needed.
-			if l1BlockHashesTx != nil {
-				log.Trace(
-					"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
-					"number", block.Number(),
-					"hash", block.Hash().String(),
-					"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
-				)
-				rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1BlockHashesTx)
-			}
 		} else {
 			log.Trace(
-				"Blockchain.writeBlockWithState WriteFirstL1BlockNumberNotInL2Block; not overwriting existing state",
+				"Blockchain.writeBlockWithoutState WriteFirstL1BlockNumberNotInL2Block; not overwriting existing state",
 				"number", block.Number(),
 				"hash", block.Hash().String(),
 				"prevStart", *firstL1BlockNumber,
 				"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
-				"nextStartL1BlockNumber", nextStart,
+				"nextStartL1BlockNumber", startL1Block,
 			)
+		}
+
+		if currentL1BlockHashesTx != nil {
+			if l1blockHashesTx := rawdb.ReadL1BlockHashesTxForL2BlockHash(bc.db, block.Hash()); l1blockHashesTx == nil {
+				log.Trace(
+					"Blockchain.writeBlockWithoutState WriteL1BlockHashesTxForL2BlockHash",
+					"number", block.Number(),
+					"hash", block.Hash().String(),
+					"currentL1BlockHashesTx", currentL1BlockHashesTx,
+				)
+				rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1blockHashesTx)
+			} else {
+				log.Trace(
+					"Blockchain.writeBlockWithoutState WriteL1BlockHashesTxForL2BlockHash; not overwriting existing state",
+					"number", block.Number(),
+					"hash", block.Hash().String(),
+					"currentL1BlockHashesTx", currentL1BlockHashesTx,
+					"l1BlockHashesTx", l1blockHashesTx,
+				)
+			}
 		}
 	}
 
@@ -1310,7 +1321,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	rawdb.WriteReceipts(blockBatch, block.Hash(), block.NumberU64(), receipts)
 	rawdb.WritePreimages(blockBatch, state.Preimages())
 
-	// L1BlockHashesTx
 	firstL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(bc.db, block.ParentHash())
 	if firstL1BlockNumber == nil {
 		// We expect that we only insert contiguous chain segments,
@@ -1318,8 +1328,12 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		log.Crit("LastAppliedL1Block in DB for parent is nil", "parent", block.ParentHash(), "hash", block.Hash())
 	}
 
-	lastAppliedL1BlockNumber := block.LastAppliedL1Block()
-	nextStart := lastAppliedL1BlockNumber + 1
+	lastAppliedL1BlockNumber, currentL1BlockHashesTx := block.L1BlockHashesInfo()
+	nextStart := *firstL1BlockNumber   // take last l1 block number
+	if currentL1BlockHashesTx != nil { // if there is an L1BlockHashesTx, take its last applied
+		nextStart = lastAppliedL1BlockNumber + 1
+	}
+
 	if startL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(bc.db, block.Hash()); startL1BlockNumber == nil {
 		log.Trace(
 			"Blockchain.writeBlockWithState WriteL1BlockNumberForL2Block",
@@ -1331,15 +1345,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		)
 
 		rawdb.WriteFirstL1BlockNumberNotInL2Block(bc.db, block.Hash(), nextStart)
-		//if l1BlockHashesTx != nil {
-		//	log.Trace(
-		//		"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
-		//		"number", block.Number(),
-		//		"hash", block.Hash().String(),
-		//		"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
-		//	)
-		//	rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *l1BlockHashesTx)
-		//}
 	} else {
 		log.Trace(
 			"Blockchain.writeBlockWithState WriteL1BlockNumberForL2Block; not overwriting existing state",
@@ -1349,15 +1354,27 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 			"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
 			"nextStartL1BlockNumber", nextStart,
 		)
+	}
 
-		log.Trace(
-			"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash; not overwriting existing state",
-			"number", block.Number(),
-			"hash", block.Hash().String(),
-			"prevStart", *firstL1BlockNumber,
-			"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
-			"nextStartL1BlockNumber", nextStart,
-		)
+	if currentL1BlockHashesTx != nil {
+		if l1BlockHashesTx := rawdb.ReadL1BlockHashesTxForL2BlockHash(bc.db, block.Hash()); l1BlockHashesTx == nil {
+			log.Trace(
+				"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+			)
+
+			rawdb.WriteL1BlockHashesTxForL2BlockHash(bc.db, block.Hash(), *currentL1BlockHashesTx)
+		} else {
+			log.Trace(
+				"Blockchain.writeBlockWithState WriteL1BlockHashesTxForL2BlockHash; not overwriting existing state",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"prevStart", *firstL1BlockNumber,
+				"lastAppliedL1BlockNumber", lastAppliedL1BlockNumber,
+				"nextStartL1BlockNumber", nextStart,
+			)
+		}
 	}
 
 	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())

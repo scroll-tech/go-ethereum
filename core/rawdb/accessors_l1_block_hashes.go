@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
+	"time"
+	"unsafe"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
-
-// L1BlockHashesTx
 
 func WriteL1BlockHashesSyncedBlockNumber(db ethdb.KeyValueWriter, l1BlockNumber uint64) {
 	value := big.NewInt(0).SetUint64(l1BlockNumber).Bytes()
@@ -42,39 +43,6 @@ func ReadL1BlockHashesSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 
 	value := number.Uint64()
 	return &value
-}
-
-func WriteL1BlockHashesTx(db ethdb.KeyValueWriter, l1BlockHashesTx types.L1BlockHashesTx) {
-	bytes, err := rlp.EncodeToBytes(l1BlockHashesTx)
-	if err != nil {
-		log.Crit("Failed to RLP encode L1BlockHashesTx", "err", err)
-	}
-	if err := db.Put(L1BlockHashesKey(l1BlockHashesTx.LastAppliedL1Block), bytes); err != nil {
-		log.Crit("Failed to store L1BlockHashesTx", "err", err)
-	}
-}
-
-func ReadL1BlockHashesTx(db ethdb.Reader, lastAppliedL1BlockNumber uint64) *types.L1BlockHashesTx {
-	data := readL1BlockHashesTxRLP(db, lastAppliedL1BlockNumber)
-	if len(data) == 0 {
-		return nil
-	}
-	l1BlockHashesTx := new(types.L1BlockHashesTx)
-	if err := rlp.Decode(bytes.NewReader(data), l1BlockHashesTx); err != nil {
-		log.Crit("Invalid L1BlockHashesTx RLP", "lastAppliedL1BlockNumber", lastAppliedL1BlockNumber, "data", data, "err", err)
-	}
-	return l1BlockHashesTx
-}
-
-func readL1BlockHashesTxRLP(db ethdb.Reader, lastAppliedL1BlockNumber uint64) rlp.RawValue {
-	data, err := db.Get(L1BlockHashesKey(lastAppliedL1BlockNumber))
-	if err != nil && isNotFoundErr(err) {
-		return nil
-	}
-	if err != nil {
-		log.Crit("Failed to load L1BlockHashesTx", "lastAppliedL1BlockNumber", lastAppliedL1BlockNumber, "err", err)
-	}
-	return data
 }
 
 func WriteFirstL1BlockNumberNotInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, l1BlockNumber uint64) {
@@ -133,6 +101,7 @@ func readL1BlockHashRLPL2BlockHash(db ethdb.Reader, l2BlockHash common.Hash) rlp
 
 func WriteL1BlockNumberHashes(db ethdb.KeyValueWriter, l1BlockHashes []common.Hash, start uint64) {
 	for i := 0; i < len(l1BlockHashes); i++ {
+		log.Debug("Writing L1BlockNumberHash", "number", start+uint64(i), "hash", l1BlockHashes)
 		writeL1BlockNumberHash(db, start+uint64(i), l1BlockHashes[i])
 	}
 }
@@ -158,7 +127,7 @@ func ReadL1BlockHashesRange(db ethdb.Reader, from uint64, to uint64) []byte {
 }
 
 func readL1BlockNumberHash(db ethdb.Reader, l1blockNumber uint64) common.Hash {
-	data := readL1BlockHashRLP(db, l1blockNumber)
+	data := readL1BlockNumberRLP(db, l1blockNumber)
 	if len(data) == 0 {
 		return common.Hash{}
 	}
@@ -169,7 +138,7 @@ func readL1BlockNumberHash(db ethdb.Reader, l1blockNumber uint64) common.Hash {
 	return *l1blockHash
 }
 
-func readL1BlockHashRLP(db ethdb.Reader, l1BlockNumber uint64) rlp.RawValue {
+func readL1BlockNumberRLP(db ethdb.Reader, l1BlockNumber uint64) rlp.RawValue {
 	data, err := db.Get(L1BlockNumberHashKey(l1BlockNumber))
 	if err != nil && isNotFoundErr(err) {
 		return nil
@@ -178,4 +147,102 @@ func readL1BlockHashRLP(db ethdb.Reader, l1BlockNumber uint64) rlp.RawValue {
 		log.Crit("Failed to load L1BlockNumberHash", "l1BlockNumber", l1BlockNumber, "err", err)
 	}
 	return data
+}
+
+var (
+	// L1 message iterator metrics
+	iteratorBlockHashesNextCalledCounter      = metrics.NewRegisteredCounter("rawdb/l1_block_hashes/iterator/next_called", nil)
+	iteratorBlockHashesInnerNextCalledCounter = metrics.NewRegisteredCounter("rawdb/l1_block_hashes/iterator/inner_next_called", nil)
+	iteratorBlockHashesLengthMismatchCounter  = metrics.NewRegisteredCounter("rawdb/l1_block_hashes/iterator/length_mismatch", nil)
+	iteratorBlockHashesNextDurationTimer      = metrics.NewRegisteredTimer("rawdb/l1_block_hashes/iterator/next_time", nil)
+	iteratorBlockHashesL1BlockHashSizeGauge   = metrics.NewRegisteredGauge("rawdb/l1_block_hashes/size", nil)
+)
+
+type L1BlockHashesIterator struct {
+	inner          ethdb.Iterator
+	keyLength      int
+	maxBlockNumber uint64
+}
+
+func IterateL1BlockHashesFrom(db ethdb.Database, from uint64) L1BlockHashesIterator {
+	start := encodeBigEndian(from)
+	it := db.NewIterator(l1BlockPrefix, start)
+	keyLength := len(l1BlockPrefix) + 8
+	maxBlock := ReadL1BlockHashesSyncedL1BlockNumber(db)
+	maxBlockNumber := from
+
+	if maxBlock != nil {
+		maxBlockNumber = *maxBlock
+	}
+
+	return L1BlockHashesIterator{
+		inner:          it,
+		keyLength:      keyLength,
+		maxBlockNumber: maxBlockNumber,
+	}
+}
+
+// Next moves the iterator to the next key/value pair.
+// It returns false when the iterator is exhausted.
+// TODO: Consider reading items in batches.
+func (it *L1BlockHashesIterator) Next() bool {
+	iteratorBlockHashesNextCalledCounter.Inc(1)
+
+	defer func(t0 time.Time) {
+		iteratorBlockHashesNextDurationTimer.Update(time.Since(t0))
+	}(time.Now())
+
+	for it.inner.Next() {
+		iteratorBlockHashesInnerNextCalledCounter.Inc(1)
+
+		key := it.inner.Key()
+		if len(key) == it.keyLength {
+			return true
+		} else {
+			iteratorBlockHashesLengthMismatchCounter.Inc(1)
+		}
+	}
+	return false
+}
+
+func (it *L1BlockHashesIterator) L1BlockHash() common.Hash {
+	data := it.inner.Value()
+
+	l1blockHash := new(common.Hash)
+	if err := rlp.Decode(bytes.NewReader(data), l1blockHash); err != nil {
+		log.Crit("Invalid L1BlockNumberHash RLP", "data", data, "err", err)
+	}
+	return *l1blockHash
+}
+
+// Release releases the associated resources.
+func (it *L1BlockHashesIterator) Release() {
+	it.inner.Release()
+}
+
+func ReadL1BlockHashes(db ethdb.Database, startIndex, maxCount uint64) ([]common.Hash, uint64) {
+	blockHashes := make([]common.Hash, 0, maxCount)
+	it := IterateL1BlockHashesFrom(db, startIndex)
+	defer it.Release()
+
+	index := startIndex
+	count := maxCount
+
+	for count > 0 && it.Next() {
+		blockHash := it.L1BlockHash()
+
+		blockHashes = append(blockHashes, blockHash)
+		index += 1
+		count -= 1
+
+		iteratorBlockHashesL1BlockHashSizeGauge.Update(int64(unsafe.Sizeof(blockHash) + uintptr(cap(blockHash)))) // TODO(l1blockhashes)
+
+		// TODO: check to stop if it.maxBlockNumber == blockhash number
+	}
+
+	if len(blockHashes) == 0 && startIndex == 0 {
+		return blockHashes, 0
+	}
+
+	return blockHashes, startIndex + uint64(len(blockHashes)) - uint64(1)
 }

@@ -45,6 +45,5 @@ type ChainHeadEvent struct{ Block *types.Block }
 // NewL1MsgsEvent is posted when we receive some new messages from L1.
 type NewL1MsgsEvent struct{ Count int }
 
-// L1BlockHashesTx
-// NewL1BlockHashesTxEvent is posted when we receive new blocks from L1.
-type NewL1BlockHashesTxEvent struct{ HasNewBlockHashesTx bool }
+// NewL1BlockHashesEvent is posted when we receive new blocks hashes from L1.
+type NewL1BlockHashesEvent struct{ Count int }

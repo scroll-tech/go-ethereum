@@ -112,10 +112,9 @@ var (
 
 	// Scroll L1 BlockHashes store
 	syncedL1BlockHashesTxBlockNumberKey = []byte("LastSyncedL1BlockHashesTxNumber")
-	l1BlockPrefix                       = []byte("L1Block")
-	l1BlockHashesPrefix                 = []byte("L1BlockHashes")
-	includedl1BlockNumberPrefix         = []byte("bl1") // includedl1BlockNumberPrefix + L2 block hash -> l1 block number
-	includedl1BlockHashesTx             = []byte("txL1BlockHashes")
+	l1BlockPrefix                       = []byte("L2L1Block")         // l1BlockPrefix + blockNum (uint64 big endian) -> l1 block hash
+	includedl1BlockNumberPrefix         = []byte("L2L1BlNumber")      // includedl1BlockNumberPrefix + L2 block hash -> l1 block number
+	includedl1BlockHashesTx             = []byte("L2L1TxBlockHashes") // includedl1BlockHashesTx + L2 block hash -> L1BlockHashesTx
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
@@ -269,12 +268,6 @@ func encodeBigEndian(index uint64) []byte {
 	enc := make([]byte, 8)
 	binary.BigEndian.PutUint64(enc, index)
 	return enc
-}
-
-// L1BlockHashesTx
-
-func L1BlockHashesKey(blockNumber uint64) []byte {
-	return append(l1BlockHashesPrefix, encodeBigEndian(blockNumber)...)
 }
 
 func L1BlockNumberHashKey(blockNumber uint64) []byte {

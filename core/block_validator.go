@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/scroll-tech/go-ethereum/accounts/abi"
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -28,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/abis"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
@@ -46,10 +49,16 @@ type BlockValidator struct {
 	db                     ethdb.Database                                 // db to store row consumption
 	cMu                    sync.Mutex                                     // mutex for circuit capacity checker
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker // circuit capacity checker instance
+	l1BlockHashesABI       *abi.ABI
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
 func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine, db ethdb.Database, checkCircuitCapacity bool) *BlockValidator {
+	l1BlockHashesABI, err := abis.L1BlockHashesMetaData.GetAbi()
+	if err != nil {
+		log.Crit("Could not initialise L1BlockHashes ABI", "err", err)
+	}
+
 	validator := &BlockValidator{
 		config:                 config,
 		engine:                 engine,
@@ -57,6 +66,7 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 		checkCircuitCapacity:   checkCircuitCapacity,
 		db:                     db,
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
+		l1BlockHashesABI:       l1BlockHashesABI,
 	}
 	log.Info("created new BlockValidator", "CircuitCapacityChecker ID", validator.circuitCapacityChecker.ID)
 	return validator
@@ -129,7 +139,6 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - The L1 block hashes tx included in the block match the node's view of the L1 ledger.
 // TODO(l1BlockHashes): What if this block must not have it at all, and was included in the previous one?
 // This should be in some way written in the rawdb and changed if skipped, etc.
-// L1BlockHashesTx
 func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
 	// skip DB read if the block contains no L1 block hashes tx
 	if !block.ContainsL1BlockHashesTx() {
@@ -142,19 +151,60 @@ func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
 	}
 
 	for i, tx := range block.Transactions() {
+		// Check if the tx is first in the block
 		if tx.IsL1BlockHashesTx() && i != 0 {
 			return consensus.ErrInvalidL1BlockHashesTxOrder
 		}
 
+		// Skip other transactions
 		if !tx.IsL1BlockHashesTx() {
 			continue
 		}
 
-		lastAppliedBlockNumber := tx.AsL1BlockHashesTx().LastAppliedL1Block
-
-		localTx := rawdb.ReadL1BlockHashesTx(v.db, lastAppliedBlockNumber)
-		if localTx == nil {
+		// Validate the transaction
+		nextL1BlockNumber := rawdb.ReadFirstL1BlockNumberNotInL2Block(v.bc.db, block.ParentHash())
+		if nextL1BlockNumber == nil {
+			// we'll reprocess this block at a later time
 			return consensus.ErrMissingL1BlockHashesTxData
+		}
+		firstAppliedL1BlockNumber := *nextL1BlockNumber
+
+		l1BlockHashesTx := tx.AsL1BlockHashesTx()
+		if l1BlockHashesTx.FirstAppliedL1Block != firstAppliedL1BlockNumber {
+			return consensus.ErrUnknownL1BlockHashesTx
+		}
+
+		localBlockHashes, localLastAppliedL1Block := rawdb.ReadL1BlockHashes(v.bc.db, firstAppliedL1BlockNumber, v.config.Scroll.L1Config.NumL1BlockHashesPerTx)
+		if localLastAppliedL1Block < l1BlockHashesTx.LastAppliedL1Block {
+			// we'll reprocess this block at a later time.
+			return consensus.ErrMissingL1BlockHashesTxData
+		}
+		if len(localBlockHashes) < len(l1BlockHashesTx.BlockHashesRange) {
+			// we'll reprocess this block at a later time.
+			return consensus.ErrMissingL1BlockHashesTxData
+		}
+
+		// Rebuild the tx using the stored l1 block hashes.
+		// Different sequencers may have different L1 block height,
+		// which may lead to mismatching tx.
+		totalHashes := len(l1BlockHashesTx.BlockHashesRange)
+
+		blockHashes := localBlockHashes[:totalHashes]
+		data, err := v.l1BlockHashesABI.Pack("appendBlockhashes", blockHashes)
+		if err != nil {
+			log.Error("Could not pack blockHashes", "err", err)
+			return err
+		}
+
+		lastAppliedL1BlockNumber := firstAppliedL1BlockNumber + uint64(totalHashes) - uint64(1)
+
+		localTx := &types.L1BlockHashesTx{
+			FirstAppliedL1Block: firstAppliedL1BlockNumber,
+			LastAppliedL1Block:  lastAppliedL1BlockNumber,
+			BlockHashesRange:    blockHashes,
+			To:                  &v.config.Scroll.L1Config.L1BlockHashesAddress,
+			Data:                data,
+			Sender:              common.Address{},
 		}
 
 		// check that the L1BlockHashesTx in the block is the same that we collected from L1

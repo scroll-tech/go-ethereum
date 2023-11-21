@@ -49,7 +49,6 @@ const (
 	AccessListTxType
 	DynamicFeeTxType
 
-	// L1BlockHashesTx
 	L1BlockHashesTxType = 0x7D
 	L1MessageTxType     = 0x7E
 )

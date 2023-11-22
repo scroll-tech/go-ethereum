@@ -409,6 +409,9 @@ func (c *ChainConfig) Description() string {
 	if c.ArrowGlacierBlock != nil {
 		banner += fmt.Sprintf(" - Arrow Glacier:               #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/arrow-glacier.md)\n", c.ArrowGlacierBlock)
 	}
+	if c.ArchimedesBlock != nil {
+		banner += fmt.Sprintf(" - Archimedes:                  #%-8v\n", c.ArchimedesBlock) // TODO: add archimedes execution-specs
+	}
 	if c.GrayGlacierBlock != nil {
 		banner += fmt.Sprintf(" - Gray Glacier:                #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/gray-glacier.md)\n", c.GrayGlacierBlock)
 	}

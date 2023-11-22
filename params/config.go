@@ -518,7 +518,7 @@ func (c *ChainConfig) IsArrowGlacier(num *big.Int) bool {
 
 // IsArchimedes returns whether num is either equal to the Archimedes fork block or greater.
 func (c *ChainConfig) IsArchimedes(num *big.Int) bool {
-	return isForked(c.ArchimedesBlock, num)
+	return isBlockForked(c.ArchimedesBlock, num)
 }
 
 // IsGrayGlacier returns whether num is either equal to the Gray Glacier (EIP-5133) fork block or greater.
@@ -698,8 +698,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkBlockIncompatible(c.ArrowGlacierBlock, newcfg.ArrowGlacierBlock, headNumber) {
 		return newBlockCompatError("Arrow Glacier fork block", c.ArrowGlacierBlock, newcfg.ArrowGlacierBlock)
 	}
-	if isForkIncompatible(c.ArchimedesBlock, newcfg.ArchimedesBlock, head) {
-		return newCompatError("Archimedes fork block", c.ArchimedesBlock, newcfg.ArchimedesBlock)
+	if isForkBlockIncompatible(c.ArchimedesBlock, newcfg.ArchimedesBlock, headNumber) {
+		return newBlockCompatError("Archimedes fork block", c.ArchimedesBlock, newcfg.ArchimedesBlock)
 	}
 	if isForkBlockIncompatible(c.GrayGlacierBlock, newcfg.GrayGlacierBlock, headNumber) {
 		return newBlockCompatError("Gray Glacier fork block", c.GrayGlacierBlock, newcfg.GrayGlacierBlock)

@@ -1613,8 +1613,8 @@ func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
 }
 
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
-	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
-		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
+	if ctx.IsSet(MaxBlockRangeFlag.Name) {
+		cfg.MaxBlockRange = ctx.Int64(MaxBlockRangeFlag.Name)
 	} else {
 		cfg.MaxBlockRange = -1
 	}
@@ -1972,7 +1972,7 @@ func RegisterFilterAPI(stack *node.Node, backend ethapi.Backend, ethcfg *ethconf
 	})
 	stack.RegisterAPIs([]rpc.API{{
 		Namespace: "eth",
-		Service:   filters.NewFilterAPI(filterSystem, isLightClient),
+		Service:   filters.NewFilterAPI(filterSystem, isLightClient, ethcfg.MaxBlockRange),
 	}})
 	return filterSystem
 }

@@ -112,9 +112,15 @@ var (
 
 	// Scroll L1 BlockHashes store
 	syncedL1BlockHashesTxBlockNumberKey = []byte("LastSyncedL1BlockHashesTxNumber")
-	l1BlockPrefix                       = []byte("L2L1Block")         // l1BlockPrefix + blockNum (uint64 big endian) -> l1 block hash
-	includedl1BlockNumberPrefix         = []byte("L2L1BlNumber")      // includedl1BlockNumberPrefix + L2 block hash -> l1 block number
-	includedl1BlockHashesTx             = []byte("L2L1TxBlockHashes") // includedl1BlockHashesTx + L2 block hash -> L1BlockHashesTx
+	l1BlockPrefix                       = []byte("L2-L1Block")         // l1BlockPrefix + blockNum (uint64 big endian) -> l1 block hash
+	includedl1BlockNumberPrefix         = []byte("L2-L1BlNumber")      // includedl1BlockNumberPrefix + L2 block hash -> l1 block number
+	includedl1BlockHashesTx             = []byte("L2-L1TxBlockHashes") // includedl1BlockHashesTx + L2 block hash -> L1BlockHashesTx
+
+	// Scroll rollup event store
+	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")
+	batchChunkRangesPrefix            = []byte("R-bcr")
+	batchMetaPrefix                   = []byte("R-bm")
+	finalizedL2BlockNumberKey         = []byte("R-finalized")
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
@@ -311,4 +317,14 @@ func SkippedTransactionKey(txHash common.Hash) []byte {
 // SkippedTransactionHashKey = skippedTransactionHashPrefix + index (uint64 big endian)
 func SkippedTransactionHashKey(index uint64) []byte {
 	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
+}
+
+// batchChunkRangesKey = batchChunkRangesPrefix + batch index (uint64 big endian)
+func batchChunkRangesKey(batchIndex uint64) []byte {
+	return append(batchChunkRangesPrefix, encodeBigEndian(batchIndex)...)
+}
+
+// batchMetaKey = batchMetaPrefix + batch index (uint64 big endian)
+func batchMetaKey(batchIndex uint64) []byte {
+	return append(batchMetaPrefix, encodeBigEndian(batchIndex)...)
 }

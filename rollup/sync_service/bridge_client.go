@@ -106,7 +106,7 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 func (c *BridgeClient) fetchBlockHashesInRange(ctx context.Context, from, to uint64) ([]common.Hash, error) {
 	log.Trace("BridgeClient fetchBlockHashesInRange start", "fromBlock", from, "toBlock", to)
 
-	// TODO(l1blockhashes): fetch in parallel.
+	// TODO(l1blockhashes): use WaitGroup
 	var blockHashes []common.Hash
 	for i := from; i <= to; i++ {
 		header, err := c.client.HeaderByNumber(ctx, new(big.Int).SetUint64(i))

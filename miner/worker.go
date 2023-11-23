@@ -1254,8 +1254,7 @@ loop:
 				if tx.IsL1BlockHashesTx() {
 					txs.Shift() // TODO(l1BlockHashes): This should skip the L1BlockHashesTx, but it is not saved anywhere.
 					l1TxRowConsumptionOverflowCounter.Inc(1)
-					lastAppliedL1Block := tx.AsL1BlockHashesTx().LastAppliedL1Block
-					log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", lastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
+					log.Info("Skipping L1BlockHashesTx", "lastAppliedL1Block", tx.AsL1BlockHashesTx().LastAppliedL1Block, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					l1TxRowConsumptionOverflowCounter.Inc(1)
 				} else if tx.IsL1MessageTx() {
 					// Skip L1 message transaction,

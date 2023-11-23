@@ -137,8 +137,6 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // We check the following conditions:
 // - L1BlockHashesTx is in a contiguous section at the front of the block.
 // - The L1 block hashes tx included in the block match the node's view of the L1 ledger.
-// TODO(l1BlockHashes): What if this block must not have it at all, and was included in the previous one?
-// This should be in some way written in the rawdb and changed if skipped, etc.
 func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
 	// skip DB read if the block contains no L1 block hashes tx
 	if !block.ContainsL1BlockHashesTx() {

@@ -11,7 +11,7 @@ type L1BlockHashesTx struct {
 	FirstAppliedL1Block uint64
 	LastAppliedL1Block  uint64
 	BlockHashesRange    []common.Hash
-	To                  *common.Address // L1 block hashes contract on L2
+	To                  *common.Address
 	Data                []byte
 	Sender              common.Address
 }
@@ -37,7 +37,7 @@ func (tx *L1BlockHashesTx) txType() byte           { return L1BlockHashesTxType 
 func (tx *L1BlockHashesTx) chainID() *big.Int      { return common.Big0 }
 func (tx *L1BlockHashesTx) accessList() AccessList { return nil }
 func (tx *L1BlockHashesTx) data() []byte           { return tx.Data }
-func (tx *L1BlockHashesTx) gas() uint64            { return 1_000_000 } // TODO(l1blockhashes): Benchmark it based on scenario
+func (tx *L1BlockHashesTx) gas() uint64            { return 1_000_000 } // TODO(l1blockhashes): Benchmark it based on worst-case scenario with maxL1BlockHashesPerTx
 func (tx *L1BlockHashesTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (tx *L1BlockHashesTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (tx *L1BlockHashesTx) gasPrice() *big.Int     { return new(big.Int) }

@@ -4,6 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"math/big"
+	"reflect"
+	"slices"
+	"testing"
+	"time"
+
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -21,11 +27,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rpc"
-	"math/big"
-	"reflect"
-	"slices"
-	"testing"
-	"time"
 )
 
 func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i int, b *core.BlockGen)) *testBackend {

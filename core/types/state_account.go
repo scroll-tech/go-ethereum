@@ -81,8 +81,9 @@ func SlimAccountRLP(account StateAccount) []byte {
 	if account.Root != EmptyRootHash {
 		slim.Root = account.Root[:]
 	}
-	if !bytes.Equal(account.CodeHash, EmptyKeccakCodeHash[:]) {
-		slim.CodeHash = account.CodeHash
+	if !bytes.Equal(account.KeccakCodeHash, EmptyKeccakCodeHash[:]) {
+		slim.KeccakCodeHash = account.KeccakCodeHash
+		slim.PoseidonCodeHash = account.PoseidonCodeHash
 	}
 	data, err := rlp.EncodeToBytes(slim)
 	if err != nil {
@@ -107,10 +108,12 @@ func FullAccount(data []byte) (*StateAccount, error) {
 	} else {
 		account.Root = common.BytesToHash(slim.Root)
 	}
-	if len(slim.CodeHash) == 0 {
-		account.CodeHash = EmptyKeccakCodeHash[:]
+	if len(slim.KeccakCodeHash) == 0 {
+		account.KeccakCodeHash = EmptyKeccakCodeHash[:]
+		account.PoseidonCodeHash = EmptyPoseidonCodeHash[:]
 	} else {
-		account.CodeHash = slim.CodeHash
+		account.KeccakCodeHash = slim.KeccakCodeHash
+		account.PoseidonCodeHash = slim.PoseidonCodeHash
 	}
 	return &account, nil
 }

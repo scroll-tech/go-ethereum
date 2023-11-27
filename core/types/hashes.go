@@ -32,8 +32,11 @@ var (
 	// // EmptyCodeHash is the known hash of the empty EVM bytecode.
 	// EmptyCodeHash = crypto.Keccak256Hash(nil) // c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
 
-	// EmptyKeccakCodeHash is the known hash of the empty EVM bytecode.
+	// EmptyKeccakCodeHash is the known Keccak hash of the empty EVM bytecode.
 	EmptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
+
+	// EmptyKeccakCodeHash is the known Poseidon hash of the empty EVM bytecode.
+	EmptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash
 
 	// EmptyTxsHash is the known hash of the empty transaction set.
 	EmptyTxsHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")

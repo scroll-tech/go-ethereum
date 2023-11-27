@@ -68,6 +68,7 @@ type ExecutionResult struct {
 	ByteCode   string          `json:"byteCode,omitempty"`
 	StructLogs []*StructLogRes `json:"structLogs"`
 	CallTrace  json.RawMessage `json:"callTrace"`
+	Prestate   json.RawMessage `json:"prestate"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

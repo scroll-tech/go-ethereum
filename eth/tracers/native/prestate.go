@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
@@ -21,10 +20,19 @@ func init() {
 type state = map[common.Address]*account
 
 type account struct {
-	Balance *big.Int                    `json:"balance,omitempty"`
-	Code    []byte                      `json:"code,omitempty"`
-	Nonce   uint64                      `json:"nonce,omitempty"`
-	Storage map[common.Hash]common.Hash `json:"storage,omitempty"`
+	Balance *big.Int
+	Code    []byte
+	Nonce   uint64
+	Storage map[common.Hash]common.Hash
+}
+
+func (a *account) marshal() accountMarshaling {
+	return accountMarshaling{
+		Balance: bigToHex(a.Balance),
+		Code:    bytesToHex(a.Code),
+		Nonce:   a.Nonce,
+		Storage: a.Storage,
+	}
 }
 
 func (a *account) exists() bool {
@@ -32,8 +40,10 @@ func (a *account) exists() bool {
 }
 
 type accountMarshaling struct {
-	Balance *hexutil.Big
-	Code    hexutil.Bytes
+	Balance string                      `json:"balance,omitempty"`
+	Code    string                      `json:"code,omitempty"`
+	Nonce   uint64                      `json:"nonce,omitempty"`
+	Storage map[common.Hash]common.Hash `json:"storage,omitempty"`
 }
 
 type prestateTracer struct {
@@ -207,13 +217,15 @@ func (t *prestateTracer) CaptureTxEnd(restGas uint64) {
 // GetResult returns the json-encoded nested list of call traces, and any
 // error arising from the encoding or forceful termination (via `Stop`).
 func (t *prestateTracer) GetResult() (json.RawMessage, error) {
-	var res []byte
-	var err error
-	res, err = json.Marshal(t.pre)
+	pre := make(map[string]accountMarshaling)
+	for addr, state := range t.pre {
+		pre[addrToHex(addr)] = state.marshal()
+	}
+	res, err := json.Marshal(pre)
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(res), t.reason
+	return res, t.reason
 }
 
 // Stop terminates execution of the tracer at the first opportune moment.

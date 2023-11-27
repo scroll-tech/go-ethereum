@@ -581,7 +581,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				Root:     common.BytesToHash(acc.Root),
 			}
 			if len(data.CodeHash) == 0 {
-				data.CodeHash = types.EmptyCodeHash.Bytes()
+				data.CodeHash = types.EmptyKeccakCodeHash.Bytes()
 			}
 			if data.Root == (common.Hash{}) {
 				data.Root = types.EmptyRootHash

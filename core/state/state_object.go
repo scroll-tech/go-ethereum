@@ -93,7 +93,7 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, types.EmptyCodeHash.Bytes())
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, types.EmptyKeccakCodeHash.Bytes())
 }
 
 // newObject creates a state object.
@@ -469,7 +469,7 @@ func (s *stateObject) Code() []byte {
 	if s.code != nil {
 		return s.code
 	}
-	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
+	if bytes.Equal(s.CodeHash(), types.EmptyKeccakCodeHash.Bytes()) {
 		return nil
 	}
 	code, err := s.db.db.ContractCode(s.address, common.BytesToHash(s.CodeHash()))
@@ -487,7 +487,7 @@ func (s *stateObject) CodeSize() int {
 	if s.code != nil {
 		return len(s.code)
 	}
-	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
+	if bytes.Equal(s.CodeHash(), types.EmptyKeccakCodeHash.Bytes()) {
 		return 0
 	}
 	size, err := s.db.db.ContractCodeSize(s.address, common.BytesToHash(s.CodeHash()))

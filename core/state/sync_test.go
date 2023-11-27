@@ -615,7 +615,7 @@ func testIncompleteStateSync(t *testing.T, scheme string) {
 			isCode[crypto.Keccak256Hash(acc.code)] = struct{}{}
 		}
 	}
-	isCode[types.EmptyCodeHash] = struct{}{}
+	isCode[types.EmptyKeccakCodeHash] = struct{}{}
 
 	// Create a destination state and sync with the scheduler
 	dstDb := rawdb.NewMemoryDatabase()

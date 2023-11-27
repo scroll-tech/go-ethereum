@@ -40,7 +40,7 @@ func NewEmptyStateAccount() *StateAccount {
 	return &StateAccount{
 		Balance:  new(big.Int),
 		Root:     EmptyRootHash,
-		CodeHash: EmptyCodeHash.Bytes(),
+		CodeHash: EmptyKeccakCodeHash.Bytes(),
 	}
 }
 
@@ -65,7 +65,7 @@ type SlimAccount struct {
 	Nonce    uint64
 	Balance  *big.Int
 	Root     []byte // Nil if root equals to types.EmptyRootHash
-	CodeHash []byte // Nil if hash equals to types.EmptyCodeHash
+	CodeHash []byte // Nil if hash equals to types.EmptyKeccakCodeHash
 }
 
 // SlimAccountRLP encodes the state account in 'slim RLP' format.
@@ -77,7 +77,7 @@ func SlimAccountRLP(account StateAccount) []byte {
 	if account.Root != EmptyRootHash {
 		slim.Root = account.Root[:]
 	}
-	if !bytes.Equal(account.CodeHash, EmptyCodeHash[:]) {
+	if !bytes.Equal(account.CodeHash, EmptyKeccakCodeHash[:]) {
 		slim.CodeHash = account.CodeHash
 	}
 	data, err := rlp.EncodeToBytes(slim)
@@ -104,7 +104,7 @@ func FullAccount(data []byte) (*StateAccount, error) {
 		account.Root = common.BytesToHash(slim.Root)
 	}
 	if len(slim.CodeHash) == 0 {
-		account.CodeHash = EmptyCodeHash[:]
+		account.CodeHash = EmptyKeccakCodeHash[:]
 	} else {
 		account.CodeHash = slim.CodeHash
 	}

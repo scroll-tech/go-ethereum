@@ -1489,7 +1489,7 @@ func getCodeHash(i uint64) []byte {
 
 // getCodeByHash convenience function to lookup the code from the code hash
 func getCodeByHash(hash common.Hash) []byte {
-	if hash == types.EmptyCodeHash {
+	if hash == types.EmptyKeccakCodeHash {
 		return nil
 	}
 	for i, h := range codehashes {
@@ -1607,7 +1607,7 @@ func makeAccountTrieWithStorageWithUniqueStorage(scheme string, accounts, slots 
 	// Create n accounts in the trie
 	for i := uint64(1); i <= uint64(accounts); i++ {
 		key := key32(i)
-		codehash := types.EmptyCodeHash.Bytes()
+		codehash := types.EmptyKeccakCodeHash.Bytes()
 		if code {
 			codehash = getCodeHash(i)
 		}
@@ -1662,7 +1662,7 @@ func makeAccountTrieWithStorage(scheme string, accounts, slots int, code, bounda
 	// Create n accounts in the trie
 	for i := uint64(1); i <= uint64(accounts); i++ {
 		key := key32(i)
-		codehash := types.EmptyCodeHash.Bytes()
+		codehash := types.EmptyKeccakCodeHash.Bytes()
 		if code {
 			codehash = getCodeHash(i)
 		}

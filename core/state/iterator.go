@@ -134,7 +134,7 @@ func (it *nodeIterator) step() error {
 	if !it.dataIt.Next(true) {
 		it.dataIt = nil
 	}
-	if !bytes.Equal(account.CodeHash, types.EmptyCodeHash.Bytes()) {
+	if !bytes.Equal(account.CodeHash, types.EmptyKeccakCodeHash.Bytes()) {
 		it.codeHash = common.BytesToHash(account.CodeHash)
 		it.code, err = it.state.db.ContractCode(address, common.BytesToHash(account.CodeHash))
 		if err != nil {

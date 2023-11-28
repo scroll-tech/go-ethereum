@@ -838,12 +838,13 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 		}
 		// If we have collected enough transactions then we're done
 		// Originally we only limit l2txs count, but now strictly limit total txs number.
-		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount + 1) {
-			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+		// log.Info("w.chainConfig", "w.chainConfig.Scroll", w.chainConfig.Scroll)
+		if !w.chainConfig.Scroll.IsValidTxCount(env.tcount + 1) {
+			log.Trace("Transaction count limit reached", "have", env.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
-		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
-			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
+		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(env.blockSize+tx.Size()) {
+			log.Trace("Block size limit reached", "have", env.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
 			txs.Pop() // skip transactions from this account
 			continue
 		}
@@ -877,7 +878,7 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 			if tx.IsL1MessageTx() {
 			} else {
 				// only consider block size limit for L2 transactions
-				w.current.blockSize += tx.Size()
+				env.blockSize += tx.Size()
 			}
 
 		default:

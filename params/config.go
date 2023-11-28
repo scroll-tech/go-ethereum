@@ -353,8 +353,8 @@ func (s ScrollConfig) IsValidTxCount(count int) bool {
 }
 
 // IsValidBlockSize returns whether the given block's transaction payload size is below the limit.
-func (s ScrollConfig) IsValidBlockSize(size common.StorageSize) bool {
-	return s.MaxTxPayloadBytesPerBlock == nil || size <= common.StorageSize(*s.MaxTxPayloadBytesPerBlock)
+func (s ScrollConfig) IsValidBlockSize(size uint64) bool {
+	return s.MaxTxPayloadBytesPerBlock == nil || size <= uint64(*s.MaxTxPayloadBytesPerBlock)
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

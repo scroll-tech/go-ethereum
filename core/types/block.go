@@ -415,10 +415,10 @@ func (b *Block) Size() uint64 {
 	return uint64(c)
 }
 
-// PayloadSize returns the sum of all transactions in a block.
-func (b *Block) PayloadSize() common.StorageSize {
+// PayloadSize returns the encoded storage size sum of all transactions in a block.
+func (b *Block) PayloadSize() uint64 {
 	// add up all txs sizes
-	var totalSize common.StorageSize
+	var totalSize uint64 
 	for _, tx := range b.transactions {
 		if !tx.IsL1MessageTx() {
 			totalSize += tx.Size()

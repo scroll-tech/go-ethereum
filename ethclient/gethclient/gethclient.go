@@ -65,7 +65,8 @@ type AccountResult struct {
 	Address      common.Address  `json:"address"`
 	AccountProof []string        `json:"accountProof"`
 	Balance      *big.Int        `json:"balance"`
-	CodeHash     common.Hash     `json:"codeHash"`
+	KeccakCodeHash   common.Hash     `json:"keccakCodeHash"`
+	PoseidonCodeHash common.Hash     `json:"poseidonCodeHash"`
 	Nonce        uint64          `json:"nonce"`
 	StorageHash  common.Hash     `json:"storageHash"`
 	StorageProof []StorageResult `json:"storageProof"`
@@ -91,7 +92,8 @@ func (ec *Client) GetProof(ctx context.Context, account common.Address, keys []s
 		Address      common.Address  `json:"address"`
 		AccountProof []string        `json:"accountProof"`
 		Balance      *hexutil.Big    `json:"balance"`
-		CodeHash     common.Hash     `json:"codeHash"`
+		KeccakCodeHash   common.Hash     `json:"keccakCodeHash"`
+		PoseidonCodeHash common.Hash     `json:"poseidonCodeHash"`
 		Nonce        hexutil.Uint64  `json:"nonce"`
 		StorageHash  common.Hash     `json:"storageHash"`
 		StorageProof []storageResult `json:"storageProof"`
@@ -118,7 +120,8 @@ func (ec *Client) GetProof(ctx context.Context, account common.Address, keys []s
 		AccountProof: res.AccountProof,
 		Balance:      res.Balance.ToInt(),
 		Nonce:        uint64(res.Nonce),
-		CodeHash:     res.CodeHash,
+		KeccakCodeHash:     res.KeccakCodeHash,
+		PoseidonCodeHash:     res.PoseidonCodeHash,
 		StorageHash:  res.StorageHash,
 		StorageProof: storageResults,
 	}

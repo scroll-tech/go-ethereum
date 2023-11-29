@@ -644,7 +644,8 @@ type AccountResult struct {
 	Address      common.Address  `json:"address"`
 	AccountProof []string        `json:"accountProof"`
 	Balance      *hexutil.Big    `json:"balance"`
-	CodeHash     common.Hash     `json:"codeHash"`
+	KeccakCodeHash   common.Hash     `json:"keccakCodeHash"`
+	PoseidonCodeHash common.Hash     `json:"poseidonCodeHash"`
 	Nonce        hexutil.Uint64  `json:"nonce"`
 	StorageHash  common.Hash     `json:"storageHash"`
 	StorageProof []StorageResult `json:"storageProof"`
@@ -688,7 +689,8 @@ func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, st
 	if statedb == nil || err != nil {
 		return nil, err
 	}
-	codeHash := statedb.GetCodeHash(address)
+	keccakCodeHash := statedb.GetKeccakCodeHash(address)
+	poseidonCodeHash := statedb.GetPoseidonCodeHash(address)
 	storageRoot := statedb.GetStorageRoot(address)
 
 	if len(keys) > 0 {
@@ -738,7 +740,8 @@ func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, st
 		Address:      address,
 		AccountProof: accountProof,
 		Balance:      (*hexutil.Big)(statedb.GetBalance(address)),
-		CodeHash:     codeHash,
+		KeccakCodeHash:   keccakCodeHash,
+		PoseidonCodeHash: poseidonCodeHash,
 		Nonce:        hexutil.Uint64(statedb.GetNonce(address)),
 		StorageHash:  storageRoot,
 		StorageProof: storageProof,

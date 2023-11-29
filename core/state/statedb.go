@@ -583,11 +583,11 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				return nil
 			}
 			data = &types.StateAccount{
-				Nonce:    acc.Nonce,
-				Balance:  acc.Balance,
+				Nonce:            acc.Nonce,
+				Balance:          acc.Balance,
 				KeccakCodeHash:   acc.KeccakCodeHash,
 				PoseidonCodeHash: acc.PoseidonCodeHash,
-				Root:     common.BytesToHash(acc.Root),
+				Root:             common.BytesToHash(acc.Root),
 			}
 			if len(data.KeccakCodeHash) == 0 {
 				data.KeccakCodeHash = types.EmptyKeccakCodeHash.Bytes()

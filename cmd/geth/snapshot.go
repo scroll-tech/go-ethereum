@@ -568,12 +568,12 @@ func dumpState(ctx *cli.Context) error {
 			return err
 		}
 		da := &state.DumpAccount{
-			Balance:   account.Balance.String(),
-			Nonce:     account.Nonce,
-			Root:      account.Root.Bytes(),
-			KeccakCodeHash:  account.KeccakCodeHash,
-			PoseidonCodeHash:  account.PoseidonCodeHash,
-			SecureKey: accIt.Hash().Bytes(),
+			Balance:          account.Balance.String(),
+			Nonce:            account.Nonce,
+			Root:             account.Root.Bytes(),
+			KeccakCodeHash:   account.KeccakCodeHash,
+			PoseidonCodeHash: account.PoseidonCodeHash,
+			SecureKey:        accIt.Hash().Bytes(),
 		}
 		if !conf.SkipCode && !bytes.Equal(account.KeccakCodeHash, types.EmptyKeccakCodeHash.Bytes()) {
 			da.Code = rawdb.ReadCode(db, common.BytesToHash(account.KeccakCodeHash))

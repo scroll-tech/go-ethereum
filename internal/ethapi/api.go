@@ -641,14 +641,14 @@ func (s *BlockChainAPI) GetBalance(ctx context.Context, address common.Address, 
 
 // Result structs for GetProof
 type AccountResult struct {
-	Address      common.Address  `json:"address"`
-	AccountProof []string        `json:"accountProof"`
-	Balance      *hexutil.Big    `json:"balance"`
+	Address          common.Address  `json:"address"`
+	AccountProof     []string        `json:"accountProof"`
+	Balance          *hexutil.Big    `json:"balance"`
 	KeccakCodeHash   common.Hash     `json:"keccakCodeHash"`
 	PoseidonCodeHash common.Hash     `json:"poseidonCodeHash"`
-	Nonce        hexutil.Uint64  `json:"nonce"`
-	StorageHash  common.Hash     `json:"storageHash"`
-	StorageProof []StorageResult `json:"storageProof"`
+	Nonce            hexutil.Uint64  `json:"nonce"`
+	StorageHash      common.Hash     `json:"storageHash"`
+	StorageProof     []StorageResult `json:"storageProof"`
 }
 
 type StorageResult struct {
@@ -737,14 +737,14 @@ func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, st
 		return nil, err
 	}
 	return &AccountResult{
-		Address:      address,
-		AccountProof: accountProof,
-		Balance:      (*hexutil.Big)(statedb.GetBalance(address)),
+		Address:          address,
+		AccountProof:     accountProof,
+		Balance:          (*hexutil.Big)(statedb.GetBalance(address)),
 		KeccakCodeHash:   keccakCodeHash,
 		PoseidonCodeHash: poseidonCodeHash,
-		Nonce:        hexutil.Uint64(statedb.GetNonce(address)),
-		StorageHash:  storageRoot,
-		StorageProof: storageProof,
+		Nonce:            hexutil.Uint64(statedb.GetNonce(address)),
+		StorageHash:      storageRoot,
+		StorageProof:     storageProof,
 	}, statedb.Error()
 }
 

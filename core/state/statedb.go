@@ -329,12 +329,20 @@ func (s *StateDB) GetCodeSize(addr common.Address) int {
 	return 0
 }
 
-func (s *StateDB) GetCodeHash(addr common.Address) common.Hash {
+func (s *StateDB) GetPoseidonCodeHash(addr common.Address) common.Hash {
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
 		return common.Hash{}
 	}
-	return common.BytesToHash(stateObject.CodeHash())
+	return common.BytesToHash(stateObject.PoseidonCodeHash())
+}
+
+func (s *StateDB) GetKeccakCodeHash(addr common.Address) common.Hash {
+	stateObject := s.getStateObject(addr)
+	if stateObject == nil {
+		return common.Hash{}
+	}
+	return common.BytesToHash(stateObject.KeccakCodeHash())
 }
 
 // GetState retrieves a value from the given account's storage trie.
@@ -510,7 +518,7 @@ func (s *StateDB) updateStateObject(obj *stateObject) {
 		s.setError(fmt.Errorf("updateStateObject (%x) error: %v", addr[:], err))
 	}
 	if obj.dirtyCode {
-		s.trie.UpdateContractCode(obj.Address(), common.BytesToHash(obj.CodeHash()), obj.code)
+		s.trie.UpdateContractCode(obj.Address(), common.BytesToHash(obj.KeccakCodeHash()), obj.code)
 	}
 	// Cache the data until commit. Note, this update mechanism is not symmetric
 	// to the deletion, because whereas it is enough to track account updates
@@ -577,11 +585,13 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 			data = &types.StateAccount{
 				Nonce:    acc.Nonce,
 				Balance:  acc.Balance,
-				CodeHash: acc.CodeHash,
+				KeccakCodeHash:   acc.KeccakCodeHash,
+				PoseidonCodeHash: acc.PoseidonCodeHash,
 				Root:     common.BytesToHash(acc.Root),
 			}
-			if len(data.CodeHash) == 0 {
-				data.CodeHash = types.EmptyKeccakCodeHash.Bytes()
+			if len(data.KeccakCodeHash) == 0 {
+				data.KeccakCodeHash = types.EmptyKeccakCodeHash.Bytes()
+				data.PoseidonCodeHash = types.EmptyPoseidonCodeHash.Bytes()
 			}
 			if data.Root == (common.Hash{}) {
 				data.Root = types.EmptyRootHash
@@ -1194,7 +1204,7 @@ func (s *StateDB) Commit(block uint64, deleteEmptyObjects bool) (common.Hash, er
 		}
 		// Write any contract code associated with the state object
 		if obj.code != nil && obj.dirtyCode {
-			rawdb.WriteCode(codeWriter, common.BytesToHash(obj.CodeHash()), obj.code)
+			rawdb.WriteCode(codeWriter, common.BytesToHash(obj.KeccakCodeHash()), obj.code)
 			obj.dirtyCode = false
 		}
 		// Write any storage changes in the state object to its storage trie

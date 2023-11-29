@@ -571,7 +571,8 @@ func dumpState(ctx *cli.Context) error {
 			Balance:   account.Balance.String(),
 			Nonce:     account.Nonce,
 			Root:      account.Root.Bytes(),
-			CodeHash:  account.KeccakCodeHash,
+			KeccakCodeHash:  account.KeccakCodeHash,
+			PoseidonCodeHash:  account.PoseidonCodeHash,
 			SecureKey: accIt.Hash().Bytes(),
 		}
 		if !conf.SkipCode && !bytes.Equal(account.KeccakCodeHash, types.EmptyKeccakCodeHash.Bytes()) {

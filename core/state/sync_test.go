@@ -67,7 +67,7 @@ func makeTestState(scheme string) (ethdb.Database, Database, *trie.Database, com
 		acc.nonce = uint64(42 * i)
 
 		if i%3 == 0 {
-			obj.SetCode(crypto.Keccak256Hash([]byte{i, i, i, i, i}), []byte{i, i, i, i, i})
+			obj.SetCode([]byte{i, i, i, i, i})
 			acc.code = []byte{i, i, i, i, i}
 		}
 		if i%5 == 0 {

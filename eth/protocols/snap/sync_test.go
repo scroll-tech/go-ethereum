@@ -1513,7 +1513,7 @@ func makeAccountTrieNoStorage(n int, scheme string) (string, *trie.Trie, []*kv) 
 			Balance:        big.NewInt(int64(i)),
 			Root:           types.EmptyRootHash,
 			KeccakCodeHash: getCodeHash(i),
-			// TODO: PoseidonHash
+			// TODO: PoseidonCodeHash
 		})
 		key := key32(i)
 		elem := &kv{key, value}
@@ -1565,7 +1565,7 @@ func makeBoundaryAccountTrie(scheme string, n int) (string, *trie.Trie, []*kv) {
 			Balance:        big.NewInt(int64(i)),
 			Root:           types.EmptyRootHash,
 			KeccakCodeHash: getCodeHash(uint64(i)),
-			// TODO: PoseidonHash
+			// TODO: PoseidonCodeHash
 		})
 		elem := &kv{boundaries[i].Bytes(), value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1578,7 +1578,7 @@ func makeBoundaryAccountTrie(scheme string, n int) (string, *trie.Trie, []*kv) {
 			Balance:        big.NewInt(int64(i)),
 			Root:           types.EmptyRootHash,
 			KeccakCodeHash: getCodeHash(i),
-			// TODO: PoseidonHash
+			// TODO: PoseidonCodeHash
 		})
 		elem := &kv{key32(i), value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1623,7 +1623,7 @@ func makeAccountTrieWithStorageWithUniqueStorage(scheme string, accounts, slots 
 			Balance:        big.NewInt(int64(i)),
 			Root:           stRoot,
 			KeccakCodeHash: codehash,
-			// TODO: PoseidonHash
+			// TODO: PoseidonCodeHash
 		})
 		elem := &kv{key, value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1690,7 +1690,7 @@ func makeAccountTrieWithStorage(scheme string, accounts, slots int, code, bounda
 			Balance:        big.NewInt(int64(i)),
 			Root:           stRoot,
 			KeccakCodeHash: codehash,
-			// TODO: PoseidonHash
+			// TODO: PoseidonCodeHash
 		})
 		elem := &kv{key, value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1843,10 +1843,11 @@ func verifyTrie(scheme string, db ethdb.KeyValueStore, root common.Hash, t *test
 	accIt := trie.NewIterator(accTrie.MustNodeIterator(nil))
 	for accIt.Next() {
 		var acc struct {
-			Nonce          uint64
-			Balance        *big.Int
-			Root           common.Hash
-			KeccakCodeHash []byte
+			Nonce            uint64
+			Balance          *big.Int
+			Root             common.Hash
+			KeccakCodeHash   []byte
+			PoseidonCodeHash []byte
 		}
 		if err := rlp.DecodeBytes(accIt.Value, &acc); err != nil {
 			log.Crit("Invalid account encountered during snapshot creation", "err", err)

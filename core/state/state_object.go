@@ -486,17 +486,7 @@ func (s *stateObject) Code() []byte {
 // or zero if none. This method is an almost mirror of Code, but uses a cache
 // inside the database to avoid loading codes seen recently.
 func (s *stateObject) CodeSize() int {
-	if s.code != nil {
-		return len(s.code)
-	}
-	if bytes.Equal(s.KeccakCodeHash(), types.EmptyKeccakCodeHash.Bytes()) {
-		return 0
-	}
-	size, err := s.db.db.ContractCodeSize(s.address, common.BytesToHash(s.KeccakCodeHash()))
-	if err != nil {
-		s.db.setError(fmt.Errorf("can't load code size %x: %v", s.KeccakCodeHash(), err))
-	}
-	return size
+	return s.data.CodeSize
 }
 
 func (s *stateObject) SetCode(code []byte) {
@@ -512,6 +502,7 @@ func (s *stateObject) setCode(code []byte) {
 	s.code = code
 	s.data.KeccakCodeHash = codehash.KeccakCodeHash(code).Bytes()
 	s.data.PoseidonCodeHash = codehash.PoseidonCodeHash(code).Bytes()
+	s.data.CodeSize = uint64(len(code))
 	s.dirtyCode = true
 }
 

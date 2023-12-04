@@ -321,7 +321,7 @@ func (s *StateDB) GetCode(addr common.Address) []byte {
 	return nil
 }
 
-func (s *StateDB) GetCodeSize(addr common.Address) int {
+func (s *StateDB) GetCodeSize(addr common.Address) uint64 {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
 		return stateObject.CodeSize()

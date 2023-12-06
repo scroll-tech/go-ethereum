@@ -1,23 +1,10 @@
-## Go Ethereum
+## Scroll l2geth
 
-Official Golang implementation of the Ethereum protocol.
+Official Golang implementation of the Scroll sequencer.
 
-[![API Reference](
-https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/68747470733a2f2f676f646f632e6f72672f6769746875622e636f6d2f676f6c616e672f6764646f3f7374617475732e737667
-)](https://pkg.go.dev/github.com/scroll-tech/go-ethereum?tab=doc)
-[![Go Report Card](https://goreportcard.com/badge/github.com/scroll-tech/go-ethereum)](https://goreportcard.com/report/github.com/scroll-tech/go-ethereum)
-[![Travis](https://travis-ci.com/scroll-tech/go-ethereum.svg?branch=master)](https://travis-ci.com/scroll-tech/go-ethereum)
-[![Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/2stGbxwb)
+Scroll is a zk-Rollup L2 for Ethereum. L2geth is responsible for maintaining the L2 blockchain: it can collect transactions, execute them, produce blocks, sync the blockchain, and expose standard Ethereum APIs.
 
-## ZK-Rollup
-
-ZK-Rollup adapts the Go Ethereum to run as Layer 2 Sequencer. The codebase is based on v1.10.13.
-
-### ZKTrie Storage
-
-Another implement for storage trie, base on patricia merkle tree, has been induced. It is feasible to zk proving in the storage part. It is specified as a flag in gensis, set `config.scroll.useZktrie` to true for enabling it.
-
-Notice current the snapshot would be disabled by the zktrie implement.
+Scroll l2geth is a fork of [go-ethereum](https://github.com/ethereum/go-ethereum). Our `L1MessageTx` deposit mechanism was inspired by Optimism's [op-geth](https://github.com/ethereum-optimism/op-geth/blob/optimism/core/types/deposit_tx.go).
 
 ## Building the source
 

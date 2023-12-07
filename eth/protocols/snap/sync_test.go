@@ -1583,8 +1583,8 @@ func makeBoundaryAccountTrie(scheme string, n int) (string, *trie.Trie, []*kv) {
 			Nonce:            uint64(0),
 			Balance:          big.NewInt(int64(i)),
 			Root:             types.EmptyRootHash,
-			KeccakCodeHash:   getKeccakCodeHash(i),
-			PoseidonCodeHash: getPoseidonCodeHash(i),
+			KeccakCodeHash:   getKeccakCodeHash(uint64(i)),
+			PoseidonCodeHash: getPoseidonCodeHash(uint64(i)),
 			CodeSize:         1,
 		})
 		elem := &kv{boundaries[i].Bytes(), value}
@@ -1631,11 +1631,11 @@ func makeAccountTrieWithStorageWithUniqueStorage(scheme string, accounts, slots 
 	// Create n accounts in the trie
 	for i := uint64(1); i <= uint64(accounts); i++ {
 		key := key32(i)
-		keccakCodehash := types.EmptyKeccakCodeHash.Bytes()
+		keccakCodeHash := types.EmptyKeccakCodeHash.Bytes()
 		poseidonCodeHash := types.EmptyPoseidonCodeHash.Bytes()
 		codeSize := uint64(0)
 		if code {
-			keccakCodehash = getKeccakCodeHash(i)
+			keccakCodeHash = getKeccakCodeHash(i)
 			poseidonCodeHash = getPoseidonCodeHash(i)
 			codeSize = 1
 		}

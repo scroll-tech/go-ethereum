@@ -374,7 +374,7 @@ func testGenerateExistentStateWithWrongAccounts(t *testing.T, scheme string) {
 	// Wrong accounts
 	{
 		helper.addTrieAccount("acc-2", &types.StateAccount{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})
-		helper.addSnapAccount("acc-2", &types.StateAccount{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: common.Hex2Bytes("0x1234"), PoseidonCodeHash: common.Hex2Bytes("0x1234"), CodeSize: len(common.Hex2Bytes("0x1234"))})
+		helper.addSnapAccount("acc-2", &types.StateAccount{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: common.Hex2Bytes("0x1234"), PoseidonCodeHash: common.Hex2Bytes("0x1234"), CodeSize: uint64(len(common.Hex2Bytes("0x1234")))})
 
 		helper.addTrieAccount("acc-3", &types.StateAccount{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})
 		helper.addSnapAccount("acc-3", &types.StateAccount{Balance: big.NewInt(1), Root: types.EmptyRootHash, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})
@@ -382,9 +382,9 @@ func testGenerateExistentStateWithWrongAccounts(t *testing.T, scheme string) {
 
 	// Extra accounts, only in the snap
 	{
-		helper.addSnapAccount("acc-0", &types.StateAccount{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})                            // before the beginning
-		helper.addSnapAccount("acc-5", &types.StateAccount{Balance: big.NewInt(1), Root: types.EmptyRootHash, KeccakCodeHash: common.Hex2Bytes("0x1234"), PoseidonCodeHash: common.Hex2Bytes("0x1234"), CodeSize: len(common.Hex2Bytes("0x1234"))}) // Middle
-		helper.addSnapAccount("acc-7", &types.StateAccount{Balance: big.NewInt(1), Root: types.EmptyRootHash, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})               // after the end
+		helper.addSnapAccount("acc-0", &types.StateAccount{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})                                    // before the beginning
+		helper.addSnapAccount("acc-5", &types.StateAccount{Balance: big.NewInt(1), Root: types.EmptyRootHash, KeccakCodeHash: common.Hex2Bytes("0x1234"), PoseidonCodeHash: common.Hex2Bytes("0x1234"), CodeSize: uint64(len(common.Hex2Bytes("0x1234")))}) // Middle
+		helper.addSnapAccount("acc-7", &types.StateAccount{Balance: big.NewInt(1), Root: types.EmptyRootHash, KeccakCodeHash: types.EmptyKeccakCodeHash.Bytes(), PoseidonCodeHash: types.EmptyPoseidonCodeHash.Bytes(), CodeSize: 0})                       // after the end
 	}
 
 	root, snap := helper.CommitAndGenerate()

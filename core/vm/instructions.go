@@ -17,11 +17,14 @@
 package vm
 
 import (
+	"encoding/binary"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+	"golang.org/x/crypto/sha3"
 )
 
 func opAdd(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
@@ -454,7 +457,7 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 		binary.BigEndian.PutUint64(num64Buf, num64)
 
 		if interpreter.hasher == nil {
-			interpreter.hasher = sha3.NewLegacyKeccak256().(keccakState)
+			interpreter.hasher = sha3.NewLegacyKeccak256().(crypto.KeccakState)
 		} else {
 			interpreter.hasher.Reset()
 		}

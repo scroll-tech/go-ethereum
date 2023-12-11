@@ -105,7 +105,9 @@ func CheckJournalAccount(db ethdb.KeyValueStore, hash common.Hash) error {
 		fmt.Printf("\taccount.nonce: %d\n", account.Nonce)
 		fmt.Printf("\taccount.balance: %x\n", account.Balance)
 		fmt.Printf("\taccount.root: %x\n", account.Root)
-		fmt.Printf("\taccount.codehash: %x\n", account.CodeHash)
+		fmt.Printf("\taccount.keccakCodehash: %x\n", account.KeccakCodeHash)
+		fmt.Printf("\taccount.poseidonCodehash: %x\n", account.PoseidonCodeHash)
+		fmt.Printf("\taccount.codesize: %x\n", account.CodeSize)
 	}
 	// Check storage
 	{
@@ -136,7 +138,9 @@ func CheckJournalAccount(db ethdb.KeyValueStore, hash common.Hash) error {
 			fmt.Printf("\taccount.nonce: %d\n", account.Nonce)
 			fmt.Printf("\taccount.balance: %x\n", account.Balance)
 			fmt.Printf("\taccount.root: %x\n", account.Root)
-			fmt.Printf("\taccount.codehash: %x\n", account.CodeHash)
+			fmt.Printf("\taccount.keccakCodehash: %x\n", account.KeccakCodeHash)
+			fmt.Printf("\taccount.poseidonCodehash: %x\n", account.PoseidonCodeHash)
+			fmt.Printf("\taccount.codesize: %x\n", account.CodeSize)
 		}
 		if _, ok := destructs[hash]; ok {
 			fmt.Printf("\t Destructed!")

@@ -586,8 +586,9 @@ func generateAccounts(ctx *generatorContext, dl *diskLayer, accMarker []byte) er
 		if accMarker == nil || !bytes.Equal(account[:], accMarker) {
 			dataLen := len(val) // Approximate size, saves us a round of RLP-encoding
 			if !write {
-				if bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) {
-					dataLen -= 32
+				if bytes.Equal(acc.KeccakCodeHash, types.EmptyKeccakCodeHash[:]) {
+					// account for keccakCodeHash, poseidonCodeHash and codeSize
+					dataLen = dataLen - 32 - 32 - 8
 				}
 				if acc.Root == types.EmptyRootHash {
 					dataLen -= 32

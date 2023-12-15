@@ -313,7 +313,7 @@ func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) (
 
 	tx, _, err := s.client.client.TransactionByHash(s.ctx, vLog.TxHash)
 	if err != nil {
-		log.Warn("failed to get transaction by hash, probably an unindexing transaction, fetching the whole block to get the transaction",
+		log.Warn("failed to get transaction by hash, probably an unindexed transaction, fetching the whole block to get the transaction",
 			"tx hash", vLog.TxHash.Hex(), "block number", vLog.BlockNumber, "block hash", vLog.BlockHash.Hex(), "err", err)
 		block, err := s.client.client.BlockByHash(s.ctx, vLog.BlockHash)
 		if err != nil {

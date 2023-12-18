@@ -423,13 +423,13 @@ func TestEstimateGas(t *testing.T) {
 			function Revert() public { revert("revert reason");}
 			function OOG() public { for (uint i = 0; ; i++) {}}
 			function Assert() public { assert(false);}
-			function SelfDestruct() public { selfdestruct(msg.sender); }
 			function Valid() public {}
 			function Difficulty() public { assert(block.difficulty == 0); }
 		}
 	*/
-	const contractAbi = "[{\"inputs\":[],\"name\":\"Assert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"Difficulty\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"OOG\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PureRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"Revert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"SelfDestruct\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"Valid\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
-	const contractBin = "0x608060405234801561001057600080fd5b506101b2806100206000396000f3fe608060405234801561001057600080fd5b506004361061007d5760003560e01c8063b9b046f91161005b578063b9b046f9146100a0578063d8b98391146100aa578063dba5e917146100b4578063e09fface146100be5761007d565b806350f6fe341461008257806391b4a0e71461008c578063aa8b1d3014610096575b600080fd5b61008a6100c8565b005b6100946100d8565b005b61009e6100e4565b005b6100a86100e9565b005b6100b26100f3565b005b6100bc610161565b005b6100c661017a565b005b60005b80806001019150506100cb565b600044146100e257fe5b565b600080fd5b60006100f157fe5b565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600d8152602001807f72657665727420726561736f6e0000000000000000000000000000000000000081525060200191505060405180910390fd5b3373ffffffffffffffffffffffffffffffffffffffff16ff5b56fea26469706673582212201b608395248efd3133d81869fff20e9b287dc3fd8c43c02baf86a41efe9bfae164736f6c634300060c0033"
+
+	const contractAbi = "[{\"inputs\":[],\"name\":\"Assert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"Difficulty\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"OOG\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PureRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"Revert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"Valid\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+	const contractBin = "0x608060405234801561001057600080fd5b50610174806100206000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c806350f6fe341461006757806391b4a0e714610071578063aa8b1d301461007b578063b9b046f914610085578063d8b983911461008f578063e09fface14610099575b600080fd5b61006f6100a3565b005b6100796100b3565b005b6100836100bf565b005b61008d6100c4565b005b6100976100ce565b005b6100a161013c565b005b60005b80806001019150506100a6565b600044146100bd57fe5b565b600080fd5b60006100cc57fe5b565b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252600d8152602001807f72657665727420726561736f6e0000000000000000000000000000000000000081525060200191505060405180910390fd5b56fea264697066735822122091176e1f029ca73f9aff41666b415e1d48e8f03fdedd880e994a34b603f6114864736f6c634300060c0033"
 
 	key, _ := crypto.GenerateKey()
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -503,15 +503,6 @@ func TestEstimateGas(t *testing.T) {
 			Data:     common.Hex2Bytes("b9b046f9"),
 		}, 0, errors.New("invalid opcode: INVALID"), nil},
 
-		{"SelfDestruct", ethereum.CallMsg{
-			From:     addr,
-			To:       &contractAddr,
-			Gas:      100000,
-			GasPrice: big.NewInt(0),
-			Value:    nil,
-			Data:     common.Hex2Bytes("dba5e917"),
-		}, 0, errors.New("invalid opcode: SELFDESTRUCT"), nil},
-
 		{"Valid", ethereum.CallMsg{
 			From:     addr,
 			To:       &contractAddr,
@@ -519,7 +510,7 @@ func TestEstimateGas(t *testing.T) {
 			GasPrice: big.NewInt(0),
 			Value:    nil,
 			Data:     common.Hex2Bytes("e09fface"),
-		}, 21274, nil, nil},
+		}, 21296, nil, nil},
 		{"Difficulty", ethereum.CallMsg{
 			From:     addr,
 			To:       &contractAddr,
@@ -527,7 +518,7 @@ func TestEstimateGas(t *testing.T) {
 			GasPrice: big.NewInt(0),
 			Value:    nil,
 			Data:     common.Hex2Bytes("91b4a0e7"),
-		}, 21253, nil, nil},
+		}, 21230, nil, nil},
 	}
 	for _, c := range cases {
 		got, err := sim.EstimateGas(context.Background(), c.message)

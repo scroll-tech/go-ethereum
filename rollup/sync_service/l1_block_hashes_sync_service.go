@@ -179,7 +179,7 @@ func (s *L1BlockHashesSyncService) fetchBlockHashesTx() {
 	numBlockHashesPendingDbWrite += len(hashes)
 
 	// TODO(l1blockhashes): if it fetches a lot of block hashes, this might overflow and should be done in chunks.
-	// flush new messages to database periodically
+	// flush new blockhashes to database periodically
 	if to == latestConfirmed || batchWriter.ValueSize() >= DbWriteThresholdBytes || numBlocksPendingDbWrite >= DbWriteThresholdBlocks {
 		flush(to)
 	}

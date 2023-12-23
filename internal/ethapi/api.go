@@ -1294,9 +1294,11 @@ type RPCTransaction struct {
 	S                *hexutil.Big      `json:"s"`
 
 	// L1 message transaction fields:
-	Sender             common.Address  `json:"sender,omitempty"`
-	QueueIndex         *hexutil.Uint64 `json:"queueIndex,omitempty"`
-	LastAppliedL1Block *hexutil.Uint64 `json:"lastAppliedL1Block,omitempty"`
+	Sender              common.Address  `json:"sender,omitempty"`
+	QueueIndex          *hexutil.Uint64 `json:"queueIndex,omitempty"`
+	FirstAppliedL1Block *hexutil.Uint64 `json:"firstAppliedL1Block,omitempty"`
+	LastAppliedL1Block  *hexutil.Uint64 `json:"lastAppliedL1Block,omitempty"`
+	BlockRangeHash      []common.Hash   `json:"blockRangeHash,omitempty"`
 }
 
 // NewRPCTransaction returns a transaction that will serialize to the RPC
@@ -1346,7 +1348,9 @@ func NewRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	case types.L1BlockHashesTxType:
 		blockHashes := tx.AsL1BlockHashesTx()
 		result.Sender = blockHashes.Sender
+		result.FirstAppliedL1Block = (*hexutil.Uint64)(&blockHashes.FirstAppliedL1Block)
 		result.LastAppliedL1Block = (*hexutil.Uint64)(&blockHashes.LastAppliedL1Block)
+		result.BlockRangeHash = blockHashes.BlockHashesRange
 	case types.L1MessageTxType:
 		msg := tx.AsL1MessageTx()
 		result.Sender = msg.Sender

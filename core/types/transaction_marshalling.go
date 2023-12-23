@@ -50,9 +50,11 @@ type txJSON struct {
 	Hash common.Hash `json:"hash"`
 
 	// L1 message transaction fields:
-	Sender             common.Address  `json:"sender,omitempty"`
-	QueueIndex         *hexutil.Uint64 `json:"queueIndex,omitempty"`
-	LastAppliedL1Block *hexutil.Uint64 `json:"lastAppliedL1Block,omitempty"`
+	Sender              common.Address  `json:"sender,omitempty"`
+	QueueIndex          *hexutil.Uint64 `json:"queueIndex,omitempty"`
+	FirstAppliedL1Block *hexutil.Uint64 `json:"firstAppliedL1Block,omitempty"`
+	LastAppliedL1Block  *hexutil.Uint64 `json:"lastAppliedL1Block,omitempty"`
+	BlockRangeHash      []common.Hash   `json:"blockRangeHash,omitempty"`
 }
 
 // MarshalJSON marshals as JSON with a hash.
@@ -100,7 +102,9 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		enc.R = (*hexutil.Big)(tx.R)
 		enc.S = (*hexutil.Big)(tx.S)
 	case *L1BlockHashesTx:
+		enc.FirstAppliedL1Block = (*hexutil.Uint64)(&tx.FirstAppliedL1Block)
 		enc.LastAppliedL1Block = (*hexutil.Uint64)(&tx.LastAppliedL1Block)
+		enc.BlockRangeHash = tx.BlockHashesRange
 		enc.To = t.To()
 		enc.Data = (*hexutil.Bytes)(&tx.Data)
 		enc.Sender = tx.Sender
@@ -283,10 +287,15 @@ func (t *Transaction) UnmarshalJSON(input []byte) error {
 	case L1BlockHashesTxType:
 		var itx L1BlockHashesTx
 		inner = &itx
+		if dec.FirstAppliedL1Block == nil {
+			return errors.New("missing required field 'firstAppliedL1Block' in transaction")
+		}
+		itx.FirstAppliedL1Block = uint64(*dec.FirstAppliedL1Block)
 		if dec.LastAppliedL1Block == nil {
 			return errors.New("missing required field 'lastAppliedL1Block' in transaction")
 		}
 		itx.LastAppliedL1Block = uint64(*dec.LastAppliedL1Block)
+		itx.BlockHashesRange = dec.BlockRangeHash
 		if dec.To != nil {
 			itx.To = dec.To
 		}

@@ -50,5 +50,5 @@ func (tx *L1BlockHashesTx) rawSignatureValues() (v, r, s *big.Int) {
 }
 
 func (tx *L1BlockHashesTx) setSignatureValues(chainID, v, r, s *big.Int) {
-	// this is a noop for l1 message transactions
+	// this is a noop for l1 blockhashes transactions
 }

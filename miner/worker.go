@@ -1234,8 +1234,8 @@ loop:
 			break loop
 
 		case (errors.Is(err, core.ErrInsufficientFunds) || errors.Is(errors.Unwrap(err), core.ErrInsufficientFunds)):
-			log.Trace("Skipping account with insufficient funds", "sender", from)
-			txs.Pop()
+			log.Trace("Skipping tx with insufficient funds", "sender", from)
+			w.eth.TxPool().RemoveTx(tx.Hash(), true)
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the

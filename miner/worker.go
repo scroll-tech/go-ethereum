@@ -1234,7 +1234,7 @@ loop:
 			break loop
 
 		case (errors.Is(err, core.ErrInsufficientFunds) || errors.Is(errors.Unwrap(err), core.ErrInsufficientFunds)):
-			log.Trace("Skipping tx with insufficient funds", "sender", from)
+			log.Trace("Skipping tx with insufficient funds", "sender", from, "tx", tx.Hash().String())
 			w.eth.TxPool().RemoveTx(tx.Hash(), true)
 
 		default:

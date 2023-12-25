@@ -80,8 +80,6 @@ const (
 
 	// staleThreshold is the maximum depth of the acceptable stale block.
 	staleThreshold = 7
-
-	txRetryTimes = 15
 )
 
 var (

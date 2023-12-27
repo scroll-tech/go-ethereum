@@ -143,6 +143,9 @@ type Message struct {
 	// account nonce in state. It also disables checking that the sender is an EOA.
 	// This field will be set to true for operations like RPC eth_call.
 	SkipAccountChecks bool
+
+	// scroll-related fields
+	IsL1MessageTx bool
 }
 
 // TransactionToMessage converts a transaction into a Message.
@@ -160,6 +163,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipAccountChecks: false,
 		BlobHashes:        tx.BlobHashes(),
 		BlobGasFeeCap:     tx.BlobGasFeeCap(),
+		IsL1MessageTx:     tx.IsL1MessageTx(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {

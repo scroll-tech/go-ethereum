@@ -148,12 +148,12 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 		enc.YParity = (*hexutil.Uint64)(&yparity)
 
 	case *L1MessageTx:
-		enc.QueueIndex = (*hexutil.Uint64)(&tx.QueueIndex)
-		enc.Gas = (*hexutil.Uint64)(&tx.Gas)
-		enc.To = t.To()
-		enc.Value = (*hexutil.Big)(tx.Value)
-		enc.Data = (*hexutil.Bytes)(&tx.Data)
-		enc.Sender = tx.Sender
+		enc.QueueIndex = (*hexutil.Uint64)(&itx.QueueIndex)
+		enc.Gas = (*hexutil.Uint64)(&itx.Gas)
+		enc.To = tx.To()
+		enc.Value = (*hexutil.Big)(itx.Value)
+		enc.Input = (*hexutil.Bytes)(&itx.Data)
+		enc.Sender = itx.Sender
 	}
 	return json.Marshal(&enc)
 }
@@ -434,10 +434,10 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 			return errors.New("missing required field 'value' in transaction")
 		}
 		itx.Value = (*big.Int)(dec.Value)
-		if dec.Data == nil {
+		if dec.Input == nil {
 			return errors.New("missing required field 'input' in transaction")
 		}
-		itx.Data = *dec.Data
+		itx.Data = *dec.Input
 		itx.Sender = dec.Sender
 
 	default:

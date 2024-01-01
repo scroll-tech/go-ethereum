@@ -190,11 +190,6 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB) (*big.Int, error) 
 	return l1DataFee, nil
 }
 
-func calculateL2Fee(tx *types.Transaction) *big.Int {
-	l2GasLimit := new(big.Int).SetUint64(tx.Gas())
-	return new(big.Int).Mul(tx.GasPrice(), l2GasLimit)
-}
-
 func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error {
 	from, err := types.Sender(signer, tx)
 	if err != nil {
@@ -202,10 +197,7 @@ func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error 
 	}
 
 	balance := state.GetBalance(from)
-	cost := tx.Value()
-
-	l2Fee := calculateL2Fee(tx)
-	cost = cost.Add(cost, l2Fee)
+	cost := tx.Cost()
 	if balance.Cmp(cost) < 0 {
 		return errors.New("invalid transaction: insufficient funds for gas * price + value")
 	}

@@ -2,8 +2,6 @@ package fees
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -188,31 +186,4 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB) (*big.Int, error) 
 	l1BaseFee, overhead, scalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 	l1DataFee := calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
 	return l1DataFee, nil
-}
-
-func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error {
-	from, err := types.Sender(signer, tx)
-	if err != nil {
-		return errors.New("invalid transaction: invalid sender")
-	}
-
-	balance := state.GetBalance(from)
-	cost := tx.Cost()
-	if balance.Cmp(cost) < 0 {
-		return errors.New("invalid transaction: insufficient funds for gas * price + value")
-	}
-
-	l1DataFee, err := CalculateL1DataFee(tx, state)
-	if err != nil {
-		return fmt.Errorf("invalid transaction: %w", err)
-	}
-
-	cost = cost.Add(cost, l1DataFee)
-	if balance.Cmp(cost) < 0 {
-		return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
-	}
-
-	// TODO: check GasPrice is in an expected range
-
-	return nil
 }

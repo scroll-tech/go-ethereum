@@ -658,10 +658,23 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
 		return ErrNonceTooLow
 	}
-	// Transactor should have enough funds to cover the costs
-	// cost == V + GP * GL
-	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
-		return ErrInsufficientFunds
+	if pool.chainconfig.Scroll.FeeVaultEnabled() {
+		// Get L1 data fee in current state
+		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState)
+		if err != nil {
+			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+		}
+		// Transactor should have enough funds to cover the costs
+		// cost == V + GP * GL + L1 data fee
+		if b := pool.currentState.GetBalance(from); b.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0 {
+			return ErrInsufficientFunds
+		}
+	} else {
+		// Transactor should have enough funds to cover the costs
+		// cost == V + GP * GL
+		if b := pool.currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {
+			return ErrInsufficientFunds
+		}
 	}
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul, pool.shanghai)
@@ -692,14 +705,6 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	// Make the local flag. If it's from local source or it's from the network but
 	// the sender is marked as local previously, treat it as the local transaction.
 	isLocal := local || pool.locals.containsTx(tx)
-
-	if pool.chainconfig.Scroll.FeeVaultEnabled() {
-		if err := fees.VerifyFee(pool.signer, tx, pool.currentState); err != nil {
-			log.Trace("Discarding insufficient l1DataFee transaction", "hash", hash, "err", err)
-			invalidTxMeter.Mark(1)
-			return false, err
-		}
-	}
 
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, isLocal); err != nil {

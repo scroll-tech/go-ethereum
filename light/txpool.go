@@ -377,11 +377,23 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	if tx.Value().Sign() < 0 {
 		return core.ErrNegativeValue
 	}
-
-	// Transactor should have enough funds to cover the costs
-	// cost == V + GP * GL
-	if b := currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {
-		return core.ErrInsufficientFunds
+	if pool.config.Scroll.FeeVaultEnabled() {
+		// Get L1 data fee in current state
+		l1DataFee, err := fees.CalculateL1DataFee(tx, currentState)
+		if err != nil {
+			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+		}
+		// Transactor should have enough funds to cover the costs
+		// cost == V + GP * GL + L1 data fee
+		if b := currentState.GetBalance(from); b.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0 {
+			return core.ErrInsufficientFunds
+		}
+	} else {
+		// Transactor should have enough funds to cover the costs
+		// cost == V + GP * GL
+		if b := currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {
+			return core.ErrInsufficientFunds
+		}
 	}
 
 	// Should supply enough intrinsic gas
@@ -402,12 +414,6 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 
 	if pool.pending[hash] != nil {
 		return fmt.Errorf("Known transaction (%x)", hash[:4])
-	}
-
-	if pool.config.Scroll.FeeVaultEnabled() {
-		if err := fees.VerifyFee(pool.signer, tx, pool.currentState(ctx)); err != nil {
-			return err
-		}
 	}
 
 	err := pool.validateTx(ctx, tx)

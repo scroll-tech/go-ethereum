@@ -658,6 +658,13 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
 		return ErrNonceTooLow
 	}
+	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the previous logic.
+	// Transactor should have enough funds to cover the costs
+	// cost == V + GP * GL
+	if b := pool.currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {
+		return ErrInsufficientFunds
+	}
+	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.
 	if pool.chainconfig.Scroll.FeeVaultEnabled() {
 		// Get L1 data fee in current state
 		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState)
@@ -665,15 +672,9 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
 		}
 		// Transactor should have enough funds to cover the costs
-		// cost == V + GP * GL + L1 data fee
+		// cost == L1 data fee + V + GP * GL
 		if b := pool.currentState.GetBalance(from); b.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0 {
 			return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
-		}
-	} else {
-		// Transactor should have enough funds to cover the costs
-		// cost == V + GP * GL
-		if b := pool.currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {
-			return ErrInsufficientFunds
 		}
 	}
 	// Ensure the transaction has more gas than the basic tx fee.

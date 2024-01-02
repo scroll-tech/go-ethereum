@@ -18,6 +18,7 @@ package light
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -386,7 +387,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 		// Transactor should have enough funds to cover the costs
 		// cost == V + GP * GL + L1 data fee
 		if b := currentState.GetBalance(from); b.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0 {
-			return core.ErrInsufficientFunds
+			return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
 		}
 	} else {
 		// Transactor should have enough funds to cover the costs

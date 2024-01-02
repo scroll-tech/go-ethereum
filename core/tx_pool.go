@@ -661,7 +661,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the previous logic.
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
-	if b := pool.currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {
+	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
 	}
 	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.

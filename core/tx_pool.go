@@ -658,7 +658,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
 		return ErrNonceTooLow
 	}
-	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the previous logic.
+	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the logic without considering L1 data fee.
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
 	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {

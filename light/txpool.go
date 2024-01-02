@@ -378,7 +378,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	if tx.Value().Sign() < 0 {
 		return core.ErrNegativeValue
 	}
-	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the previous logic.
+	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the logic without considering L1 data fee.
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
 	if b := currentState.GetBalance(from); b.Cmp(tx.Cost()) < 0 {

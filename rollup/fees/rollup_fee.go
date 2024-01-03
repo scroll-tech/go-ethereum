@@ -25,17 +25,17 @@ var (
 // It should be a subset of the methods found on
 // types.Message
 type Message interface {
-	From() common.Address
-	To() *common.Address
-	GasPrice() *big.Int
-	Gas() uint64
-	GasFeeCap() *big.Int
-	GasTipCap() *big.Int
-	Value() *big.Int
-	Nonce() uint64
-	Data() []byte
-	AccessList() types.AccessList
-	IsL1MessageTx() bool
+	GetFrom() common.Address
+	GetTo() *common.Address
+	GetGasPrice() *big.Int
+	GetGasLimit() uint64
+	GetGasFeeCap() *big.Int
+	GetGasTipCap() *big.Int
+	GetValue() *big.Int
+	GetNonce() uint64
+	GetData() []byte
+	GetAccessList() types.AccessList
+	GetIsL1MessageTx() bool
 }
 
 // StateDB represents the StateDB interface
@@ -46,7 +46,7 @@ type StateDB interface {
 }
 
 func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer types.Signer, state StateDB) (*big.Int, error) {
-	if msg.IsL1MessageTx() {
+	if msg.GetIsL1MessageTx() {
 		return big.NewInt(0), nil
 	}
 
@@ -70,7 +70,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee, chainID *big.Int, signer 
 // asUnsignedTx turns a Message into a types.Transaction
 func asUnsignedTx(msg Message, baseFee, chainID *big.Int) *types.Transaction {
 	if baseFee == nil {
-		if msg.AccessList() == nil {
+		if msg.GetAccessList() == nil {
 			return asUnsignedLegacyTx(msg)
 		}
 
@@ -82,38 +82,38 @@ func asUnsignedTx(msg Message, baseFee, chainID *big.Int) *types.Transaction {
 
 func asUnsignedLegacyTx(msg Message) *types.Transaction {
 	return types.NewTx(&types.LegacyTx{
-		Nonce:    msg.Nonce(),
-		To:       msg.To(),
-		Value:    msg.Value(),
-		Gas:      msg.Gas(),
-		GasPrice: msg.GasPrice(),
-		Data:     msg.Data(),
+		Nonce:    msg.GetNonce(),
+		To:       msg.GetTo(),
+		Value:    msg.GetValue(),
+		Gas:      msg.GetGasLimit(),
+		GasPrice: msg.GetGasPrice(),
+		Data:     msg.GetData(),
 	})
 }
 
 func asUnsignedAccessListTx(msg Message, chainID *big.Int) *types.Transaction {
 	return types.NewTx(&types.AccessListTx{
-		Nonce:      msg.Nonce(),
-		To:         msg.To(),
-		Value:      msg.Value(),
-		Gas:        msg.Gas(),
-		GasPrice:   msg.GasPrice(),
-		Data:       msg.Data(),
-		AccessList: msg.AccessList(),
+		Nonce:      msg.GetNonce(),
+		To:         msg.GetTo(),
+		Value:      msg.GetValue(),
+		Gas:        msg.GetGasLimit(),
+		GasPrice:   msg.GetGasPrice(),
+		Data:       msg.GetData(),
+		AccessList: msg.GetAccessList(),
 		ChainID:    chainID,
 	})
 }
 
 func asUnsignedDynamicTx(msg Message, chainID *big.Int) *types.Transaction {
 	return types.NewTx(&types.DynamicFeeTx{
-		Nonce:      msg.Nonce(),
-		To:         msg.To(),
-		Value:      msg.Value(),
-		Gas:        msg.Gas(),
-		GasFeeCap:  msg.GasFeeCap(),
-		GasTipCap:  msg.GasTipCap(),
-		Data:       msg.Data(),
-		AccessList: msg.AccessList(),
+		Nonce:      msg.GetNonce(),
+		To:         msg.GetTo(),
+		Value:      msg.GetValue(),
+		Gas:        msg.GetGasLimit(),
+		GasFeeCap:  msg.GetGasFeeCap(),
+		GasTipCap:  msg.GetGasTipCap(),
+		Data:       msg.GetData(),
+		AccessList: msg.GetAccessList(),
 		ChainID:    chainID,
 	})
 }

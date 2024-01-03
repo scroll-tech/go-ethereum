@@ -150,6 +150,18 @@ type Message struct {
 	IsL1MessageTx bool
 }
 
+func (m *Message) GetFrom() common.Address         { return m.From }
+func (m *Message) GetTo() *common.Address          { return m.To }
+func (m *Message) GetGasPrice() *big.Int           { return m.GasPrice }
+func (m *Message) GetGasLimit() uint64             { return m.GasLimit }
+func (m *Message) GetGasFeeCap() *big.Int          { return m.GasFeeCap }
+func (m *Message) GetGasTipCap() *big.Int          { return m.GasTipCap }
+func (m *Message) GetValue() *big.Int              { return m.Value }
+func (m *Message) GetNonce() uint64                { return m.Nonce }
+func (m *Message) GetData() []byte                 { return m.Data }
+func (m *Message) GetAccessList() types.AccessList { return m.AccessList }
+func (m *Message) GetIsL1MessageTx() bool          { return m.IsL1MessageTx }
+
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
 	msg := &Message{

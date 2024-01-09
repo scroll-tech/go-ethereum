@@ -269,6 +269,10 @@ type ReceiptForStorage Receipt
 // EncodeRLP implements rlp.Encoder, and flattens all content fields of a receipt
 // into an RLP stream.
 func (r *ReceiptForStorage) EncodeRLP(_w io.Writer) error {
+	if r.L1Fee == nil {
+		r.L1Fee = big.NewInt(0)
+	}
+
 	w := rlp.NewEncoderBuffer(_w)
 	outerList := w.List()
 	w.WriteBytes((*Receipt)(r).statusEncoding())

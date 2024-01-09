@@ -18,7 +18,6 @@ package txpool
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -236,7 +235,7 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 	// cost == L1 data fee + V + GP * GL
 	cost = new(big.Int).Add(tx.Cost(), l1DataFee)
 	if balance.Cmp(cost) < 0 {
-		return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
+		return fmt.Errorf("invalid transaction: %w", core.ErrInsufficientFundsWithL1DataFee)
 	}
 	// Ensure the transactor has enough funds to cover for replacements or nonce
 	// expansions without overdrafts

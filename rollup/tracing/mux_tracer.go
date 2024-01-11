@@ -1,5 +1,14 @@
 package tracing
 
+import (
+	"math/big"
+	"time"
+
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/vm"
+	_ "github.com/scroll-tech/go-ethereum/eth/tracers/native"
+)
+
 type MuxTracer struct {
 	tracers []vm.EVMLogger
 }

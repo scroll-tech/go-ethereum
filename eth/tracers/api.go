@@ -86,13 +86,13 @@ type Backend interface {
 
 // API is the collection of tracing APIs exposed over the private debugging endpoint.
 type API struct {
-	backend Backend
-	tracer  tracerWrapper
+	backend             Backend
+	scrollTracerWrapper scrollTracerWrapper
 }
 
 // NewAPI creates a new API definition for the tracing methods of the Ethereum service.
-func NewAPI(backend Backend, tracer tracerWrapper) *API {
-	return &API{backend: backend, tracer: tracer}
+func NewAPI(backend Backend, scrollTracerWrapper scrollTracerWrapper) *API {
+	return &API{backend: backend, scrollTracerWrapper: scrollTracerWrapper}
 }
 
 type chainContext struct {
@@ -980,19 +980,19 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 }
 
 // APIs return the collection of RPC services the tracer package offers.
-func APIs(backend Backend, tracer tracerWrapper) []rpc.API {
+func APIs(backend Backend, scrollTracerWrapper scrollTracerWrapper) []rpc.API {
 	// Append all the local APIs and return
 	return []rpc.API{
 		{
 			Namespace: "debug",
 			Version:   "1.0",
-			Service:   NewAPI(backend, tracer),
+			Service:   NewAPI(backend, scrollTracerWrapper),
 			Public:    false,
 		},
 		{
 			Namespace: "scroll",
 			Version:   "1.0",
-			Service:   TraceBlock(NewAPI(backend, tracer)),
+			Service:   TraceBlock(NewAPI(backend, scrollTracerWrapper)),
 			Public:    true,
 		},
 	}

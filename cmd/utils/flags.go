@@ -1905,8 +1905,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 		if err != nil {
 			Fatalf("Failed to register the Ethereum service: %v", err)
 		}
-		tracer := tracing.NewTracerWrapper()
-		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, tracer))
+		scrollTracerWrapper := tracing.NewTracerWrapper()
+		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, scrollTracerWrapper))
 		return backend.ApiBackend, nil
 	}
 
@@ -1935,8 +1935,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 			Fatalf("Failed to create the LES server: %v", err)
 		}
 	}
-	tracer := tracing.NewTracerWrapper()
-	stack.RegisterAPIs(tracers.APIs(backend.APIBackend, tracer))
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	stack.RegisterAPIs(tracers.APIs(backend.APIBackend, scrollTracerWrapper))
 	return backend.APIBackend, backend
 }
 

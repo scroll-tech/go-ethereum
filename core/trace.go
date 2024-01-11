@@ -119,6 +119,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	env := CreateTraceEnvHelper(
 		chainConfig,
 		&vm.LogConfig{
+			DisableStorage:   true,
 			EnableMemory:     false,
 			EnableReturnData: true,
 		},
@@ -279,11 +280,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	// Computes the new state by applying the given message.
 	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
 	if err != nil {
-		return fmt.Errorf("tracing failed: %w", err)
+		return err
 	}
 	result, err := ApplyMessage(vmenv, msg, new(GasPool).AddGas(msg.Gas()), l1DataFee)
 	if err != nil {
-		return fmt.Errorf("tracing failed: %w", err)
+		return err
 	}
 	// If the result contains a revert reason, return it.
 	returnVal := result.Return()

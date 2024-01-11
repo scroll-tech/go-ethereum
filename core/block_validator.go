@@ -42,9 +42,10 @@ type BlockValidator struct {
 	engine consensus.Engine    // Consensus engine used for validating
 
 	// circuit capacity checker related fields
-	checkCircuitCapacity   bool                                           // whether enable circuit capacity check
-	db                     ethdb.Database                                 // db to store row consumption
-	cMu                    sync.Mutex                                     // mutex for circuit capacity checker
+	checkCircuitCapacity   bool           // whether enable circuit capacity check
+	db                     ethdb.Database // TODO: remove this and use bc.db
+	cMu                    sync.Mutex     // mutex for circuit capacity checker
+	tracer                 tracerWrapper
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker // circuit capacity checker instance
 }
 
@@ -60,6 +61,17 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 	}
 	log.Info("created new BlockValidator", "CircuitCapacityChecker ID", validator.circuitCapacityChecker.ID)
 	return validator
+}
+
+type tracerWrapper interface {
+	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
+}
+
+func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper) {
+	v.checkCircuitCapacity = true
+	v.tracer = tracer
+	v.circuitCapacityChecker = circuitcapacitychecker.NewCircuitCapacityChecker(true)
+	log.Info("created new BlockValidator", "CircuitCapacityChecker ID", v.circuitCapacityChecker.ID)
 }
 
 // ValidateBody validates the given block's uncles and verifies the block
@@ -260,7 +272,7 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 	return limit
 }
 
-func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
+func (v *BlockValidator) createTraceEnvAndGetBlockTrace(block *types.Block) (*types.BlockTrace, error) {
 	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, errors.New("validateCircuitRowConsumption: no parent block found")
@@ -271,7 +283,7 @@ func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
 		return nil, err
 	}
 
-	return CreateTraceEnv(v.config, v.bc, v.engine, v.db, statedb, parent, block, true)
+	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.db, statedb, parent, block, true)
 }
 
 func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {
@@ -283,12 +295,7 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 		"len(txs)", block.Transactions().Len(),
 	)
 
-	env, err := v.createTraceEnv(block)
-	if err != nil {
-		return nil, err
-	}
-
-	traces, err := env.GetBlockTrace(block)
+	traces, err := v.createTraceEnvAndGetBlockTrace(block)
 	if err != nil {
 		return nil, err
 	}

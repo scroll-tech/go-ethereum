@@ -46,6 +46,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/eth/protocols/snap"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/hack"
 	"github.com/scroll-tech/go-ethereum/internal/ethapi"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/miner"
@@ -198,6 +199,11 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if err != nil {
 		return nil, err
 	}
+	if config.CheckCircuitCapacity {
+		tracer := hack.NewTracerWrapper()
+		eth.blockchain.Validator().SetupTracerAndCircuitCapacityChecker(tracer)
+	}
+
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)

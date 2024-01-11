@@ -1112,6 +1112,7 @@ loop:
 			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
+
 		if tx.IsL1BlockHashesTx() && tx.AsL1BlockHashesTx().FirstAppliedL1Block != w.current.nextL1BlockNumber {
 			log.Error(
 				"Unexpected L1 block hashes tx in worker",
@@ -1431,7 +1432,7 @@ func (w *worker) collectPendingL1BlockHashes(firstNonAppliedL1BlockNumber uint64
 		BlockHashesRange:    l1BlockHashes,
 		To:                  &w.chainConfig.Scroll.L1Config.L1BlockHashesAddress,
 		Data:                data,
-		Sender:              common.Address{},
+		Sender:              *w.chainConfig.Scroll.FeeVaultAddress,
 	}
 }
 

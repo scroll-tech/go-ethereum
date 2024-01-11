@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
-	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -202,7 +201,7 @@ func (v *BlockValidator) ValidateL1BlockHashesTx(block *types.Block) error {
 			BlockHashesRange:    blockHashes,
 			To:                  &v.config.Scroll.L1Config.L1BlockHashesAddress,
 			Data:                data,
-			Sender:              common.Address{},
+			Sender:              *v.config.Scroll.FeeVaultAddress,
 		}
 
 		// check that the L1BlockHashesTx in the block is the same that we collected from L1

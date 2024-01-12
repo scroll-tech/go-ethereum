@@ -132,6 +132,7 @@ func (s *SyncService) Stop() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+	log.Info("sync service stopped")
 }
 
 // SubscribeNewL1MsgsEvent registers a subscription of NewL1MsgsEvent and

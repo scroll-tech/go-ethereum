@@ -42,24 +42,19 @@ type BlockValidator struct {
 	engine consensus.Engine    // Consensus engine used for validating
 
 	// circuit capacity checker related fields
-	checkCircuitCapacity   bool           // whether enable circuit capacity check
-	db                     ethdb.Database // TODO: remove this and use bc.db
-	cMu                    sync.Mutex     // mutex for circuit capacity checker
-	tracer                 tracerWrapper
+	checkCircuitCapacity   bool                                           // whether enable circuit capacity check
+	cMu                    sync.Mutex                                     // mutex for circuit capacity checker
+	tracer                 tracerWrapper                                  // scroll tracer wrapper
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker // circuit capacity checker instance
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine, db ethdb.Database, checkCircuitCapacity bool) *BlockValidator {
+func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
 	validator := &BlockValidator{
-		config:                 config,
-		engine:                 engine,
-		bc:                     blockchain,
-		checkCircuitCapacity:   checkCircuitCapacity,
-		db:                     db,
-		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
+		config: config,
+		engine: engine,
+		bc:     blockchain,
 	}
-	log.Info("created new BlockValidator", "CircuitCapacityChecker ID", validator.circuitCapacityChecker.ID)
 	return validator
 }
 
@@ -71,7 +66,7 @@ func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapp
 	v.checkCircuitCapacity = true
 	v.tracer = tracer
 	v.circuitCapacityChecker = circuitcapacitychecker.NewCircuitCapacityChecker(true)
-	log.Info("created new BlockValidator", "CircuitCapacityChecker ID", v.circuitCapacityChecker.ID)
+	log.Info("new CircuitCapacityChecker in BlockValidator", "ID", v.circuitCapacityChecker.ID)
 }
 
 // ValidateBody validates the given block's uncles and verifies the block
@@ -113,7 +108,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		// if a block's RowConsumption has been stored, which means it has been processed before,
 		// (e.g., in miner/worker.go or in insertChain),
 		// we simply skip its calculation and validation
-		if rawdb.ReadBlockRowConsumption(v.db, block.Hash()) != nil {
+		if rawdb.ReadBlockRowConsumption(v.bc.db, block.Hash()) != nil {
 			return nil
 		}
 		rowConsumption, err := v.validateCircuitRowConsumption(block)
@@ -127,7 +122,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 			"hash", block.Hash().String(),
 			"rowConsumption", rowConsumption,
 		)
-		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), rowConsumption)
+		rawdb.WriteBlockRowConsumption(v.bc.db, block.Hash(), rowConsumption)
 	}
 	return nil
 }
@@ -191,7 +186,7 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 			l1msg := it.L1Message()
 			skippedTx := types.NewTx(&l1msg)
 			log.Debug("Skipped L1 message", "queueIndex", index, "tx", skippedTx.Hash().String(), "block", blockHash.String())
-			rawdb.WriteSkippedTransaction(v.db, skippedTx, nil, "unknown", block.NumberU64(), &blockHash)
+			rawdb.WriteSkippedTransaction(v.bc.db, skippedTx, nil, "unknown", block.NumberU64(), &blockHash)
 		}
 
 		queueIndex = txQueueIndex + 1
@@ -283,7 +278,7 @@ func (v *BlockValidator) createTraceEnvAndGetBlockTrace(block *types.Block) (*ty
 		return nil, err
 	}
 
-	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.db, statedb, parent, block, true)
+	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.bc.db, statedb, parent, block, true)
 }
 
 func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {

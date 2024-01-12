@@ -3,14 +3,15 @@ package native
 import (
 	"bytes"
 	"encoding/json"
+	"math/big"
+	"sync/atomic"
+	"time"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
 	"github.com/scroll-tech/go-ethereum/log"
-	"math/big"
-	"sync/atomic"
-	"time"
 )
 
 func init() {

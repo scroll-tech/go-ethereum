@@ -15,6 +15,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
+var errNoScrollTracerWrapper = errors.New("no ScrollTracerWrapper")
+
 type TraceBlock interface {
 	GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error)
 	GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error)
@@ -26,6 +28,10 @@ type scrollTracerWrapper interface {
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
 func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (trace *types.BlockTrace, err error) {
+	if api.scrollTracerWrapper == nil {
+		return nil, errNoScrollTracerWrapper
+	}
+
 	var block *types.Block
 	if number, ok := blockNrOrHash.Number(); ok {
 		block, err = api.blockByNumber(ctx, number)
@@ -45,6 +51,10 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 }
 
 func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error) {
+	if api.scrollTracerWrapper == nil {
+		return nil, errNoScrollTracerWrapper
+	}
+
 	// Try to retrieve the specified block
 	var (
 		err   error

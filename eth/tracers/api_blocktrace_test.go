@@ -14,6 +14,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -88,7 +89,8 @@ func TestAPI_GetBlockTraceByNumberOrHash(t *testing.T) {
 	block, err := backend.BlockByNumber(context.Background(), 2)
 	assert.NoError(t, err)
 
-	api := NewAPI(backend)
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	api := NewAPI(backend, scrollTracerWrapper)
 	// get trace
 	hash := block.Hash()
 	blockTrace, err := api.GetBlockTraceByNumberOrHash(context.Background(), rpc.BlockNumberOrHash{

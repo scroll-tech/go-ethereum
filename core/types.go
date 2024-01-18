@@ -33,7 +33,8 @@ type Validator interface {
 	// gas used.
 	ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error
 
-	// TODO: add comments
+	// SetupTracerAndCircuitCapacityChecker sets up ScrollTracerWrapper and CircuitCapacityChecker for validator,
+	// to get scroll-related traces and to validate the circuit row consumption
 	SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper)
 }
 

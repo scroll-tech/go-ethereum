@@ -26,12 +26,15 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
+// TracerWrapper implements ScrollTracerWrapper interface
 type TracerWrapper struct{}
 
+// TracerWrapper creates a new TracerWrapper
 func NewTracerWrapper() *TracerWrapper {
 	return &TracerWrapper{}
 }
 
+// CreateTraceEnvAndGetBlockTrace wraps the whole block tracing logic for a block
 func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*types.BlockTrace, error) {
 	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parent, block, commitAfterApply)
 	if err != nil {

@@ -65,10 +65,10 @@ type ExecutionResult struct {
 	// `PoseidonCodeHash` only exists when tx is a contract call.
 	PoseidonCodeHash *common.Hash `json:"poseidonCodeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
-	ByteCode   string          `json:"byteCode,omitempty"`
-	StructLogs []*StructLogRes `json:"structLogs"`
-	CallTrace  json.RawMessage `json:"callTrace"`
-	Prestate   json.RawMessage `json:"prestate"`
+	ByteCode      string          `json:"byteCode,omitempty"`
+	StructLogs    []*StructLogRes `json:"structLogs"`
+	CallTrace     json.RawMessage `json:"callTrace"`
+	PrestateTrace json.RawMessage `json:"prestateTrace"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

@@ -459,7 +459,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("failed to get callTracer result: %w", err)
 	}
-	prestate, err := prestateTracer.GetResult()
+	prestateTrace, err := prestateTracer.GetResult()
 	if err != nil {
 		return fmt.Errorf("failed to get prestateTracer result: %w", err)
 	}
@@ -475,7 +475,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		ReturnValue:    fmt.Sprintf("%x", returnVal),
 		StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
 		CallTrace:      callTrace,
-		Prestate:       prestate,
+		PrestateTrace:  prestateTrace,
 	}
 	env.TxStorageTraces[index] = txStorageTrace
 

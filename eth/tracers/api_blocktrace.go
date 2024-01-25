@@ -101,10 +101,11 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	if config != nil && config.Reexec != nil {
 		reexec = *config.Reexec
 	}
-	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, true)
+	statedb, release, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, true)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 
 	chaindb := api.backend.ChainDb()
 	return api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)

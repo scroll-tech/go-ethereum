@@ -212,6 +212,10 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	l.logs = append(l.logs, log)
 }
 
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (t *StructLogger) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+}
+
 // CaptureFault implements the EVMLogger interface to trace an execution fault
 // while running an opcode.
 func (l *StructLogger) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {

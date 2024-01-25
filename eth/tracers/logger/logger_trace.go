@@ -1,4 +1,4 @@
-package vm
+package logger
 
 import (
 	"github.com/ethereum/go-ethereum/common"

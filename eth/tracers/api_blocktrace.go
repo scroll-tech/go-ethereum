@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -83,7 +83,7 @@ func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Trans
 func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *TraceConfig, block *types.Block) (*types.BlockTrace, error) {
 	if config == nil {
 		config = &TraceConfig{
-			LogConfig: &vm.LogConfig{
+			Config: &logger.Config{
 				EnableMemory:     false,
 				EnableReturnData: true,
 			},

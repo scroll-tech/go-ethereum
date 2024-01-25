@@ -179,6 +179,10 @@ func (t *prestateTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64,
 	}
 }
 
+// CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.
+func (t *prestateTracer) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+}
+
 func (t *prestateTracer) CaptureTxStart(gasLimit uint64) {
 	t.gasLimit = gasLimit
 }

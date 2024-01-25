@@ -4,34 +4,35 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
-type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error
+type traceFunc func(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error
 
 var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
-	OpcodeExecs = map[OpCode][]traceFunc{
-		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
-		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
-		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
-		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
-		CREATE:       {}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
-		CREATE2:      {}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
-		SLOAD:        {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
-		SSTORE:       {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
-		SELFDESTRUCT: {traceContractAccount, traceLastNAddressAccount(0)},
-		SELFBALANCE:  {traceContractAccount},
-		BALANCE:      {traceLastNAddressAccount(0)},
-		EXTCODEHASH:  {traceLastNAddressAccount(0)},
-		CODESIZE:     {traceContractCode},
-		CODECOPY:     {traceContractCode},
-		EXTCODESIZE:  {traceLastNAddressCode(0)},
-		EXTCODECOPY:  {traceLastNAddressCode(0)},
+	OpcodeExecs = map[vm.OpCode][]traceFunc{
+		vm.CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
+		vm.CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
+		vm.DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
+		vm.STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
+		vm.CREATE:       {}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
+		vm.CREATE2:      {}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
+		vm.SLOAD:        {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
+		vm.SSTORE:       {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
+		vm.SELFDESTRUCT: {traceContractAccount, traceLastNAddressAccount(0)},
+		vm.SELFBALANCE:  {traceContractAccount},
+		vm.BALANCE:      {traceLastNAddressAccount(0)},
+		vm.EXTCODEHASH:  {traceLastNAddressAccount(0)},
+		vm.CODESIZE:     {traceContractCode},
+		vm.CODECOPY:     {traceContractCode},
+		vm.EXTCODESIZE:  {traceLastNAddressCode(0)},
+		vm.EXTCODECOPY:  {traceLastNAddressCode(0)},
 	}
 )
 
 // traceToAddressCode gets tx.to address’s code
-func traceToAddressCode(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+func traceToAddressCode(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 	if l.env.To == nil {
 		return nil
 	}
@@ -42,7 +43,7 @@ func traceToAddressCode(l *StructLogger, scope *ScopeContext, extraData *types.E
 
 // traceLastNAddressCode
 func traceLastNAddressCode(n int) traceFunc {
-	return func(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+	return func(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 		stack := scope.Stack
 		if stack.len() <= n {
 			return nil
@@ -56,14 +57,14 @@ func traceLastNAddressCode(n int) traceFunc {
 }
 
 // traceContractCode gets the contract's code
-func traceContractCode(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+func traceContractCode(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 	code := l.env.StateDB.GetCode(scope.Contract.Address())
 	extraData.CodeList = append(extraData.CodeList, hexutil.Encode(code))
 	return nil
 }
 
 // traceStorage get contract's storage at storage_address
-func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+func traceStorage(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 	if scope.Stack.len() == 0 {
 		return nil
 	}
@@ -75,7 +76,7 @@ func traceStorage(l *StructLogger, scope *ScopeContext, extraData *types.ExtraDa
 }
 
 // traceContractAccount gets the contract's account
-func traceContractAccount(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+func traceContractAccount(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 	// Get account state.
 	state := getWrappedAccountForAddr(l, scope.Contract.Address())
 	extraData.StateList = append(extraData.StateList, state)
@@ -86,7 +87,7 @@ func traceContractAccount(l *StructLogger, scope *ScopeContext, extraData *types
 
 // traceLastNAddressAccount returns func about the last N's address account.
 func traceLastNAddressAccount(n int) traceFunc {
-	return func(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+	return func(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 		stack := scope.Stack
 		if stack.len() <= n {
 			return nil

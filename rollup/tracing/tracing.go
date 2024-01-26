@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -45,7 +46,7 @@ func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.Chai
 }
 
 type TraceEnv struct {
-	logConfig        *vm.LogConfig
+	logConfig        *logger.Config
 	commitAfterApply bool
 	chainConfig      *params.ChainConfig
 
@@ -87,13 +88,13 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Config, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
 	return &TraceEnv{
 		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
 		chainConfig:      chainConfig,
 		coinbase:         coinbase,
-		signer:           types.MakeSigner(chainConfig, block.Number()),
+		signer:           types.MakeSigner(chainConfig, block.Number(), block.Time()),
 		state:            statedb,
 		blockCtx:         blockCtx,
 		StorageTrace: &types.StorageTrace{
@@ -140,7 +141,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 	}
 	env := CreateTraceEnvHelper(
 		chainConfig,
-		&vm.LogConfig{
+		&logger.Config{
 			EnableMemory:     false,
 			EnableReturnData: true,
 		},
@@ -208,15 +209,15 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 		jobs <- &txTraceTask{statedb: env.state.Copy(), index: i}
 
 		// Generate the next state snapshot fast without tracing
-		msg, _ := tx.AsMessage(env.signer, block.BaseFee())
-		env.state.Prepare(tx.Hash(), i)
+		msg, _ := core.TransactionToMessage(tx, env.signer, block.BaseFee())
+		env.state.SetTxContext(tx.Hash(), i)
 		vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{})
 		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
 		if err != nil {
 			failed = err
 			break
 		}
-		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee); err != nil {
+		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.GasLimit), l1DataFee); err != nil {
 			failed = err
 			break
 		}
@@ -261,7 +262,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 
 func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.Block) error {
 	tx := block.Transactions()[index]
-	msg, _ := tx.AsMessage(env.signer, block.BaseFee())
+	msg, _ := core.TransactionToMessage(tx, env.signer, block.BaseFee())
 	from, _ := types.Sender(env.signer, tx)
 	to := tx.To()
 
@@ -291,7 +292,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		}
 	}
 
-	structLogger := vm.NewStructLogger(env.logConfig)
+	structLogger := logger.NewStructLogger(env.logConfig)
 	tracerContext := tracers.Context{
 		BlockHash: block.Hash(),
 		TxIndex:   index,
@@ -309,15 +310,14 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 
-	// Call Prepare to clear out the statedb access list
-	state.Prepare(txctx.TxHash, txctx.TxIndex)
+	state.SetTxContext(txctx.TxHash, txctx.TxIndex)
 
 	// Computes the new state by applying the given message.
 	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
 	if err != nil {
 		return err
 	}
-	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
+	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.GasLimit), l1DataFee)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())
 	for i, tx := range block.Transactions() {
-		txs[i] = types.NewTransactionData(tx, block.NumberU64(), env.chainConfig)
+		txs[i] = types.NewTransactionData(tx, block.NumberU64(), block.Time(), env.chainConfig)
 	}
 
 	intrinsicStorageProofs := map[common.Address][]common.Hash{

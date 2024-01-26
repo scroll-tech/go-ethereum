@@ -118,6 +118,9 @@ type StructLogger struct {
 
 	interrupt atomic.Bool // Atomic flag to signal execution interruption
 	reason    error       // Textual reason for the interruption
+
+	statesAffected map[common.Address]struct{}
+	createdAccount *types.AccountWrapper
 }
 
 // NewStructLogger returns a new logger
@@ -282,6 +285,19 @@ func (l *StructLogger) Error() error { return l.err }
 
 // Output returns the VM return value captured by the trace.
 func (l *StructLogger) Output() []byte { return l.output }
+
+// UpdatedAccounts is used to collect all "touched" accounts
+func (l *StructLogger) UpdatedAccounts() map[common.Address]struct{} {
+	return l.statesAffected
+}
+
+// UpdatedStorages is used to collect all "touched" storage slots
+func (l *StructLogger) UpdatedStorages() map[common.Address]Storage {
+	return l.storage
+}
+
+// CreatedAccount return the account data in case it is a create tx
+func (l *StructLogger) CreatedAccount() *types.AccountWrapper { return l.createdAccount }
 
 // WriteTrace writes a formatted trace to the given writer
 func WriteTrace(writer io.Writer, logs []StructLog) {

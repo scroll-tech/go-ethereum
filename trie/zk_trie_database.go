@@ -29,7 +29,7 @@ func NewZktrieDatabase(diskdb ethdb.KeyValueStore) *ZktrieDatabase {
 
 // adhoc wrapper...
 func NewZktrieDatabaseFromTriedb(db *Database) *ZktrieDatabase {
-	db.Zktrie = true
+	db.config.IsUsingZktrie = true
 	return &ZktrieDatabase{db: db, prefix: []byte{}}
 }
 

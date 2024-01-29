@@ -35,7 +35,7 @@ type Config struct {
 	PathDB    *pathdb.Config // Configs for experimental path-based scheme
 
 	// zktrie related stuff
-	Zktrie bool
+	IsUsingZktrie bool
 }
 
 // HashDefaults represents a config for using hash-based scheme with
@@ -117,6 +117,10 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 		db.backend = hashdb.New(diskdb, config.HashDB, mptResolver{})
 	}
 	return db
+}
+
+func (db *Database) IsUsingZktrie() bool {
+	return db.config.IsUsingZktrie
 }
 
 // Reader returns a reader for accessing all trie nodes with provided state root.

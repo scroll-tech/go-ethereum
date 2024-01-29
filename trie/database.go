@@ -33,6 +33,9 @@ type Config struct {
 	Preimages bool           // Flag whether the preimage of node key is recorded
 	HashDB    *hashdb.Config // Configs for hash-based scheme
 	PathDB    *pathdb.Config // Configs for experimental path-based scheme
+
+	// zktrie related stuff
+	Zktrie bool
 }
 
 // HashDefaults represents a config for using hash-based scheme with
@@ -83,6 +86,10 @@ type Database struct {
 	diskdb    ethdb.Database // Persistent database to store the snapshot
 	preimages *preimageStore // The store for caching preimages
 	backend   backend        // The backend for managing trie nodes
+
+	// zktrie related stuff
+	// TODO: It's a quick&dirty implementation. FIXME later.
+	rawDirties KvMap
 }
 
 // NewDatabase initializes the trie database with default settings, note

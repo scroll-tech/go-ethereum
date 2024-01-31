@@ -23,8 +23,8 @@ type ZktrieDatabase struct {
 	prefix []byte
 }
 
-func NewZktrieDatabase(diskdb ethdb.KeyValueStore) *ZktrieDatabase {
-	return &ZktrieDatabase{db: NewDatabase(diskdb), prefix: []byte{}}
+func NewZktrieDatabase(diskdb ethdb.Database) *ZktrieDatabase {
+	return &ZktrieDatabase{db: NewDatabase(diskdb, nil), prefix: []byte{}}
 }
 
 // adhoc wrapper...

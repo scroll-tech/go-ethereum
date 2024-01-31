@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/trie/triedb/hashdb"
 )
 
 // ZktrieDatabase Database adaptor implements zktrie.ZktrieDatbase
@@ -55,8 +56,8 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 
 	if l.db.GetCleans() != nil {
 		if enc := l.db.GetCleans().Get(nil, concatKey); enc != nil {
-			memcacheCleanHitMeter.Mark(1)
-			memcacheCleanReadMeter.Mark(int64(len(enc)))
+			hashdb.MemcacheCleanHitMeter.Mark(1)
+			hashdb.MemcacheCleanReadMeter.Mark(int64(len(enc)))
 			return enc, nil
 		}
 	}
@@ -67,8 +68,8 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 	}
 	if l.db.GetCleans() != nil {
 		l.db.GetCleans().Set(concatKey[:], v)
-		memcacheCleanMissMeter.Mark(1)
-		memcacheCleanWriteMeter.Mark(int64(len(v)))
+		hashdb.MemcacheCleanMissMeter.Mark(1)
+		hashdb.MemcacheCleanWriteMeter.Mark(int64(len(v)))
 	}
 	return v, err
 }

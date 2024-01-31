@@ -18,6 +18,7 @@ package trie
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -76,6 +77,9 @@ type backend interface {
 
 	// Close closes the trie database backend and releases all held resources.
 	Close() error
+
+	// database supplementary methods, to get the underlying fields
+	GetLock() *sync.RWMutex
 }
 
 // Database is the wrapper of the underlying backend which is shared by different

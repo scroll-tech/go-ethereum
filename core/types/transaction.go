@@ -48,6 +48,7 @@ const (
 	LegacyTxType = iota
 	AccessListTxType
 	DynamicFeeTxType
+	BlobTxType
 
 	L1MessageTxType = 0x7E
 )
@@ -189,6 +190,10 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		return &inner, err
 	case DynamicFeeTxType:
 		var inner DynamicFeeTx
+		err := rlp.DecodeBytes(b[1:], &inner)
+		return &inner, err
+	case BlobTxType:
+		var inner BlobTx
 		err := rlp.DecodeBytes(b[1:], &inner)
 		return &inner, err
 	case L1MessageTxType:

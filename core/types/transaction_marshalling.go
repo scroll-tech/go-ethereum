@@ -98,6 +98,23 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		enc.V = (*hexutil.Big)(tx.V)
 		enc.R = (*hexutil.Big)(tx.R)
 		enc.S = (*hexutil.Big)(tx.S)
+	case *BlobTx:
+		enc.ChainID = (*hexutil.Big)(itx.ChainID.ToBig())
+		enc.Nonce = (*hexutil.Uint64)(&itx.Nonce)
+		enc.Gas = (*hexutil.Uint64)(&itx.Gas)
+		enc.MaxFeePerGas = (*hexutil.Big)(itx.GasFeeCap.ToBig())
+		enc.MaxPriorityFeePerGas = (*hexutil.Big)(itx.GasTipCap.ToBig())
+		enc.MaxFeePerBlobGas = (*hexutil.Big)(itx.BlobFeeCap.ToBig())
+		enc.Value = (*hexutil.Big)(itx.Value.ToBig())
+		enc.Input = (*hexutil.Bytes)(&itx.Data)
+		enc.AccessList = &itx.AccessList
+		enc.BlobVersionedHashes = itx.BlobHashes
+		enc.To = tx.To()
+		enc.V = (*hexutil.Big)(itx.V.ToBig())
+		enc.R = (*hexutil.Big)(itx.R.ToBig())
+		enc.S = (*hexutil.Big)(itx.S.ToBig())
+		yparity := itx.V.Uint64()
+		enc.YParity = (*hexutil.Uint64)(&yparity)
 	case *L1MessageTx:
 		enc.QueueIndex = (*hexutil.Uint64)(&tx.QueueIndex)
 		enc.Gas = (*hexutil.Uint64)(&tx.Gas)
@@ -270,6 +287,87 @@ func (t *Transaction) UnmarshalJSON(input []byte) error {
 		withSignature := itx.V.Sign() != 0 || itx.R.Sign() != 0 || itx.S.Sign() != 0
 		if withSignature {
 			if err := sanityCheckSignature(itx.V, itx.R, itx.S, false); err != nil {
+				return err
+			}
+		}
+
+	case BlobTxType:
+		var itx BlobTx
+		inner = &itx
+		if dec.ChainID == nil {
+			return errors.New("missing required field 'chainId' in transaction")
+		}
+		itx.ChainID = uint256.MustFromBig((*big.Int)(dec.ChainID))
+		if dec.Nonce == nil {
+			return errors.New("missing required field 'nonce' in transaction")
+		}
+		itx.Nonce = uint64(*dec.Nonce)
+		if dec.To == nil {
+			return errors.New("missing required field 'to' in transaction")
+		}
+		itx.To = *dec.To
+		if dec.Gas == nil {
+			return errors.New("missing required field 'gas' for txdata")
+		}
+		itx.Gas = uint64(*dec.Gas)
+		if dec.MaxPriorityFeePerGas == nil {
+			return errors.New("missing required field 'maxPriorityFeePerGas' for txdata")
+		}
+		itx.GasTipCap = uint256.MustFromBig((*big.Int)(dec.MaxPriorityFeePerGas))
+		if dec.MaxFeePerGas == nil {
+			return errors.New("missing required field 'maxFeePerGas' for txdata")
+		}
+		itx.GasFeeCap = uint256.MustFromBig((*big.Int)(dec.MaxFeePerGas))
+		if dec.MaxFeePerBlobGas == nil {
+			return errors.New("missing required field 'maxFeePerBlobGas' for txdata")
+		}
+		itx.BlobFeeCap = uint256.MustFromBig((*big.Int)(dec.MaxFeePerBlobGas))
+		if dec.Value == nil {
+			return errors.New("missing required field 'value' in transaction")
+		}
+		itx.Value = uint256.MustFromBig((*big.Int)(dec.Value))
+		if dec.Input == nil {
+			return errors.New("missing required field 'input' in transaction")
+		}
+		itx.Data = *dec.Input
+		if dec.V == nil {
+			return errors.New("missing required field 'v' in transaction")
+		}
+		if dec.AccessList != nil {
+			itx.AccessList = *dec.AccessList
+		}
+		if dec.BlobVersionedHashes == nil {
+			return errors.New("missing required field 'blobVersionedHashes' in transaction")
+		}
+		itx.BlobHashes = dec.BlobVersionedHashes
+		// signature R
+		var overflow bool
+		if dec.R == nil {
+			return errors.New("missing required field 'r' in transaction")
+		}
+		itx.R, overflow = uint256.FromBig((*big.Int)(dec.R))
+		if overflow {
+			return errors.New("'r' value overflows uint256")
+		}
+		// signature S
+		if dec.S == nil {
+			return errors.New("missing required field 's' in transaction")
+		}
+		itx.S, overflow = uint256.FromBig((*big.Int)(dec.S))
+		if overflow {
+			return errors.New("'s' value overflows uint256")
+		}
+		// signature V
+		vbig, err := dec.yParityValue()
+		if err != nil {
+			return err
+		}
+		itx.V, overflow = uint256.FromBig(vbig)
+		if overflow {
+			return errors.New("'v' value overflows uint256")
+		}
+		if itx.V.Sign() != 0 || itx.R.Sign() != 0 || itx.S.Sign() != 0 {
+			if err := sanityCheckSignature(vbig, itx.R.ToBig(), itx.S.ToBig(), false); err != nil {
 				return err
 			}
 		}

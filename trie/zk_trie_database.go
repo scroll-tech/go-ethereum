@@ -36,9 +36,9 @@ func NewZktrieDatabaseFromTriedb(db *Database) *ZktrieDatabase {
 // Put saves a key:value into the Storage
 func (l *ZktrieDatabase) Put(k, v []byte) error {
 	k = bitReverse(k)
-	l.db.lock.Lock()
+	l.db.GetLock().Lock()
 	l.db.rawDirties.Put(Concat(l.prefix, k[:]), v)
-	l.db.lock.Unlock()
+	l.db.GetLock().Unlock()
 	return nil
 }
 
@@ -46,15 +46,15 @@ func (l *ZktrieDatabase) Put(k, v []byte) error {
 func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 	key = bitReverse(key)
 	concatKey := Concat(l.prefix, key[:])
-	l.db.lock.RLock()
+	l.db.GetLock().RLock()
 	value, ok := l.db.rawDirties.Get(concatKey)
-	l.db.lock.RUnlock()
+	l.db.GetLock().RUnlock()
 	if ok {
 		return value, nil
 	}
 
-	if l.db.cleans != nil {
-		if enc := l.db.cleans.Get(nil, concatKey); enc != nil {
+	if l.db.GetCleans() != nil {
+		if enc := l.db.GetCleans().Get(nil, concatKey); enc != nil {
 			memcacheCleanHitMeter.Mark(1)
 			memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return enc, nil
@@ -65,8 +65,8 @@ func (l *ZktrieDatabase) Get(key []byte) ([]byte, error) {
 	if err == leveldb.ErrNotFound {
 		return nil, zktrie.ErrKeyNotFound
 	}
-	if l.db.cleans != nil {
-		l.db.cleans.Set(concatKey[:], v)
+	if l.db.GetCleans() != nil {
+		l.db.GetCleans().Set(concatKey[:], v)
 		memcacheCleanMissMeter.Mark(1)
 		memcacheCleanWriteMeter.Mark(int64(len(v)))
 	}

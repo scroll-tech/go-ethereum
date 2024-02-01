@@ -1112,7 +1112,8 @@ loop:
 			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
-
+		// TODO: check if this can be converted to
+		// tx.AsL1BlockHashesTx().LastAppliedL1Block < w.current.nextL1BlockNumber
 		if tx.IsL1BlockHashesTx() && tx.AsL1BlockHashesTx().FirstAppliedL1Block != w.current.nextL1BlockNumber {
 			log.Error(
 				"Unexpected L1 block hashes tx in worker",

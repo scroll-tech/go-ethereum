@@ -97,7 +97,7 @@ func txsToTxsData(txs types.Transactions) []*types.TransactionData {
 			nonce = msg.QueueIndex
 		}
 
-		txsData[i] = &types.TransactionData{
+		txData := &types.TransactionData{
 			Type:     tx.Type(),
 			TxHash:   tx.Hash().String(),
 			Nonce:    nonce,
@@ -112,6 +112,15 @@ func txsToTxsData(txs types.Transactions) []*types.TransactionData {
 			R:        (*hexutil.Big)(r),
 			S:        (*hexutil.Big)(s),
 		}
+
+		if l1blockHashesTx := tx.AsL1BlockHashesTx(); l1blockHashesTx != nil {
+			txData.From = l1blockHashesTx.Sender
+			txData.FirstAppliedL1Block = (*hexutil.Uint64)(&l1blockHashesTx.FirstAppliedL1Block)
+			txData.LastAppliedL1Block = (*hexutil.Uint64)(&l1blockHashesTx.LastAppliedL1Block)
+			txData.BlockRangeHash = l1blockHashesTx.BlockHashesRange
+		}
+
+		txsData[i] = txData
 	}
 	return txsData
 }

@@ -148,20 +148,23 @@ type StorageWrapper struct {
 }
 
 type TransactionData struct {
-	Type     uint8           `json:"type"`
-	Nonce    uint64          `json:"nonce"`
-	TxHash   string          `json:"txHash"`
-	Gas      uint64          `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	From     common.Address  `json:"from"`
-	To       *common.Address `json:"to"`
-	ChainId  *hexutil.Big    `json:"chainId"`
-	Value    *hexutil.Big    `json:"value"`
-	Data     string          `json:"data"`
-	IsCreate bool            `json:"isCreate"`
-	V        *hexutil.Big    `json:"v"`
-	R        *hexutil.Big    `json:"r"`
-	S        *hexutil.Big    `json:"s"`
+	Type                uint8           `json:"type"`
+	Nonce               uint64          `json:"nonce"`
+	TxHash              string          `json:"txHash"`
+	Gas                 uint64          `json:"gas"`
+	GasPrice            *hexutil.Big    `json:"gasPrice"`
+	From                common.Address  `json:"from"`
+	To                  *common.Address `json:"to"`
+	ChainId             *hexutil.Big    `json:"chainId"`
+	Value               *hexutil.Big    `json:"value"`
+	Data                string          `json:"data"`
+	IsCreate            bool            `json:"isCreate"`
+	V                   *hexutil.Big    `json:"v"`
+	R                   *hexutil.Big    `json:"r"`
+	S                   *hexutil.Big    `json:"s"`
+	FirstAppliedL1Block *hexutil.Uint64 `json:"firstAppliedL1Block"`
+	LastAppliedL1Block  *hexutil.Uint64 `json:"lastAppliedL1Block"`
+	BlockRangeHash      []common.Hash   `json:"blockRangeHash"`
 }
 
 // NewTransactionData returns a transaction that will serialize to the trace
@@ -192,6 +195,13 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 		R:        (*hexutil.Big)(r),
 		S:        (*hexutil.Big)(s),
 	}
+
+	if l1blockHashesTx := tx.AsL1BlockHashesTx(); l1blockHashesTx != nil {
+		result.FirstAppliedL1Block = (*hexutil.Uint64)(&l1blockHashesTx.FirstAppliedL1Block)
+		result.LastAppliedL1Block = (*hexutil.Uint64)(&l1blockHashesTx.LastAppliedL1Block)
+		result.BlockRangeHash = l1blockHashesTx.BlockHashesRange
+	}
+
 	return result
 }
 

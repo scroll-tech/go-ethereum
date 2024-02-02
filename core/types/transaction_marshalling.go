@@ -432,6 +432,9 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 			return errors.New("missing required field 'input' in transaction")
 		}
 		itx.Data = *dec.Input
+		if dec.Sender == nil {
+			return errors.New("missing required field 'sender' in transaction")
+		}
 		itx.Sender = *dec.Sender
 
 	default:

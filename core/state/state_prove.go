@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	zktrie "github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/trie/zkproof"
 )
 
 type TrieProve interface {
@@ -36,7 +37,7 @@ func (t ZktrieProofTracer) Available() bool {
 
 // NewProofTracer is not in Db interface and used explictily for reading proof in storage trie (not updated by the dirty value)
 func (s *StateDB) NewProofTracer(trieS Trie) ZktrieProofTracer {
-	if s.IsZktrie() {
+	if s.IsUsingZktrie() {
 		zkTrie := trieS.(*zktrie.ZkTrie)
 		if zkTrie == nil {
 			panic("unexpected trie type for zktrie")
@@ -48,13 +49,11 @@ func (s *StateDB) NewProofTracer(trieS Trie) ZktrieProofTracer {
 
 // GetStorageTrieForProof is not in Db interface and used explictily for reading proof in storage trie (not updated by the dirty value)
 func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
-
 	// try the trie in stateObject first, else we would create one
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
 		// still return a empty trie
-		addrHash := crypto.Keccak256Hash(addr[:])
-		dummy_trie, _ := s.db.OpenStorageTrie(addrHash, common.Hash{})
+		dummy_trie, _ := s.db.OpenStorageTrie(s.originalRoot, addr, common.Hash{})
 		return dummy_trie, nil
 	}
 
@@ -62,7 +61,7 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 	var err error
 	if trie == nil {
 		// use a new, temporary trie
-		trie, err = s.db.OpenStorageTrie(stateObject.addrHash, stateObject.data.Root)
+		trie, err = s.db.OpenStorageTrie(s.originalRoot, stateObject.address, stateObject.data.Root)
 		if err != nil {
 			return nil, fmt.Errorf("can't create storage trie on root %s: %v ", stateObject.data.Root, err)
 		}
@@ -74,10 +73,9 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 // GetSecureTrieProof handle any interface with Prove (should be a Trie in most case) and
 // deliver the proof in bytes
 func (s *StateDB) GetSecureTrieProof(trieProve TrieProve, key common.Hash) ([][]byte, error) {
-
-	var proof proofList
+	var proof zkproof.ProofList
 	var err error
-	if s.IsZktrie() {
+	if s.IsUsingZktrie() {
 		key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())
 		err = trieProve.Prove(key_s.Bytes(), 0, &proof)
 	} else {

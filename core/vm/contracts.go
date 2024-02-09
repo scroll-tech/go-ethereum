@@ -330,7 +330,7 @@ var (
 //
 // def mult_complexity(x):
 //
-//	f x <= 64: return x ** 2
+//	if x <= 64: return x ** 2
 //	elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
 //	else: return x ** 2 // 16 + 480 * x - 199680
 //

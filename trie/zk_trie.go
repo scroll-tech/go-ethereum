@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/poseidon"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/trie/trienode"
 )
 
 var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
@@ -123,10 +124,16 @@ func (t *ZkTrie) GetKey(kHashBytes []byte) []byte {
 //
 // Committing flushes nodes from memory. Subsequent Get calls will load nodes
 // from the database.
-func (t *ZkTrie) Commit(LeafCallback) (common.Hash, int, error) {
+//
+//	func (t *ZkTrie) Commit(LeafCallback) (common.Hash, int, error) {
+//		// in current implmentation, every update of trie already writes into database
+//		// so Commmit does nothing
+//		return t.Hash(), 0, nil
+//	}
+func (t *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
 	// in current implmentation, every update of trie already writes into database
 	// so Commmit does nothing
-	return t.Hash(), 0, nil
+	return t.Hash(), nil, nil
 }
 
 // Hash returns the root hash of SecureBinaryTrie. It does not write to the

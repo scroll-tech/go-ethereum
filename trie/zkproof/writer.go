@@ -381,7 +381,7 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 
 	var proof ProofList
 	s_key, _ := zkt.ToSecureKeyBytes(addr.Bytes())
-	if err := w.tracingZktrie.Prove(s_key.Bytes(), 0, &proof); err != nil {
+	if err := w.tracingZktrie.Prove(s_key.Bytes(), &proof); err != nil {
 		return nil, fmt.Errorf("prove BEFORE state fail: %s", err)
 	}
 
@@ -425,7 +425,7 @@ func (w *zktrieProofWriter) traceAccountUpdate(addr common.Address, updateAccDat
 	} // notice if both before/after is nil, we do not touch zktrie
 
 	proof = ProofList{}
-	if err := w.tracingZktrie.Prove(s_key.Bytes(), 0, &proof); err != nil {
+	if err := w.tracingZktrie.Prove(s_key.Bytes(), &proof); err != nil {
 		return nil, fmt.Errorf("prove AFTER state fail: %s", err)
 	}
 
@@ -479,7 +479,7 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 
 	var storageBeforeProof, storageAfterProof ProofList
 	s_key, _ := zkt.ToSecureKeyBytes(storeKey.Bytes())
-	if err := trie.Prove(s_key.Bytes(), 0, &storageBeforeProof); err != nil {
+	if err := trie.Prove(s_key.Bytes(), &storageBeforeProof); err != nil {
 		return nil, fmt.Errorf("prove BEFORE storage state fail: %s", err)
 	}
 
@@ -502,7 +502,7 @@ func (w *zktrieProofWriter) traceStorageUpdate(addr common.Address, key, value [
 		}
 	}
 
-	if err := trie.Prove(s_key.Bytes(), 0, &storageAfterProof); err != nil {
+	if err := trie.Prove(s_key.Bytes(), &storageAfterProof); err != nil {
 		return nil, fmt.Errorf("prove AFTER storage state fail: %s", err)
 	}
 	decodeProofForMPTPath(storageAfterProof, statePath[1])

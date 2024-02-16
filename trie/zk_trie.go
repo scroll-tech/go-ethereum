@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/poseidon"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie/trienode"
 )
 
@@ -70,6 +71,30 @@ func (t *ZkTrie) Get(key []byte) []byte {
 	return res
 }
 
+func (t *ZkTrie) GetAccount(address common.Address) (*types.StateAccount, error) {
+	key := address.Bytes()
+	sanityCheckByte32Key(key)
+	res, err := t.TryGet(key)
+	if res == nil || err != nil {
+		return nil, err
+	}
+	return types.UnmarshalStateAccount(res)
+}
+
+func (t *ZkTrie) GetStorage(_ common.Address, key []byte) ([]byte, error) {
+	sanityCheckByte32Key(key)
+	enc, err := t.TryGet(key)
+	if err != nil || len(enc) == 0 {
+		return nil, err
+	}
+	_, content, _, err := rlp.Split(enc)
+	return content, err
+}
+
+func (t *ZkTrie) UpdateAccount(address common.Address, acc *types.StateAccount) error {
+	return t.TryUpdateAccount(address.Bytes(), acc)
+}
+
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *ZkTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
@@ -97,12 +122,32 @@ func (t *ZkTrie) TryUpdate(key, value []byte) error {
 	return t.ZkTrie.TryUpdate(key, 1, []zkt.Byte32{*zkt.NewByte32FromBytes(value)})
 }
 
+func (t *ZkTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
+	return nil
+}
+
+func (t *ZkTrie) UpdateStorage(_ common.Address, key, value []byte) error {
+	v, _ := rlp.EncodeToBytes(value)
+	return t.TryUpdate(key, v)
+}
+
 // Delete removes any existing value for key from the trie.
 func (t *ZkTrie) Delete(key []byte) {
 	sanityCheckByte32Key(key)
 	if err := t.TryDelete(key); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
+}
+
+func (t *ZkTrie) DeleteAccount(address common.Address) error {
+	key := address.Bytes()
+	sanityCheckByte32Key(key)
+	return t.TryDelete(key)
+}
+
+func (t *ZkTrie) DeleteStorage(_ common.Address, key []byte) error {
+	sanityCheckByte32Key(key)
+	return t.TryDelete(key)
 }
 
 // GetKey returns the preimage of a hashed key that was
@@ -151,7 +196,7 @@ func (t *ZkTrie) Copy() *ZkTrie {
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
 // starts at the key after the given start key.
-func (t *ZkTrie) NodeIterator(start []byte) NodeIterator {
+func (t *ZkTrie) NodeIterator(start []byte) (NodeIterator, error) {
 	/// FIXME
 	panic("not implemented")
 }
@@ -180,7 +225,9 @@ func (t *ZkTrie) NodeIterator(start []byte) NodeIterator {
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+// func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+func (t *ZkTrie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
+	fromLevel := uint(0)
 	err := t.ZkTrie.Prove(key, fromLevel, func(n *zktrie.Node) error {
 		nodeHash, err := n.NodeHash()
 		if err != nil {

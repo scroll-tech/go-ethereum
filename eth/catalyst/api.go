@@ -141,7 +141,7 @@ func (api *consensusAPI) AssembleBlock(params assembleBlockParams) (*executableD
 		Extra:      []byte{},
 		Time:       params.Timestamp,
 	}
-	if config := api.eth.BlockChain().Config(); config.IsLondon(header.Number) {
+	if config := api.eth.BlockChain().Config(); config.IsBanach(header.Number) {
 		header.BaseFee = misc.CalcBaseFee(config, parent.Header())
 	}
 	err = api.eth.Engine().Prepare(bc, header)
@@ -267,7 +267,7 @@ func insertBlockParamsToBlock(config *chainParams.ChainConfig, parent *types.Hea
 		GasUsed:     params.GasUsed,
 		Time:        params.Timestamp,
 	}
-	if config.IsLondon(number) {
+	if config.IsBanach(number) {
 		header.BaseFee = misc.CalcBaseFee(config, parent)
 	}
 	block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)

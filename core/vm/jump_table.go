@@ -69,6 +69,7 @@ type JumpTable [256]*operation
 // contantinople, istanbul, petersburg, berlin, london, shanghai, and banach instructions.
 func newBanachInstructionSet() JumpTable {
 	instructionSet := newShanghaiInstructionSet()
+	enable3198(&instructionSet) // Base fee opcode https://eips.ethereum.org/EIPS/eip-3198
 	return instructionSet
 }
 

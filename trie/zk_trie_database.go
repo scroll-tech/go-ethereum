@@ -25,7 +25,9 @@ type ZktrieDatabase struct {
 }
 
 func NewZktrieDatabase(diskdb ethdb.Database) *ZktrieDatabase {
-	return &ZktrieDatabase{db: NewDatabase(diskdb, nil), prefix: []byte{}}
+	db := NewDatabase(diskdb, nil)
+	db.config.IsUsingZktrie = true
+	return &ZktrieDatabase{db: db, prefix: []byte{}}
 }
 
 // adhoc wrapper...

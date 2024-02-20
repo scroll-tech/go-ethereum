@@ -268,7 +268,11 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 		cacheConfig = defaultCacheConfig
 	}
 	// Open trie database with provided config
-	triedb := trie.NewDatabase(db, cacheConfig.triedbConfig())
+	triedbConfig := cacheConfig.triedbConfig()
+	if genesis != nil && genesis.Config != nil && genesis.Config.Scroll.ZktrieEnabled() {
+		triedbConfig.IsUsingZktrie = true
+	}
+	triedb := trie.NewDatabase(db, triedbConfig)
 
 	// Setup the genesis block, commit the provided genesis specification
 	// to database if the genesis block is not present yet, or load the
@@ -284,6 +288,12 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 	}
 	log.Info(strings.Repeat("-", 153))
 	log.Info("")
+
+	// override snapshot setting
+	if chainConfig.Scroll.ZktrieEnabled() && cacheConfig.SnapshotLimit > 0 {
+		log.Warn("Snapshot has been disabled by zktrie")
+		cacheConfig.SnapshotLimit = 0
+	}
 
 	if chainConfig.Scroll.FeeVaultEnabled() {
 		log.Warn("Using fee vault address", "FeeVaultAddress", *chainConfig.Scroll.FeeVaultAddress)

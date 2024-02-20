@@ -124,7 +124,13 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 }
 
 func (db *Database) IsUsingZktrie() bool {
+	// config must not be nil
 	return db.config.IsUsingZktrie
+}
+
+func (db *Database) SetIsUsingZktrie(isUsingZktrie bool) {
+	// config must not be nil
+	db.config.IsUsingZktrie = isUsingZktrie
 }
 
 // Reader returns a reader for accessing all trie nodes with provided state root.

@@ -124,7 +124,11 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 func (ga *GenesisAlloc) hash(isUsingZktrie bool) (common.Hash, error) {
 	// Create an ephemeral in-memory database for computing hash,
 	// all the derived states will be discarded to not pollute disk.
-	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &trie.Config{IsUsingZktrie: isUsingZktrie})
+	trieConfig := trie.HashDefaults
+	if isUsingZktrie {
+		trieConfig = trie.HashDefaultsWithZktrie
+	}
+	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), trieConfig)
 	statedb, err := state.New(types.EmptyRootHash, db, nil)
 	if err != nil {
 		return common.Hash{}, err

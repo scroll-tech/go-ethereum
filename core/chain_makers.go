@@ -349,7 +349,11 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		return nil, nil
 	}
 	// Forcibly use hash-based state scheme for retaining all nodes in disk.
-	triedb := trie.NewDatabase(db, trie.HashDefaults)
+	trieConfig := trie.HashDefaults
+	if config.Scroll.ZktrieEnabled() {
+		trieConfig = trie.HashDefaultsWithZktrie
+	}
+	triedb := trie.NewDatabase(db, trieConfig)
 	defer triedb.Close()
 
 	for i := 0; i < n; i++ {

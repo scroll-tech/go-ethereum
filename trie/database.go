@@ -46,6 +46,19 @@ var HashDefaults = &Config{
 	HashDB:    hashdb.Defaults,
 }
 
+// HashDefaultsWithZktrie represents a config based on HashDefaults but with zktrie enabled.
+var HashDefaultsWithZktrie = &Config{
+	Preimages:     false,
+	HashDB:        hashdb.Defaults,
+	IsUsingZktrie: true,
+}
+
+// HashDefaultsWithPreimages represents a config based on HashDefaults but with Preimages enabled.
+var HashDefaultsWithPreimages = &Config{
+	Preimages: true,
+	HashDB:    hashdb.Defaults,
+}
+
 // backend defines the methods needed to access/update trie nodes in different
 // state scheme.
 type backend interface {

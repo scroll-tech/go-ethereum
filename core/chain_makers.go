@@ -384,8 +384,7 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 	if err != nil {
 		panic(err)
 	}
-	// isUsingZktrie := false
-	blocks, receipts := GenerateChain(genesis.Config, genesis.ToBlock(triedb.IsUsingZktrie()), engine, db, n, gen)
+	blocks, receipts := GenerateChain(genesis.Config, genesis.ToBlock(), engine, db, n, gen)
 	return db, blocks, receipts
 }
 

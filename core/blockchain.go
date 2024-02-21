@@ -149,8 +149,8 @@ type CacheConfig struct {
 }
 
 // triedbConfig derives the configures for trie database.
-func (c *CacheConfig) triedbConfig() *trie.Config {
-	config := &trie.Config{Preimages: c.Preimages}
+func (c *CacheConfig) triedbConfig(isUsingZktrie bool) *trie.Config {
+	config := &trie.Config{Preimages: c.Preimages, IsUsingZktrie: isUsingZktrie}
 	if c.StateScheme == rawdb.HashScheme {
 		config.HashDB = &hashdb.Config{
 			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
@@ -268,9 +268,9 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 		cacheConfig = defaultCacheConfig
 	}
 	// Open trie database with provided config
-	triedbConfig := cacheConfig.triedbConfig()
+	triedbConfig := cacheConfig.triedbConfig(false)
 	if genesis != nil && genesis.Config != nil && genesis.Config.Scroll.ZktrieEnabled() {
-		triedbConfig.IsUsingZktrie = true
+		cacheConfig.triedbConfig(true)
 	}
 	triedb := trie.NewDatabase(db, triedbConfig)
 

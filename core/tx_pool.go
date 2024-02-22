@@ -664,8 +664,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
 	}
-	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.
-	if pool.chainconfig.Scroll.FeeVaultEnabled() {
+	// 2. If FeeVault is enabled and l1Config is exist, perform an additional check for L1 data fees.
+	if pool.chainconfig.Scroll.L1Config != nil && pool.chainconfig.Scroll.FeeVaultEnabled() {
 		// Get L1 data fee in current state
 		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState)
 		if err != nil {

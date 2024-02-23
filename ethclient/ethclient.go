@@ -343,10 +343,29 @@ func (ec *Client) GetBlockTraceByNumber(ctx context.Context, number *big.Int) (*
 	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", toBlockNumArg(number))
 }
 
-// GetTxBlockTraceOnTopOfBlockHash returns the BlockTrace given the tx and block hash.
+// GetTxBlockTraceOnTopOfBlock returns the BlockTrace given the tx and block.
 func (ec *Client) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNumberOrHash rpc.BlockNumberOrHash, config *tracers.TraceConfig) (*types.BlockTrace, error) {
 	blockTrace := &types.BlockTrace{}
 	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getTxBlockTraceOnTopOfBlock", tx, blockNumberOrHash, config)
+}
+
+// GetNumSkippedTransactions returns the ...
+func (ec *Client) GetNumSkippedTransactions(ctx context.Context) (uint, error) {
+	var num hexutil.Uint
+	return uint(num), ec.c.CallContext(ctx, &num, "scroll_getNumSkippedTransactions")
+}
+
+// GetSkippedTransactionHashes returns the BlockTrace given the tx and block.
+func (ec *Client) GetSkippedTransactionHashes(ctx context.Context, from uint64, to uint64) (*types.BlockTrace, error) {
+	// TODO: FIXME
+	blockTrace := &types.BlockTrace{}
+	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getSkippedTransactionHashes", from, to)
+}
+
+// GetSkippedTransaction returns the BlockTrace given the tx and block.
+func (ec *Client) GetSkippedTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, error) {
+	tx := &types.Transaction{}
+	return tx, ec.c.CallContext(ctx, &tx, "scroll_getSkippedTransaction", txHash)
 }
 
 type rpcRowConsumption struct {

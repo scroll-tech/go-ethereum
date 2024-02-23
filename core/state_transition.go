@@ -406,7 +406,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 	effectiveTip := st.gasPrice
 
-	if rules.IsBanach {
+	// only burn the base fee if the fee vault is not enabled
+	if rules.IsBanach && !st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
 	}
 

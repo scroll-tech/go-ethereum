@@ -3171,7 +3171,10 @@ func TestFeeVault(t *testing.T) {
 
 	// Ensure that the fee vault received all tx fees
 	actual = state.GetBalance(*params.TestChainConfig.Scroll.FeeVaultAddress)
-	expected = new(big.Int).SetUint64(block.GasUsed() * block.Transactions()[0].GasTipCap().Uint64())
+
+	effectiveGasPrice := new(big.Int).Add(block.BaseFee(), block.Transactions()[0].GasTipCap())
+	gasUsed := new(big.Int).SetUint64(block.GasUsed())
+	expected = new(big.Int).Mul(gasUsed, effectiveGasPrice)
 
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("fee vault balance incorrect: expected %d, got %d", expected, actual)

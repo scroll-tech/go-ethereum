@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/eth/tracers"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -340,6 +341,12 @@ func (ec *Client) GetBlockTraceByHash(ctx context.Context, blockHash common.Hash
 func (ec *Client) GetBlockTraceByNumber(ctx context.Context, number *big.Int) (*types.BlockTrace, error) {
 	blockTrace := &types.BlockTrace{}
 	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", toBlockNumArg(number))
+}
+
+// GetTxBlockTraceOnTopOfBlockHash returns the BlockTrace given the tx and block hash.
+func (ec *Client) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNumberOrHash rpc.BlockNumberOrHash, config *tracers.TraceConfig) (*types.BlockTrace, error) {
+	blockTrace := &types.BlockTrace{}
+	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getTxBlockTraceOnTopOfBlock", tx, blockNumberOrHash, config)
 }
 
 type rpcRowConsumption struct {

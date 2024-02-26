@@ -30,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -89,7 +90,13 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 		bf.results.baseFee = new(big.Int)
 	}
 	if chainconfig.IsBanach(big.NewInt(int64(bf.blockNumber + 1))) {
-		bf.results.nextBaseFee = misc.CalcBaseFee(chainconfig, bf.header)
+		state, err := oracle.backend.StateAt(bf.header.Root)
+		if err != nil || state == nil {
+			log.Error("State not found", "number", bf.header.Number, "hash", bf.header.Hash().Hex(), "state", state, "err", err)
+			return
+		}
+		l1BaseFee := fees.GetL1BaseFee(state)
+		bf.results.nextBaseFee = misc.CalcBaseFee(chainconfig, bf.header, l1BaseFee)
 	} else {
 		bf.results.nextBaseFee = new(big.Int)
 	}

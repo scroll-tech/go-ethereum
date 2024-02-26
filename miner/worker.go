@@ -39,6 +39,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
@@ -1322,10 +1323,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		Extra:      w.extra,
 		Time:       uint64(timestamp),
 	}
-	// Set baseFee if we are on an EIP-1559 chain
-	if w.chainConfig.IsBanach(header.Number) {
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
-	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
 		if w.coinbase == (common.Address{}) {
@@ -1333,6 +1330,16 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 		header.Coinbase = w.coinbase
+	}
+	// Set baseFee if we are on an EIP-1559 chain
+	if w.chainConfig.IsBanach(header.Number) {
+		state, err := w.chain.StateAt(parent.Root())
+		if err != nil {
+			log.Error("Failed to create mining context", "err", err)
+			return
+		}
+		parentL1BaseFee := fees.GetL1BaseFee(state)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
 	}
 	if err := w.engine.Prepare(w.chain, header); err != nil {
 		log.Error("Failed to prepare header for mining", "err", err)

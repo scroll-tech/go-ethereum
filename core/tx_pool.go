@@ -1232,7 +1232,8 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsBanach(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
-			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead)
+			l1BaseFee := fees.GetL1BaseFee(pool.currentState)
+			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead, l1BaseFee)
 			pool.priced.SetBaseFee(pendingBaseFee)
 		}
 		// Update all accounts to the latest known pending nonce

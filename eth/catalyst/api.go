@@ -32,6 +32,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/node"
 	chainParams "github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rpc"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
@@ -142,7 +143,9 @@ func (api *consensusAPI) AssembleBlock(params assembleBlockParams) (*executableD
 		Time:       params.Timestamp,
 	}
 	if config := api.eth.BlockChain().Config(); config.IsBanach(header.Number) {
-		header.BaseFee = misc.CalcBaseFee(config, parent.Header())
+		stateDb, _ := api.eth.BlockChain().StateAt(parent.Root())
+		parentL1BaseFee := fees.GetL1BaseFee(stateDb)
+		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee)
 	}
 	err = api.eth.Engine().Prepare(bc, header)
 	if err != nil {
@@ -245,7 +248,7 @@ func decodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
 	return txs, nil
 }
 
-func insertBlockParamsToBlock(config *chainParams.ChainConfig, parent *types.Header, params executableData) (*types.Block, error) {
+func insertBlockParamsToBlock(config *chainParams.ChainConfig, parent *types.Header, params executableData, parentL1BaseFee *big.Int) (*types.Block, error) {
 	txs, err := decodeTransactions(params.Transactions)
 	if err != nil {
 		return nil, err
@@ -268,7 +271,7 @@ func insertBlockParamsToBlock(config *chainParams.ChainConfig, parent *types.Hea
 		Time:        params.Timestamp,
 	}
 	if config.IsBanach(number) {
-		header.BaseFee = misc.CalcBaseFee(config, parent)
+		header.BaseFee = misc.CalcBaseFee(config, parent, parentL1BaseFee)
 	}
 	block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
 	return block, nil
@@ -282,7 +285,9 @@ func (api *consensusAPI) NewBlock(params executableData) (*newBlockResponse, err
 	if parent == nil {
 		return &newBlockResponse{false}, fmt.Errorf("could not find parent %x", params.ParentHash)
 	}
-	block, err := insertBlockParamsToBlock(api.eth.BlockChain().Config(), parent.Header(), params)
+	stateDb, _ := api.eth.BlockChain().StateAt(parent.Root())
+	parentL1BaseFee := fees.GetL1BaseFee(stateDb)
+	block, err := insertBlockParamsToBlock(api.eth.BlockChain().Config(), parent.Header(), params, parentL1BaseFee)
 	if err != nil {
 		return nil, err
 	}

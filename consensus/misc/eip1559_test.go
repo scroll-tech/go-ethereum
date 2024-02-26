@@ -109,15 +109,18 @@ func TestBlockGasLimits(t *testing.T) {
 
 // TestCalcBaseFee assumes all blocks are 1559-blocks
 func TestCalcBaseFee(t *testing.T) {
+	parentL1BaseFee := big.NewInt(1000000000) // 1 gwei
+	expectedL2BaseFee := int64(164000000)
+
 	tests := []struct {
 		parentBaseFee   int64
 		parentGasLimit  uint64
 		parentGasUsed   uint64
 		expectedBaseFee int64
 	}{
-		{params.InitialBaseFee, 20000000, 10000000, params.InitialBaseFee}, // usage == target
-		{params.InitialBaseFee, 20000000, 9000000, 987500000},              // usage below target
-		{params.InitialBaseFee, 20000000, 11000000, 1012500000},            // usage above target
+		{params.InitialBaseFee, 20000000, 10000000, expectedL2BaseFee}, // usage == target
+		{params.InitialBaseFee, 20000000, 9000000, expectedL2BaseFee},  // usage below target
+		{params.InitialBaseFee, 20000000, 11000000, expectedL2BaseFee}, // usage above target
 	}
 	for i, test := range tests {
 		parent := &types.Header{
@@ -126,7 +129,8 @@ func TestCalcBaseFee(t *testing.T) {
 			GasUsed:  test.parentGasUsed,
 			BaseFee:  big.NewInt(test.parentBaseFee),
 		}
-		if have, want := CalcBaseFee(config(), parent), big.NewInt(test.expectedBaseFee); have.Cmp(want) != 0 {
+
+		if have, want := CalcBaseFee(config(), parent, parentL1BaseFee), big.NewInt(test.expectedBaseFee); have.Cmp(want) != 0 {
 			t.Errorf("test %d: have %d  want %d, ", i, have, want)
 		}
 	}

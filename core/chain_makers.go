@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
 
 // BlockGen creates blocks for testing.
@@ -276,7 +277,8 @@ func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.S
 		Time:     time,
 	}
 	if chain.Config().IsBanach(header.Number) {
-		header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header())
+		parentL1BaseFee := fees.GetL1BaseFee(state)
+		header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header(), parentL1BaseFee)
 	}
 	return header
 }

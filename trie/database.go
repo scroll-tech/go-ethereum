@@ -124,6 +124,8 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 		config:    config,
 		diskdb:    diskdb,
 		preimages: preimages,
+		// scroll-related
+		rawDirties: make(KvMap),
 	}
 	if config.HashDB != nil && config.PathDB != nil {
 		log.Crit("Both 'hash' and 'path' mode are configured")
@@ -176,6 +178,25 @@ func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, n
 // to disk. As a side effect, all pre-images accumulated up to this point are
 // also written.
 func (db *Database) Commit(root common.Hash, report bool) error {
+	batch := db.diskdb.NewBatch()
+
+	db.GetLock().Lock()
+	for _, v := range db.rawDirties {
+		batch.Put(v.K, v.V)
+	}
+	for k := range db.rawDirties {
+		delete(db.rawDirties, k)
+	}
+	db.GetLock().Unlock()
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	batch.Reset()
+
+	if (root == common.Hash{}) {
+		return nil
+	}
+
 	if db.preimages != nil {
 		db.preimages.commit(true)
 	}

@@ -254,7 +254,6 @@ func TestZkTrieDelete(t *testing.T) {
 	trie1.Commit(nil)
 
 	for i := count - 1; i >= 0; i-- {
-
 		binary.LittleEndian.PutUint64(key, uint64(i))
 		v, err := trie1.TryGet(key)
 		assert.NoError(t, err)

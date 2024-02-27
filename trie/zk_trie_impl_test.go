@@ -40,7 +40,6 @@ func newZkTrieImplWithRoot(storage *ZktrieDatabase, root *zkt.Hash, maxLevels in
 // AddWord
 // Deprecated: Add a Bytes32 kv to ZkTrieImpl, only for testing
 func (mt *zkTrieImplTestWrapper) AddWord(kPreimage, vPreimage *zkt.Byte32) error {
-
 	k, err := kPreimage.Hash()
 	if err != nil {
 		return err

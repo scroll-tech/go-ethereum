@@ -13,8 +13,8 @@ import (
 	zkt "github.com/scroll-tech/zktrie/types"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 )
 
 // we do not need zktrie impl anymore, only made a wrapper for adapting testing
@@ -105,7 +105,7 @@ type Fatalable interface {
 }
 
 func newTestingMerkle(f Fatalable, numLevels int) *zkTrieImplTestWrapper {
-	mt, err := newZkTrieImpl(NewZktrieDatabase((memorydb.New())), numLevels)
+	mt, err := newZkTrieImpl(NewZktrieDatabase(rawdb.NewMemoryDatabase()), numLevels)
 	if err != nil {
 		f.Fatal(err)
 		return nil

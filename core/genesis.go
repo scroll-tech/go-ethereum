@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/common/math"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -316,7 +317,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
-			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
+			head.BaseFee = misc.CalcBaseFee(g.Config, nil, big.NewInt(0))
 		}
 	}
 	statedb.Commit(false)

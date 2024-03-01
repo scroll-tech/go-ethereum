@@ -107,6 +107,7 @@ func TestBlockGasLimits(t *testing.T) {
 	}
 }
 
+// TODO: update these tests
 // TestCalcBaseFee assumes all blocks are 1559-blocks
 func TestCalcBaseFee(t *testing.T) {
 	parentL1BaseFee := big.NewInt(1000000000) // 1 gwei

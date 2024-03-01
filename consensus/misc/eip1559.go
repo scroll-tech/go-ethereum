@@ -24,6 +24,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
+// Protocol-enforced maximum L2 base fee.
+// We would only go above this if L1 base fee hits 700 Gwei.
+const MaximumL2BaseFee = 10000000000
+
 // VerifyEip1559Header verifies some header attributes which were changed in EIP-1559,
 // - gas limit check
 // - basefee check
@@ -36,10 +40,12 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 	if header.BaseFee == nil {
 		return fmt.Errorf("header is missing baseFee")
 	}
-	// note: we do not verify base fee, the sequencer has the
-	// right to set any base fee, and it is not subject to
-	// L2 consensus or zk verification.
-	// TODO: add some reasonable bounds on base fee
+	// note: we do not verify L2 base fee, the sequencer has the
+	// right to set any base fee below the maximum. L2 base fee
+	// is not subject to L2 consensus or zk verification.
+	if header.BaseFee.Cmp(big.NewInt(MaximumL2BaseFee)) > 0 {
+		return fmt.Errorf("invalid baseFee: have %s, maximum %d", header.BaseFee, MaximumL2BaseFee)
+	}
 	return nil
 }
 
@@ -57,5 +63,10 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 	baseFee.Add(baseFee, l2SequencerFee)
 	baseFee.Add(baseFee, provingFee)
 	baseFee.Add(baseFee, verificationFee)
+
+	if baseFee.Cmp(big.NewInt(MaximumL2BaseFee)) > 0 {
+		baseFee = big.NewInt(MaximumL2BaseFee)
+	}
+
 	return baseFee
 }

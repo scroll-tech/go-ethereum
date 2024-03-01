@@ -37,7 +37,7 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 		return fmt.Errorf("header is missing baseFee")
 	}
 	// note: we do not verify base fee, the sequencer has the
-	// right to set any base fee, any it is not subject to
+	// right to set any base fee, and it is not subject to
 	// L2 consensus or zk verification.
 	// TODO: add some reasonable bounds on base fee
 	return nil

@@ -1323,14 +1323,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		Extra:      w.extra,
 		Time:       uint64(timestamp),
 	}
-	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
-	if w.isRunning() {
-		if w.coinbase == (common.Address{}) {
-			log.Error("Refusing to mine without etherbase")
-			return
-		}
-		header.Coinbase = w.coinbase
-	}
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsBanach(header.Number) {
 		state, err := w.chain.StateAt(parent.Root())
@@ -1340,6 +1332,14 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 		parentL1BaseFee := fees.GetL1BaseFee(state)
 		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+	}
+	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
+	if w.isRunning() {
+		if w.coinbase == (common.Address{}) {
+			log.Error("Refusing to mine without etherbase")
+			return
+		}
+		header.Coinbase = w.coinbase
 	}
 	if err := w.engine.Prepare(w.chain, header); err != nil {
 		log.Error("Failed to prepare header for mining", "err", err)

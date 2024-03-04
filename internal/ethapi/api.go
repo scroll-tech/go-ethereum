@@ -1694,7 +1694,6 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 			baseFee = big.NewInt(0)
 		}
 
-		// TODO
 		gasPrice := new(big.Int).Add(baseFee, tx.EffectiveGasTipValue(header.BaseFee))
 		fields["effectiveGasPrice"] = hexutil.Uint64(gasPrice.Uint64())
 	}

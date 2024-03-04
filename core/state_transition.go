@@ -287,8 +287,9 @@ func (st *StateTransition) preCheck() error {
 				st.msg.From().Hex(), codeHash)
 		}
 	}
-	// Make sure that transaction gasFeeCap is greater than the baseFee (post Banach)
-	if st.evm.ChainConfig().IsBanach(st.evm.Context.BlockNumber) {
+	// Make sure that transaction gasFeeCap is greater than the baseFee (post London)
+	// Note: Logically, this should be `IsBanach`, but we keep `IsLondon` to ensure backward compatibility.
+	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 		if !st.evm.Config.NoBaseFee || st.gasFeeCap.BitLen() > 0 || st.gasTipCap.BitLen() > 0 {
 			if l := st.gasFeeCap.BitLen(); l > 256 {

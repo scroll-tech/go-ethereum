@@ -267,6 +267,12 @@ func compareStateObjects(so0, so1 *stateObject, t *testing.T) {
 	if !bytes.Equal(so0.KeccakCodeHash(), so1.KeccakCodeHash()) {
 		t.Fatalf("CodeHash mismatch: have %v, want %v", so0.KeccakCodeHash(), so1.KeccakCodeHash())
 	}
+	if !bytes.Equal(so0.PoseidonCodeHash(), so1.PoseidonCodeHash()) {
+		t.Fatalf("PoseidonCodeHash mismatch: have %v, want %v", so0.PoseidonCodeHash(), so1.PoseidonCodeHash())
+	}
+	if so0.CodeSize() != so1.CodeSize() {
+		t.Fatalf("CodeSize mismatch: have %v, want %v", so0.CodeSize(), so1.CodeSize())
+	}
 	if !bytes.Equal(so0.code, so1.code) {
 		t.Fatalf("Code mismatch: have %v, want %v", so0.code, so1.code)
 	}

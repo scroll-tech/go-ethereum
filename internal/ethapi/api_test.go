@@ -403,7 +403,8 @@ func allBlobTxs(addr common.Address, config *params.ChainConfig) []txData {
                 "v": "0x0",
                 "r": "0x618be8908e0e5320f8f3b48042a079fe5a335ebd4ed1422a7d2207cd45d872bc",
                 "s": "0x27b2bc6c80e849a8e8b764d4549d8c2efac3441e73cf37054eb0a9b9f8e89b27",
-                "yParity": "0x0"
+                "yParity": "0x0",
+                "sender":"0x0000000000000000000000000000000000000000"
             }`,
 		},
 	}

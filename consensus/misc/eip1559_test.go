@@ -20,7 +20,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -107,31 +106,21 @@ func TestBlockGasLimits(t *testing.T) {
 	}
 }
 
-// TODO: update these tests
 // TestCalcBaseFee assumes all blocks are 1559-blocks
-func TestCalcBaseFee(t *testing.T) {
-	parentL1BaseFee := big.NewInt(1000000000) // 1 gwei
-	expectedL2BaseFee := int64(164000000)
-
+func TestCalcBaseFee2(t *testing.T) {
 	tests := []struct {
-		parentBaseFee   int64
-		parentGasLimit  uint64
-		parentGasUsed   uint64
-		expectedBaseFee int64
+		parentL1BaseFee   int64
+		expectedL2BaseFee int64
 	}{
-		{params.InitialBaseFee, 20000000, 10000000, expectedL2BaseFee}, // usage == target
-		{params.InitialBaseFee, 20000000, 9000000, expectedL2BaseFee},  // usage below target
-		{params.InitialBaseFee, 20000000, 11000000, expectedL2BaseFee}, // usage above target
+		{0, 150000000},
+		{1000000000, 164000000},
+		{2000000000, 178000000},
+		{100000000000, 1550000000},
+		{111111111111, 1705555555},
+		{1000000000000, 10000000000}, // cap at max L2 base fee
 	}
 	for i, test := range tests {
-		parent := &types.Header{
-			Number:   common.Big32,
-			GasLimit: test.parentGasLimit,
-			GasUsed:  test.parentGasUsed,
-			BaseFee:  big.NewInt(test.parentBaseFee),
-		}
-
-		if have, want := CalcBaseFee(config(), parent, parentL1BaseFee), big.NewInt(test.expectedBaseFee); have.Cmp(want) != 0 {
+		if have, want := CalcBaseFee(config(), nil, big.NewInt(test.parentL1BaseFee)), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
 			t.Errorf("test %d: have %d  want %d, ", i, have, want)
 		}
 	}

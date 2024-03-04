@@ -107,7 +107,7 @@ func TestBlockGasLimits(t *testing.T) {
 }
 
 // TestCalcBaseFee assumes all blocks are 1559-blocks
-func TestCalcBaseFee2(t *testing.T) {
+func TestCalcBaseFee(t *testing.T) {
 	tests := []struct {
 		parentL1BaseFee   int64
 		expectedL2BaseFee int64

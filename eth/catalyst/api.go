@@ -143,7 +143,10 @@ func (api *consensusAPI) AssembleBlock(params assembleBlockParams) (*executableD
 		Time:       params.Timestamp,
 	}
 	if config := api.eth.BlockChain().Config(); config.IsBanach(header.Number) {
-		stateDb, _ := api.eth.BlockChain().StateAt(parent.Root())
+		stateDb, err := api.eth.BlockChain().StateAt(parent.Root())
+		if err != nil {
+			return nil, err
+		}
 		parentL1BaseFee := fees.GetL1BaseFee(stateDb)
 		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee)
 	}
@@ -285,7 +288,10 @@ func (api *consensusAPI) NewBlock(params executableData) (*newBlockResponse, err
 	if parent == nil {
 		return &newBlockResponse{false}, fmt.Errorf("could not find parent %x", params.ParentHash)
 	}
-	stateDb, _ := api.eth.BlockChain().StateAt(parent.Root())
+	stateDb, err := api.eth.BlockChain().StateAt(parent.Root())
+	if err != nil {
+		return nil, err
+	}
 	parentL1BaseFee := fees.GetL1BaseFee(stateDb)
 	block, err := insertBlockParamsToBlock(api.eth.BlockChain().Config(), parent.Header(), params, parentL1BaseFee)
 	if err != nil {

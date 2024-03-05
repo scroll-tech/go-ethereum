@@ -139,7 +139,10 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 }
 
 func (db *Database) IsUsingZktrie() bool {
-	// config must not be nil
+	// compatible logic for light mode
+	if db == nil || db.config == nil {
+		return false
+	}
 	return db.config.IsUsingZktrie
 }
 

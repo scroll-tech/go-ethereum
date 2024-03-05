@@ -78,10 +78,10 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 	if args.GasPrice != nil && (args.MaxFeePerGas != nil || args.MaxPriorityFeePerGas != nil) {
 		return errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
-	// After london, default to 1559 unless gasPrice is set
+	// After banach, default to 1559 unless gasPrice is set
 	head := b.CurrentHeader()
 	// If user specifies both maxPriorityfee and maxFee, then we do not
-	// need to consult the chain for defaults. It's definitely a London tx.
+	// need to consult the chain for defaults. It's definitely a Banach tx.
 	if args.MaxPriorityFeePerGas == nil || args.MaxFeePerGas == nil {
 		// In this clause, user left some fields unspecified.
 		if b.ChainConfig().IsBanach(head.Number) && args.GasPrice == nil {
@@ -110,7 +110,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 			}
 		} else {
 			if args.MaxFeePerGas != nil || args.MaxPriorityFeePerGas != nil {
-				return errors.New("maxFeePerGas or maxPriorityFeePerGas specified but london is not active yet")
+				return errors.New("maxFeePerGas or maxPriorityFeePerGas specified but banach is not active yet")
 			}
 			if args.GasPrice == nil {
 				price, err := b.SuggestGasTipCap(ctx)

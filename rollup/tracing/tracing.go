@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
+	"github.com/ethereum/go-ethereum/eth/tracers/native"
 	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -299,7 +300,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		TxIndex:   index,
 		TxHash:    tx.Hash(),
 	}
-	callTracer, err := tracers.New("callTracer", &tracerContext)
+	callTracerConfig := native.CallTracerConfig{
+		OnlyTopCall: false,
+		WithLog:     true,
+	}
+	callTracer, err := native.NewCallTracerWithConfig(&tracerContext, callTracerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create callTracer: %w", err)
 	}

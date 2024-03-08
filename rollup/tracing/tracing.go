@@ -474,7 +474,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		Gas:            result.UsedGas,
 		Failed:         result.Failed(),
 		ReturnValue:    fmt.Sprintf("%x", returnVal),
-		StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
+		StructLogs:     logger.FormatLogs(structLogger.StructLogs()),
 		CallTrace:      callTrace,
 		PrestateTrace:  prestateTrace,
 	}

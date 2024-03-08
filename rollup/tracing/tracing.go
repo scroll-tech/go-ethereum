@@ -308,7 +308,8 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("failed to create callTracer: %w", err)
 	}
-	prestateTracer, err := tracers.New("prestateTracer", &tracerContext)
+	prestateTracerConfig := native.PrestateTracerConfig{DiffMode: false}
+	prestateTracer, err := native.NewPrestateTracerWithConfig(&tracerContext, prestateTracerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create prestateTracer: %w", err)
 	}

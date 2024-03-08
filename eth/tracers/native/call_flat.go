@@ -108,7 +108,7 @@ type flatCallResultMarshaling struct {
 // flatCallTracer reports call frame information of a tx in a flat format, i.e.
 // as opposed to the nested format of `callTracer`.
 type flatCallTracer struct {
-	tracer            *callTracer
+	tracer            *CallTracer
 	config            flatCallTracerConfig
 	ctx               *tracers.Context // Holds tracer context data
 	reason            error            // Textual reason for the interruption
@@ -135,7 +135,7 @@ func newFlatCallTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Trace
 	if err != nil {
 		return nil, err
 	}
-	t, ok := tracer.(*callTracer)
+	t, ok := tracer.(*CallTracer)
 	if !ok {
 		return nil, errors.New("internal error: embedded tracer has wrong type")
 	}

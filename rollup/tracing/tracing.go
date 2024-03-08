@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
-	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
+	"github.com/ethereum/go-ethereum/eth/tracers/native"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -299,15 +299,24 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		TxIndex:   index,
 		TxHash:    tx.Hash(),
 	}
-	callTracer, err := tracers.New("callTracer", &tracerContext)
+	callTracerConfig := native.CallTracerConfig{
+		OnlyTopCall: false,
+		WithLog:     true,
+	}
+	callTracer, err := native.NewCallTracerWithConfig(&tracerContext, callTracerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create callTracer: %w", err)
 	}
-	prestateTracer, err := tracers.New("prestateTracer", &tracerContext)
+	prestateTracerConfig := native.PrestateTracerConfig{DiffMode: false}
+	prestateTracer, err := native.NewPrestateTracerWithConfig(&tracerContext, prestateTracerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create prestateTracer: %w", err)
 	}
-	tracer := NewMuxTracer(structLogger, callTracer, prestateTracer)
+	tracer := &native.MuxTracer{}
+	tracer.Append("structLogger", structLogger)
+	tracer.Append("callTracer", callTracer)
+	tracer.Append("prestateTracer", prestateTracer)
+
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Tracer: tracer, NoBaseFee: true})
 

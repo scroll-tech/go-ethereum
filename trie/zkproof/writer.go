@@ -248,7 +248,7 @@ const (
 	// posSELFDESTRUCT = 2
 )
 
-func getAccountState(l *types.StructLogRes, pos int) *types.AccountWrapper {
+func getAccountState(l types.StructLogRes, pos int) *types.AccountWrapper {
 	if exData := l.ExtraData; exData == nil {
 		return nil
 	} else if len(exData.StateList) < pos {
@@ -590,7 +590,7 @@ func (w *zktrieProofWriter) HandleNewState(accountState *types.AccountWrapper) (
 	}
 }
 
-func handleLogs(od opOrderer, currentContract common.Address, logs []*types.StructLogRes) {
+func handleLogs(od opOrderer, currentContract common.Address, logs []types.StructLogRes) {
 	logStack := []int{0}
 	contractStack := map[int]common.Address{}
 	callEnterAddress := currentContract

@@ -66,7 +66,7 @@ type ExecutionResult struct {
 	PoseidonCodeHash *common.Hash `json:"poseidonCodeHash,omitempty"`
 	// If it is a contract call, the contract code is returned.
 	ByteCode      string          `json:"byteCode,omitempty"`
-	StructLogs    []*StructLogRes `json:"structLogs"`
+	StructLogs    []StructLogRes  `json:"structLogs"`
 	CallTrace     json.RawMessage `json:"callTrace"`
 	PrestateTrace json.RawMessage `json:"prestateTrace"`
 }

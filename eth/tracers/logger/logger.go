@@ -258,7 +258,7 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 		Gas:         l.usedGas,
 		Failed:      failed,
 		ReturnValue: returnVal,
-		StructLogs:  formatLogs(l.StructLogs()),
+		StructLogs:  FormatLogs(l.StructLogs()),
 		// L1DataFee:   (*hexutil.Big)(result.L1DataFee),
 	})
 }
@@ -445,8 +445,8 @@ type StructLogRes struct {
 	RefundCounter uint64             `json:"refund,omitempty"`
 }
 
-// formatLogs formats EVM returned structured logs for json output
-func formatLogs(logs []StructLog) []StructLogRes {
+// FormatLogs formats EVM returned structured logs for json output
+func FormatLogs(logs []StructLog) []StructLogRes {
 	formatted := make([]StructLogRes, len(logs))
 	for index, trace := range logs {
 		formatted[index] = StructLogRes{

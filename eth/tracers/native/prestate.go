@@ -73,6 +73,10 @@ type PrestateTracerConfig struct {
 	DiffMode bool `json:"diffMode"` // If true, this tracer will return state modifications
 }
 
+func NewPrestateTracerWithConfig(ctx *tracers.Context, config PrestateTracerConfig) (tracers.Tracer, error) {
+	return newPrestateTracerWithConfig(ctx, config)
+}
+
 func newPrestateTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, error) {
 	var config PrestateTracerConfig
 	if cfg != nil {
@@ -80,16 +84,10 @@ func newPrestateTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Trace
 			return nil, err
 		}
 	}
-	return &PrestateTracer{
-		pre:     state{},
-		post:    state{},
-		config:  config,
-		created: make(map[common.Address]bool),
-		deleted: make(map[common.Address]bool),
-	}, nil
+	return newPrestateTracerWithConfig(ctx, config)
 }
 
-func NewPrestateTracerWithConfig(ctx *tracers.Context, config PrestateTracerConfig) (tracers.Tracer, error) {
+func newPrestateTracerWithConfig(ctx *tracers.Context, config PrestateTracerConfig) (tracers.Tracer, error) {
 	return &PrestateTracer{
 		pre:     state{},
 		post:    state{},

@@ -112,6 +112,10 @@ type CallTracerConfig struct {
 	WithLog     bool `json:"withLog"`     // If true, call tracer will collect event logs
 }
 
+func NewCallTracerWithConfig(ctx *tracers.Context, config CallTracerConfig) (tracers.Tracer, error) {
+	return newCallTracerWithConfig(ctx, config)
+}
+
 // newCallTracer returns a native go tracer which tracks
 // call frames of a tx, and implements vm.EVMLogger.
 func newCallTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, error) {
@@ -121,12 +125,12 @@ func newCallTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, e
 			return nil, err
 		}
 	}
-	// First callframe contains tx context info
-	// and is populated on start and end.
-	return &CallTracer{callstack: make([]callFrame, 1), config: config}, nil
+	return newCallTracerWithConfig(ctx, config)
 }
 
-func NewCallTracerWithConfig(ctx *tracers.Context, config CallTracerConfig) (tracers.Tracer, error) {
+func newCallTracerWithConfig(ctx *tracers.Context, config CallTracerConfig) (tracers.Tracer, error) {
+	// First callframe contains tx context info
+	// and is populated on start and end.
 	return &CallTracer{callstack: make([]callFrame, 1), config: config}, nil
 }
 

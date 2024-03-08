@@ -144,6 +144,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 		&logger.Config{
 			EnableMemory:     false,
 			EnableReturnData: true,
+			Debug:            true,
 		},
 		core.NewEVMBlockContext(block.Header(), chainContext, chainConfig, nil),
 		*startL1QueueIndex,
@@ -308,7 +309,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 	tracer := NewMuxTracer(structLogger, callTracer, prestateTracer)
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
+	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Tracer: tracer, NoBaseFee: true})
 
 	state.SetTxContext(txctx.TxHash, txctx.TxIndex)
 

@@ -313,7 +313,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("failed to create prestateTracer: %w", err)
 	}
-	tracer := NewMuxTracer(structLogger, callTracer, prestateTracer)
+	tracer := &native.MuxTracer{}
+	tracer.Append("structLogger", structLogger)
+	tracer.Append("callTracer", callTracer)
+	tracer.Append("prestateTracer", prestateTracer)
+
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Tracer: tracer, NoBaseFee: true})
 

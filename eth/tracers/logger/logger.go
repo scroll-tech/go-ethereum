@@ -254,7 +254,7 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 	if failed && l.err != vm.ErrExecutionReverted {
 		returnVal = ""
 	}
-	return json.Marshal(&ExecutionResult{
+	return json.Marshal(&types.ExecutionResult{
 		Gas:         l.usedGas,
 		Failed:      failed,
 		ReturnValue: returnVal,
@@ -421,16 +421,6 @@ func (t *mdLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
 func (*mdLogger) CaptureTxStart(gasLimit uint64) {}
 
 func (*mdLogger) CaptureTxEnd(restGas uint64) {}
-
-// ExecutionResult groups all structured logs emitted by the EVM
-// while replaying a transaction in debug mode as well as transaction
-// execution status, the amount of gas used and the return value
-type ExecutionResult struct {
-	Gas         uint64               `json:"gas"`
-	Failed      bool                 `json:"failed"`
-	ReturnValue string               `json:"returnValue"`
-	StructLogs  []types.StructLogRes `json:"structLogs"`
-}
 
 // FormatLogs formats EVM returned structured logs for json output
 func FormatLogs(logs []StructLog) []types.StructLogRes {

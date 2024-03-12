@@ -429,22 +429,6 @@ type ExecutionResult struct {
 	StructLogs  []types.StructLogRes `json:"structLogs"`
 }
 
-// // StructLogRes stores a structured log emitted by the EVM while replaying a
-// // transaction in debug mode
-// type StructLogRes struct {
-// 	Pc            uint64             `json:"pc"`
-// 	Op            string             `json:"op"`
-// 	Gas           uint64             `json:"gas"`
-// 	GasCost       uint64             `json:"gasCost"`
-// 	Depth         int                `json:"depth"`
-// 	Error         string             `json:"error,omitempty"`
-// 	Stack         *[]string          `json:"stack,omitempty"`
-// 	ReturnData    string             `json:"returnData,omitempty"`
-// 	Memory        *[]string          `json:"memory,omitempty"`
-// 	Storage       *map[string]string `json:"storage,omitempty"`
-// 	RefundCounter uint64             `json:"refund,omitempty"`
-// }
-
 // FormatLogs formats EVM returned structured logs for json output
 func FormatLogs(logs []StructLog) []types.StructLogRes {
 	formatted := make([]types.StructLogRes, len(logs))

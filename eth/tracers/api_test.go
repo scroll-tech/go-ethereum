@@ -43,6 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rollup/fees"
+	"github.com/ethereum/go-ethereum/rollup/tracing"
 	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/exp/slices"
 )
@@ -213,7 +214,8 @@ func TestTraceCall(t *testing.T) {
 		b.AddTx(tx)
 	})
 	defer backend.teardown()
-	api := NewAPI(backend)
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	api := NewAPI(backend, scrollTracerWrapper)
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
 		call        ethapi.TransactionArgs
@@ -348,7 +350,8 @@ func TestTraceTransaction(t *testing.T) {
 		target = tx.Hash()
 	})
 	defer backend.chain.Stop()
-	api := NewAPI(backend)
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	api := NewAPI(backend, scrollTracerWrapper)
 	result, err := api.TraceTransaction(context.Background(), target, nil)
 	if err != nil {
 		t.Errorf("Failed to trace transaction %v", err)
@@ -398,7 +401,8 @@ func TestTraceBlock(t *testing.T) {
 		txHash = tx.Hash()
 	})
 	defer backend.chain.Stop()
-	api := NewAPI(backend)
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	api := NewAPI(backend, scrollTracerWrapper)
 
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
@@ -487,7 +491,8 @@ func TestTracingWithOverrides(t *testing.T) {
 		b.AddTx(tx)
 	})
 	defer backend.chain.Stop()
-	api := NewAPI(backend)
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	api := NewAPI(backend, scrollTracerWrapper)
 	randomAccounts := newAccounts(3)
 	type res struct {
 		Gas         int
@@ -851,7 +856,8 @@ func TestTraceChain(t *testing.T) {
 	})
 	backend.refHook = func() { ref.Add(1) }
 	backend.relHook = func() { rel.Add(1) }
-	api := NewAPI(backend)
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	api := NewAPI(backend, scrollTracerWrapper)
 
 	single := `{"txHash":"0x0000000000000000000000000000000000000000000000000000000000000000","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}`
 	var cases = []struct {

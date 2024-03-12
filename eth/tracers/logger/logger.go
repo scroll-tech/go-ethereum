@@ -401,6 +401,9 @@ func (t *mdLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope
 	}
 }
 
+func (t *mdLogger) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+}
+
 func (t *mdLogger) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {
 	fmt.Fprintf(t.out, "\nError: at pc=%d, op=%v: %v\n", pc, op, err)
 }

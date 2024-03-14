@@ -277,6 +277,10 @@ func (t *PrestateTracer) GetResult() (json.RawMessage, error) {
 	return json.RawMessage(res), t.reason
 }
 
+func (t *PrestateTracer) GetResultWithL1DataFee(l1DataFee *big.Int) (json.RawMessage, error) {
+	panic("not supported")
+}
+
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *PrestateTracer) Stop(err error) {
 	t.reason = err

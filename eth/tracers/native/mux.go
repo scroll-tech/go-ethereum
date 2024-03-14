@@ -139,6 +139,10 @@ func (t *MuxTracer) GetResult() (json.RawMessage, error) {
 	return res, nil
 }
 
+func (t *MuxTracer) GetResultWithL1DataFee(l1DataFee *big.Int) (json.RawMessage, error) {
+	panic("not supported")
+}
+
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *MuxTracer) Stop(err error) {
 	for _, t := range t.tracers {

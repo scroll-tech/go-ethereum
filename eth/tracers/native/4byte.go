@@ -125,6 +125,10 @@ func (t *fourByteTracer) GetResult() (json.RawMessage, error) {
 	return res, t.reason
 }
 
+func (t *fourByteTracer) GetResultWithL1DataFee(l1DataFee *big.Int) (json.RawMessage, error) {
+	panic("not supported")
+}
+
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *fourByteTracer) Stop(err error) {
 	t.reason = err

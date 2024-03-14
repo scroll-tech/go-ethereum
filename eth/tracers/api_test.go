@@ -38,12 +38,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rollup/fees"
-	"github.com/ethereum/go-ethereum/rollup/tracing"
 	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/exp/slices"
 )
@@ -214,8 +212,7 @@ func TestTraceCall(t *testing.T) {
 		b.AddTx(tx)
 	})
 	defer backend.teardown()
-	scrollTracerWrapper := tracing.NewTracerWrapper()
-	api := NewAPI(backend, scrollTracerWrapper)
+	api := NewAPI(backend, nil)
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
 		call        ethapi.TransactionArgs
@@ -233,7 +230,7 @@ func TestTraceCall(t *testing.T) {
 			},
 			config:    nil,
 			expectErr: nil,
-			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
+			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}`,
 		},
 		// Standard JSON trace upon the head, plain transfer.
 		{
@@ -245,7 +242,7 @@ func TestTraceCall(t *testing.T) {
 			},
 			config:    nil,
 			expectErr: nil,
-			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
+			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}`,
 		},
 		// Standard JSON trace upon the non-existent block, error expects
 		{
@@ -269,7 +266,7 @@ func TestTraceCall(t *testing.T) {
 			},
 			config:    nil,
 			expectErr: nil,
-			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
+			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}`,
 		},
 		// Tracing on 'pending' should fail:
 		{
@@ -294,7 +291,8 @@ func TestTraceCall(t *testing.T) {
 			expectErr: nil,
 			expect: ` {"gas":53018,"failed":false,"returnValue":"","structLogs":[
 		{"pc":0,"op":"NUMBER","gas":24946984,"gasCost":2,"depth":1,"stack":[]},
-		{"pc":1,"op":"STOP","gas":24946982,"gasCost":0,"depth":1,"stack":["0x1337"]}]}`,
+		{"pc":1,"op":"STOP","gas":24946982,"gasCost":0,"depth":1,"stack":["0x1337"]}],
+		"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}`,
 		},
 	}
 	for i, testspec := range testSuite {
@@ -312,11 +310,11 @@ func TestTraceCall(t *testing.T) {
 				t.Errorf("test %d: expect no error, got %v", i, err)
 				continue
 			}
-			var have *logger.ExecutionResult
+			var have *types.ExecutionResult
 			if err := json.Unmarshal(result.(json.RawMessage), &have); err != nil {
 				t.Errorf("test %d: failed to unmarshal result %v", i, err)
 			}
-			var want *logger.ExecutionResult
+			var want *types.ExecutionResult
 			if err := json.Unmarshal([]byte(testspec.expect), &want); err != nil {
 				t.Errorf("test %d: failed to unmarshal result %v", i, err)
 			}
@@ -350,17 +348,16 @@ func TestTraceTransaction(t *testing.T) {
 		target = tx.Hash()
 	})
 	defer backend.chain.Stop()
-	scrollTracerWrapper := tracing.NewTracerWrapper()
-	api := NewAPI(backend, scrollTracerWrapper)
+	api := NewAPI(backend, nil)
 	result, err := api.TraceTransaction(context.Background(), target, nil)
 	if err != nil {
 		t.Errorf("Failed to trace transaction %v", err)
 	}
-	var have *logger.ExecutionResult
+	var have *types.ExecutionResult
 	if err := json.Unmarshal(result.(json.RawMessage), &have); err != nil {
 		t.Errorf("failed to unmarshal result %v", err)
 	}
-	if !reflect.DeepEqual(have, &logger.ExecutionResult{
+	if !reflect.DeepEqual(have, &types.ExecutionResult{
 		Gas:         params.TxGas,
 		Failed:      false,
 		ReturnValue: "",
@@ -401,8 +398,7 @@ func TestTraceBlock(t *testing.T) {
 		txHash = tx.Hash()
 	})
 	defer backend.chain.Stop()
-	scrollTracerWrapper := tracing.NewTracerWrapper()
-	api := NewAPI(backend, scrollTracerWrapper)
+	api := NewAPI(backend, nil)
 
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
@@ -418,7 +414,7 @@ func TestTraceBlock(t *testing.T) {
 		// Trace head block
 		{
 			blockNumber: rpc.BlockNumber(genBlocks),
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHash),
+			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}}]`, txHash),
 		},
 		// Trace non-existent block
 		{
@@ -428,12 +424,12 @@ func TestTraceBlock(t *testing.T) {
 		// Trace latest block
 		{
 			blockNumber: rpc.LatestBlockNumber,
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHash),
+			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}}]`, txHash),
 		},
 		// Trace pending block
 		{
 			blockNumber: rpc.PendingBlockNumber,
-			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHash),
+			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}}]`, txHash),
 		},
 	}
 	for i, tc := range testSuite {
@@ -491,8 +487,7 @@ func TestTracingWithOverrides(t *testing.T) {
 		b.AddTx(tx)
 	})
 	defer backend.chain.Stop()
-	scrollTracerWrapper := tracing.NewTracerWrapper()
-	api := NewAPI(backend, scrollTracerWrapper)
+	api := NewAPI(backend, nil)
 	randomAccounts := newAccounts(3)
 	type res struct {
 		Gas         int
@@ -856,10 +851,9 @@ func TestTraceChain(t *testing.T) {
 	})
 	backend.refHook = func() { ref.Add(1) }
 	backend.relHook = func() { rel.Add(1) }
-	scrollTracerWrapper := tracing.NewTracerWrapper()
-	api := NewAPI(backend, scrollTracerWrapper)
+	api := NewAPI(backend, nil)
 
-	single := `{"txHash":"0x0000000000000000000000000000000000000000000000000000000000000000","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}`
+	single := `{"txHash":"0x0000000000000000000000000000000000000000000000000000000000000000","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[],"accountAfter":null,"l1DataFee":"0x0","callTrace":null,"prestateTrace":null}}`
 	var cases = []struct {
 		start  uint64
 		end    uint64

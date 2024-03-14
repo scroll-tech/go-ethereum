@@ -76,6 +76,10 @@ func (t *noopTracer) GetResult() (json.RawMessage, error) {
 	return json.RawMessage(`{}`), nil
 }
 
+func (t *noopTracer) GetResultWithL1DataFee(l1DataFee *big.Int) (json.RawMessage, error) {
+	panic("not supported")
+}
+
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *noopTracer) Stop(err error) {
 }

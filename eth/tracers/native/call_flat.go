@@ -231,6 +231,10 @@ func (t *flatCallTracer) GetResult() (json.RawMessage, error) {
 	return res, t.reason
 }
 
+func (t *flatCallTracer) GetResultWithL1DataFee(l1DataFee *big.Int) (json.RawMessage, error) {
+	panic("not supported")
+}
+
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *flatCallTracer) Stop(err error) {
 	t.tracer.Stop(err)

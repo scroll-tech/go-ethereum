@@ -243,6 +243,24 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 }
 
 func (l *StructLogger) GetResult() (json.RawMessage, error) {
+	result, err := l.getResult()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(result)
+}
+
+func (l *StructLogger) GetResultWithL1DataFee(l1DataFee *big.Int) (json.RawMessage, error) {
+	result, err := l.getResult()
+	if err != nil {
+		return nil, err
+	}
+
+	result.L1DataFee = (*hexutil.Big)(l1DataFee)
+	return json.Marshal(result)
+}
+
+func (l *StructLogger) getResult() (*types.ExecutionResult, error) {
 	// Tracing aborted
 	if l.reason != nil {
 		return nil, l.reason
@@ -254,13 +272,12 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 	if failed && l.err != vm.ErrExecutionReverted {
 		returnVal = ""
 	}
-	return json.Marshal(&types.ExecutionResult{
+	return &types.ExecutionResult{
 		Gas:         l.usedGas,
 		Failed:      failed,
 		ReturnValue: returnVal,
 		StructLogs:  FormatLogs(l.StructLogs()),
-		// L1DataFee:   (*hexutil.Big)(result.L1DataFee),
-	})
+	}, nil
 }
 
 // Stop terminates execution of the tracer at the first opportune moment.

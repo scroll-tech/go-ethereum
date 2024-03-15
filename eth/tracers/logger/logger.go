@@ -318,7 +318,7 @@ func (l *StructLogger) CaptureEnter(typ vm.OpCode, from common.Address, to commo
 	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
 	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
 	// sanity check
-	if len(l.callStackLogInd) != l.env.depth {
+	if len(l.callStackLogInd) != l.env.Depth() {
 		panic("unexpected evm depth in capture enter")
 	}
 	l.statesAffected[to] = struct{}{}

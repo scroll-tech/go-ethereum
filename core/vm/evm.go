@@ -532,3 +532,8 @@ func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 func (evm *EVM) FeeRecipient() common.Address {
 	return evm.Context.Coinbase
 }
+
+// Depth returns the environment's depth of the current call stack.
+func (evm *EVM) Depth() int {
+	return evm.depth
+}

@@ -84,7 +84,7 @@ type StructLogRes struct {
 	Depth         int                `json:"depth"`
 	Error         string             `json:"error,omitempty"`
 	Stack         *[]string          `json:"stack,omitempty"`
-	ReturnData    string             `json:"returnData,omitempty"` // TODO: fill this
+	ReturnData    string             `json:"returnData,omitempty"`
 	Memory        *[]string          `json:"memory,omitempty"`
 	Storage       *map[string]string `json:"storage,omitempty"`
 	RefundCounter uint64             `json:"refund,omitempty"`

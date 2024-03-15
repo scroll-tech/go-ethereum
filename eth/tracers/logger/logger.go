@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
@@ -266,10 +267,10 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	}
 	// in reality it is impossible for CREATE to trigger ErrContractAddressCollision
 	if op == vm.CREATE2 && err == nil {
-		_ = stack.Data()[stack.len()-1] // value
-		offset := stack.Data()[stack.len()-2]
-		size := stack.Data()[stack.len()-3]
-		salt := stack.Data()[stack.len()-4]
+		_ = stack.Data()[stackLen-1] // value
+		offset := stack.Data()[stackLen-2]
+		size := stack.Data()[stackLen-3]
+		salt := stack.Data()[stackLen-4]
 		// `CaptureState` is called **before** memory resizing
 		// So sometimes we need to auto pad 0.
 		code := getData(scope.Memory.Data(), offset.Uint64(), size.Uint64())

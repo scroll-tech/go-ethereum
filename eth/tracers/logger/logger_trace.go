@@ -45,10 +45,12 @@ func traceToAddressCode(l *StructLogger, scope *vm.ScopeContext, extraData *type
 func traceLastNAddressCode(n int) traceFunc {
 	return func(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 		stack := scope.Stack
-		if stack.len() <= n {
+		stackData := stack.Data()
+		stackLen := len(stackData)
+		if stackLen <= n {
 			return nil
 		}
-		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
+		address := common.Address(stackData[stackLen-1-n].Bytes20())
 		code := l.env.StateDB.GetCode(address)
 		extraData.CodeList = append(extraData.CodeList, hexutil.Encode(code))
 		l.statesAffected[address] = struct{}{}
@@ -65,7 +67,7 @@ func traceContractCode(l *StructLogger, scope *vm.ScopeContext, extraData *types
 
 // traceStorage get contract's storage at storage_address
 func traceStorage(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
-	if scope.Stack.len() == 0 {
+	if len(scope.Stack.Data()) == 0 {
 		return nil
 	}
 	key := common.Hash(scope.Stack.peek().Bytes32())
@@ -89,11 +91,12 @@ func traceContractAccount(l *StructLogger, scope *vm.ScopeContext, extraData *ty
 func traceLastNAddressAccount(n int) traceFunc {
 	return func(l *StructLogger, scope *vm.ScopeContext, extraData *types.ExtraData) error {
 		stack := scope.Stack
-		if stack.len() <= n {
+		stackData := stack.Data()
+		stackLen := len(stackData)
+		if stackLen <= n {
 			return nil
 		}
-
-		address := common.Address(stack.data[stack.len()-1-n].Bytes20())
+		address := common.Address(stackData[stackLen-1-n].Bytes20())
 		state := getWrappedAccountForAddr(l, address)
 		extraData.StateList = append(extraData.StateList, state)
 		l.statesAffected[address] = struct{}{}

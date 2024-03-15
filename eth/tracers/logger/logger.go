@@ -251,6 +251,12 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	// create a new snapshot of the EVM.
 	structLog := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err, nil}
 
+	if !l.cfg.DisableStorage && (op == vm.SLOAD || op == vm.SSTORE) {
+		if err := traceStorage(l, scope, structLog.getOrInitExtraData()); err != nil {
+			log.Error("Failed to trace data", "opcode", op.String(), "err", err)
+		}
+	}
+
 	execFuncList, ok := OpcodeExecs[op]
 	if ok {
 		// execute trace func list.

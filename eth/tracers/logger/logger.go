@@ -274,7 +274,40 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, err error) {
 func (l *StructLogger) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
 }
 
+// CaptureExit phase, a CREATE has its target address's code being set and queryable
 func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
+	stackH := len(l.callStackLogInd)
+	if stackH == 0 {
+		panic("unexpected capture exit occur")
+	}
+
+	theLogPos := l.callStackLogInd[stackH-1]
+	l.callStackLogInd = l.callStackLogInd[:stackH-1]
+	theLog := l.logs[theLogPos]
+	// update "forecast" data
+	if err != nil {
+		theLog.ExtraData.CallFailed = true
+	}
+
+	// handling updating for CREATE only
+	switch theLog.Op {
+	case vm.CREATE, vm.CREATE2:
+		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
+		dataLen := len(theLog.ExtraData.StateList)
+		if dataLen == 0 {
+			panic("unexpected data capture for target op")
+		}
+
+		lastAccData := theLog.ExtraData.StateList[dataLen-1]
+		wrappedStatus := getWrappedAccountForAddr(l, lastAccData.Address)
+		theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
+		code := getCodeForAddr(l, lastAccData.Address)
+		theLog.ExtraData.CodeList = append(theLog.ExtraData.CodeList, hexutil.Encode(code))
+	default:
+		//do nothing for other op code
+		return
+	}
+
 }
 
 func (l *StructLogger) GetResult() (json.RawMessage, error) {

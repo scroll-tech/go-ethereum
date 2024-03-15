@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -272,6 +273,25 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, err error) {
 }
 
 func (l *StructLogger) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+	// the last logged op should be CALL/STATICCALL/CALLCODE/CREATE/CREATE2
+	lastLogPos := len(l.logs) - 1
+	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
+	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
+	// sanity check
+	if len(l.callStackLogInd) != l.env.depth {
+		panic("unexpected evm depth in capture enter")
+	}
+	l.statesAffected[to] = struct{}{}
+	theLog := l.logs[lastLogPos]
+	theLog.getOrInitExtraData()
+	// handling additional updating for CALL/STATICCALL/CALLCODE/CREATE/CREATE2 only
+	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
+	wrappedStatus := getWrappedAccountForAddr(l, to)
+	theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
+	// finally we update the caller's status (it is possible that nonce and balance being updated)
+	if len(theLog.ExtraData.Caller) == 1 {
+		theLog.ExtraData.Caller = append(theLog.ExtraData.Caller, getWrappedAccountForAddr(l, from))
+	}
 }
 
 // CaptureExit phase, a CREATE has its target address's code being set and queryable

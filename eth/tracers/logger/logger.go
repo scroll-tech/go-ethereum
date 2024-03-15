@@ -75,6 +75,24 @@ type StructLog struct {
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
 	Err           error                       `json:"-"`
+	// scroll-related
+	ExtraData *types.ExtraData `json:"extraData"`
+}
+
+func (s *StructLog) clean() {
+	s.Memory = s.Memory[:0]
+	s.Stack = s.Stack[:0]
+	s.ReturnData = s.ReturnData[:0]
+	s.Storage = nil
+	s.ExtraData = nil
+	s.Err = nil
+}
+
+func (s *StructLog) getOrInitExtraData() *types.ExtraData {
+	if s.ExtraData == nil {
+		s.ExtraData = &types.ExtraData{}
+	}
+	return s.ExtraData
 }
 
 // overrides for gencodec
@@ -119,14 +137,16 @@ type StructLogger struct {
 	interrupt atomic.Bool // Atomic flag to signal execution interruption
 	reason    error       // Textual reason for the interruption
 
-	statesAffected map[common.Address]struct{}
-	createdAccount *types.AccountWrapper
+	statesAffected  map[common.Address]struct{}
+	createdAccount  *types.AccountWrapper
+	callStackLogInd []int
 }
 
 // NewStructLogger returns a new logger
 func NewStructLogger(cfg *Config) *StructLogger {
 	logger := &StructLogger{
-		storage: make(map[common.Address]Storage),
+		storage:        make(map[common.Address]Storage),
+		statesAffected: make(map[common.Address]struct{}),
 	}
 	if cfg != nil {
 		logger.cfg = *cfg
@@ -140,6 +160,9 @@ func (l *StructLogger) Reset() {
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.err = nil
+	l.statesAffected = make(map[common.Address]struct{})
+	l.createdAccount = nil
+	l.callStackLogInd = nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
@@ -211,7 +234,7 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err, nil}
 	l.logs = append(l.logs, log)
 }
 

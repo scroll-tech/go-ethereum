@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/codehash"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
@@ -273,14 +274,14 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 		salt := stack.Data()[stackLen-4]
 		// `CaptureState` is called **before** memory resizing
 		// So sometimes we need to auto pad 0.
-		code := getData(scope.Memory.Data(), offset.Uint64(), size.Uint64())
+		code := vm.GetData(scope.Memory.Data(), offset.Uint64(), size.Uint64())
 
 		codeAndHash := &codeAndHash{code: code}
 
 		address := crypto.CreateAddress2(contract.Address(), salt.Bytes32(), codeAndHash.Hash().Bytes())
 
 		contractHash := l.env.StateDB.GetKeccakCodeHash(address)
-		if l.env.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyKeccakCodeHash) {
+		if l.env.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != codehash.EmptyKeccakCodeHash) {
 			extraData := structLog.getOrInitExtraData()
 			wrappedStatus := getWrappedAccountForAddr(l, address)
 			extraData.StateList = append(extraData.StateList, wrappedStatus)
@@ -289,6 +290,20 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	}
 
 	l.logs = append(l.logs, structLog)
+}
+
+// codeAndHash is the same as codeAndHash in core/vm/evm.go
+type codeAndHash struct {
+	code []byte
+	hash common.Hash
+}
+
+func (c *codeAndHash) Hash() common.Hash {
+	if c.hash == (common.Hash{}) {
+		// when calculating CREATE2 address, we use Keccak256 not Poseidon
+		c.hash = crypto.Keccak256Hash(c.code)
+	}
+	return c.hash
 }
 
 // CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.

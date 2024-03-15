@@ -70,7 +70,7 @@ func traceStorage(l *StructLogger, scope *vm.ScopeContext, extraData *types.Extr
 	if len(scope.Stack.Data()) == 0 {
 		return nil
 	}
-	key := common.Hash(scope.Stack.peek().Bytes32())
+	key := common.Hash(scope.Stack.Peek().Bytes32())
 	storage := getWrappedAccountForStorage(l, scope.Contract.Address(), key)
 	extraData.StateList = append(extraData.StateList, storage)
 

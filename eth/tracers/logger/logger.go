@@ -247,8 +247,47 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err, nil}
-	l.logs = append(l.logs, log)
+	structLog := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err, nil}
+
+	execFuncList, ok := OpcodeExecs[op]
+	if ok {
+		// execute trace func list.
+		for _, exec := range execFuncList {
+			if e := exec(l, scope, structLog.getOrInitExtraData()); e != nil {
+				log.Error("Failed to trace data", "opcode", op.String(), "err", e)
+			}
+		}
+	}
+	// for each "calling" op, pick the caller's state
+	switch op {
+	case vm.CALL, vm.CALLCODE, vm.STATICCALL, vm.DELEGATECALL, vm.CREATE, vm.CREATE2:
+		extraData := structLog.getOrInitExtraData()
+		extraData.Caller = append(extraData.Caller, getWrappedAccountForAddr(l, scope.Contract.Address()))
+	}
+	// in reality it is impossible for CREATE to trigger ErrContractAddressCollision
+	if op == vm.CREATE2 && err == nil {
+		_ = stack.Data()[stack.len()-1] // value
+		offset := stack.Data()[stack.len()-2]
+		size := stack.Data()[stack.len()-3]
+		salt := stack.Data()[stack.len()-4]
+		// `CaptureState` is called **before** memory resizing
+		// So sometimes we need to auto pad 0.
+		code := getData(scope.Memory.Data(), offset.Uint64(), size.Uint64())
+
+		codeAndHash := &codeAndHash{code: code}
+
+		address := crypto.CreateAddress2(contract.Address(), salt.Bytes32(), codeAndHash.Hash().Bytes())
+
+		contractHash := l.env.StateDB.GetKeccakCodeHash(address)
+		if l.env.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyKeccakCodeHash) {
+			extraData := structLog.getOrInitExtraData()
+			wrappedStatus := getWrappedAccountForAddr(l, address)
+			extraData.StateList = append(extraData.StateList, wrappedStatus)
+			l.statesAffected[address] = struct{}{}
+		}
+	}
+
+	l.logs = append(l.logs, structLog)
 }
 
 // CaptureStateAfter for special needs, tracks SSTORE ops and records the storage change.

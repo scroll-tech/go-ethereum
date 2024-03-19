@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/ethereum/go-ethereum/rollup/tracing"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -309,11 +310,27 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
+
+		l1MsgsCh:               make(chan core.NewL1MsgsEvent, txChanSize),
+		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
 	}
+	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
+
 	// Subscribe for transaction insertion events (whether from network or resurrects)
 	worker.txsSub = eth.TxPool().SubscribeTransactions(worker.txsCh, true)
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
+
+	// Subscribe NewL1MsgsEvent for sync service
+	if s := eth.SyncService(); s != nil {
+		worker.l1MsgsSub = s.SubscribeNewL1MsgsEvent(worker.l1MsgsCh)
+	} else {
+		// create an empty subscription so that the tests won't fail
+		worker.l1MsgsSub = event.NewSubscription(func(quit <-chan struct{}) error {
+			<-quit
+			return nil
+		})
+	}
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	recommit := worker.config.Recommit

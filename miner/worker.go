@@ -203,6 +203,13 @@ type intervalAdjust struct {
 	inc   bool
 }
 
+// prioritizedTransaction represents a single transaction that
+// should be processed as the first transaction in the next block.
+type prioritizedTransaction struct {
+	blockNumber uint64
+	tx          *types.Transaction
+}
+
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
@@ -221,6 +228,8 @@ type worker struct {
 	txsSub       event.Subscription
 	chainHeadCh  chan core.ChainHeadEvent
 	chainHeadSub event.Subscription
+	l1MsgsCh     chan core.NewL1MsgsEvent
+	l1MsgsSub    event.Subscription
 
 	// Channels
 	newWorkCh          chan *newWorkReq
@@ -249,9 +258,10 @@ type worker struct {
 	snapshotState    *state.StateDB
 
 	// atomic status counters
-	running atomic.Bool  // The indicator whether the consensus engine is running or not.
-	newTxs  atomic.Int32 // New arrival transaction count since last sealing work submitting.
-	syncing atomic.Bool  // The indicator whether the node is still syncing.
+	running   atomic.Bool  // The indicator whether the consensus engine is running or not.
+	newTxs    atomic.Int32 // New arrival transaction count since last sealing work submitting.
+	syncing   atomic.Bool  // The indicator whether the node is still syncing.
+	newL1Msgs atomic.Int32 // New arrival L1 message count since last sealing work submitting.
 
 	// newpayloadTimeout is the maximum timeout allowance for creating payload.
 	// The default value is 2 seconds but node operator can set it to arbitrary
@@ -266,6 +276,9 @@ type worker struct {
 
 	// External functions
 	isLocalBlock func(header *types.Header) bool // Function used to determine whether the specified block is mined by local miner.
+
+	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
+	prioritizedTx          *prioritizedTransaction
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.

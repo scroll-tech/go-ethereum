@@ -583,6 +583,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
 	defer w.txsSub.Unsubscribe()
+	defer w.l1MsgsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 	defer func() {
 		if w.current != nil {
@@ -594,6 +595,7 @@ func (w *worker) mainLoop() {
 		select {
 		case req := <-w.newWorkCh:
 			w.commitWork(req.interrupt, req.timestamp)
+			// new block created.
 
 		case req := <-w.getWorkCh:
 			req.result <- w.generateWork(req.params)
@@ -642,10 +644,15 @@ func (w *worker) mainLoop() {
 			}
 			w.newTxs.Add(int32(len(ev.Txs)))
 
+		case ev := <-w.l1MsgsCh:
+			w.newL1Msgs.Add(int32(ev.Count))
+
 		// System stopped
 		case <-w.exitCh:
 			return
 		case <-w.txsSub.Err():
+			return
+		case <-w.l1MsgsSub.Err():
 			return
 		case <-w.chainHeadSub.Err():
 			return

@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -737,6 +738,7 @@ func (w *worker) resultLoop() {
 				log.Error("Block found but no relative pending task", "number", block.Number(), "sealhash", sealhash, "hash", hash)
 				continue
 			}
+			startTime := time.Now()
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
 				receipts = make([]*types.Receipt, len(task.receipts))
@@ -763,9 +765,42 @@ func (w *worker) resultLoop() {
 				}
 				logs = append(logs, receipt.Logs...)
 			}
+			// It's possible that we've stored L1 queue index for this block previously,
+			// in this case do not overwrite it.
+			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
+				// Store first L1 queue index not processed by this block.
+				// Note: This accounts for both included and skipped messages. This
+				// way, if a block only skips messages, we won't reprocess the same
+				// messages from the next block.
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"task.nextL1MsgIndex", task.nextL1MsgIndex,
+				)
+				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
+			} else {
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"index", *index,
+					"task.nextL1MsgIndex", task.nextL1MsgIndex,
+				)
+			}
+			// Store circuit row consumption.
+			log.Trace(
+				"Worker write block row consumption",
+				"id", w.circuitCapacityChecker.ID,
+				"number", block.Number(),
+				"hash", hash.String(),
+				"accRows", task.accRows,
+			)
+			rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), hash, task.accRows)
 			// Commit block and state to database.
 			_, err := w.chain.WriteBlockAndSetHead(block, receipts, logs, task.state, true)
 			if err != nil {
+				l2ResultTimer.Update(time.Since(startTime))
 				log.Error("Failed writing block to chain", "err", err)
 				continue
 			}
@@ -774,6 +809,8 @@ func (w *worker) resultLoop() {
 
 			// Broadcast the block and announce chain insertion event
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
+
+			l2ResultTimer.Update(time.Since(startTime))
 
 		case <-w.exitCh:
 			return
@@ -1205,11 +1242,46 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 	w.current = work
 }
 
+func (w *worker) calcAndSetAccRowsForEnv(env *environment) error {
+	var traces *types.BlockTrace
+	var err error
+	withTimer(l2CommitTraceTimer, func() {
+		traces, err = env.traceEnv.GetBlockTrace(types.NewBlockWithHeader(env.header))
+	})
+	if err != nil {
+		return err
+	}
+	// truncate ExecutionResults&TxStorageTraces, because we declare their lengths with a dummy tx before;
+	// however, we need to clean it up for an empty block
+	traces.ExecutionResults = traces.ExecutionResults[:0]
+	traces.TxStorageTraces = traces.TxStorageTraces[:0]
+	var accRows *types.RowConsumption
+	withTimer(l2CommitCCCTimer, func() {
+		accRows, err = w.circuitCapacityChecker.ApplyBlock(traces)
+	})
+	if err != nil {
+		return err
+	}
+	log.Trace(
+		"Worker apply ccc for empty block result",
+		"id", w.circuitCapacityChecker.ID,
+		"number", env.header.Number,
+		"hash", env.header.Hash().String(),
+		"accRows", accRows,
+	)
+	env.accRows = accRows
+	return nil
+}
+
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
 // Note the assumption is held that the mutation is allowed to the passed env, do
 // the deep copy first.
 func (w *worker) commit(env *environment, interval func(), update bool, start time.Time) error {
+	defer func(t0 time.Time) {
+		l2CommitTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	if w.isRunning() {
 		if interval != nil {
 			interval()
@@ -1217,6 +1289,12 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
+		// set env.accRows for empty-but-not-genesis block
+		if (env.header.Number.Uint64() != 0) && (env.accRows == nil || len(*env.accRows) == 0) {
+			if err := w.calcAndSetAccRowsForEnv(env); err != nil {
+				return err
+			}
+		}
 		// Withdrawals are set to nil here, because this is only called in PoW.
 		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, nil, env.receipts, nil)
 		if err != nil {
@@ -1225,7 +1303,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// If we're post merge, just ignore
 		if !w.isTTDReached(block.Header()) {
 			select {
-			case w.taskCh <- &task{receipts: env.receipts, state: env.state, block: block, createdAt: time.Now()}:
+			case w.taskCh <- &task{receipts: env.receipts, state: env.state, block: block, createdAt: time.Now(), accRows: env.accRows, nextL1MsgIndex: env.nextL1MsgIndex}:
 				fees := totalFees(block, env.receipts)
 				feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(params.Ether))
 				log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),

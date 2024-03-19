@@ -1300,3 +1300,11 @@ func signalToErr(signal int32) error {
 		panic(fmt.Errorf("undefined signal %d", signal))
 	}
 }
+
+func withTimer(timer metrics.Timer, f func()) {
+	if metrics.Enabled {
+		timer.Time(f)
+	} else {
+		f()
+	}
+}

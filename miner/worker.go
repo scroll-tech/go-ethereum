@@ -364,6 +364,12 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	return worker
 }
 
+// getCCC returns a pointer to this worker's CCC instance.
+// Only used in tests.
+func (w *worker) getCCC() *circuitcapacitychecker.CircuitCapacityChecker {
+	return w.circuitCapacityChecker
+}
+
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.mu.Lock()
@@ -498,6 +504,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		}
 		timer.Reset(recommit)
 		w.newTxs.Store(0)
+		w.newL1Msgs.Store(0)
 	}
 	// clearPending cleans the stale pending tasks.
 	clearPending := func(number uint64) {
@@ -527,7 +534,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// higher priced transactions. Disable this overhead for pending blocks.
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
 				// Short circuit if no new transaction arrives.
-				if w.newTxs.Load() == 0 {
+				if w.newTxs.Load() == 0 && w.newL1Msgs.Load() == 0 {
 					timer.Reset(recommit)
 					continue
 				}

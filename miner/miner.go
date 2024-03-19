@@ -53,6 +53,8 @@ type Config struct {
 	Recommit  time.Duration  // The time interval for miner to re-create mining work.
 
 	NewPayloadTimeout time.Duration // The maximum time allowance for creating a new payload
+
+	StoreSkippedTxTraces bool // Whether store the wrapped traces when storing a skipped tx
 }
 
 // DefaultConfig contains default settings for miner.

@@ -35,7 +35,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rollup/tracing"
 	"github.com/ethereum/go-ethereum/trie"
 )
 
@@ -79,6 +81,27 @@ var (
 	errBlockInterruptedByTimeout  = errors.New("timeout while building block")
 )
 
+var (
+	// Metrics for the skipped txs
+	l1TxGasLimitExceededCounter       = metrics.NewRegisteredCounter("miner/skipped_txs/l1/gas_limit_exceeded", nil)
+	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1/row_consumption_overflow", nil)
+	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2/row_consumption_overflow", nil)
+	l1TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l1/ccc_unknown_err", nil)
+	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
+	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
+	l2CommitTxsTimer                  = metrics.NewRegisteredTimer("miner/commit/txs_all", nil)
+	l2CommitTxTimer                   = metrics.NewRegisteredTimer("miner/commit/tx_all", nil)
+	l2CommitTxTraceTimer              = metrics.NewRegisteredTimer("miner/commit/tx_trace", nil)
+	l2CommitTxCCCTimer                = metrics.NewRegisteredTimer("miner/commit/tx_ccc", nil)
+	l2CommitTxApplyTimer              = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
+	l2CommitTimer                     = metrics.NewRegisteredTimer("miner/commit/all", nil)
+	l2CommitTraceTimer                = metrics.NewRegisteredTimer("miner/commit/trace", nil)
+	l2CommitCCCTimer                  = metrics.NewRegisteredTimer("miner/commit/ccc", nil)
+	l2CommitNewWorkTimer              = metrics.NewRegisteredTimer("miner/commit/new_work_all", nil)
+	l2CommitNewWorkL1CollectTimer     = metrics.NewRegisteredTimer("miner/commit/new_work_collect_l1", nil)
+	l2ResultTimer                     = metrics.NewRegisteredTimer("miner/result/all", nil)
+)
+
 // environment is the worker's current environment and holds all
 // information of the sealing block generation.
 type environment struct {
@@ -94,6 +117,13 @@ type environment struct {
 	receipts []*types.Receipt
 	sidecars []*types.BlobTxSidecar
 	blobs    int
+
+	l1TxCount int // l1 msg count in cycle
+
+	// circuit capacity check related fields
+	traceEnv       *tracing.TraceEnv     // env for tracing
+	accRows        *types.RowConsumption // accumulated row consumption for a block
+	nextL1MsgIndex uint64                // next L1 queue index to be processed
 }
 
 // copy creates a deep copy of environment.
@@ -135,6 +165,9 @@ type task struct {
 	state     *state.StateDB
 	block     *types.Block
 	createdAt time.Time
+
+	accRows        *types.RowConsumption // accumulated row consumption in the circuit side
+	nextL1MsgIndex uint64                // next L1 queue index to be processed
 }
 
 const (

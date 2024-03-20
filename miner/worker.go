@@ -916,16 +916,85 @@ func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) 
 // applyTransaction runs the transaction. If execution fails, state and gas pool are reverted.
 func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*types.Receipt, *types.BlockTrace, *types.RowConsumption, error) {
 	var (
-		snap = env.state.Snapshot()
-		gp   = env.gasPool.Gas()
-
 		traces  *types.BlockTrace
 		accRows *types.RowConsumption
+		receipt *types.Receipt
+		err     error
 	)
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
+
+	// do not do CCC checks on follower nodes
+	if w.isRunning() {
+		defer func(t0 time.Time) {
+			l2CommitTxTimer.Update(time.Since(t0))
+		}(time.Now())
+
+		// do gas limit check up-front and do not run CCC if it fails
+		if env.gasPool.Gas() < tx.Gas() {
+			return nil, nil, nil, core.ErrGasLimitReached
+		}
+
+		snap := env.state.Snapshot()
+
+		log.Trace(
+			"Worker apply ccc for tx",
+			"id", w.circuitCapacityChecker.ID,
+			"txHash", tx.Hash().Hex(),
+		)
+
+		// 1. we have to check circuit capacity before `core.ApplyTransaction`,
+		// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert.
+		// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
+		// the `refund` value will still be correct, because:
+		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
+		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
+		// 2.3 when starting handling the following txs, `state.refund` comes as 0
+		withTimer(l2CommitTxTraceTimer, func() {
+			traces, err = env.traceEnv.GetBlockTrace(
+				types.NewBlockWithHeader(env.header).WithBody([]*types.Transaction{tx}, nil),
+			)
+		})
+		// `env.traceEnv.State` & `env.state` share a same pointer to the state, so only need to revert `env.state`
+		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
+		env.state.RevertToSnapshot(snap)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		withTimer(l2CommitTxCCCTimer, func() {
+			accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
+		})
+		if err != nil {
+			return nil, traces, accRows, err
+		}
+		log.Trace(
+			"Worker apply ccc for tx result",
+			"id", w.circuitCapacityChecker.ID,
+			"txHash", tx.Hash().Hex(),
+			"accRows", accRows,
+		)
+	}
+
+	var (
+		snap = env.state.Snapshot() // create new snapshot for `core.ApplyTransaction`
+		gp   = env.gasPool.Gas()
+	)
+	withTimer(l2CommitTxApplyTimer, func() {
+		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
+	})
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
+		if accRows != nil {
+			// At this point, we have called CCC but the transaction failed in `ApplyTransaction`.
+			// If we skip this tx and continue to pack more, the next tx will likely fail with
+			// `circuitcapacitychecker.ErrUnknown`. However, at this point we cannot decide whether
+			// we should seal the block or skip the tx and continue, so we simply return the error.
+			log.Error(
+				"GetBlockTrace passed but ApplyTransaction failed, ccc is left in inconsistent state",
+				"blockNumber", env.header.Number,
+				"txHash", tx.Hash().Hex(),
+				"err", err,
+			)
+		}
 	}
 	return receipt, traces, accRows, err
 }

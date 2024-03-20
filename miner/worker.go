@@ -878,12 +878,13 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*
 	if tx.Type() == types.BlobTxType {
 		return w.commitBlobTransaction(env, tx)
 	}
-	receipt, traces, err := w.applyTransaction(env, tx)
+	receipt, traces, accRows, err := w.applyTransaction(env, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 	env.txs = append(env.txs, tx)
 	env.receipts = append(env.receipts, receipt)
+	env.accRows = accRows
 	return receipt.Logs, traces, nil
 }
 
@@ -899,12 +900,13 @@ func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) 
 	if (env.blobs+len(sc.Blobs))*params.BlobTxBlobGasPerBlob > params.MaxBlobGasPerBlock {
 		return nil, nil, errors.New("max data blobs reached")
 	}
-	receipt, traces, err := w.applyTransaction(env, tx)
+	receipt, traces, accRows, err := w.applyTransaction(env, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 	env.txs = append(env.txs, tx.WithoutBlobTxSidecar())
 	env.receipts = append(env.receipts, receipt)
+	env.accRows = accRows
 	env.sidecars = append(env.sidecars, sc)
 	env.blobs += len(sc.Blobs)
 	*env.header.BlobGasUsed += receipt.BlobGasUsed
@@ -912,19 +914,20 @@ func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) 
 }
 
 // applyTransaction runs the transaction. If execution fails, state and gas pool are reverted.
-func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*types.Receipt, *types.BlockTrace, error) {
+func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*types.Receipt, *types.BlockTrace, *types.RowConsumption, error) {
 	var (
 		snap = env.state.Snapshot()
 		gp   = env.gasPool.Gas()
 
-		traces *types.BlockTrace
+		traces  *types.BlockTrace
+		accRows *types.RowConsumption
 	)
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
 	}
-	return receipt, traces, err
+	return receipt, traces, accRows, err
 }
 
 func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAndNonce, interrupt *atomic.Int32) error {

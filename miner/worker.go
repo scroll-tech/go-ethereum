@@ -1344,6 +1344,22 @@ func (w *worker) isTTDReached(header *types.Header) bool {
 	return td != nil && ttd != nil && td.Cmp(ttd) >= 0
 }
 
+func (w *worker) checkCurrentTxNumWithCCC(expected int) {
+	match, got, err := w.circuitCapacityChecker.CheckTxNum(expected)
+	if err != nil {
+		log.Error("failed to CheckTxNum in ccc", "err", err)
+		return
+	}
+	if !match {
+		log.Error("tx count in miner is different with CCC", "w.current.tcount", w.current.tcount, "got", got)
+	}
+}
+
+func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
+	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
+	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
+}
+
 // copyReceipts makes a deep copy of the given receipts.
 func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	result := make([]*types.Receipt, len(receipts))

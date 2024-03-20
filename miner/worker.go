@@ -874,20 +874,20 @@ func (w *worker) updateSnapshot(env *environment) {
 	w.snapshotState = env.state.Copy()
 }
 
-func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
+func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, *types.BlockTrace, error) {
 	if tx.Type() == types.BlobTxType {
 		return w.commitBlobTransaction(env, tx)
 	}
-	receipt, err := w.applyTransaction(env, tx)
+	receipt, traces, err := w.applyTransaction(env, tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	env.txs = append(env.txs, tx)
 	env.receipts = append(env.receipts, receipt)
-	return receipt.Logs, nil
+	return receipt.Logs, traces, nil
 }
 
-func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
+func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) ([]*types.Log, *types.BlockTrace, error) {
 	sc := tx.BlobTxSidecar()
 	if sc == nil {
 		panic("blob transaction without blobs in miner")
@@ -897,32 +897,34 @@ func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) 
 	// and not during execution. This means core.ApplyTransaction will not return an error if the
 	// tx has too many blobs. So we have to explicitly check it here.
 	if (env.blobs+len(sc.Blobs))*params.BlobTxBlobGasPerBlob > params.MaxBlobGasPerBlock {
-		return nil, errors.New("max data blobs reached")
+		return nil, nil, errors.New("max data blobs reached")
 	}
-	receipt, err := w.applyTransaction(env, tx)
+	receipt, traces, err := w.applyTransaction(env, tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	env.txs = append(env.txs, tx.WithoutBlobTxSidecar())
 	env.receipts = append(env.receipts, receipt)
 	env.sidecars = append(env.sidecars, sc)
 	env.blobs += len(sc.Blobs)
 	*env.header.BlobGasUsed += receipt.BlobGasUsed
-	return receipt.Logs, nil
+	return receipt.Logs, traces, nil
 }
 
 // applyTransaction runs the transaction. If execution fails, state and gas pool are reverted.
-func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*types.Receipt, error) {
+func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*types.Receipt, *types.BlockTrace, error) {
 	var (
 		snap = env.state.Snapshot()
 		gp   = env.gasPool.Gas()
+
+		traces *types.BlockTrace
 	)
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
 	}
-	return receipt, err
+	return receipt, traces, err
 }
 
 func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAndNonce, interrupt *atomic.Int32) error {
@@ -993,7 +995,7 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 		// Start executing the transaction
 		env.state.SetTxContext(tx.Hash(), env.tcount)
 
-		logs, err := w.commitTransaction(env, tx)
+		logs, _, err := w.commitTransaction(env, tx)
 		switch {
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift

@@ -826,6 +826,18 @@ func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase co
 	if err != nil {
 		return nil, err
 	}
+
+	// don't finalize the state during tracing for circuit capacity checker, otherwise we cannot revert.
+	// and even if we don't finalize the state, the `refund` value will still be correct, as explained in `CommitTransaction`
+	finalizeStateAfterApply := false
+	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, parent,
+		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
+		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
+		finalizeStateAfterApply)
+	if err != nil {
+		return nil, err
+	}
+
 	state.StartPrefetcher("miner")
 
 	// Note the passed coinbase may be different with header.Coinbase.
@@ -834,10 +846,15 @@ func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase co
 		state:    state,
 		coinbase: coinbase,
 		header:   header,
+		traceEnv: traceEnv,
+		accRows:  nil,
 	}
 	// Keep track of transactions which return errors so they can be removed
 	env.tcount = 0
 	env.blockSize = 0
+	env.blockSize = 0
+	env.l1TxCount = 0
+	env.nextL1MsgIndex = traceEnv.StartL1QueueIndex
 	return env, nil
 }
 

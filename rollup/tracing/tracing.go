@@ -36,8 +36,8 @@ func NewTracerWrapper() *TracerWrapper {
 }
 
 // CreateTraceEnvAndGetBlockTrace wraps the whole block tracing logic for a block
-func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, finalizeStateAfterApply bool) (*types.BlockTrace, error) {
-	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parent.Header(), block, finalizeStateAfterApply)
+func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parentHeader *types.Header, block *types.Block, finaliseStateAfterApply bool) (*types.BlockTrace, error) {
+	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parentHeader, block, finaliseStateAfterApply)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.Chai
 
 type TraceEnv struct {
 	logConfig               *logger.Config
-	finalizeStateAfterApply bool
+	finaliseStateAfterApply bool
 	chainConfig             *params.ChainConfig
 
 	coinbase common.Address
@@ -88,10 +88,10 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Config, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, finalizeStateAfterApply bool) *TraceEnv {
+func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Config, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, finaliseStateAfterApply bool) *TraceEnv {
 	return &TraceEnv{
 		logConfig:               logConfig,
-		finalizeStateAfterApply: finalizeStateAfterApply,
+		finaliseStateAfterApply: finaliseStateAfterApply,
 		chainConfig:             chainConfig,
 		coinbase:                coinbase,
 		signer:                  types.MakeSigner(chainConfig, block.Number(), block.Time()),
@@ -110,7 +110,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Con
 	}
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Header, block *types.Block, finalizeStateAfterApply bool) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parentHeader *types.Header, block *types.Block, finaliseStateAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 
 	var err error
@@ -134,10 +134,10 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 	// block `C`.
 	// `ReadFirstQueueIndexNotInL1Block(B)` will return the correct value
 	// `10` on follower nodes.
-	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, parent.Hash())
+	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, parentHeader.Hash())
 	if startL1QueueIndex == nil {
-		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parent.Number.Uint64(), "hash", parent.Hash())
-		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
+		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parentHeader.Number.Uint64(), "hash", parentHeader.Hash())
+		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parentHeader.Hash())
 	}
 	env := CreateTraceEnvHelper(
 		chainConfig,
@@ -150,9 +150,9 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 		*startL1QueueIndex,
 		coinbase,
 		statedb,
-		parent.Root,
+		parentHeader.Root,
 		block,
-		finalizeStateAfterApply,
+		finaliseStateAfterApply,
 	)
 
 	key := coinbase.String()
@@ -222,7 +222,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			failed = err
 			break
 		}
-		if env.finalizeStateAfterApply {
+		if env.finaliseStateAfterApply {
 			env.state.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
 		}
 	}

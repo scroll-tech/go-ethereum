@@ -829,11 +829,11 @@ func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase co
 
 	// don't finalize the state during tracing for circuit capacity checker, otherwise we cannot revert.
 	// and even if we don't finalize the state, the `refund` value will still be correct, as explained in `CommitTransaction`
-	finalizeStateAfterApply := false
+	finaliseStateAfterApply := false
 	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
-		finalizeStateAfterApply)
+		finaliseStateAfterApply)
 	if err != nil {
 		return nil, err
 	}

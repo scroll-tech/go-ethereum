@@ -196,6 +196,56 @@ func TestGetChunkRangesCodecv0(t *testing.T) {
 	}
 }
 
+func TestGetChunkRangesCodecv1(t *testing.T) {
+	genesisConfig := &params.ChainConfig{
+		Scroll: params.ScrollConfig{
+			L1Config: &params.L1Config{
+				L1ChainId:          11155111,
+				ScrollChainAddress: common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
+			},
+		},
+	}
+	db := rawdb.NewDatabase(memorydb.New())
+
+	rlpData, err := os.ReadFile("./testdata/commitBatch_codecv1.rlp")
+	if err != nil {
+		t.Fatalf("Failed to read RLP data: %v", err)
+	}
+	l1Client := &mockEthClient{
+		commitBatchRLP: rlpData,
+	}
+	bc := &core.BlockChain{}
+	stack, err := node.New(&node.DefaultConfig)
+	if err != nil {
+		t.Fatalf("Failed to new P2P node: %v", err)
+	}
+	defer stack.Close()
+	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
+	if err != nil {
+		t.Fatalf("Failed to new rollup sync service: %v", err)
+	}
+
+	vLog := &types.Log{
+		TxHash: common.HexToHash("0x1"),
+	}
+	ranges, err := service.getChunkRanges(1, vLog)
+	require.NoError(t, err)
+
+	expectedRanges := []*rawdb.ChunkBlockRange{
+		{StartBlockNumber: 1, EndBlockNumber: 11},
+	}
+
+	if len(expectedRanges) != len(ranges) {
+		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(ranges))
+	}
+
+	for i := range ranges {
+		if *expectedRanges[i] != *ranges[i] {
+			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+		}
+	}
+}
+
 func TestValidateBatchCodecv0(t *testing.T) {
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}

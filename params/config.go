@@ -862,10 +862,10 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 		return newCompatError("Shanghai fork block", c.ShanghaiBlock, newcfg.ShanghaiBlock)
 	}
 	if isForkIncompatible(c.BernoulliBlock, newcfg.BernoulliBlock, head) {
-		return newCompatError("Hard fork block", c.BernoulliBlock, newcfg.BernoulliBlock)
+		return newCompatError("Bernoulli fork block", c.BernoulliBlock, newcfg.BernoulliBlock)
 	}
 	if isForkIncompatible(c.CurieBlock, newcfg.CurieBlock, head) {
-		return newCompatError("Hard fork block", c.CurieBlock, newcfg.CurieBlock)
+		return newCompatError("Curie fork block", c.CurieBlock, newcfg.CurieBlock)
 	}
 	return nil
 }

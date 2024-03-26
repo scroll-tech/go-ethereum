@@ -1,8 +1,6 @@
 package encoding
 
 import (
-	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -40,17 +38,6 @@ type Batch struct {
 	TotalL1MessagePoppedBefore uint64
 	ParentBatchHash            common.Hash
 	Chunks                     []*Chunk
-}
-
-// BlockContext represents the essential data of a block in the ScrollChain.
-// It provides an overview of block attributes including hash values, block numbers, gas details, and transaction counts.
-type BlockContext struct {
-	BlockNumber     uint64
-	Timestamp       uint64
-	BaseFee         uint64
-	GasLimit        uint64
-	NumTransactions uint16
-	NumL1Messages   uint16
 }
 
 // NumL1Messages returns the number of L1 messages in this block.
@@ -269,20 +256,4 @@ func TxsToTxsData(txs types.Transactions) []*types.TransactionData {
 		}
 	}
 	return txsData
-}
-
-// DecodeBlockContext decodes the encoded block context byte array into BlockContext.
-func DecodeBlockContext(encodedBlockContext []byte) (*BlockContext, error) {
-	if len(encodedBlockContext) != 60 {
-		return nil, errors.New("block encoding is not 60 bytes long")
-	}
-
-	return &BlockContext{
-		BlockNumber:     binary.BigEndian.Uint64(encodedBlockContext[0:8]),
-		Timestamp:       binary.BigEndian.Uint64(encodedBlockContext[8:16]),
-		BaseFee:         binary.BigEndian.Uint64(encodedBlockContext[40:48]),
-		GasLimit:        binary.BigEndian.Uint64(encodedBlockContext[48:56]),
-		NumTransactions: binary.BigEndian.Uint16(encodedBlockContext[56:58]),
-		NumL1Messages:   binary.BigEndian.Uint16(encodedBlockContext[58:60]),
-	}, nil
 }

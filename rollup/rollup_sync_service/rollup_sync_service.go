@@ -474,29 +474,43 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 			if len(chunk) < 1+numBlocks*60 {
 				return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected minimum length: %v", len(chunk), 1+numBlocks*60)
 			}
+			daBlocks := make([]*codecv0.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlock, err := codecv0.DecodeDABlock(chunk[startIdx:endIdx])
+				if err != nil {
+					return nil, err
+				}
+				daBlocks[i] = daBlock
+			}
+
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
 		case encoding.CodecV1:
 			if len(chunk) == 1+numBlocks*60 {
 				return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected length: %v", len(chunk), 1+numBlocks*60)
 			}
+			daBlocks := make([]*codecv1.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlock, err := codecv1.DecodeDABlock(chunk[startIdx:endIdx])
+				if err != nil {
+					return nil, err
+				}
+				daBlocks[i] = daBlock
+			}
+
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
 		default:
 			return nil, fmt.Errorf("unexpected batch version %v", codecVersion)
 		}
-
-		blockContexts := make([]*encoding.BlockContext, numBlocks)
-		for i := 0; i < numBlocks; i++ {
-			startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-			endIdx := startIdx + 60
-			blockContext, err := encoding.DecodeBlockContext(chunk[startIdx:endIdx])
-			if err != nil {
-				return nil, err
-			}
-			blockContexts[i] = blockContext
-		}
-
-		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-			StartBlockNumber: blockContexts[0].BlockNumber,
-			EndBlockNumber:   blockContexts[len(blockContexts)-1].BlockNumber,
-		})
 	}
 	return chunkBlockRanges, nil
 }

@@ -330,7 +330,7 @@ func TestValidateBatchCodecv1(t *testing.T) {
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, &params.ChainConfig{BanachBlock: big.NewInt(0)}, nil)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, &params.ChainConfig{BernoulliBlock: big.NewInt(0)}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock1)
 
@@ -350,7 +350,7 @@ func TestValidateBatchCodecv1(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, &params.ChainConfig{BanachBlock: big.NewInt(0)}, nil)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, &params.ChainConfig{BernoulliBlock: big.NewInt(0)}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock2)
 
@@ -381,7 +381,7 @@ func TestValidateBatchFromCodecv0ToCodecv1(t *testing.T) {
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, &params.ChainConfig{BanachBlock: big.NewInt(16)}, nil)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, &params.ChainConfig{BernoulliBlock: big.NewInt(16)}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock1)
 
@@ -401,7 +401,7 @@ func TestValidateBatchFromCodecv0ToCodecv1(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, &params.ChainConfig{BanachBlock: big.NewInt(16)}, nil)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, &params.ChainConfig{BernoulliBlock: big.NewInt(16)}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock2)
 

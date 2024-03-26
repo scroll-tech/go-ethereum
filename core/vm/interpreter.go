@@ -29,7 +29,6 @@ import (
 type Config struct {
 	Debug                   bool      // Enables debugging
 	Tracer                  EVMLogger // Opcode logger
-	NoRecursion             bool      // Disables call, callcode, delegate call and create
 	NoBaseFee               bool      // Forces the EIP-1559 baseFee to 0 (needed for 0 price calls)
 	EnablePreimageRecording bool      // Enables recording of SHA3/keccak preimages
 
@@ -221,7 +220,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 		// Static portion of gas
 		cost = operation.constantGas // For tracing
-		if !contract.UseGas(operation.constantGas) {
+		if !contract.UseGas(cost) {
 			return nil, ErrOutOfGas
 		}
 

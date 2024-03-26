@@ -12,7 +12,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
@@ -494,38 +493,4 @@ func chunkL1CommitBlobDataSize(c *encoding.Chunk) (uint64, error) {
 		}
 	}
 	return dataSize, nil
-}
-
-// DecodeBlockRangesFromEncodedChunks decodes the provided chunks into a list of block ranges. Each chunk
-// contains information about multiple blocks, which are decoded and their ranges (from the
-// start block to the end block) are returned.
-func DecodeBlockRangesFromEncodedChunks(chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
-	var chunkBlockRanges []*rawdb.ChunkBlockRange
-	for _, chunk := range chunks {
-		if len(chunk) < 1 {
-			return nil, fmt.Errorf("invalid chunk, length is less than 1")
-		}
-
-		numBlocks := int(chunk[0])
-		if len(chunk) == 1+numBlocks*60 {
-			return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected length: %v", len(chunk), 1+numBlocks*60)
-		}
-
-		blockContexts := make([]*encoding.BlockContext, numBlocks)
-		for i := 0; i < numBlocks; i++ {
-			startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-			endIdx := startIdx + 60
-			blockContext, err := encoding.DecodeBlockContext(chunk[startIdx:endIdx])
-			if err != nil {
-				return nil, err
-			}
-			blockContexts[i] = blockContext
-		}
-
-		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-			StartBlockNumber: blockContexts[0].BlockNumber,
-			EndBlockNumber:   blockContexts[len(blockContexts)-1].BlockNumber,
-		})
-	}
-	return chunkBlockRanges, nil
 }

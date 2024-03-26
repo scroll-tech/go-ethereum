@@ -373,14 +373,7 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 		return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 	}
 
-	switch encoding.CodecVersion(args.Version) {
-	case encoding.CodecV0:
-		return codecv0.DecodeBlockRangesFromEncodedChunks(args.Chunks)
-	case encoding.CodecV1:
-		return codecv1.DecodeBlockRangesFromEncodedChunks(args.Chunks)
-	default:
-		return nil, fmt.Errorf("unexpected batch version %v", args.Version)
-	}
+	return decodeBlockRangesFromEncodedChunks(encoding.CodecVersion(args.Version), args.Chunks)
 }
 
 // validateBatch verifies the consistency between the L1 contract and L2 node data.
@@ -464,4 +457,46 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		WithdrawRoot:         localWithdrawRoot,
 	}
 	return endBlock.Header.Number.Uint64(), finalizedBatchMeta, nil
+}
+
+// decodeBlockRangesFromEncodedChunks decodes the provided chunks into a list of block ranges.
+func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
+	var chunkBlockRanges []*rawdb.ChunkBlockRange
+	for _, chunk := range chunks {
+		if len(chunk) < 1 {
+			return nil, fmt.Errorf("invalid chunk, length is less than 1")
+		}
+
+		numBlocks := int(chunk[0])
+
+		switch codecVersion {
+		case encoding.CodecV0:
+			if len(chunk) < 1+numBlocks*60 {
+				return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected minimum length: %v", len(chunk), 1+numBlocks*60)
+			}
+		case encoding.CodecV1:
+			if len(chunk) == 1+numBlocks*60 {
+				return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected length: %v", len(chunk), 1+numBlocks*60)
+			}
+		default:
+			return nil, fmt.Errorf("unexpected batch version %v", codecVersion)
+		}
+
+		blockContexts := make([]*encoding.BlockContext, numBlocks)
+		for i := 0; i < numBlocks; i++ {
+			startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+			endIdx := startIdx + 60
+			blockContext, err := encoding.DecodeBlockContext(chunk[startIdx:endIdx])
+			if err != nil {
+				return nil, err
+			}
+			blockContexts[i] = blockContext
+		}
+
+		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+			StartBlockNumber: blockContexts[0].BlockNumber,
+			EndBlockNumber:   blockContexts[len(blockContexts)-1].BlockNumber,
+		})
+	}
+	return chunkBlockRanges, nil
 }

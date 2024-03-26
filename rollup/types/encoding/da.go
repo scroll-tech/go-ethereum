@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
@@ -46,11 +45,9 @@ type Batch struct {
 // BlockContext represents the essential data of a block in the ScrollChain.
 // It provides an overview of block attributes including hash values, block numbers, gas details, and transaction counts.
 type BlockContext struct {
-	BlockHash       common.Hash
-	ParentHash      common.Hash
 	BlockNumber     uint64
 	Timestamp       uint64
-	BaseFee         *big.Int
+	BaseFee         uint64
 	GasLimit        uint64
 	NumTransactions uint16
 	NumL1Messages   uint16
@@ -283,6 +280,7 @@ func DecodeBlockContext(encodedBlockContext []byte) (*BlockContext, error) {
 	return &BlockContext{
 		BlockNumber:     binary.BigEndian.Uint64(encodedBlockContext[0:8]),
 		Timestamp:       binary.BigEndian.Uint64(encodedBlockContext[8:16]),
+		BaseFee:         binary.BigEndian.Uint64(encodedBlockContext[40:48]),
 		GasLimit:        binary.BigEndian.Uint64(encodedBlockContext[48:56]),
 		NumTransactions: binary.BigEndian.Uint16(encodedBlockContext[56:58]),
 		NumL1Messages:   binary.BigEndian.Uint16(encodedBlockContext[58:60]),

@@ -419,7 +419,7 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	}
 
 	var localBatchHash common.Hash
-	if !chainCfg.IsBanach(startBlock.Header.Number) {
+	if !chainCfg.IsBernoulli(startBlock.Header.Number) {
 		daBatch, err := codecv0.NewDABatch(batch)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to create codecv0 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)

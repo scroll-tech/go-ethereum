@@ -80,14 +80,21 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 	}
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
-		{StartBlockNumber: 335921, EndBlockNumber: 335928},
-		{StartBlockNumber: 335929, EndBlockNumber: 335933},
-		{StartBlockNumber: 335934, EndBlockNumber: 335938},
-		{StartBlockNumber: 335939, EndBlockNumber: 335942},
-		{StartBlockNumber: 335943, EndBlockNumber: 335945},
-		{StartBlockNumber: 335946, EndBlockNumber: 335949},
-		{StartBlockNumber: 335950, EndBlockNumber: 335956},
-		{StartBlockNumber: 335957, EndBlockNumber: 335962},
+		{StartBlockNumber: 4435142, EndBlockNumber: 4435142},
+		{StartBlockNumber: 4435143, EndBlockNumber: 4435144},
+		{StartBlockNumber: 4435145, EndBlockNumber: 4435145},
+		{StartBlockNumber: 4435146, EndBlockNumber: 4435146},
+		{StartBlockNumber: 4435147, EndBlockNumber: 4435147},
+		{StartBlockNumber: 4435148, EndBlockNumber: 4435148},
+		{StartBlockNumber: 4435149, EndBlockNumber: 4435150},
+		{StartBlockNumber: 4435151, EndBlockNumber: 4435151},
+		{StartBlockNumber: 4435152, EndBlockNumber: 4435152},
+		{StartBlockNumber: 4435153, EndBlockNumber: 4435153},
+		{StartBlockNumber: 4435154, EndBlockNumber: 4435154},
+		{StartBlockNumber: 4435155, EndBlockNumber: 4435155},
+		{StartBlockNumber: 4435156, EndBlockNumber: 4435156},
+		{StartBlockNumber: 4435157, EndBlockNumber: 4435157},
+		{StartBlockNumber: 4435158, EndBlockNumber: 4435158},
 	}
 
 	if len(expectedRanges) != len(ranges) {
@@ -96,7 +103,7 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 
 	for i := range ranges {
 		if *expectedRanges[i] != *ranges[i] {
-			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+			t.Errorf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
 		}
 	}
 }
@@ -130,7 +137,15 @@ func TestDecodeChunkRangesCodecv1(t *testing.T) {
 	}
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
-		{StartBlockNumber: 1, EndBlockNumber: 11},
+		{StartBlockNumber: 1690, EndBlockNumber: 1780},
+		{StartBlockNumber: 1781, EndBlockNumber: 1871},
+		{StartBlockNumber: 1872, EndBlockNumber: 1962},
+		{StartBlockNumber: 1963, EndBlockNumber: 2053},
+		{StartBlockNumber: 2054, EndBlockNumber: 2144},
+		{StartBlockNumber: 2145, EndBlockNumber: 2235},
+		{StartBlockNumber: 2236, EndBlockNumber: 2326},
+		{StartBlockNumber: 2327, EndBlockNumber: 2417},
+		{StartBlockNumber: 2418, EndBlockNumber: 2508},
 	}
 
 	if len(expectedRanges) != len(ranges) {
@@ -139,7 +154,7 @@ func TestDecodeChunkRangesCodecv1(t *testing.T) {
 
 	for i := range ranges {
 		if *expectedRanges[i] != *ranges[i] {
-			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+			t.Errorf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
 		}
 	}
 }

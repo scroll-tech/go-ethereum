@@ -59,17 +59,17 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 		scrollChainABI: scrollChainABI,
 	}
 
-	data, err := os.ReadFile("./testdata/commit_batch_transaction_codecv0.json")
+	data, err := os.ReadFile("./testdata/commitBatch_input_codecv0.json")
 	require.NoError(t, err, "Failed to read json file")
 
-	type transactionJson struct {
-		CallData string `json:"calldata"`
+	type tx struct {
+		Input string `json:"input"`
 	}
-	var txObj transactionJson
-	err = json.Unmarshal(data, &txObj)
+	var commitBatch tx
+	err = json.Unmarshal(data, &commitBatch)
 	require.NoError(t, err, "Failed to unmarshal transaction json")
 
-	testTxData, err := hex.DecodeString(txObj.CallData[2:])
+	testTxData, err := hex.DecodeString(commitBatch.Input[2:])
 	if err != nil {
 		t.Fatalf("Failed to decode string: %v", err)
 	}
@@ -101,6 +101,49 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 	}
 }
 
+func TestDecodeChunkRangesCodecv1(t *testing.T) {
+	scrollChainABI, err := scrollChainMetaData.GetAbi()
+	require.NoError(t, err)
+
+	service := &RollupSyncService{
+		scrollChainABI: scrollChainABI,
+	}
+
+	data, err := os.ReadFile("./testdata/commitBatch_input_codecv1.json")
+	require.NoError(t, err, "Failed to read json file")
+
+	type tx struct {
+		Input string `json:"input"`
+	}
+	var commitBatch tx
+	err = json.Unmarshal(data, &commitBatch)
+	require.NoError(t, err, "Failed to unmarshal transaction json")
+
+	testTxData, err := hex.DecodeString(commitBatch.Input[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode string: %v", err)
+	}
+
+	ranges, err := service.decodeChunkBlockRanges(testTxData)
+	if err != nil {
+		t.Fatalf("Failed to decode chunk ranges: %v", err)
+	}
+
+	expectedRanges := []*rawdb.ChunkBlockRange{
+		{StartBlockNumber: 1, EndBlockNumber: 11},
+	}
+
+	if len(expectedRanges) != len(ranges) {
+		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(ranges))
+	}
+
+	for i := range ranges {
+		if *expectedRanges[i] != *ranges[i] {
+			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+		}
+	}
+}
+
 func TestGetChunkRangesCodecv0(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
 		Scroll: params.ScrollConfig{
@@ -112,7 +155,7 @@ func TestGetChunkRangesCodecv0(t *testing.T) {
 	}
 	db := rawdb.NewDatabase(memorydb.New())
 
-	rlpData, err := os.ReadFile("./testdata/commit_batch_tx_codecv0.rlp")
+	rlpData, err := os.ReadFile("./testdata/commitBatch_codecv0.rlp")
 	if err != nil {
 		t.Fatalf("Failed to read RLP data: %v", err)
 	}

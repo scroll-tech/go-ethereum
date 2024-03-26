@@ -472,7 +472,7 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 		switch codecVersion {
 		case encoding.CodecV0:
 			if len(chunk) < 1+numBlocks*60 {
-				return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected minimum length: %v", len(chunk), 1+numBlocks*60)
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
 			}
 			daBlocks := make([]*codecv0.DABlock, numBlocks)
 			for i := 0; i < numBlocks; i++ {
@@ -490,8 +490,8 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
 			})
 		case encoding.CodecV1:
-			if len(chunk) == 1+numBlocks*60 {
-				return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected length: %v", len(chunk), 1+numBlocks*60)
+			if len(chunk) != 1+numBlocks*60 {
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
 			}
 			daBlocks := make([]*codecv1.DABlock, numBlocks)
 			for i := 0; i < numBlocks; i++ {

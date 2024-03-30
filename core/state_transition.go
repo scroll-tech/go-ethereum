@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	cmath "github.com/scroll-tech/go-ethereum/common/math"
@@ -27,10 +28,13 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
+
+var evmCallExecutionTimer = metrics.NewRegisteredTimer("evm/call/execution", nil)
 
 /*
 The State Transitioning Model
@@ -284,6 +288,7 @@ func (st *StateTransition) preCheck() error {
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
+	// Note: Logically, this should be `IsCurie`, but we keep `IsLondon` to ensure backward compatibility.
 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 		if !st.evm.Config.NoBaseFee || st.gasFeeCap.BitLen() > 0 || st.gasTipCap.BitLen() > 0 {
@@ -384,7 +389,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		evmCallStart := time.Now()
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		evmCallExecutionTimer.Update(time.Since(evmCallStart))
 	}
 
 	// no refunds for l1 messages
@@ -405,12 +412,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
 	effectiveTip := st.gasPrice
-	if rules.IsLondon {
-		if st.evm.Context.BaseFee != nil {
-			effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
-		} else {
-			effectiveTip = cmath.BigMin(st.gasTipCap, st.gasFeeCap)
-		}
+
+	// only burn the base fee if the fee vault is not enabled
+	if rules.IsCurie && !st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
+		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
 	}
 
 	// The L2 Fee is the same as the fee that is charged in the normal geth

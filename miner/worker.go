@@ -39,6 +39,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -90,6 +92,17 @@ var (
 	l1TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l1/ccc_unknown_err", nil)
 	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
 	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
+	l2CommitTxsTimer                  = metrics.NewRegisteredTimer("miner/commit/txs_all", nil)
+	l2CommitTxTimer                   = metrics.NewRegisteredTimer("miner/commit/tx_all", nil)
+	l2CommitTxTraceTimer              = metrics.NewRegisteredTimer("miner/commit/tx_trace", nil)
+	l2CommitTxCCCTimer                = metrics.NewRegisteredTimer("miner/commit/tx_ccc", nil)
+	l2CommitTxApplyTimer              = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
+	l2CommitTimer                     = metrics.NewRegisteredTimer("miner/commit/all", nil)
+	l2CommitTraceTimer                = metrics.NewRegisteredTimer("miner/commit/trace", nil)
+	l2CommitCCCTimer                  = metrics.NewRegisteredTimer("miner/commit/ccc", nil)
+	l2CommitNewWorkTimer              = metrics.NewRegisteredTimer("miner/commit/new_work_all", nil)
+	l2CommitNewWorkL1CollectTimer     = metrics.NewRegisteredTimer("miner/commit/new_work_collect_l1", nil)
+	l2ResultTimer                     = metrics.NewRegisteredTimer("miner/result/all", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -110,7 +123,7 @@ type environment struct {
 	receipts []*types.Receipt
 
 	// circuit capacity check related fields
-	traceEnv       *core.TraceEnv        // env for tracing
+	traceEnv       *tracing.TraceEnv     // env for tracing
 	accRows        *types.RowConsumption // accumulated row consumption for a block
 	nextL1MsgIndex uint64                // next L1 queue index to be processed
 }
@@ -142,6 +155,13 @@ type newWorkReq struct {
 type intervalAdjust struct {
 	ratio float64
 	inc   bool
+}
+
+// prioritizedTransaction represents a single transaction that
+// should be processed as the first transaction in the next block.
+type prioritizedTransaction struct {
+	blockNumber uint64
+	tx          *types.Transaction
 }
 
 // worker is the main object which takes care of submitting new work to consensus engine
@@ -211,6 +231,7 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
+	prioritizedTx          *prioritizedTransaction
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -678,6 +699,7 @@ func (w *worker) resultLoop() {
 			if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
 				continue
 			}
+
 			var (
 				sealhash = w.engine.SealHash(block.Header())
 				hash     = block.Hash()
@@ -686,10 +708,14 @@ func (w *worker) resultLoop() {
 			w.pendingMu.RLock()
 			task, exist := w.pendingTasks[sealhash]
 			w.pendingMu.RUnlock()
+
 			if !exist {
 				log.Error("Block found but no relative pending task", "number", block.Number(), "sealhash", sealhash, "hash", hash)
 				continue
 			}
+
+			startTime := time.Now()
+
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
 			var (
 				receipts = make([]*types.Receipt, len(task.receipts))
@@ -751,6 +777,7 @@ func (w *worker) resultLoop() {
 			// Commit block and state to database.
 			_, err := w.chain.WriteBlockWithState(block, receipts, logs, task.state, true)
 			if err != nil {
+				l2ResultTimer.Update(time.Since(startTime))
 				log.Error("Failed writing block to chain", "err", err)
 				continue
 			}
@@ -762,6 +789,8 @@ func (w *worker) resultLoop() {
 
 			// Insert the block into the set of pending ones to resultLoop for confirmations
 			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
+
+			l2ResultTimer.Update(time.Since(startTime))
 
 		case <-w.exitCh:
 			return
@@ -781,7 +810,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
 	// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
 	commitStateAfterApply := false
-	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, parent,
+	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
 		commitStateAfterApply)
@@ -813,14 +842,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	env.tcount = 0
 	env.blockSize = 0
 	env.l1TxCount = 0
-
-	// find next L1 message queue index
-	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), parent.Hash())
-	if nextQueueIndex == nil {
-		// the parent must have been processed before we start a new mining job.
-		log.Crit("Failed to read last L1 message in L2 block", "parent.Hash()", parent.Hash().String())
-	}
-	env.nextL1MsgIndex = *nextQueueIndex
+	env.nextL1MsgIndex = traceEnv.StartL1QueueIndex
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
 	// processes in the mean time and starting a new one.
@@ -891,6 +913,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	// do not do CCC checks on follower nodes
 	if w.isRunning() {
+		defer func(t0 time.Time) {
+			l2CommitTxTimer.Update(time.Since(t0))
+		}(time.Now())
+
 		// do gas limit check up-front and do not run CCC if it fails
 		if w.current.gasPool.Gas() < tx.Gas() {
 			return nil, nil, core.ErrGasLimitReached
@@ -911,16 +937,20 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
-		traces, err = w.current.traceEnv.GetBlockTrace(
-			types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
-		)
+		withTimer(l2CommitTxTraceTimer, func() {
+			traces, err = w.current.traceEnv.GetBlockTrace(
+				types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
+			)
+		})
 		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
 		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
 		w.current.state.RevertToSnapshot(snap)
 		if err != nil {
 			return nil, nil, err
 		}
-		accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
+		withTimer(l2CommitTxCCCTimer, func() {
+			accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
+		})
 		if err != nil {
 			return nil, traces, err
 		}
@@ -935,7 +965,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	// create new snapshot for `core.ApplyTransaction`
 	snap := w.current.state.Snapshot()
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+	var receipt *types.Receipt
+	withTimer(l2CommitTxApplyTimer, func() {
+		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+	})
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 
@@ -963,6 +996,10 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 }
 
 func (w *worker) commitTransactions(txs types.OrderedTransactionSet, coinbase common.Address, interrupt *int32) (bool, bool) {
+	defer func(t0 time.Time) {
+		l2CommitTxsTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	var circuitCapacityReached bool
 
 	// Short circuit if current is nil
@@ -1109,6 +1146,17 @@ loop:
 				// but it's a trade-off between tracing overhead & block usage rate
 				log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String())
 				log.Info("Skipping message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "accumulated row consumption overflow")
+
+				// Prioritize transaction for the next block.
+				// If there are no new L1 messages, this transaction will be the 1st transaction in the next block,
+				// at which point we can definitively decide if we should skip it or not.
+				log.Debug("Prioritizing transaction for next block", "blockNumber", w.current.header.Number.Uint64()+1, "tx", tx.Hash().String())
+				w.prioritizedTx = &prioritizedTransaction{
+					blockNumber: w.current.header.Number.Uint64() + 1,
+					tx:          tx,
+				}
+				atomic.AddInt32(&w.newTxs, int32(1))
+
 				circuitCapacityReached = true
 				break loop
 			} else {
@@ -1187,6 +1235,11 @@ loop:
 			w.checkCurrentTxNumWithCCC(w.current.tcount)
 			break loop
 
+		case (errors.Is(err, core.ErrInsufficientFunds) || errors.Is(errors.Unwrap(err), core.ErrInsufficientFunds)):
+			log.Trace("Skipping tx with insufficient funds", "sender", from, "tx", tx.Hash().String())
+			txs.Pop()
+			w.eth.TxPool().RemoveTx(tx.Hash(), true)
+
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
@@ -1250,6 +1303,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
+	defer func(t0 time.Time) {
+		l2CommitNewWorkTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
 	w.circuitCapacityChecker.Reset()
@@ -1266,20 +1323,15 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		Extra:      w.extra,
 		Time:       uint64(timestamp),
 	}
-	// Set baseFee and GasLimit if we are on an EIP-1559 chain
-	if w.chainConfig.IsLondon(header.Number) {
-		if w.chainConfig.Scroll.BaseFeeEnabled() {
-			header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
-		} else {
-			// When disabling EIP-2718 or EIP-1559, we do not set baseFeePerGas in RPC response.
-			// Setting BaseFee as nil here can help outside SDK calculates l2geth's RLP encoding,
-			// otherwise the l2geth's BaseFee is not known from the outside.
-			header.BaseFee = nil
+	// Set baseFee if we are on an EIP-1559 chain
+	if w.chainConfig.IsCurie(header.Number) {
+		state, err := w.chain.StateAt(parent.Root())
+		if err != nil {
+			log.Error("Failed to create mining context", "err", err)
+			return
 		}
-		if !w.chainConfig.IsLondon(parent.Number()) {
-			parentGasLimit := parent.GasLimit() * params.ElasticityMultiplier
-			header.GasLimit = core.CalcGasLimit(parentGasLimit, w.config.GasCeil)
-		}
+		parentL1BaseFee := fees.GetL1BaseFee(state)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -1350,7 +1402,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// fetch l1Txs
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
-		l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
+		withTimer(l2CommitNewWorkL1CollectTimer, func() {
+			l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
+		})
 	}
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
@@ -1377,6 +1431,19 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
 			return
 		}
+		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		if skipCommit {
+			return
+		}
+	}
+	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
+		w.prioritizedTx = nil
+	}
+	if !circuitCapacityReached && w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
+		tx := w.prioritizedTx.tx
+		from, _ := types.Sender(w.current.signer, tx) // error already checked before
+		txList := map[common.Address]types.Transactions{from: []*types.Transaction{tx}}
+		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, txList, header.BaseFee)
 		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
 			return
@@ -1410,6 +1477,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
 func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time) error {
+	defer func(t0 time.Time) {
+		l2CommitTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	// set w.current.accRows for empty-but-not-genesis block
 	if (w.current.header.Number.Uint64() != 0) &&
 		(w.current.accRows == nil || len(*w.current.accRows) == 0) && w.isRunning() {
@@ -1419,7 +1490,11 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			"number", w.current.header.Number,
 			"hash", w.current.header.Hash().String(),
 		)
-		traces, err := w.current.traceEnv.GetBlockTrace(types.NewBlockWithHeader(w.current.header))
+		var traces *types.BlockTrace
+		var err error
+		withTimer(l2CommitTraceTimer, func() {
+			traces, err = w.current.traceEnv.GetBlockTrace(types.NewBlockWithHeader(w.current.header))
+		})
 		if err != nil {
 			return err
 		}
@@ -1427,7 +1502,10 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 		// however, we need to clean it up for an empty block
 		traces.ExecutionResults = traces.ExecutionResults[:0]
 		traces.TxStorageTraces = traces.TxStorageTraces[:0]
-		accRows, err := w.circuitCapacityChecker.ApplyBlock(traces)
+		var accRows *types.RowConsumption
+		withTimer(l2CommitCCCTimer, func() {
+			accRows, err = w.circuitCapacityChecker.ApplyBlock(traces)
+		})
 		if err != nil {
 			return err
 		}
@@ -1496,4 +1574,12 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
 	}
 	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
+}
+
+func withTimer(timer metrics.Timer, f func()) {
+	if metrics.Enabled {
+		timer.Time(f)
+	} else {
+		f()
+	}
 }

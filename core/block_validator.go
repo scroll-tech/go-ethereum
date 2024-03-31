@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -27,9 +28,18 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/trie"
+)
+
+var (
+	validateL1MessagesTimer     = metrics.NewRegisteredTimer("validator/l1msg", nil)
+	validateRowConsumptionTimer = metrics.NewRegisteredTimer("validator/rowconsumption", nil)
+	validateTraceTimer          = metrics.NewRegisteredTimer("validator/trace", nil)
+	validateLockTimer           = metrics.NewRegisteredTimer("validator/lock", nil)
+	validateCccTimer            = metrics.NewRegisteredTimer("validator/ccc", nil)
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -43,23 +53,30 @@ type BlockValidator struct {
 
 	// circuit capacity checker related fields
 	checkCircuitCapacity   bool                                           // whether enable circuit capacity check
-	db                     ethdb.Database                                 // db to store row consumption
 	cMu                    sync.Mutex                                     // mutex for circuit capacity checker
+	tracer                 tracerWrapper                                  // scroll tracer wrapper
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker // circuit capacity checker instance
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine, db ethdb.Database, checkCircuitCapacity bool) *BlockValidator {
+func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
 	validator := &BlockValidator{
-		config:                 config,
-		engine:                 engine,
-		bc:                     blockchain,
-		checkCircuitCapacity:   checkCircuitCapacity,
-		db:                     db,
-		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
+		config: config,
+		engine: engine,
+		bc:     blockchain,
 	}
-	log.Info("created new BlockValidator", "CircuitCapacityChecker ID", validator.circuitCapacityChecker.ID)
 	return validator
+}
+
+type tracerWrapper interface {
+	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
+}
+
+func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper) {
+	v.checkCircuitCapacity = true
+	v.tracer = tracer
+	v.circuitCapacityChecker = circuitcapacitychecker.NewCircuitCapacityChecker(true)
+	log.Info("new CircuitCapacityChecker in BlockValidator", "ID", v.circuitCapacityChecker.ID)
 }
 
 // ValidateBody validates the given block's uncles and verifies the block
@@ -101,7 +118,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		// if a block's RowConsumption has been stored, which means it has been processed before,
 		// (e.g., in miner/worker.go or in insertChain),
 		// we simply skip its calculation and validation
-		if rawdb.ReadBlockRowConsumption(v.db, block.Hash()) != nil {
+		if rawdb.ReadBlockRowConsumption(v.bc.db, block.Hash()) != nil {
 			return nil
 		}
 		rowConsumption, err := v.validateCircuitRowConsumption(block)
@@ -115,7 +132,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 			"hash", block.Hash().String(),
 			"rowConsumption", rowConsumption,
 		)
-		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), rowConsumption)
+		rawdb.WriteBlockRowConsumption(v.bc.db, block.Hash(), rowConsumption)
 	}
 	return nil
 }
@@ -127,6 +144,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - L1 messages follow the QueueIndex order.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
 func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
+	defer func(t0 time.Time) {
+		validateL1MessagesTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	// skip DB read if the block contains no L1 messages
 	if !block.ContainsL1Messages() {
 		return nil
@@ -171,6 +192,9 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 		// TODO: consider verifying that skipped messages overflow
 		for index := queueIndex; index < txQueueIndex; index++ {
 			if exists := it.Next(); !exists {
+				if err := it.Error(); err != nil {
+					log.Error("Unexpected DB error in ValidateL1Messages", "err", err, "queueIndex", queueIndex)
+				}
 				// the message in this block is not available in our local db.
 				// we'll reprocess this block at a later time.
 				return consensus.ErrMissingL1MessageData
@@ -179,12 +203,15 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 			l1msg := it.L1Message()
 			skippedTx := types.NewTx(&l1msg)
 			log.Debug("Skipped L1 message", "queueIndex", index, "tx", skippedTx.Hash().String(), "block", blockHash.String())
-			rawdb.WriteSkippedTransaction(v.db, skippedTx, nil, "unknown", block.NumberU64(), &blockHash)
+			rawdb.WriteSkippedTransaction(v.bc.db, skippedTx, nil, "unknown", block.NumberU64(), &blockHash)
 		}
 
 		queueIndex = txQueueIndex + 1
 
 		if exists := it.Next(); !exists {
+			if err := it.Error(); err != nil {
+				log.Error("Unexpected DB error in ValidateL1Messages", "err", err, "queueIndex", txQueueIndex)
+			}
 			// the message in this block is not available in our local db.
 			// we'll reprocess this block at a later time.
 			return consensus.ErrMissingL1MessageData
@@ -260,7 +287,7 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 	return limit
 }
 
-func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
+func (v *BlockValidator) createTraceEnvAndGetBlockTrace(block *types.Block) (*types.BlockTrace, error) {
 	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
 		return nil, errors.New("validateCircuitRowConsumption: no parent block found")
@@ -271,10 +298,14 @@ func (v *BlockValidator) createTraceEnv(block *types.Block) (*TraceEnv, error) {
 		return nil, err
 	}
 
-	return CreateTraceEnv(v.config, v.bc, v.engine, v.db, statedb, parent, block, true)
+	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.bc.db, statedb, parent, block, true)
 }
 
 func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {
+	defer func(t0 time.Time) {
+		validateRowConsumptionTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	log.Trace(
 		"Validator apply ccc for block",
 		"id", v.circuitCapacityChecker.ID,
@@ -283,22 +314,23 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 		"len(txs)", block.Transactions().Len(),
 	)
 
-	env, err := v.createTraceEnv(block)
+	traceStartTime := time.Now()
+	traces, err := v.createTraceEnvAndGetBlockTrace(block)
 	if err != nil {
 		return nil, err
 	}
+	validateTraceTimer.Update(time.Since(traceStartTime))
 
-	traces, err := env.GetBlockTrace(block)
-	if err != nil {
-		return nil, err
-	}
-
+	lockStartTime := time.Now()
 	v.cMu.Lock()
 	defer v.cMu.Unlock()
+	validateLockTimer.Update(time.Since(lockStartTime))
 
+	cccStartTime := time.Now()
 	v.circuitCapacityChecker.Reset()
 	log.Trace("Validator reset ccc", "id", v.circuitCapacityChecker.ID)
 	rc, err := v.circuitCapacityChecker.ApplyBlock(traces)
+	validateCccTimer.Update(time.Since(cccStartTime))
 
 	log.Trace(
 		"Validator apply ccc for block result",

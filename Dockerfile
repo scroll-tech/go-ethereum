@@ -4,7 +4,7 @@ ARG VERSION=""
 ARG BUILDNUM=""
 
 # Build libzkp dependency
-FROM scrolltech/go-rust-builder:go-1.19-rust-nightly-2022-12-10 as chef
+FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as chef
 WORKDIR app
 
 FROM chef as planner
@@ -17,11 +17,12 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY ./rollup/circuitcapacitychecker/libzkp .
+RUN cargo clean
 RUN cargo build --release
 RUN find ./ | grep libzktrie.so | xargs -I{} cp {} /app/target/release/
 
 # Build Geth in a stock Go builder container
-FROM scrolltech/go-rust-builder:go-1.19-rust-nightly-2022-12-10 as builder
+FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as builder
 
 ADD . /go-ethereum
 COPY --from=zkp-builder /app/target/release/libzkp.so /usr/local/lib/

@@ -2,8 +2,6 @@ package fees
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -190,36 +188,6 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB) (*big.Int, error) 
 	return l1DataFee, nil
 }
 
-func calculateL2Fee(tx *types.Transaction) *big.Int {
-	l2GasLimit := new(big.Int).SetUint64(tx.Gas())
-	return new(big.Int).Mul(tx.GasPrice(), l2GasLimit)
-}
-
-func VerifyFee(signer types.Signer, tx *types.Transaction, state StateDB) error {
-	from, err := types.Sender(signer, tx)
-	if err != nil {
-		return errors.New("invalid transaction: invalid sender")
-	}
-
-	balance := state.GetBalance(from)
-	l2Fee := calculateL2Fee(tx)
-	l1DataFee, err := CalculateL1DataFee(tx, state)
-	if err != nil {
-		return fmt.Errorf("invalid transaction: %w", err)
-	}
-
-	cost := tx.Value()
-	cost = cost.Add(cost, l2Fee)
-	if balance.Cmp(cost) < 0 {
-		return errors.New("invalid transaction: insufficient funds for gas * price + value")
-	}
-
-	cost = cost.Add(cost, l1DataFee)
-	if balance.Cmp(cost) < 0 {
-		return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
-	}
-
-	// TODO: check GasPrice is in an expected range
-
-	return nil
+func GetL1BaseFee(state StateDB) *big.Int {
+	return state.GetState(rcfg.L1GasPriceOracleAddress, rcfg.L1BaseFeeSlot).Big()
 }

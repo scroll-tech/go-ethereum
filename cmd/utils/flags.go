@@ -73,6 +73,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/nat"
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -836,6 +837,12 @@ var (
 		Usage: "Enable circuit capacity check during block validation",
 	}
 
+	// Rollup verify service settings
+	RollupVerifyEnabledFlag = cli.BoolFlag{
+		Name:  "rollup.verify",
+		Usage: "Enable verification of batch consistency between L1 and L2 in rollup",
+	}
+
 	// Max block range for `eth_getLogs` method
 	MaxBlockRangeFlag = cli.Int64Flag{
 		Name:  "rpc.getlogs.maxrange",
@@ -1546,6 +1553,12 @@ func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+func setEnableRollupVerify(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(RollupVerifyEnabledFlag.Name) {
+		cfg.EnableRollupVerify = ctx.GlobalBool(RollupVerifyEnabledFlag.Name)
+	}
+}
+
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
 		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
@@ -1620,6 +1633,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setWhitelist(ctx, cfg)
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
+	setEnableRollupVerify(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
 
 	// Cap the cache allowance and tune the garbage collector
@@ -1891,7 +1905,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 		if err != nil {
 			Fatalf("Failed to register the Ethereum service: %v", err)
 		}
-		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend))
+		scrollTracerWrapper := tracing.NewTracerWrapper()
+		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, scrollTracerWrapper))
 		return backend.ApiBackend, nil
 	}
 
@@ -1920,7 +1935,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 			Fatalf("Failed to create the LES server: %v", err)
 		}
 	}
-	stack.RegisterAPIs(tracers.APIs(backend.APIBackend))
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	stack.RegisterAPIs(tracers.APIs(backend.APIBackend, scrollTracerWrapper))
 	return backend.APIBackend, backend
 }
 
@@ -2117,7 +2133,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 
 	// TODO(rjl493456442) disable snapshot generation/wiping if the chain is read only.
 	// Disable transaction indexing/unindexing by default.
-	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg, nil, nil, false)
+	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg, nil, nil)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

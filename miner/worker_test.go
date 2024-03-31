@@ -141,7 +141,7 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 
 	chain, _ := core.NewBlockChain(db, &core.CacheConfig{TrieDirtyDisabled: true}, gspec.Config, engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true})}, nil, nil)
 	txpool := core.NewTxPool(testTxPoolConfig, chainConfig, chain)
 
 	// Generate a small n-block chain and an uncle block for it
@@ -242,7 +242,7 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 	b.genesis.MustCommit(db2)
 	chain, _ := core.NewBlockChain(db2, nil, b.chain.Config(), engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
 	defer chain.Stop()
 
 	// Ignore empty commit here for less noise.
@@ -572,7 +572,7 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 	b.genesis.MustCommit(db)
 	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
 	defer chain.Stop()
 
 	// Ignore empty commit here for less noise.
@@ -639,7 +639,7 @@ func TestAcceptableTxlimit(t *testing.T) {
 	b.genesis.MustCommit(db)
 	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
 	defer chain.Stop()
 
 	// Ignore empty commit here for less noise.
@@ -702,7 +702,7 @@ func TestUnacceptableTxlimit(t *testing.T) {
 	b.genesis.MustCommit(db)
 	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
 	defer chain.Stop()
 
 	// Ignore empty commit here for less noise.
@@ -765,7 +765,7 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 	b.genesis.MustCommit(db)
 	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
 	defer chain.Stop()
 
 	// Ignore empty commit here for less noise.
@@ -827,7 +827,7 @@ func l1MessageTest(t *testing.T, msgs []types.L1MessageTx, withL2Tx bool, callba
 	b.genesis.MustCommit(db)
 	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
 		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
 	defer chain.Stop()
 
 	// Ignore empty commit here for less noise.
@@ -1113,6 +1113,85 @@ func TestOversizedTxThenNormal(t *testing.T) {
 			return true
 		}
 	})
+}
+
+func TestPrioritizeOverflowTx(t *testing.T) {
+	assert := assert.New(t)
+
+	var (
+		chainConfig = params.AllCliqueProtocolChanges
+		db          = rawdb.NewMemoryDatabase()
+		engine      = clique.New(chainConfig.Clique, db)
+	)
+
+	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.LondonBlock = big.NewInt(0)
+
+	w, b := newTestWorker(t, chainConfig, engine, db, 0)
+	defer w.close()
+
+	// This test chain imports the mined blocks.
+	db2 := rawdb.NewMemoryDatabase()
+	b.genesis.MustCommit(db2)
+	chain, _ := core.NewBlockChain(db2, nil, b.chain.Config(), engine, vm.Config{
+		Debug:  true,
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
+	defer chain.Stop()
+
+	// Ignore empty commit here for less noise.
+	w.skipSealHook = func(task *task) bool {
+		return len(task.receipts) == 0
+	}
+
+	// Wait for mined blocks.
+	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
+	defer sub.Unsubscribe()
+
+	// Define 3 transactions:
+	// A --> B (nonce: 0, gas: 20)
+	tx0, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(100000000000000000), params.TxGas, big.NewInt(20*params.InitialBaseFee), nil), types.HomesteadSigner{}, testBankKey)
+	// A --> B (nonce: 1, gas: 5)
+	tx1, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(0), params.TxGas, big.NewInt(5*params.InitialBaseFee), nil), types.HomesteadSigner{}, testBankKey)
+	// B --> A (nonce: 0, gas: 20)
+	tx2, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testUserAddress), testBankAddress, big.NewInt(0), params.TxGas, big.NewInt(20*params.InitialBaseFee), nil), types.HomesteadSigner{}, testUserKey)
+
+	// Process 2 transactions with gas order: tx0 > tx1, tx1 will overflow.
+	b.txPool.AddRemotesSync([]*types.Transaction{tx0, tx1})
+	w.getCCC().ScheduleError(2, circuitcapacitychecker.ErrBlockRowConsumptionOverflow)
+	w.start()
+
+	select {
+	case ev := <-sub.Chan():
+		w.stop()
+		block := ev.Data.(core.NewMinedBlockEvent).Block
+		assert.Equal(1, len(block.Transactions()))
+		assert.Equal(tx0.Hash(), block.Transactions()[0].Hash())
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
+		}
+	case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
+		t.Fatalf("timeout")
+	}
+
+	// Process 2 transactions with gas order: tx2 > tx1,
+	// but we will prioritize tx1.
+	b.txPool.AddRemotesSync([]*types.Transaction{tx2})
+	w.start()
+
+	select {
+	case ev := <-sub.Chan():
+		w.stop()
+		block := ev.Data.(core.NewMinedBlockEvent).Block
+		assert.Equal(2, len(block.Transactions()))
+		// note: txs are not included according to their gas fee order
+		assert.Equal(tx1.Hash(), block.Transactions()[0].Hash())
+		assert.Equal(tx2.Hash(), block.Transactions()[1].Hash())
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
+		}
+	case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
+		t.Fatalf("timeout")
+	}
 }
 
 func TestSkippedTransactionDatabaseEntries(t *testing.T) {

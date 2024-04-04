@@ -228,10 +228,6 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			if len(chunks) == 0 {
-				return fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", event.BatchIndex.Uint64())
-			}
-
 			endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
 			if err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)

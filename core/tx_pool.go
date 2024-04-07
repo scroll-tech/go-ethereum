@@ -1682,10 +1682,7 @@ func (as *accountSet) containsTx(tx *types.Transaction) bool {
 // add inserts a new address into the set to track.
 func (as *accountSet) add(addr common.Address) {
 	as.accounts[addr] = struct{}{}
-	if as.cache != nil {
-		addrsPool.Put((*as.cache)[:0])
-		as.cache = nil
-	}
+	as.cache = nil
 }
 
 // addTx adds the sender of tx into the set.
@@ -1699,7 +1696,7 @@ func (as *accountSet) addTx(tx *types.Transaction) {
 // reuse. The returned slice should not be changed!
 func (as *accountSet) flatten() []common.Address {
 	if as.cache == nil {
-		accounts := addrsPool.Get().([]common.Address)
+		accounts := make([]common.Address, 0, len(as.accounts))
 		for account := range as.accounts {
 			accounts = append(accounts, account)
 		}
@@ -1713,10 +1710,7 @@ func (as *accountSet) merge(other *accountSet) {
 	for addr := range other.accounts {
 		as.accounts[addr] = struct{}{}
 	}
-	if as.cache != nil {
-		addrsPool.Put((*as.cache)[:0])
-		as.cache = nil
-	}
+	as.cache = nil
 }
 
 // txLookup is used internally by TxPool to track transactions while allowing

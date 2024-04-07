@@ -131,19 +131,6 @@ var (
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
 )
 
-var (
-	addrsPool = sync.Pool{
-		New: func() interface{} {
-			return make([]common.Address, 0, 8)
-		},
-	}
-	addrBeatPool = sync.Pool{
-		New: func() interface{} {
-			return make(addressesByHeartbeat, 0, 8)
-		},
-	}
-)
-
 // TxStatus is the current status of a transaction as seen by the pool.
 type TxStatus uint
 
@@ -283,8 +270,6 @@ type TxPool struct {
 	wg              sync.WaitGroup // tracks loop, scheduleReorgLoop
 	initDoneCh      chan struct{}  // is closed once the pool is initialized (for tests)
 
-	spammers *prque.Prque
-
 	changesSinceReorg int // A counter for how many drops we've performed in-between reorg.
 }
 
@@ -316,7 +301,6 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		reorgShutdownCh: make(chan struct{}),
 		initDoneCh:      make(chan struct{}),
 		gasPrice:        new(big.Int).SetUint64(config.PriceLimit),
-		spammers:        prque.New(nil),
 	}
 	pool.locals = newAccountSet(pool.signer)
 	for _, addr := range config.Locals {
@@ -1218,14 +1202,13 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			}
 		}
 		// Reset needs promote for all addresses
-		promoteAddrs = addrsPool.Get().([]common.Address)
+		promoteAddrs = make([]common.Address, 0, len(pool.queue))
 		for addr := range pool.queue {
 			promoteAddrs = append(promoteAddrs, addr)
 		}
 	}
 	// Check for pending transactions for every account that sent new ones
 	promoted := pool.promoteExecutables(promoteAddrs)
-	defer addrsPool.Put(promoteAddrs[:0])
 
 	// If a new block appeared, validate the pool of pending transactions. This will
 	// remove any transaction that has been included in the block or was invalidated
@@ -1465,19 +1448,18 @@ func (pool *TxPool) truncatePending() {
 
 	pendingBeforeCap := pending
 	// Assemble a spam order to penalize large transactors first
-	pool.spammers.Reset()
+	spammers := prque.New(nil)
 	for addr, list := range pool.pending {
 		// Only evict transactions from high rollers
 		if !pool.locals.contains(addr) && uint64(list.Len()) > pool.config.AccountSlots {
-			pool.spammers.Push(addr, int64(list.Len()))
+			spammers.Push(addr, int64(list.Len()))
 		}
 	}
 	// Gradually drop transactions from offenders
-	offenders := addrsPool.Get().([]common.Address)
-	defer addrsPool.Put(offenders[:0])
-	for pending > pool.config.GlobalSlots && !pool.spammers.Empty() {
+	offenders := []common.Address{}
+	for pending > pool.config.GlobalSlots && !spammers.Empty() {
 		// Retrieve the next offender if not local address
-		offender, _ := pool.spammers.Pop()
+		offender, _ := spammers.Pop()
 		offenders = append(offenders, offender.(common.Address))
 
 		// Equalize balances until all the same or below threshold
@@ -1550,8 +1532,7 @@ func (pool *TxPool) truncateQueue() {
 	}
 
 	// Sort all accounts with queued transactions by heartbeat
-	addresses := addrBeatPool.Get().(addressesByHeartbeat)
-	defer addrBeatPool.Put(addresses[:0])
+	addresses := make(addressesByHeartbeat, 0, len(pool.queue))
 	for addr := range pool.queue {
 		if !pool.locals.contains(addr) { // don't drop locals
 			addresses = append(addresses, addressByHeartbeat{addr, pool.beats[addr]})

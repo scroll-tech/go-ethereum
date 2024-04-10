@@ -1342,6 +1342,11 @@ func (w *worker) calcAndSetAccRowsForEnv(env *environment) error {
 	if err != nil {
 		return err
 	}
+	if traces == nil {
+		log.Warn("running in light mode and traces is nil, don't update `env.accRows`")
+		return nil
+	}
+
 	// truncate ExecutionResults&TxStorageTraces, because we declare their lengths with a dummy tx before;
 	// however, we need to clean it up for an empty block
 	traces.ExecutionResults = traces.ExecutionResults[:0]

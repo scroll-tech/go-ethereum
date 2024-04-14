@@ -107,6 +107,7 @@ var (
 	l2TxsCountLimitMeter              = metrics.NewRegisteredMeter("miner/consume/count/limit", nil)
 	l1TxsQueueIndexUnexpected         = metrics.NewRegisteredMeter("miner/consume/queue_index_expected", nil)
 	l2BlockSizeLimitReached           = metrics.NewRegisteredMeter("miner/consume/block_size_limit_reached", nil)
+	commitTransactionsLoopsGauge      = metrics.NewRegisteredGauge("miner/consume/commit_transactions_tx_loops", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -1019,9 +1020,10 @@ func (w *worker) commitTransactions(txs types.OrderedTransactionSet, coinbase co
 	}
 
 	var coalescedLogs []*types.Log
-
+	var loops int64
 loop:
 	for {
+		loops++
 		// In the following three cases, we will interrupt the execution of the transaction.
 		// (1) new head block event arrival, the interrupt signal is 1
 		// (2) worker start or restart, the interrupt signal is 1
@@ -1267,6 +1269,8 @@ loop:
 			txs.Shift()
 		}
 	}
+
+	commitTransactionsLoopsGauge.Update(loops)
 
 	if !w.isRunning() && len(coalescedLogs) > 0 {
 		// We don't push the pendingLogsEvent while we are mining. The reason is that

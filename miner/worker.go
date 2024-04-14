@@ -944,7 +944,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
-		withTimer(l2CommitTxTraceTimer, func() {
+		common.WithTimer(l2CommitTxTraceTimer, func() {
 			traces, err = w.current.traceEnv.GetBlockTrace(
 				types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 			)
@@ -955,7 +955,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		if err != nil {
 			return nil, nil, err
 		}
-		withTimer(l2CommitTxCCCTimer, func() {
+		common.WithTimer(l2CommitTxCCCTimer, func() {
 			accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
 		})
 		if err != nil {
@@ -973,7 +973,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	snap := w.current.state.Snapshot()
 
 	var receipt *types.Receipt
-	withTimer(l2CommitTxApplyTimer, func() {
+	common.WithTimer(l2CommitTxApplyTimer, func() {
 		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	})
 	if err != nil {
@@ -1415,7 +1415,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// fetch l1Txs
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
-		withTimer(l2CommitNewWorkL1CollectTimer, func() {
+		common.WithTimer(l2CommitNewWorkL1CollectTimer, func() {
 			l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
 		})
 	}
@@ -1505,7 +1505,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 		)
 		var traces *types.BlockTrace
 		var err error
-		withTimer(l2CommitTraceTimer, func() {
+		common.WithTimer(l2CommitTraceTimer, func() {
 			traces, err = w.current.traceEnv.GetBlockTrace(types.NewBlockWithHeader(w.current.header))
 		})
 		if err != nil {
@@ -1516,7 +1516,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 		traces.ExecutionResults = traces.ExecutionResults[:0]
 		traces.TxStorageTraces = traces.TxStorageTraces[:0]
 		var accRows *types.RowConsumption
-		withTimer(l2CommitCCCTimer, func() {
+		common.WithTimer(l2CommitCCCTimer, func() {
 			accRows, err = w.circuitCapacityChecker.ApplyBlock(traces)
 		})
 		if err != nil {
@@ -1587,12 +1587,4 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
 	}
 	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
-}
-
-func withTimer(timer metrics.Timer, f func()) {
-	if metrics.Enabled {
-		timer.Time(f)
-	} else {
-		f()
-	}
 }

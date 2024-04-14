@@ -29,9 +29,12 @@ import (
 )
 
 var (
-	getTxResultTimer    = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result", nil)
-	feedTxToTracerTimer = metrics.NewRegisteredTimer("rollup/tracing/feed_tx_to_tracer", nil)
-	fillBlockTraceTimer = metrics.NewRegisteredTimer("rollup/tracing/fill_block_trace", nil)
+	getTxResultTimer             = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result", nil)
+	getTxResultApplyMessageTimer = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result/apply_message", nil)
+	getTxResultZkTrieBuildTimer  = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result/zk_trie_build", nil)
+	getTxResultTracerResultTimer = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result/tracer_result", nil)
+	feedTxToTracerTimer          = metrics.NewRegisteredTimer("rollup/tracing/feed_tx_to_tracer", nil)
+	fillBlockTraceTimer          = metrics.NewRegisteredTimer("rollup/tracing/fill_block_trace", nil)
 )
 
 // TracerWrapper implements ScrollTracerWrapper interface
@@ -320,6 +323,8 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("failed to create prestateTracer: %w", err)
 	}
+
+	applyMessageStart := time.Now()
 	structLogger := vm.NewStructLogger(env.logConfig)
 	tracer := NewMuxTracer(structLogger, callTracer, prestateTracer)
 	// Run the transaction with tracing enabled.
@@ -337,6 +342,8 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return err
 	}
+	getTxResultApplyMessageTimer.UpdateSince(applyMessageStart)
+
 	// If the result contains a revert reason, return it.
 	returnVal := result.Return()
 	if len(result.Revert()) > 0 {
@@ -402,6 +409,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		env.pMu.Unlock()
 	}
 
+	zkTrieBuildStart := time.Now()
 	proofStorages := structLogger.UpdatedStorages()
 	for addr, keys := range proofStorages {
 		if _, existed := txStorageTrace.StorageProofs[addr.String()]; !existed {
@@ -470,7 +478,9 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			env.sMu.Unlock()
 		}
 	}
+	getTxResultZkTrieBuildTimer.UpdateSince(zkTrieBuildStart)
 
+	tracerResultTimer := time.Now()
 	callTrace, err := callTracer.GetResult()
 	if err != nil {
 		return fmt.Errorf("failed to get callTracer result: %w", err)
@@ -479,6 +489,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("failed to get prestateTracer result: %w", err)
 	}
+	getTxResultTracerResultTimer.UpdateSince(tracerResultTimer)
 
 	env.ExecutionResults[index] = &types.ExecutionResult{
 		From:           sender,

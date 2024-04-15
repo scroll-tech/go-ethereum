@@ -92,22 +92,32 @@ var (
 	l1TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l1/ccc_unknown_err", nil)
 	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
 	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
-	l2CommitTxsTimer                  = metrics.NewRegisteredTimer("miner/commit/txs_all", nil)
-	l2CommitTxTimer                   = metrics.NewRegisteredTimer("miner/commit/tx_all", nil)
-	l2CommitTxTraceTimer              = metrics.NewRegisteredTimer("miner/commit/tx_trace", nil)
-	l2CommitTxCCCTimer                = metrics.NewRegisteredTimer("miner/commit/tx_ccc", nil)
-	l2CommitTxApplyTimer              = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
-	l2CommitTimer                     = metrics.NewRegisteredTimer("miner/commit/all", nil)
-	l2CommitTraceTimer                = metrics.NewRegisteredTimer("miner/commit/trace", nil)
-	l2CommitCCCTimer                  = metrics.NewRegisteredTimer("miner/commit/ccc", nil)
-	l2CommitNewWorkTimer              = metrics.NewRegisteredTimer("miner/commit/new_work_all", nil)
-	l2CommitNewWorkL1CollectTimer     = metrics.NewRegisteredTimer("miner/commit/new_work_collect_l1", nil)
-	l2ResultTimer                     = metrics.NewRegisteredTimer("miner/result/all", nil)
-	consumePendingTransactionsMeter   = metrics.NewRegisteredMeter("miner/consume/transaction", nil)
-	l2TxsCountLimitMeter              = metrics.NewRegisteredMeter("miner/consume/count/limit", nil)
-	l1TxsQueueIndexUnexpected         = metrics.NewRegisteredMeter("miner/consume/queue_index_expected", nil)
-	l2BlockSizeLimitReached           = metrics.NewRegisteredMeter("miner/consume/block_size_limit_reached", nil)
-	commitTransactionsLoopsGauge      = metrics.NewRegisteredGauge("miner/consume/commit_transactions_tx_loops", nil)
+
+	l2CommitTxsTimer     = metrics.NewRegisteredTimer("miner/commit/txs_all", nil)
+	l2CommitTxTimer      = metrics.NewRegisteredTimer("miner/commit/tx_all", nil)
+	l2CommitTxTraceTimer = metrics.NewRegisteredTimer("miner/commit/tx_trace", nil)
+	l2CommitTxCCCTimer   = metrics.NewRegisteredTimer("miner/commit/tx_ccc", nil)
+	l2CommitTxApplyTimer = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
+
+	l2CommitNewWorkTimer                    = metrics.NewRegisteredTimer("miner/commit/new_work_all", nil)
+	l2CommitNewWorkL1CollectTimer           = metrics.NewRegisteredTimer("miner/commit/new_work_collect_l1", nil)
+	l2CommitNewWorkPrepareTimer             = metrics.NewRegisteredTimer("miner/commit/new_work_prepare", nil)
+	l2CommitNewWorkCommitUncleTimer         = metrics.NewRegisteredTimer("miner/commit/new_work_uncle", nil)
+	l2CommitNewWorkTidyPendingTxTimer       = metrics.NewRegisteredTimer("miner/commit/new_work_tidy_pending", nil)
+	l2CommitNewWorkCommitL1MsgTimer         = metrics.NewRegisteredTimer("miner/commit/new_work_commit_l1_msg", nil)
+	l2CommitNewWorkPrioritizedTxCommitTimer = metrics.NewRegisteredTimer("miner/commit/new_work_prioritized", nil)
+	l2CommitNewWorkRemoteLocalCommitTimer   = metrics.NewRegisteredTimer("miner/commit/new_work_remote_local", nil)
+
+	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit/all", nil)
+	l2CommitTraceTimer = metrics.NewRegisteredTimer("miner/commit/trace", nil)
+	l2CommitCCCTimer   = metrics.NewRegisteredTimer("miner/commit/ccc", nil)
+	l2ResultTimer      = metrics.NewRegisteredTimer("miner/result/all", nil)
+
+	consumePendingTransactionsMeter = metrics.NewRegisteredMeter("miner/consume/transaction", nil)
+	l2TxsCountLimitMeter            = metrics.NewRegisteredMeter("miner/consume/count/limit", nil)
+	l1TxsQueueIndexUnexpected       = metrics.NewRegisteredMeter("miner/consume/queue_index_expected", nil)
+	l2BlockSizeLimitReached         = metrics.NewRegisteredMeter("miner/consume/block_size_limit_reached", nil)
+	commitTransactionsLoopsGauge    = metrics.NewRegisteredGauge("miner/consume/commit_transactions_tx_loops", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -1354,10 +1364,14 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 		header.Coinbase = w.coinbase
 	}
-	if err := w.engine.Prepare(w.chain, header); err != nil {
-		log.Error("Failed to prepare header for mining", "err", err)
-		return
-	}
+
+	common.WithTimer(l2CommitNewWorkPrepareTimer, func() {
+		if err := w.engine.Prepare(w.chain, header); err != nil {
+			log.Error("Failed to prepare header for mining", "err", err)
+			return
+		}
+	})
+
 	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
 	if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
 		// Check whether the block is among the fork extra-override range
@@ -1403,9 +1417,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			}
 		}
 	}
-	// Prefer to locally generated uncle
-	commitUncles(w.localUncles)
-	commitUncles(w.remoteUncles)
+
+	common.WithTimer(l2CommitNewWorkCommitUncleTimer, func() {
+		// Prefer to locally generated uncle
+		commitUncles(w.localUncles)
+		commitUncles(w.remoteUncles)
+	})
 
 	// Create an empty block based on temporary copied state for
 	// sealing in advance without waiting block execution finished.
@@ -1419,6 +1436,8 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
 		})
 	}
+
+	tidyPendingStart := time.Now()
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
 	// Short circuit if there is no available pending transactions.
@@ -1436,7 +1455,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
+	l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
+
 	var skipCommit, circuitCapacityReached bool
+	commitL1MsgStart := time.Now()
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
 		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
@@ -1449,6 +1471,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
+	l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
+
+	prioritizedTxStart := time.Now()
 	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
 		w.prioritizedTx = nil
 	}
@@ -1462,6 +1487,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
+	l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
+
+	remoteLocalStart := time.Now()
 	if len(localTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)
 		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
@@ -1469,6 +1497,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
+
 	if len(remoteTxs) > 0 && !circuitCapacityReached {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs, header.BaseFee)
 		// don't need to get `circuitCapacityReached` here because we don't have further `commitTransactions`
@@ -1478,6 +1507,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
+	l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 
 	// do not produce empty blocks
 	if w.current.tcount == 0 {

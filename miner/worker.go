@@ -93,11 +93,12 @@ var (
 	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
 	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
 
-	l2CommitTxsTimer     = metrics.NewRegisteredTimer("miner/commit/txs_all", nil)
-	l2CommitTxTimer      = metrics.NewRegisteredTimer("miner/commit/tx_all", nil)
-	l2CommitTxTraceTimer = metrics.NewRegisteredTimer("miner/commit/tx_trace", nil)
-	l2CommitTxCCCTimer   = metrics.NewRegisteredTimer("miner/commit/tx_ccc", nil)
-	l2CommitTxApplyTimer = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
+	l2CommitTxsTimer                = metrics.NewRegisteredTimer("miner/commit/txs_all", nil)
+	l2CommitTxTimer                 = metrics.NewRegisteredTimer("miner/commit/tx_all", nil)
+	l2CommitTxTraceTimer            = metrics.NewRegisteredTimer("miner/commit/tx_trace", nil)
+	l2CommitTxTraceStateRevertTimer = metrics.NewRegisteredTimer("miner/commit/tx_trace_state_revert", nil)
+	l2CommitTxCCCTimer              = metrics.NewRegisteredTimer("miner/commit/tx_ccc", nil)
+	l2CommitTxApplyTimer            = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
 
 	l2CommitNewWorkTimer                    = metrics.NewRegisteredTimer("miner/commit/new_work_all", nil)
 	l2CommitNewWorkL1CollectTimer           = metrics.NewRegisteredTimer("miner/commit/new_work_collect_l1", nil)
@@ -959,9 +960,11 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 				types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 			)
 		})
-		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
-		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
-		w.current.state.RevertToSnapshot(snap)
+		common.WithTimer(l2CommitTxTraceStateRevertTimer, func() {
+			// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
+			// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
+			w.current.state.RevertToSnapshot(snap)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

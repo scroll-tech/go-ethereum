@@ -108,6 +108,8 @@ var (
 	l2CommitNewWorkCommitL1MsgTimer         = metrics.NewRegisteredTimer("miner/commit/new_work_commit_l1_msg", nil)
 	l2CommitNewWorkPrioritizedTxCommitTimer = metrics.NewRegisteredTimer("miner/commit/new_work_prioritized", nil)
 	l2CommitNewWorkRemoteLocalCommitTimer   = metrics.NewRegisteredTimer("miner/commit/new_work_remote_local", nil)
+	l2CommitNewWorkLocalPriceAndNonceTimer  = metrics.NewRegisteredTimer("miner/commit/new_work_local_price_and_nonce", nil)
+	l2CommitNewWorkRemotePriceAndNonceTimer = metrics.NewRegisteredTimer("miner/commit/new_work_remote_price_and_nonce", nil)
 
 	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit/all", nil)
 	l2CommitTraceTimer = metrics.NewRegisteredTimer("miner/commit/trace", nil)
@@ -1484,7 +1486,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	remoteLocalStart := time.Now()
 	if len(localTxs) > 0 && !circuitCapacityReached {
+		localTxPriceAndNonceStart := time.Now()
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)
+		l2CommitNewWorkLocalPriceAndNonceTimer.UpdateSince(localTxPriceAndNonceStart)
+
 		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
 			l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
@@ -1493,7 +1498,10 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 
 	if len(remoteTxs) > 0 && !circuitCapacityReached {
+		remoteTxPriceAndNonceStart := time.Now()
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs, header.BaseFee)
+		l2CommitNewWorkRemotePriceAndNonceTimer.UpdateSince(remoteTxPriceAndNonceStart)
+
 		// don't need to get `circuitCapacityReached` here because we don't have further `commitTransactions`
 		// after this one, and if we assign it won't take effect (`ineffassign`)
 		skipCommit, _ = w.commitTransactions(txs, w.coinbase, interrupt)

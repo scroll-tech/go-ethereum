@@ -1,0 +1,31 @@
+# Build libzkp dependency
+FROM --platform=linux/arm64 scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as chef
+WORKDIR app
+
+FROM chef as planner
+COPY ./rollup/circuitcapacitychecker/libzkp/ .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef as zkp-builder
+COPY ./rollup/circuitcapacitychecker/libzkp/rust-toolchain ./
+COPY --from=planner /app/recipe.json recipe.json
+RUN mkdir -p .cargo && \
+    echo '[source.crates-io]' > .cargo/config.toml && \
+    echo 'registry = "https://github.com/rust-lang/crates.io-index"' >> .cargo/config.toml && \
+    echo 'replace-with = "ustc"' >> .cargo/config.toml && \
+    echo '[source.ustc]' >> .cargo/config.toml && \
+    echo 'registry = "git://mirrors.ustc.edu.cn/crates.io-index"' >> .cargo/config.toml
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY ./rollup/circuitcapacitychecker/libzkp .
+RUN cargo clean
+RUN cargo build --release
+RUN find ./ | grep libzktrie.so | xargs -I{} cp {} /app/target/release/
+
+# Build Geth in a stock Go builder container
+FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as builder
+
+ADD . /go-ethereum
+COPY --from=zkp-builder /app/target/release/libzkp.so /usr/local/lib/
+COPY --from=zkp-builder /app/target/release/libzktrie.so /usr/local/lib/
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/

@@ -166,7 +166,7 @@ func (ccc *CircuitCapacityChecker) CheckTxNum(expected int) (bool, uint64, error
 		return false, 0, fmt.Errorf("fail to json unmarshal get_tx_num result, id: %d, err: %w", ccc.ID, err)
 	}
 	if result.Error != "" {
-		return false, 0, fmt.Errorf("fail to get_tx_num in CircuitCapacityChecker, id: %d, err: %s", ccc.ID, result.Error)
+		return false, 0, fmt.Errorf("fail to get_tx_num in CircuitCapacityChecker, id: %d, err: %w", ccc.ID, result.Error)
 	}
 
 	return result.TxNum == uint64(expected), result.TxNum, nil
@@ -189,7 +189,7 @@ func (ccc *CircuitCapacityChecker) SetLightMode(lightMode bool) error {
 		return fmt.Errorf("fail to json unmarshal set_light_mode result, id: %d, err: %w", ccc.ID, err)
 	}
 	if result.Error != "" {
-		return fmt.Errorf("fail to set_light_mode in CircuitCapacityChecker, id: %d, err: %s", ccc.ID, result.Error)
+		return fmt.Errorf("fail to set_light_mode in CircuitCapacityChecker, id: %d, err: %w", ccc.ID, result.Error)
 	}
 
 	return nil

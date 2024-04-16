@@ -340,6 +340,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 	if err != nil {
+		getTxResultApplyMessageTimer.UpdateSince(applyMessageStart)
 		return err
 	}
 	getTxResultApplyMessageTimer.UpdateSince(applyMessageStart)

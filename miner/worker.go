@@ -1436,6 +1436,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// empty block is necessary to keep the liveness of the network.
 	if len(pending) == 0 && len(l1Messages) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
 		w.updateSnapshot()
+		l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
 		return
 	}
 	// Split the pending transactions into locals and remotes
@@ -1459,6 +1460,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
+			l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
 			return
 		}
 	}
@@ -1475,6 +1477,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, txList, header.BaseFee)
 		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
+			l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
 			return
 		}
 	}
@@ -1485,6 +1488,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)
 		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
+			l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 			return
 		}
 	}
@@ -1495,6 +1499,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		// after this one, and if we assign it won't take effect (`ineffassign`)
 		skipCommit, _ = w.commitTransactions(txs, w.coinbase, interrupt)
 		if skipCommit {
+			l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 			return
 		}
 	}

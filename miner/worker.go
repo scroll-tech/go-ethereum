@@ -588,7 +588,6 @@ func (w *worker) mainLoop() {
 			}
 
 		case ev := <-w.txsCh:
-			consumePendingTransactionsMeter.Mark(1)
 
 			// Apply transactions to the pending state if we're not mining.
 			//

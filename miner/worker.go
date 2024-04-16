@@ -588,7 +588,6 @@ func (w *worker) mainLoop() {
 			}
 
 		case ev := <-w.txsCh:
-
 			// Apply transactions to the pending state if we're not mining.
 			//
 			// Note all transactions received may not be continuous with transactions

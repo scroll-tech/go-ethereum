@@ -113,12 +113,6 @@ var (
 	l2CommitTraceTimer = metrics.NewRegisteredTimer("miner/commit/trace", nil)
 	l2CommitCCCTimer   = metrics.NewRegisteredTimer("miner/commit/ccc", nil)
 	l2ResultTimer      = metrics.NewRegisteredTimer("miner/result/all", nil)
-
-	consumePendingTransactionsMeter = metrics.NewRegisteredMeter("miner/consume/transaction", nil)
-	l2TxsCountLimitMeter            = metrics.NewRegisteredMeter("miner/consume/count/limit", nil)
-	l1TxsQueueIndexUnexpected       = metrics.NewRegisteredMeter("miner/consume/queue_index_expected", nil)
-	l2BlockSizeLimitReached         = metrics.NewRegisteredMeter("miner/consume/block_size_limit_reached", nil)
-	commitTransactionsLoopsGauge    = metrics.NewRegisteredGauge("miner/consume/commit_transactions_tx_loops", nil)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -1070,12 +1064,10 @@ loop:
 		// If we have collected enough transactions then we're done
 		// Originally we only limit l2txs count, but now strictly limit total txs number.
 		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount + 1) {
-			l2TxsCountLimitMeter.Mark(1)
 			log.Trace("Transaction count limit reached", "have", w.current.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			break
 		}
 		if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != w.current.nextL1MsgIndex {
-			l1TxsQueueIndexUnexpected.Mark(1)
 			log.Error(
 				"Unexpected L1 message queue index in worker",
 				"expected", w.current.nextL1MsgIndex,
@@ -1084,7 +1076,6 @@ loop:
 			break
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
-			l2BlockSizeLimitReached.Mark(1)
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
 			txs.Pop() // skip transactions from this account
 			continue
@@ -1282,8 +1273,6 @@ loop:
 			txs.Shift()
 		}
 	}
-
-	commitTransactionsLoopsGauge.Update(loops)
 
 	if !w.isRunning() && len(coalescedLogs) > 0 {
 		// We don't push the pendingLogsEvent while we are mining. The reason is that

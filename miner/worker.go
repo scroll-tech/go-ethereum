@@ -135,6 +135,8 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 
+	parentTimestamp uint64
+
 	// circuit capacity check related fields
 	traceEnv       *tracing.TraceEnv     // env for tracing
 	accRows        *types.RowConsumption // accumulated row consumption for a block
@@ -842,6 +844,8 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		header:    header,
 		traceEnv:  traceEnv,
 		accRows:   nil,
+
+		parentTimestamp: parent.Time(),
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -1054,6 +1058,10 @@ loop:
 				}
 			}
 			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, circuitCapacityReached
+		}
+		// seal block early early if we're over time
+		if w.current.tcount > 0 && w.chainConfig.Clique != nil && uint64(time.Now().Unix()) > w.current.parentTimestamp+w.chainConfig.Clique.Period {
+			return false, true
 		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {

@@ -1060,7 +1060,7 @@ loop:
 			}
 			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, circuitCapacityReached
 		}
-		// seal block early early if we're over time
+		// seal block early if we're over time
 		// note: current.header.Time = max(parent.Time + cliquePeriod, now())
 		if w.current.tcount > 0 && w.chainConfig.Clique != nil && uint64(time.Now().Unix()) > w.current.header.Time {
 			return false, true

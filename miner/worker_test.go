@@ -1280,11 +1280,14 @@ func TestSealBlockAfterCliquePeriod(t *testing.T) {
 		return len(task.receipts) == 0
 	}
 
+	// Add artificial delay to transaction processing.
+	w.beforeTxHook = func() {
+		time.Sleep(time.Duration(chainConfig.Clique.Period) * 1 * time.Second)
+	}
+
 	// Wait for mined blocks.
 	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
 	defer sub.Unsubscribe()
-
-	time.Sleep(time.Duration(chainConfig.Clique.Period) * 2 * time.Second)
 
 	// Insert 2 non-l1msg txs
 	b.txPool.AddLocal(b.newRandomTx(true))
@@ -1300,7 +1303,7 @@ func TestSealBlockAfterCliquePeriod(t *testing.T) {
 			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 		}
 		assert.Equal(1, len(block.Transactions())) // only packed 1 tx, not 2
-	case <-time.After(3 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatalf("timeout")
 	}
 
@@ -1311,7 +1314,7 @@ func TestSealBlockAfterCliquePeriod(t *testing.T) {
 			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 		}
 		assert.Equal(1, len(block.Transactions()))
-	case <-time.After(3 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatalf("timeout")
 	}
 }

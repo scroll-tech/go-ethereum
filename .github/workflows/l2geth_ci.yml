@@ -1,3 +1,5 @@
+name: CI
+
 on:
   push:
     branches: # we keep this to avoid triggering `push` & `pull_request` every time we update a PR
@@ -5,13 +7,19 @@ on:
       - staging
       - develop
       - alpha
+    paths:
+      - '**'
+      - '!params/version.go'
   pull_request:
     types:
       - opened
       - reopened
       - synchronize
       - ready_for_review
-name: CI
+    paths:
+      - '**'
+      - '!params/version.go'
+
 jobs:
   build-mock-ccc-geth: # build geth with mock circuit capacity checker
     if: github.event.pull_request.draft == false

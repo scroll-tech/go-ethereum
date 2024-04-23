@@ -49,7 +49,7 @@ func gokzgInit() {
 func gokzgBlobToCommitment(blob Blob) (Commitment, error) {
 	gokzgIniter.Do(gokzgInit)
 
-	commitment, err := context.BlobToKZGCommitment((*gokzg4844.Blob)(&blob), 0)
+	commitment, err := context.BlobToKZGCommitment((*gokzg4844.Blob)(blob), 0)
 	if err != nil {
 		return Commitment{}, err
 	}

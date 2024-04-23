@@ -1194,7 +1194,7 @@ loop:
 					// Skip L2 transaction and all other transactions from the same sender account
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
-					w.eth.TxPool().RemoveTx(tx.Hash(), true)
+					// w.eth.TxPool().RemoveTx(tx.Hash(), true)
 					l2TxRowConsumptionOverflowCounter.Inc(1)
 				}
 
@@ -1248,7 +1248,7 @@ loop:
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
-			w.eth.TxPool().RemoveTx(tx.Hash(), true)
+			// w.eth.TxPool().RemoveTx(tx.Hash(), true)
 			// circuitCapacityReached = true
 			w.checkCurrentTxNumWithCCC(w.current.tcount)
 			break loop
@@ -1256,7 +1256,7 @@ loop:
 		case (errors.Is(err, core.ErrInsufficientFunds) || errors.Is(errors.Unwrap(err), core.ErrInsufficientFunds)):
 			log.Trace("Skipping tx with insufficient funds", "sender", from, "tx", tx.Hash().String())
 			txs.Pop()
-			w.eth.TxPool().RemoveTx(tx.Hash(), true)
+			// w.eth.TxPool().RemoveTx(tx.Hash(), true)
 
 		default:
 			// Transaction is regarded as invalid, drop all consecutive transactions from

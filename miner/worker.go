@@ -1128,6 +1128,10 @@ loop:
 			txs.Shift()
 
 			if tx.IsL1MessageTx() {
+				queueIndex := tx.AsL1MessageTx().QueueIndex
+				log.Debug("Including L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String())
+				env.l1TxCount++
+				env.nextL1MsgIndex = queueIndex + 1
 			} else {
 				// only consider block size limit for L2 transactions
 				env.blockSize += tx.Size()

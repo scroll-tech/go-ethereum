@@ -1047,6 +1047,12 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 				return signalToErr(signal)
 			}
 		}
+		// seal block early if we're over time
+		// note: current.header.Time = max(parent.Time + cliquePeriod, now())
+		if env.tcount > 0 && w.chainConfig.Clique != nil && uint64(time.Now().Unix()) > env.header.Time {
+			// circuitCapacityReached = true // skip subsequent invocations of commitTransactions
+			break
+		}
 		// If we don't have enough gas for any further transactions then we're done.
 		if env.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)

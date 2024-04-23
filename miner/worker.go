@@ -1353,6 +1353,12 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 }
 
 func (w *worker) calcAndSetAccRowsForEnv(env *environment) error {
+	log.Trace(
+		"Worker apply ccc for empty block",
+		"id", w.circuitCapacityChecker.ID,
+		"number", env.header.Number,
+		"hash", env.header.Hash().String(),
+	)
 	var traces *types.BlockTrace
 	var err error
 	withTimer(l2CommitTraceTimer, func() {

@@ -1033,7 +1033,7 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 	var coalescedLogs []*types.Log
 
 	var loops int64
-	// loop:
+loop:
 	for {
 		if w.beforeTxHook != nil {
 			w.beforeTxHook()
@@ -1114,7 +1114,7 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 		// Start executing the transaction
 		env.state.SetTxContext(tx.Hash(), env.tcount)
 
-		logs, _, err := w.commitTransaction(env, tx)
+		logs, traces, err := w.commitTransaction(env, tx)
 		switch {
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
@@ -1132,6 +1132,24 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 				// only consider block size limit for L2 transactions
 				env.blockSize += tx.Size()
 			}
+
+		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
+			// If this block already contains some L1 messages,
+			// terminate here and try again in the next block.
+			if env.l1TxCount > 0 {
+				break loop
+			}
+			// A single L1 message leads to out-of-gas. Skip it.
+			queueIndex := tx.AsL1MessageTx().QueueIndex
+			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", env.header.Number, "reason", "gas limit exceeded")
+			env.nextL1MsgIndex = queueIndex + 1
+			txs.Shift()
+			if w.config.StoreSkippedTxTraces {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "gas limit exceeded", env.header.Number.Uint64(), nil)
+			} else {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "gas limit exceeded", env.header.Number.Uint64(), nil)
+			}
+			l1TxGasLimitExceededCounter.Inc(1)
 
 		default:
 			// Transaction is regarded as invalid, drop all consecutive transactions from

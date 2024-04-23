@@ -940,6 +940,9 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 	if w.isRunning() {
 		defer func(t0 time.Time) {
 			l2CommitTxTimer.Update(time.Since(t0))
+			if err != nil {
+				l2CommitTxFailedTimer.Update(time.Since(t0))
+			}
 		}(time.Now())
 
 		// do gas limit check up-front and do not run CCC if it fails
@@ -967,9 +970,11 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 				types.NewBlockWithHeader(env.header).WithBody([]*types.Transaction{tx}, nil),
 			)
 		})
-		// `env.traceEnv.State` & `env.state` share a same pointer to the state, so only need to revert `env.state`
-		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
-		env.state.RevertToSnapshot(snap)
+		withTimer(l2CommitTxTraceStateRevertTimer, func() {
+			// `env.traceEnv.State` & `env.state` share a same pointer to the state, so only need to revert `env.state`
+			// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
+			env.state.RevertToSnapshot(snap)
+		})
 		if err != nil {
 			return nil, nil, nil, err
 		}

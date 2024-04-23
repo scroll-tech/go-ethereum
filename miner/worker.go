@@ -1261,7 +1261,18 @@ loop:
 		default:
 			// Transaction is regarded as invalid, drop all consecutive transactions from
 			// the same sender because of `nonce-too-high` clause.
-			log.Debug("Transaction failed, account skipped", "hash", ltx.Hash, "err", err)
+			log.Debug("Transaction failed, account skipped", "hash", ltx.Hash.String(), "err", err)
+			if tx.IsL1MessageTx() {
+				queueIndex := tx.AsL1MessageTx().QueueIndex
+				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", env.header.Number, "reason", "strange error", "err", err)
+				env.nextL1MsgIndex = queueIndex + 1
+				if w.config.StoreSkippedTxTraces {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, fmt.Sprintf("strange error: %v", err), env.header.Number.Uint64(), nil)
+				} else {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, fmt.Sprintf("strange error: %v", err), env.header.Number.Uint64(), nil)
+				}
+				l1TxStrangeErrCounter.Inc(1)
+			}
 			txs.Pop()
 		}
 	}

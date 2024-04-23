@@ -1087,11 +1087,12 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 			txs.Pop()
 			continue
 		}
-		// If we have collected enough transactions then we're done
-		// Originally we only limit l2txs count, but now strictly limit total txs number.
-		// log.Info("w.chainConfig", "w.chainConfig.Scroll", w.chainConfig.Scroll)
-		if !w.chainConfig.Scroll.IsValidTxCount(env.tcount + 1) {
-			log.Trace("Transaction count limit reached", "have", env.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+		if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != env.nextL1MsgIndex {
+			log.Error(
+				"Unexpected L1 message queue index in worker",
+				"expected", env.nextL1MsgIndex,
+				"got", tx.AsL1MessageTx().QueueIndex,
+			)
 			break
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(env.blockSize+tx.Size()) {

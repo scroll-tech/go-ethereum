@@ -1018,14 +1018,29 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 	return receipt, traces, accRows, err
 }
 
+// TODO: how to introduce `circuitCapacityReached`?
 func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAndNonce, interrupt *atomic.Int32) error {
+	defer func(t0 time.Time) {
+		l2CommitTxsTimer.Update(time.Since(t0))
+	}(time.Now())
+
+	// var circuitCapacityReached bool
+
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
 	}
 	var coalescedLogs []*types.Log
 
+	var loops int64
+	// loop:
 	for {
+		if w.beforeTxHook != nil {
+			w.beforeTxHook()
+		}
+
+		loops++
+
 		// Check interruption signal and abort building if it's fired.
 		if interrupt != nil {
 			if signal := interrupt.Load(); signal != commitInterruptNone {

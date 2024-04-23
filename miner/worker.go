@@ -1063,6 +1063,12 @@ func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAn
 		if ltx == nil {
 			break
 		}
+		// If we have collected enough transactions then we're done
+		// Originally we only limit l2txs count, but now strictly limit total txs number.
+		if !w.chainConfig.Scroll.IsValidTxCount(env.tcount + 1) {
+			log.Trace("Transaction count limit reached", "have", env.tcount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+			break
+		}
 		// If we don't have enough space for the next transaction, skip the account.
 		if env.gasPool.Gas() < ltx.Gas {
 			log.Trace("Not enough gas left for transaction", "hash", ltx.Hash, "left", env.gasPool.Gas(), "needed", ltx.Gas)

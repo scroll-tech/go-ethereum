@@ -1476,6 +1476,9 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 			return
 		}
 	}
+	// TODO:
+	// 1. l2CommitNewWorkPrepareTimer
+	// 2. no need for l2CommitNewWorkCommitUncleTimer any more?
 	work, err := w.prepareWork(&generateParams{
 		timestamp: uint64(timestamp),
 		coinbase:  coinbase,

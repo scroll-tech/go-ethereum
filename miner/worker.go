@@ -1458,7 +1458,14 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 	if w.syncing.Load() {
 		return
 	}
+
+	defer func(t0 time.Time) {
+		l2CommitNewWorkTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	start := time.Now()
+	w.circuitCapacityChecker.Reset()
+	log.Trace("Worker reset ccc", "id", w.circuitCapacityChecker.ID)
 
 	// Set the coinbase if the worker is running or it's required
 	var coinbase common.Address

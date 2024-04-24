@@ -79,6 +79,7 @@ func newDescartesInstructionSet() JumpTable {
 func newCurieInstructionSet() JumpTable {
 	instructionSet := newShanghaiInstructionSet()
 	enable3198(&instructionSet) // Base fee opcode https://eips.ethereum.org/EIPS/eip-3198
+	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
 	return instructionSet
 }
 

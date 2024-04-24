@@ -1393,6 +1393,15 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
 func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) error {
+	// fetch l1Txs
+	var l1Messages []types.L1MessageTx
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
+		withTimer(l2CommitNewWorkL1CollectTimer, func() {
+			l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
+		})
+	}
+
+	tidyPendingStart := time.Now()
 	pending := w.eth.TxPool().Pending(true)
 
 	// Split the pending transactions into locals and remotes.
@@ -1403,20 +1412,61 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 			localTxs[account] = txs
 		}
 	}
+	l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
 
 	// Fill the block with all available pending transactions.
+	// var skipCommit, circuitCapacityReached bool
+	commitL1MsgStart := time.Now()
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
+		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
+		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
+		if err != nil {
+			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
+			return err
+		}
+		err = w.commitTransactions(env, txs, interrupt)
+		if err != nil {
+			l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
+			return err
+		}
+	}
+	l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
+	prioritizedTxStart := time.Now()
+	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
+		w.prioritizedTx = nil
+	}
+	if /*!circuitCapacityReached && */ w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
+		tx := w.prioritizedTx.tx
+		from, _ := types.Sender(w.current.signer, tx) // error already checked before
+		txList := map[common.Address]types.Transactions{from: []*types.Transaction{tx}}
+		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
+		err := w.commitTransactions(txs, w.coinbase, interrupt)
+		if err != nil {
+			l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
+			return err
+		}
+	}
+	l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
+	remoteLocalStart := time.Now()
 	if len(localTxs) > 0 {
+		localTxPriceAndNonceStart := time.Now()
 		txs := newTransactionsByPriceAndNonce(env.signer, localTxs, env.header.BaseFee)
+		l2CommitNewWorkLocalPriceAndNonceTimer.UpdateSince(localTxPriceAndNonceStart)
 		if err := w.commitTransactions(env, txs, interrupt); err != nil {
+			l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 			return err
 		}
 	}
 	if len(remoteTxs) > 0 {
+		remoteTxPriceAndNonceStart := time.Now()
 		txs := newTransactionsByPriceAndNonce(env.signer, remoteTxs, env.header.BaseFee)
+		l2CommitNewWorkRemotePriceAndNonceTimer.UpdateSince(remoteTxPriceAndNonceStart)
 		if err := w.commitTransactions(env, txs, interrupt); err != nil {
+			l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 			return err
 		}
 	}
+	l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 	return nil
 }
 

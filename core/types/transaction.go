@@ -728,7 +728,7 @@ func (t *L1MessagesByQueueIndex) Pop() {
 	log.Error("Pop() is called on L1MessagesByQueueIndex")
 
 	// this is a logic error, the intention should be "Shift()",
-	// so we will follow the same behavior in Pop
+	// so we will follow the same behavior in Shift
 	t.Shift()
 }
 

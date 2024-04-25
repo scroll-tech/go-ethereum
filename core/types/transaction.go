@@ -54,6 +54,7 @@ const (
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
 
+	SystemTxType    = 0x7D
 	L1MessageTxType = 0x7E
 )
 

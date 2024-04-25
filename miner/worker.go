@@ -1389,9 +1389,9 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	return env, nil
 }
 
-func (w *worker) txToLazyTx(tx *types.Transaction) *txpool.LazyTransaction {
+func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransaction {
 	return &txpool.LazyTransaction{
-		Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
+		Pool:      txPool,
 		Hash:      tx.Hash(),
 		Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
 		Time:      tx.Time(),
@@ -1402,10 +1402,10 @@ func (w *worker) txToLazyTx(tx *types.Transaction) *txpool.LazyTransaction {
 	}
 }
 
-func (w *worker) txsToLazyTxs(txs []*types.Transaction) []*txpool.LazyTransaction {
+func txsToLazyTxs(txPool *txpool.TxPool, txs []*types.Transaction) []*txpool.LazyTransaction {
 	lazyTxs := []*txpool.LazyTransaction{}
 	for _, tx := range txs {
-		lazyTxs = append(lazyTxs, w.txToLazyTx(tx))
+		lazyTxs = append(lazyTxs, txToLazyTx(txPool, tx))
 	}
 	return lazyTxs
 }
@@ -1440,13 +1440,12 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	commitL1MsgStart := time.Now()
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
-		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
+		txs, err := newL1MessagesByQueueIndex(w.eth.TxPool(), l1Messages)
 		if err != nil {
 			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
 			return err
 		}
-		txList := map[common.Address][]*txpool.LazyTransaction{common.Address{}: w.txsToLazyTxs(txs)}
-		err = w.commitTransactions(env, txList, interrupt)
+		err = w.commitTransactions(env, txs, interrupt)
 		if err != nil {
 			l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
 			return err
@@ -1460,8 +1459,9 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	if /*!circuitCapacityReached && */ w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
 		tx := w.prioritizedTx.tx
 		from, _ := types.Sender(w.current.signer, tx) // error already checked before
-		// no need to distinguish between L1 and L2 transactions, because there's only 1 tx. so it's ok to sort by any field
-		txList := map[common.Address][]*txpool.LazyTransaction{from: []*txpool.LazyTransaction{w.txToLazyTx(tx)}}
+		// 1. no need to distinguish between L1 and L2 transactions, because there's only 1 tx. so it's ok to sort by any field
+		// 2. we don't know where this came from, yolo resolve from everywhere (w.eth.TxPool())
+		txList := map[common.Address][]*txpool.LazyTransaction{from: []*txpool.LazyTransaction{txToLazyTx(w.eth.TxPool(), tx)}}
 		txs := newTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
 		err := w.commitTransactions(env, txs, interrupt)
 		if err != nil {

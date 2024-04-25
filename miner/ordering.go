@@ -18,12 +18,15 @@ package miner
 
 import (
 	"container/heap"
+	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // txWithMinerFee wraps a transaction with its gas price or effective miner gasTipCap
@@ -144,4 +147,47 @@ func (t *transactionsByPriceAndNonce) Shift() {
 // and hence all subsequent ones should be discarded from the same account.
 func (t *transactionsByPriceAndNonce) Pop() {
 	heap.Pop(&t.heads)
+}
+
+// l1MessagesByQueueIndex represents a set of L1 messages ordered by their queue indices.
+type l1MessagesByQueueIndex struct {
+	txPool *txpool.TxPool
+	msgs   []types.L1MessageTx
+}
+
+func newL1MessagesByQueueIndex(txPool *txpool.TxPool, msgs []types.L1MessageTx) (*l1MessagesByQueueIndex, error) {
+	// sort by queue index
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs[i].QueueIndex < msgs[j].QueueIndex
+	})
+
+	// check for duplicates/gaps
+	for ii := 0; ii < len(msgs)-1; ii++ {
+		current := msgs[ii].QueueIndex
+		next := msgs[ii+1].QueueIndex
+		if next != current+1 {
+			return nil, fmt.Errorf("invalid L1 message set, current index: %d, next index: %d", current, next)
+		}
+	}
+
+	return &l1MessagesByQueueIndex{txPool: txPool, msgs: msgs}, nil
+}
+
+func (t *l1MessagesByQueueIndex) Peek() *txpool.LazyTransaction {
+	if len(t.msgs) == 0 {
+		return nil
+	}
+	return txToLazyTx(t.txPool, types.NewTx(&t.msgs[0]))
+}
+
+func (t *l1MessagesByQueueIndex) Shift() {
+	t.msgs = t.msgs[1:]
+}
+
+func (t *l1MessagesByQueueIndex) Pop() {
+	log.Error("Pop() is called on l1MessagesByQueueIndex")
+
+	// this is a logic error, the intention should be "Shift()",
+	// so we will follow the same behavior in Pop
+	t.Shift()
 }

@@ -531,6 +531,14 @@ type ScrollConfig struct {
 
 	// L1 config
 	L1Config *L1Config `json:"l1Config,omitempty"`
+
+	// System contract config
+	SystemTxConfig *SystemTxConfig `json:"systemTxConfig,omitempty"`
+}
+
+type SystemTxConfig struct {
+	Signers   []common.Address `json:"signers"`
+	Contracts []common.Address `json:"contracts"`
 }
 
 // L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer

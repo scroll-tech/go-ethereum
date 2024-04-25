@@ -592,6 +592,10 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrTxTypeNotSupported
 	}
 
+	if tx.IsSystemTx() {
+		return pool.validateSystemTx(tx)
+	}
+
 	// Accept only legacy transactions until EIP-2718/2930 activates.
 	if !pool.eip2718 && tx.Type() != types.LegacyTxType {
 		return ErrTxTypeNotSupported
@@ -669,6 +673,40 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if tx.Gas() < intrGas {
 		return ErrIntrinsicGas
 	}
+	return nil
+}
+
+func (pool *TxPool) validateSystemTx(tx *types.Transaction) error {
+	from, err := types.Sender(pool.signer, tx)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, signer := range pool.chainconfig.Scroll.SystemTxConfig.Signers {
+		if from == signer {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return ErrUnknownSystemSigner
+	}
+
+	to := *tx.To()
+	found = false
+	for _, contract := range pool.chainconfig.Scroll.SystemTxConfig.Contracts {
+		if to == contract {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return ErrUnknownSystemContract
+	}
+
 	return nil
 }
 
@@ -1416,6 +1454,10 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 
 func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transaction) bool {
 	return func(tx *types.Transaction) bool {
+		if tx.IsSystemTx() {
+			return false
+		}
+
 		if tx.Gas() > pool.currentMaxGas || tx.Cost().Cmp(costLimit) > 0 {
 			return true
 		}

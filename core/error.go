@@ -104,3 +104,12 @@ var (
 	// ErrSenderNoEOA is returned if the sender of a transaction is a contract.
 	ErrSenderNoEOA = errors.New("sender not an eoa")
 )
+
+var (
+	// ErrUnknownSystemSigner is returned if a sender for a system transaction
+	// is not a known whitelisted system signer
+	ErrUnknownSystemSigner = errors.New("unknown system signer")
+	// ErrUnknownSystemContract is returned if the destination for a system
+	// transaction is not a known whitelisted system contract
+	ErrUnknownSystemContract = errors.New("unknown system contract")
+)

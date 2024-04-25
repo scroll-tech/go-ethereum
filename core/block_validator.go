@@ -111,6 +111,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		}
 		return consensus.ErrPrunedAncestor
 	}
+	if err := v.ValidateSystemTxs(block); err != nil {
+		return err
+	}
 	if err := v.ValidateL1Messages(block); err != nil {
 		return err
 	}
@@ -134,6 +137,52 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		)
 		rawdb.WriteBlockRowConsumption(v.bc.db, block.Hash(), rowConsumption)
 	}
+	return nil
+}
+
+// ValidateSystemTxs validates all system txs contained in a block.
+// We check that:
+// - the sender is a whitelisted address
+// - the recipient is a system contract
+func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
+	signer := types.MakeSigner(v.config, block.Number())
+
+	for _, tx := range block.Transactions() {
+		if !tx.IsSystemTx() {
+			continue
+		}
+
+		from, err := types.Sender(signer, tx)
+		if err != nil {
+			return err
+		}
+
+		found := false
+		for _, signer := range v.config.Scroll.SystemTxConfig.Signers {
+			if from == signer {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return ErrUnknownSystemSigner
+		}
+
+		to := *tx.To()
+		found = false
+		for _, contract := range v.config.Scroll.SystemTxConfig.Contracts {
+			if to == contract {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return ErrUnknownSystemContract
+		}
+	}
+
 	return nil
 }
 

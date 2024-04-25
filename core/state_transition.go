@@ -90,6 +90,7 @@ type Message interface {
 	Data() []byte
 	AccessList() types.AccessList
 	IsL1MessageTx() bool
+	IsSystemTx() bool
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -247,7 +248,7 @@ func (st *StateTransition) buyGas() error {
 		if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 			// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
 			// but double check to make sure
-			if !st.msg.IsL1MessageTx() {
+			if !st.msg.IsL1MessageTx() && !st.msg.IsSystemTx() {
 				balanceCheck.Add(balanceCheck, st.l1DataFee)
 			}
 		}

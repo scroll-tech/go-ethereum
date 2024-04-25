@@ -45,49 +45,17 @@ func (tx *SystemTx) copy() TxData {
 	return cpy
 }
 
-func (tx *SystemTx) chainID() *big.Int {
-	return tx.ChainID
-}
-
-func (tx *SystemTx) accessList() AccessList {
-	return nil
-}
-
-func (tx *SystemTx) data() []byte {
-	return tx.Data
-}
-
-func (tx *SystemTx) gas() uint64 {
-	return 0
-}
-
-func (tx *SystemTx) gasPrice() *big.Int {
-	return new(big.Int)
-}
-
-func (tx *SystemTx) gasTipCap() *big.Int {
-	return new(big.Int)
-}
-
-func (tx *SystemTx) gasFeeCap() *big.Int {
-	return new(big.Int)
-}
-
-func (tx *SystemTx) value() *big.Int {
-	return new(big.Int)
-}
-
-func (tx *SystemTx) nonce() uint64 {
-	return tx.Nonce
-}
-
-func (tx *SystemTx) to() *common.Address {
-	return tx.To
-}
-
-func (tx *SystemTx) rawSignatureValues() (v, r, s *big.Int) {
-	return tx.V, tx.R, tx.S
-}
+func (tx *SystemTx) chainID() *big.Int                      { return tx.ChainID }
+func (tx *SystemTx) accessList() AccessList                 { return nil }
+func (tx *SystemTx) data() []byte                           { return tx.Data }
+func (tx *SystemTx) gas() uint64                            { return 0 }
+func (tx *SystemTx) gasPrice() *big.Int                     { return new(big.Int) }
+func (tx *SystemTx) gasTipCap() *big.Int                    { return new(big.Int) }
+func (tx *SystemTx) gasFeeCap() *big.Int                    { return new(big.Int) }
+func (tx *SystemTx) value() *big.Int                        { return new(big.Int) }
+func (tx *SystemTx) nonce() uint64                          { return tx.Nonce }
+func (tx *SystemTx) to() *common.Address                    { return tx.To }
+func (tx *SystemTx) rawSignatureValues() (v, r, s *big.Int) { return tx.V, tx.R, tx.S }
 
 func (tx *SystemTx) setSignatureValues(chainID, v, r, s *big.Int) {
 	tx.V, tx.R, tx.S = v, r, s

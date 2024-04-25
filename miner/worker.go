@@ -1019,8 +1019,7 @@ func (w *worker) commitTransactions(txs types.OrderedTransactionSet, coinbase co
 		l2CommitTxsTimer.Update(time.Since(t0))
 	}(time.Now())
 
-	// CircuitCapacity or BlockTime Reached
-	var ccOrBtReached bool
+	var ccOrBtReached bool // CircuitCapacity or BlockTime Reached
 
 	// Short circuit if current is nil
 	if w.current == nil {
@@ -1466,7 +1465,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
 
-	var skipCommit, ccOrBtReached bool
+	var skipCommit, ccOrBtReached bool // ccOrBtReached means either circuit capacity or block time has been reached
 	commitL1MsgStart := time.Now()
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))

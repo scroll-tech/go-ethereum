@@ -191,3 +191,15 @@ func (t *l1MessagesByQueueIndex) Pop() {
 	// so we will follow the same behavior in Pop
 	t.Shift()
 }
+
+// orderedTransactionSet represents a set of transactions and some ordering on top of this set.
+type orderedTransactionSet interface {
+	// Peek returns the next transaction.
+	Peek() *txpool.LazyTransaction
+
+	// Shift removes the next transaction.
+	Shift()
+
+	// Pop removes all transactions from the current account.
+	Pop()
+}

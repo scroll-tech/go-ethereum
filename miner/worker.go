@@ -1019,7 +1019,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 }
 
 // TODO: how to introduce `circuitCapacityReached`?
-func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAndNonce, interrupt *atomic.Int32) error {
+func (w *worker) commitTransactions(env *environment, txs orderedTransactionSet, interrupt *atomic.Int32) error {
 	defer func(t0 time.Time) {
 		l2CommitTxsTimer.Update(time.Since(t0))
 	}(time.Now())

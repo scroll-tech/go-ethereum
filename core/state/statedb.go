@@ -668,8 +668,8 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 // CreateAccount is called during the EVM CREATE operation. The situation might arise that
 // a contract does the following:
 //
-//   1. sends funds to sha(account ++ (nonce + 1))
-//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//  1. sends funds to sha(account ++ (nonce + 1))
+//  2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
 func (s *StateDB) CreateAccount(addr common.Address) {
@@ -1062,48 +1062,33 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 // - Add destination to access list (2929)
 // - Add precompiles to access list (2929)
 // - Add the contents of the optional tx access list (2930)
-// - Add coinbase to access list (3651)
 //
-// This method should only be called if Berlin/2929+2930 is applicable at the current number.
-func (s *StateDB) PrepareAccessList(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
-	s.AddAddressToAccessList(sender)
-	if dst != nil {
-		s.AddAddressToAccessList(*dst)
-		// If it's a create-tx, the destination will be added inside evm.create
-	}
-	for _, addr := range precompiles {
-		s.AddAddressToAccessList(addr)
-	}
-	for _, el := range list {
-		s.AddAddressToAccessList(el.Address)
-		for _, key := range el.StorageKeys {
-			s.AddSlotToAccessList(el.Address, key)
-		}
-	}
-	if rules.IsShanghai { // EIP-3651: warm coinbase
-		s.AddAddressToAccessList(coinbase)
-	}
-}
 // Potential EIPs:
-// - Reset transient storage(1153)
-func (s *StateDB) Prepare(rules params.Rules, sender common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
+// - Reset access list (Berlin)
+// - Add coinbase to access list (EIP-3651)
+// - Reset transient storage (EIP-1153)
+func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
 	if rules.IsBerlin {
 		// Clear out any leftover from previous executions
-		s.accessList = newAccessList()
+		al := newAccessList()
+		s.accessList = al
 
-		s.AddAddressToAccessList(sender)
+		al.AddAddress(sender)
 		if dst != nil {
-			s.AddAddressToAccessList(*dst)
+			al.AddAddress(*dst)
 			// If it's a create-tx, the destination will be added inside evm.create
 		}
 		for _, addr := range precompiles {
-			s.AddAddressToAccessList(addr)
+			al.AddAddress(addr)
 		}
 		for _, el := range list {
-			s.AddAddressToAccessList(el.Address)
+			al.AddAddress(el.Address)
 			for _, key := range el.StorageKeys {
-				s.AddSlotToAccessList(el.Address, key)
+				al.AddSlot(el.Address, key)
 			}
+		}
+		if rules.IsShanghai { // EIP-3651: warm coinbase
+			al.AddAddress(coinbase)
 		}
 	}
 	// Reset transient storage at the beginning of transaction execution

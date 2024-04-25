@@ -3612,6 +3612,7 @@ func TestEIP3651(t *testing.T) {
 // between transactions.
 func TestTransientStorageReset(t *testing.T) {
 	var (
+		db          = rawdb.NewMemoryDatabase()
 		engine      = ethash.NewFaker()
 		key, _      = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		address     = crypto.PubkeyToAddress(key.PublicKey)
@@ -3654,9 +3655,10 @@ func TestTransientStorageReset(t *testing.T) {
 			address: {Balance: funds},
 		},
 	}
+	genesis := gspec.MustCommit(db)
 	nonce := uint64(0)
 	signer := types.HomesteadSigner{}
-	_, blocks, _ := GenerateChainWithGenesis(gspec, engine, 1, func(i int, b *BlockGen) {
+	blocks, _ := GenerateChain(params.AllCliqueProtocolChanges, genesis, engine, db, 1, func(i int, b *BlockGen) {
 		fee := big.NewInt(1)
 		if b.header.BaseFee != nil {
 			fee = b.header.BaseFee
@@ -3682,7 +3684,7 @@ func TestTransientStorageReset(t *testing.T) {
 	})
 
 	// Initialize the blockchain with 1153 enabled.
-	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), nil, gspec, nil, engine, vmConfig, nil, nil)
+	chain, err := NewBlockChain(db, nil, params.AllCliqueProtocolChanges, engine, vmConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}

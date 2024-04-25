@@ -3658,7 +3658,7 @@ func TestTransientStorageReset(t *testing.T) {
 	genesis := gspec.MustCommit(db)
 	nonce := uint64(0)
 	signer := types.HomesteadSigner{}
-	blocks, _ := GenerateChain(params.AllCliqueProtocolChanges, genesis, engine, db, 1, func(i int, b *BlockGen) {
+	blocks, _ := GenerateChain(gspec.Config, genesis, engine, db, 1, func(i int, b *BlockGen) {
 		fee := big.NewInt(1)
 		if b.header.BaseFee != nil {
 			fee = b.header.BaseFee
@@ -3684,7 +3684,7 @@ func TestTransientStorageReset(t *testing.T) {
 	})
 
 	// Initialize the blockchain with 1153 enabled.
-	chain, err := NewBlockChain(db, nil, params.AllCliqueProtocolChanges, engine, vmConfig, nil, nil)
+	chain, err := NewBlockChain(db, nil, gspec.Config, engine, vmConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}

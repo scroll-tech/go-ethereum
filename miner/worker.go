@@ -1389,6 +1389,19 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 }
 
 func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransaction {
+	if tx.IsL1MessageTx() {
+		return &txpool.LazyTransaction{
+			Pool:      nil, // we should never resolve a L1MessageTx from the txpool and we never need to
+			Hash:      tx.Hash(),
+			Tx:        tx, // set the tx directly, we don't need to resolve it
+			Time:      tx.Time(),
+			GasFeeCap: tx.GasFeeCap(),
+			GasTipCap: tx.GasTipCap(),
+			Gas:       tx.Gas(),
+			BlobGas:   tx.BlobGas(),
+		}
+	}
+
 	return &txpool.LazyTransaction{
 		Pool:      txPool,
 		Hash:      tx.Hash(),
@@ -1399,14 +1412,6 @@ func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransa
 		Gas:       tx.Gas(),
 		BlobGas:   tx.BlobGas(),
 	}
-}
-
-func txsToLazyTxs(txPool *txpool.TxPool, txs []*types.Transaction) []*txpool.LazyTransaction {
-	lazyTxs := []*txpool.LazyTransaction{}
-	for _, tx := range txs {
-		lazyTxs = append(lazyTxs, txToLazyTx(txPool, tx))
-	}
-	return lazyTxs
 }
 
 // fillTransactions retrieves the pending transactions from the txpool and fills them

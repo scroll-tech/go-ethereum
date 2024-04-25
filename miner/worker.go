@@ -1389,6 +1389,27 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	return env, nil
 }
 
+func (w *worker) txToLazyTx(tx *types.Transaction) *txpool.LazyTransaction {
+	return &txpool.LazyTransaction{
+		Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
+		Hash:      tx.Hash(),
+		Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
+		Time:      tx.Time(),
+		GasFeeCap: tx.GasFeeCap(),
+		GasTipCap: tx.GasTipCap(),
+		Gas:       tx.Gas(),
+		BlobGas:   tx.BlobGas(),
+	}
+}
+
+func (w *worker) txsToLazyTxs(txs []*types.Transaction) []*txpool.LazyTransaction {
+	lazyTxs := []*txpool.LazyTransaction{}
+	for _, tx := range txs {
+		lazyTxs = append(lazyTxs, w.txToLazyTx(tx))
+	}
+	return lazyTxs
+}
+
 // fillTransactions retrieves the pending transactions from the txpool and fills them
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
@@ -1424,7 +1445,8 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
 			return err
 		}
-		err = w.commitTransactions(env, txs, interrupt)
+		txList := map[common.Address][]*txpool.LazyTransaction{common.Address{}: w.txsToLazyTxs(txs)}
+		err = w.commitTransactions(env, txList, interrupt)
 		if err != nil {
 			l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
 			return err
@@ -1438,9 +1460,10 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	if /*!circuitCapacityReached && */ w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
 		tx := w.prioritizedTx.tx
 		from, _ := types.Sender(w.current.signer, tx) // error already checked before
-		txList := map[common.Address]types.Transactions{from: []*types.Transaction{tx}}
-		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
-		err := w.commitTransactions(txs, w.coinbase, interrupt)
+		// no need to distinguish between L1 and L2 transactions, because there's only 1 tx. so it's ok to sort by any field
+		txList := map[common.Address][]*txpool.LazyTransaction{from: []*txpool.LazyTransaction{w.txToLazyTx(tx)}}
+		txs := newTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
+		err := w.commitTransactions(env, txs, interrupt)
 		if err != nil {
 			l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
 			return err

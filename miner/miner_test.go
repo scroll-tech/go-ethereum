@@ -42,14 +42,16 @@ import (
 )
 
 type mockBackend struct {
-	bc     *core.BlockChain
-	txPool *txpool.TxPool
+	bc      *core.BlockChain
+	txPool  *txpool.TxPool
+	chainDb ethdb.Database
 }
 
-func NewMockBackend(bc *core.BlockChain, txPool *txpool.TxPool) *mockBackend {
+func NewMockBackend(bc *core.BlockChain, txPool *txpool.TxPool, chainDb ethdb.Database) *mockBackend {
 	return &mockBackend{
-		bc:     bc,
-		txPool: txPool,
+		bc:      bc,
+		txPool:  txPool,
+		chainDb: chainDb,
 	}
 }
 
@@ -61,9 +63,8 @@ func (m *mockBackend) TxPool() *txpool.TxPool {
 	return m.txPool
 }
 
-// TODO: fix me
 func (m *mockBackend) ChainDb() ethdb.Database {
-	return nil
+	return m.chainDb
 }
 
 func (m *mockBackend) SyncService() *sync_service.SyncService {
@@ -323,7 +324,7 @@ func createMiner(t *testing.T) (*Miner, *event.TypeMux, func(skipMiner bool)) {
 	pool := legacypool.New(testTxPoolConfig, blockchain)
 	txpool, _ := txpool.New(new(big.Int).SetUint64(testTxPoolConfig.PriceLimit), blockchain, []txpool.SubPool{pool})
 
-	backend := NewMockBackend(bc, txpool)
+	backend := NewMockBackend(bc, txpool, chainDB)
 	// Create event Mux
 	mux := new(event.TypeMux)
 	// Create Miner

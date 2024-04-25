@@ -1461,7 +1461,7 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 		from, _ := types.Sender(w.current.signer, tx) // error already checked before
 		// 1. no need to distinguish between L1 and L2 transactions, because there's only 1 tx. so it's ok to sort by any field
 		// 2. we don't know where this came from, yolo resolve from everywhere (w.eth.TxPool())
-		txList := map[common.Address][]*txpool.LazyTransaction{from: []*txpool.LazyTransaction{txToLazyTx(w.eth.TxPool(), tx)}}
+		txList := map[common.Address][]*txpool.LazyTransaction{from: {txToLazyTx(w.eth.TxPool(), tx)}}
 		txs := newTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
 		circuitCapacityReached, err = w.commitTransactions(env, txs, interrupt)
 		if err != nil {

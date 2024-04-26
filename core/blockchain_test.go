@@ -3188,6 +3188,9 @@ func TestTransactionCountLimit(t *testing.T) {
 	config := params.TestChainConfig
 	config.Scroll.MaxTxPerBlock = new(int)
 	*config.Scroll.MaxTxPerBlock = 1
+	defer func() {
+		config.Scroll.MaxTxPerBlock = nil
+	}()
 
 	var (
 		engine  = ethash.NewFaker()
@@ -3359,6 +3362,10 @@ func TestL1MessageValidationFailure(t *testing.T) {
 	config.Scroll.L1Config.NumL1MessagesPerBlock = 1
 	maxPayload := 1024
 	config.Scroll.MaxTxPayloadBytesPerBlock = &maxPayload
+	defer func() {
+		config.Scroll.MaxTxPayloadBytesPerBlock = nil
+		config.Scroll.L1Config.NumL1MessagesPerBlock = 0
+	}()
 
 	genspec := &Genesis{
 		Config: config,

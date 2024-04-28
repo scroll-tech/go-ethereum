@@ -1464,9 +1464,12 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	if !circuitCapacityReached && w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
 		tx := w.prioritizedTx.tx
 		from, _ := types.Sender(w.current.signer, tx) // error already checked before
-		// 1. no need to distinguish between L1 and L2 transactions, because there's only 1 tx. so it's ok to sort by any field
-		// 2. we don't know where this came from, yolo resolve from everywhere (w.eth.TxPool())
+		// we don't know where this came from, yolo resolve from everywhere (w.eth.TxPool())
 		txList := map[common.Address][]*txpool.LazyTransaction{from: {txToLazyTx(w.eth.TxPool(), tx)}}
+		// usually we should distinguish l1txs and l2txs:
+		// use `newL1MessagesByQueueIndex` for l1txs and `newTransactionsByPriceAndNonce` is for l2txs;
+		// but here there's only 1 tx, and hence no need for sorting, we could just simply use `newTransactionsByPriceAndNonce`
+		// (but we fill the LazyTransaction's tx first, in case it's a l1tx and cannot be resolved from the mempool).
 		txs := newTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
 		circuitCapacityReached, err = w.commitTransactions(env, txs, interrupt)
 		if err != nil {

@@ -533,11 +533,14 @@ type ScrollConfig struct {
 	L1Config *L1Config `json:"l1Config,omitempty"`
 
 	// System contract config
-	SystemTxConfig *SystemTxConfig `json:"systemTxConfig,omitempty"`
+	SystemTx *SystemTxConfig `json:"systemTxConfig,omitempty"`
 }
 
 type SystemTxConfig struct {
-	Signers   []common.Address `json:"signers"`
+	Enabled bool `json:"enabled"`
+
+	// TODO maybe move these in state (system contract)
+	Senders   []common.Address `json:"senders"`
 	Contracts []common.Address `json:"contracts"`
 }
 

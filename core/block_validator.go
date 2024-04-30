@@ -142,24 +142,19 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 
 // ValidateSystemTxs validates all system txs contained in a block.
 // We check that:
-// - the sender is a whitelisted address
+// - the sender is a predetermined address
 // - the recipient is a system contract
 func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
-	signer := types.MakeSigner(v.config, block.Number())
-
 	for _, tx := range block.Transactions() {
 		if !tx.IsSystemTx() {
 			continue
 		}
 
-		from, err := types.Sender(signer, tx)
-		if err != nil {
-			return err
-		}
+		stx := tx.AsSystemTx()
 
 		found := false
-		for _, signer := range v.config.Scroll.SystemTxConfig.Signers {
-			if from == signer {
+		for _, signer := range v.config.Scroll.SystemTx.Senders {
+			if stx.From == signer {
 				found = true
 				break
 			}
@@ -169,10 +164,9 @@ func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
 			return ErrUnknownSystemSigner
 		}
 
-		to := *tx.To()
 		found = false
-		for _, contract := range v.config.Scroll.SystemTxConfig.Contracts {
-			if to == contract {
+		for _, contract := range v.config.Scroll.SystemTx.Contracts {
+			if *stx.To == contract {
 				found = true
 				break
 			}

@@ -9,45 +9,26 @@ import (
 )
 
 type SystemTx struct {
-	ChainID *big.Int
-	Gas     uint64          // gas limit
-	To      *common.Address // system contract
-	Nonce   uint64          // nonce
-	Data    []byte          // calldata
-	V, R, S *big.Int        // signature values
+	From  common.Address  // pre-determined sender
+	To    *common.Address // system contract
+	Gas   uint64          // gas limit
+	Nonce uint64          // nonce
+	Data  []byte          // calldata
 }
 
 func (tx *SystemTx) txType() byte { return SystemTxType }
 
 func (tx *SystemTx) copy() TxData {
-	cpy := &SystemTx{
-		ChainID: new(big.Int),
-		Gas:     tx.Gas,
-		Nonce:   tx.Nonce,
-		To:      copyAddressPtr(tx.To),
-		Data:    common.CopyBytes(tx.Data),
-		V:       new(big.Int),
-		R:       new(big.Int),
-		S:       new(big.Int),
+	return &SystemTx{
+		From:  tx.From,
+		Gas:   tx.Gas,
+		Nonce: tx.Nonce,
+		To:    copyAddressPtr(tx.To),
+		Data:  common.CopyBytes(tx.Data),
 	}
-
-	if tx.ChainID != nil {
-		cpy.ChainID.Set(tx.ChainID)
-	}
-	if tx.V != nil {
-		cpy.V.Set(tx.V)
-	}
-	if tx.R != nil {
-		cpy.R.Set(tx.R)
-	}
-	if tx.S != nil {
-		cpy.S.Set(tx.S)
-	}
-
-	return cpy
 }
 
-func (tx *SystemTx) chainID() *big.Int      { return tx.ChainID }
+func (tx *SystemTx) chainID() *big.Int      { return new(big.Int) }
 func (tx *SystemTx) accessList() AccessList { return nil }
 func (tx *SystemTx) data() []byte           { return tx.Data }
 func (tx *SystemTx) gas() uint64            { return tx.Gas }
@@ -59,12 +40,10 @@ func (tx *SystemTx) nonce() uint64          { return tx.Nonce }
 func (tx *SystemTx) to() *common.Address    { return tx.To }
 
 func (tx *SystemTx) rawSignatureValues() (v, r, s *big.Int) {
-	return tx.V, tx.R, tx.S
+	return new(big.Int), new(big.Int), new(big.Int)
 }
 
-func (tx *SystemTx) setSignatureValues(chainID, v, r, s *big.Int) {
-	tx.V, tx.R, tx.S = v, r, s
-}
+func (tx *SystemTx) setSignatureValues(chainID, v, r, s *big.Int) {}
 
 func (tx *SystemTx) encode(b *bytes.Buffer) error {
 	return rlp.Encode(b, tx)
@@ -75,3 +54,34 @@ func (tx *SystemTx) decode(input []byte) error {
 }
 
 var _ TxData = (*SystemTx)(nil)
+
+func NewOrderedSystemTxs(stxs []*SystemTx) *OrderedSystemTxs {
+	txs := make([]*Transaction, 0, len(stxs))
+	for _, stx := range stxs {
+		txs = append(txs, NewTx(stx))
+	}
+	return &OrderedSystemTxs{txs: txs}
+}
+
+type OrderedSystemTxs struct {
+	txs []*Transaction
+}
+
+func (o *OrderedSystemTxs) Peek() *Transaction {
+	if len(o.txs) > 0 {
+		return o.txs[0]
+	}
+	return nil
+}
+
+func (o *OrderedSystemTxs) Shift() {
+	if len(o.txs) > 0 {
+		o.txs = o.txs[1:]
+	}
+}
+
+func (o *OrderedSystemTxs) Pop() {
+	o.txs = nil
+}
+
+var _ OrderedTransactionSet = (*OrderedSystemTxs)(nil)

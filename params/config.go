@@ -573,6 +573,10 @@ func (s ScrollConfig) ShouldIncludeL1Messages() bool {
 	return s.L1Config != nil && s.L1Config.NumL1MessagesPerBlock > 0
 }
 
+func (s ScrollConfig) SystemTxEnabled() bool {
+	return s.SystemTx != nil && s.SystemTx.Enabled
+}
+
 func (s ScrollConfig) String() string {
 	maxTxPerBlock := "<nil>"
 	if s.MaxTxPerBlock != nil {

@@ -1446,7 +1446,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	// emit system txs
 	var systemTxs []*types.SystemTx
-	if w.chainConfig.Scroll.SystemTx.Enabled {
+	if w.chainConfig.Scroll.SystemTxEnabled() {
 		common.WithTimer(l2CommitNewWorkSystemTxTimer, func() {
 			systemTxs = w.emitSystemTxs(env)
 		})

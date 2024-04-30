@@ -234,7 +234,7 @@ func (st *StateTransition) buyGas() error {
 	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
 		// but double check to make sure
-		if !st.msg.IsL1MessageTx() {
+		if !st.msg.IsL1MessageTx() && !st.msg.IsSystemTx() {
 			log.Debug("Adding L1DataFee", "l1DataFee", st.l1DataFee)
 			mgval = mgval.Add(mgval, st.l1DataFee)
 		}
@@ -267,7 +267,7 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
-	if st.msg.IsL1MessageTx() {
+	if st.msg.IsL1MessageTx() || st.msg.IsSystemTx() {
 		// No fee fields to check, no nonce to check, and no need to check if EOA (L1 already verified it for us)
 		// Gas is free, but no refunds!
 		st.gas += st.msg.Gas()
@@ -402,8 +402,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		stateTransitionEvmCallExecutionTimer.Update(time.Since(evmCallStart))
 	}
 
-	// no refunds for l1 messages
-	if st.msg.IsL1MessageTx() {
+	// no refunds for l1 messages and system txs
+	if st.msg.IsL1MessageTx() || st.msg.IsSystemTx() {
 		return &ExecutionResult{
 			L1DataFee:  big.NewInt(0),
 			UsedGas:    st.gasUsed(),

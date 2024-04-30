@@ -112,4 +112,7 @@ var (
 	// ErrUnknownSystemContract is returned if the destination for a system
 	// transaction is not a known whitelisted system contract
 	ErrUnknownSystemContract = errors.New("unknown system contract")
+	// ErrSystemTxNotEnabled is returned if a system tx is included in a block
+	// but system transactions are not enabled in the sequenced
+	ErrSystemTxNotEnabled = errors.New("unexpected system transaction")
 )

@@ -150,6 +150,10 @@ func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
 			continue
 		}
 
+		if !v.config.Scroll.SystemTxEnabled() {
+			return ErrSystemTxNotEnabled
+		}
+
 		stx := tx.AsSystemTx()
 
 		found := false

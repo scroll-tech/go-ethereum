@@ -145,13 +145,33 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // - the sender is a predetermined address
 // - the recipient is a system contract
 func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
+	// first pass: ensure that system txs are first, in a continuous block
+	haveSystemTx := false
+	haveNonSystemTx := false
 	for _, tx := range block.Transactions() {
-		if !tx.IsSystemTx() {
+		if tx.IsSystemTx() {
+			if !v.config.Scroll.SystemTxEnabled() {
+				return ErrSystemTxNotEnabled
+			}
+
+			if haveNonSystemTx {
+				return consensus.ErrInvalidL1MessageOrder
+			}
+
+			haveSystemTx = true
 			continue
 		}
 
-		if !v.config.Scroll.SystemTxEnabled() {
-			return ErrSystemTxNotEnabled
+		haveNonSystemTx = true
+	}
+
+	if !haveSystemTx {
+		return nil
+	}
+
+	for _, tx := range block.Transactions() {
+		if !tx.IsSystemTx() {
+			break
 		}
 
 		stx := tx.AsSystemTx()
@@ -186,7 +206,7 @@ func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
 
 // ValidateL1Messages validates L1 messages contained in a block.
 // We check the following conditions:
-// - L1 messages are in a contiguous section at the front of the block.
+// - L1 messages are in a contiguous section at the front of the block, after system txs
 // - The first L1 message's QueueIndex is right after the last L1 message included in the chain.
 // - L1 messages follow the QueueIndex order.
 // - The L1 messages included in the block match the node's view of the L1 ledger.
@@ -218,6 +238,10 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 	it := rawdb.IterateL1MessagesFrom(v.bc.db, queueIndex)
 
 	for _, tx := range block.Transactions() {
+		if tx.IsSystemTx() {
+			continue
+		}
+
 		if !tx.IsL1MessageTx() {
 			L1SectionOver = true
 			continue // we do not verify L2 transactions here

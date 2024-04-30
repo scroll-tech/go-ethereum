@@ -1485,7 +1485,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	var skipCommit, circuitCapacityReached bool
 
 	commitSystemTxStart := time.Now()
-	if w.chainConfig.Scroll.SystemTx.Enabled {
+	if w.chainConfig.Scroll.SystemTxEnabled() {
 		log.Trace("Processing SystemTxs for inclusion", "count", len(systemTxs))
 
 		txs := types.NewOrderedSystemTxs(systemTxs)

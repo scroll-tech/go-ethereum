@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"math/big"
+	"sort"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -60,6 +61,18 @@ func NewOrderedSystemTxs(stxs []*SystemTx) *OrderedSystemTxs {
 	for _, stx := range stxs {
 		txs = append(txs, NewTx(stx))
 	}
+	sort.SliceStable(txs, func(i, j int) bool {
+		txi := txs[i].AsSystemTx()
+		txj := txs[j].AsSystemTx()
+		cmp := bytes.Compare(txi.From.Bytes(), txj.From.Bytes())
+		if cmp < 0 {
+			return true
+		} else if cmp == 0 {
+			return txi.Nonce < txj.Nonce
+		} else {
+			return false
+		}
+	})
 	return &OrderedSystemTxs{txs: txs}
 }
 
@@ -81,7 +94,16 @@ func (o *OrderedSystemTxs) Shift() {
 }
 
 func (o *OrderedSystemTxs) Pop() {
-	o.txs = nil
+	if len(o.txs) > 0 {
+		currentSender := o.txs[0].AsSystemTx().From
+		i := 1
+		for ; i < len(o.txs); i++ {
+			if o.txs[i].AsSystemTx().From != currentSender {
+				break
+			}
+		}
+		o.txs = o.txs[i:]
+	}
 }
 
 var _ OrderedTransactionSet = (*OrderedSystemTxs)(nil)

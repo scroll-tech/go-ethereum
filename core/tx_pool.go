@@ -587,12 +587,8 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
-	// No unauthenticated deposits allowed in the transaction pool.
-	if tx.IsL1MessageTx() {
-		return ErrTxTypeNotSupported
-	}
-
-	if tx.IsSystemTx() {
+	// No unauthenticated deposits or system txs allowed in the transaction pool.
+	if tx.IsL1MessageTx() || tx.IsSystemTx() {
 		return ErrTxTypeNotSupported
 	}
 

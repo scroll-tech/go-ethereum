@@ -228,13 +228,18 @@ func (st *StateTransition) to() common.Address {
 }
 
 func (st *StateTransition) buyGas() error {
+	if st.msg.IsSystemTx() {
+		// no gas accounting for system txs
+		return nil
+	}
+
 	mgval := new(big.Int).SetUint64(st.msg.Gas())
 	mgval = mgval.Mul(mgval, st.gasPrice)
 
 	if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
 		// but double check to make sure
-		if !st.msg.IsL1MessageTx() && !st.msg.IsSystemTx() {
+		if !st.msg.IsL1MessageTx() {
 			log.Debug("Adding L1DataFee", "l1DataFee", st.l1DataFee)
 			mgval = mgval.Add(mgval, st.l1DataFee)
 		}
@@ -248,7 +253,7 @@ func (st *StateTransition) buyGas() error {
 		if st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 			// should be fine to add st.l1DataFee even without `L1MessageTx` check, since L1MessageTx will come with 0 l1DataFee,
 			// but double check to make sure
-			if !st.msg.IsL1MessageTx() && !st.msg.IsSystemTx() {
+			if !st.msg.IsL1MessageTx() {
 				balanceCheck.Add(balanceCheck, st.l1DataFee)
 			}
 		}
@@ -267,7 +272,14 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
-	if st.msg.IsL1MessageTx() || st.msg.IsSystemTx() {
+	if st.msg.IsSystemTx() {
+		// system tx gas is free and not accounted for.
+		st.gas += st.msg.Gas()
+		st.initialGas = st.msg.Gas()
+		return nil
+	}
+
+	if st.msg.IsL1MessageTx() {
 		// No fee fields to check, no nonce to check, and no need to check if EOA (L1 already verified it for us)
 		// Gas is free, but no refunds!
 		st.gas += st.msg.Gas()

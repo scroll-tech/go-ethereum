@@ -3,41 +3,39 @@ package types
 import (
 	"bytes"
 	"math/big"
-	"sort"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 type SystemTx struct {
-	From  common.Address  // pre-determined sender
-	To    *common.Address // system contract
-	Gas   uint64          // gas limit
-	Nonce uint64          // nonce
-	Data  []byte          // calldata
+	Sender common.Address  // pre-determined sender
+	To     *common.Address // system contract
+	Data   []byte          // calldata
 }
+
+// not accountend
+const SystemTxGas = 1_000_000
 
 func (tx *SystemTx) txType() byte { return SystemTxType }
 
 func (tx *SystemTx) copy() TxData {
 	return &SystemTx{
-		From:  tx.From,
-		Gas:   tx.Gas,
-		Nonce: tx.Nonce,
-		To:    copyAddressPtr(tx.To),
-		Data:  common.CopyBytes(tx.Data),
+		Sender: tx.Sender,
+		To:     copyAddressPtr(tx.To),
+		Data:   common.CopyBytes(tx.Data),
 	}
 }
 
 func (tx *SystemTx) chainID() *big.Int      { return new(big.Int) }
 func (tx *SystemTx) accessList() AccessList { return nil }
 func (tx *SystemTx) data() []byte           { return tx.Data }
-func (tx *SystemTx) gas() uint64            { return tx.Gas }
+func (tx *SystemTx) gas() uint64            { return SystemTxGas }
 func (tx *SystemTx) gasPrice() *big.Int     { return new(big.Int) }
 func (tx *SystemTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (tx *SystemTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (tx *SystemTx) value() *big.Int        { return new(big.Int) }
-func (tx *SystemTx) nonce() uint64          { return tx.Nonce }
+func (tx *SystemTx) nonce() uint64          { return 0 }
 func (tx *SystemTx) to() *common.Address    { return tx.To }
 
 func (tx *SystemTx) rawSignatureValues() (v, r, s *big.Int) {
@@ -61,18 +59,6 @@ func NewOrderedSystemTxs(stxs []*SystemTx) *OrderedSystemTxs {
 	for _, stx := range stxs {
 		txs = append(txs, NewTx(stx))
 	}
-	sort.SliceStable(txs, func(i, j int) bool {
-		txi := txs[i].AsSystemTx()
-		txj := txs[j].AsSystemTx()
-		cmp := bytes.Compare(txi.From.Bytes(), txj.From.Bytes())
-		if cmp < 0 {
-			return true
-		} else if cmp == 0 {
-			return txi.Nonce < txj.Nonce
-		} else {
-			return false
-		}
-	})
 	return &OrderedSystemTxs{txs: txs}
 }
 
@@ -93,17 +79,6 @@ func (o *OrderedSystemTxs) Shift() {
 	}
 }
 
-func (o *OrderedSystemTxs) Pop() {
-	if len(o.txs) > 0 {
-		currentSender := o.txs[0].AsSystemTx().From
-		i := 1
-		for ; i < len(o.txs); i++ {
-			if o.txs[i].AsSystemTx().From != currentSender {
-				break
-			}
-		}
-		o.txs = o.txs[i:]
-	}
-}
+func (o *OrderedSystemTxs) Pop() {}
 
 var _ OrderedTransactionSet = (*OrderedSystemTxs)(nil)

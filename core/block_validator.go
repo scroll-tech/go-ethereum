@@ -177,8 +177,8 @@ func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
 		stx := tx.AsSystemTx()
 
 		found := false
-		for _, signer := range v.config.Scroll.SystemTx.Senders {
-			if stx.From == signer {
+		for _, sender := range v.config.Scroll.SystemTx.Senders {
+			if stx.Sender == sender {
 				found = true
 				break
 			}

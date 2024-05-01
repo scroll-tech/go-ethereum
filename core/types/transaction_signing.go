@@ -257,7 +257,7 @@ func (s londonSigner) Sender(tx *Transaction) (common.Address, error) {
 		return tx.AsL1MessageTx().Sender, nil
 	}
 	if tx.IsSystemTx() {
-		return tx.AsSystemTx().From, nil
+		return tx.AsSystemTx().Sender, nil
 	}
 	if tx.Type() != DynamicFeeTxType {
 		return s.eip2930Signer.Sender(tx)

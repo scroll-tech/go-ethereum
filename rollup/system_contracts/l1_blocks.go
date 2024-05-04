@@ -53,8 +53,8 @@ func NewL1BlocksWorker(ctx context.Context, l1Client sync_service.EthClient, l1C
 	return &worker, nil
 }
 
-func (w *L1BlocksWorker) GetLatestL1BlockNumberOnL2(state StateDB) (*big.Int) {
-	return state.GetState(rcfg.L1BlocksAddress, rcfg.LatestBlockNumberSlot).Big()
+func (w *L1BlocksWorker) GetLatestL1BlockNumberOnL2(state StateDB) uint64 {
+	return state.GetState(rcfg.L1BlocksAddress, rcfg.LatestBlockNumberSlot).Big().Uint64()
 }
 
 func (w *L1BlocksWorker) GetLatestConfirmedL1BlockNumber() (uint64, error) {
@@ -126,11 +126,11 @@ func (w *L1BlocksWorker) generateL1BlockMsg(l1BlockNumber uint64, nonce uint64) 
 	}, nil
 }
 
-func (w *L1BlocksWorker) GenerateL1BlockMsgs(from, to uint64, state StateDB) ([]types.SystemTx, error) {
+func (w *L1BlocksWorker) GenerateL1BlockMsgs(from, to uint64, state StateDB) ([]*types.SystemTx, error) {
 	if to < from {
 		return nil, fmt.Errorf("invalid block range", "from", from, "to", to)
 	}
-	msgs := make([]types.SystemTx, (to - from + 1))
+	msgs := make([]*types.SystemTx, (to - from + 1))
 	nonce := state.GetNonce(rcfg.SystemSenderAddress)
 	var i uint64
 	for i = 0; i < to - from + 1; i++ {
@@ -138,7 +138,7 @@ func (w *L1BlocksWorker) GenerateL1BlockMsgs(from, to uint64, state StateDB) ([]
 		if err != nil {
 			return nil, err
 		}
-		msgs[i] = *msg
+		msgs[i] = msg
 	}
 	return msgs, nil
 }

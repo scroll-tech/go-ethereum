@@ -1334,8 +1334,22 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 }
 
 func (w *worker) emitSystemTxs(env *environment) []*types.SystemTx {
-	// TODO
-	return nil
+	l1BlockNumber, err := w.l1BlocksWorker.GetLatestConfirmedL1BlockNumber()
+	if err != nil {
+		log.Error("failed to get latest confirmed L1 block number", "err", err)
+		return nil
+	}
+	latestL1BlockNumberOnL2 := w.l1BlocksWorker.GetLatestL1BlockNumberOnL2(env.state)
+	cnt := l1BlockNumber - latestL1BlockNumberOnL2
+	if cnt > w.chainConfig.Scroll.L1Config.MaxNumL1BlockTxPerBlock {
+		cnt = w.chainConfig.Scroll.L1Config.MaxNumL1BlockTxPerBlock
+	}
+	systemTxs, err := w.l1BlocksWorker.GenerateL1BlockMsgs(latestL1BlockNumberOnL2 + 1, latestL1BlockNumberOnL2 + cnt, env.state)
+	if err != nil {
+		log.Error("failed to generate L1Blocks messages", "err", err)
+		return nil
+	}
+	return systemTxs
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.

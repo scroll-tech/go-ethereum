@@ -40,6 +40,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/rollup/system_contracts"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
@@ -187,6 +188,7 @@ type worker struct {
 	engine      consensus.Engine
 	eth         Backend
 	chain       *core.BlockChain
+	l1BlocksWorker *system_contracts.L1BlocksWorker
 
 	// Feeds
 	pendingLogsFeed event.Feed
@@ -256,7 +258,7 @@ type worker struct {
 	beforeTxHook func()                             // Method to call before processing a transaction.
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, l1BlocksWorker *system_contracts.L1BlocksWorker, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
 	worker := &worker{
 		config:                 config,
 		chainConfig:            chainConfig,
@@ -264,6 +266,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		eth:                    eth,
 		mux:                    mux,
 		chain:                  eth.BlockChain(),
+		l1BlocksWorker:         l1BlocksWorker,
 		isLocalBlock:           isLocalBlock,
 		localUncles:            make(map[common.Hash]*types.Block),
 		remoteUncles:           make(map[common.Hash]*types.Block),

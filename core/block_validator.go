@@ -190,7 +190,7 @@ func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
 
 		found = false
 		for _, contract := range v.config.Scroll.SystemTx.Contracts {
-			if *stx.To == contract {
+			if stx.To == contract {
 				found = true
 				break
 			}

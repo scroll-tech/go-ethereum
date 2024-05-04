@@ -35,6 +35,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/system_contracts"
 )
 
 // Backend wraps all methods required for mining.
@@ -74,7 +75,8 @@ type Miner struct {
 	wg sync.WaitGroup
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, l1BlocksWorker *system_contracts.L1BlocksWorker, isLocalBlock func(block *types.Block) bool) *Miner {
+	//system_contracts.NewL1BlocksWorker(context.Background(), )
 	miner := &Miner{
 		eth:     eth,
 		mux:     mux,
@@ -82,7 +84,7 @@ func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *even
 		exitCh:  make(chan struct{}),
 		startCh: make(chan common.Address),
 		stopCh:  make(chan struct{}),
-		worker:  newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true),
+		worker:  newWorker(config, chainConfig, engine, eth, l1BlocksWorker, mux, isLocalBlock, true),
 	}
 	miner.wg.Add(1)
 	go miner.update()

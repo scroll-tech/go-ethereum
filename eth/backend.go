@@ -57,6 +57,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/system_contracts"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -253,7 +254,11 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
+	l1BlocksWorker, err := system_contracts.NewL1BlocksWorker(context.Background(), l1Client, chainConfig.Scroll.L1Config.L1ChainId, stack.Config().L1Confirmations)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize L1BlocksWorker: %w", err)
+	}
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, l1BlocksWorker, eth.isLocalBlock)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}

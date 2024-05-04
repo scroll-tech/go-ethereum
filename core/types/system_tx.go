@@ -10,7 +10,8 @@ import (
 
 type SystemTx struct {
 	Sender common.Address  // pre-determined sender
-	To     *common.Address // system contract
+	To     common.Address  // system contract address
+	Nonce  uint64          // nonce of sender account
 	Data   []byte          // calldata
 }
 
@@ -22,7 +23,7 @@ func (tx *SystemTx) txType() byte { return SystemTxType }
 func (tx *SystemTx) copy() TxData {
 	return &SystemTx{
 		Sender: tx.Sender,
-		To:     copyAddressPtr(tx.To),
+		To:     tx.To,
 		Data:   common.CopyBytes(tx.Data),
 	}
 }
@@ -35,8 +36,8 @@ func (tx *SystemTx) gasPrice() *big.Int     { return new(big.Int) }
 func (tx *SystemTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (tx *SystemTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (tx *SystemTx) value() *big.Int        { return new(big.Int) }
-func (tx *SystemTx) nonce() uint64          { return 0 }
-func (tx *SystemTx) to() *common.Address    { return tx.To }
+func (tx *SystemTx) nonce() uint64          { return tx.Nonce }
+func (tx *SystemTx) to() *common.Address    { return &tx.To }
 
 func (tx *SystemTx) rawSignatureValues() (v, r, s *big.Int) {
 	return new(big.Int), new(big.Int), new(big.Int)

@@ -120,6 +120,9 @@ const (
 	MSIZE    OpCode = 0x59
 	GAS      OpCode = 0x5a
 	JUMPDEST OpCode = 0x5b
+	TLOAD    OpCode = 0x5c
+	TSTORE   OpCode = 0x5d
+	MCOPY    OpCode = 0x5e
 	PUSH0    OpCode = 0x5f
 )
 
@@ -285,7 +288,11 @@ var opCodeToString = map[OpCode]string{
 	GASLIMIT:    "GASLIMIT",
 	CHAINID:     "CHAINID",
 	SELFBALANCE: "SELFBALANCE",
-	BASEFEE:     "BASEFEE",
+
+	// we temporarily comment this out, since ccc expects
+	// the "opcode 0x%x not defined" string in the traces,
+	// should uncomment once ccc supports the string version.
+	// BASEFEE:     "BASEFEE",
 
 	// 0x50 range - 'storage' and execution.
 	POP: "POP",
@@ -302,7 +309,15 @@ var opCodeToString = map[OpCode]string{
 	MSIZE:    "MSIZE",
 	GAS:      "GAS",
 	JUMPDEST: "JUMPDEST",
-	PUSH0:    "PUSH0",
+
+	// we temporarily comment these out, since ccc expects
+	// the "opcode 0x%x not defined" string in the traces,
+	// should uncomment once ccc supports the string version.
+	// TLOAD:    "TLOAD",
+	// TSTORE:   "TSTORE",
+	// MCOPY:    "MCOPY",
+
+	PUSH0: "PUSH0",
 
 	// 0x60 range - push.
 	PUSH1:  "PUSH1",
@@ -377,7 +392,7 @@ var opCodeToString = map[OpCode]string{
 	LOG3:   "LOG3",
 	LOG4:   "LOG4",
 
-	// 0xf0 range.
+	// 0xf0 range - closures.
 	CREATE:       "CREATE",
 	CALL:         "CALL",
 	RETURN:       "RETURN",
@@ -466,6 +481,9 @@ var stringToOp = map[string]OpCode{
 	"MSIZE":          MSIZE,
 	"GAS":            GAS,
 	"JUMPDEST":       JUMPDEST,
+	"TLOAD":          TLOAD,
+	"TSTORE":         TSTORE,
+	"MCOPY":          MCOPY,
 	"PUSH0":          PUSH0,
 	"PUSH1":          PUSH1,
 	"PUSH2":          PUSH2,

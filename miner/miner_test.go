@@ -66,6 +66,10 @@ func (m *mockBackend) ChainDb() ethdb.Database {
 	return m.chainDb
 }
 
+func (m *mockBackend) L1Client() sync_service.EthClient {
+	return nil
+}
+
 type testBlockChain struct {
 	statedb       *state.StateDB
 	gasLimit      uint64

@@ -8,12 +8,14 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 const (
@@ -34,11 +36,27 @@ const (
 	// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
 	// this secion.
 	DbWriteThresholdBlocks = 1000
+
+	// MaxNumCachedL1BlocksTx is the capacity of the L1BlocksTx pool
+	MaxNumCachedL1BlocksTx = 100
 )
 
 var (
 	l1MessageTotalCounter = metrics.NewRegisteredCounter("rollup/l1/message", nil)
 )
+
+type L1BlocksTx struct {
+	tx          *types.SystemTx
+	blockNumber uint64
+}
+
+type L1BlocksPool struct {
+	enabled              bool
+	latestL1BlockNumOnL2 uint64
+	l1BlocksTxs	 		 []L1BlocksTx // The L1Blocks txs to be included in the blocks
+	pendingL1BlocksTxs   []L1BlocksTx // The L1Blocks txs that are pending confirmation in the blocks
+	l1BlocksFeed         event.Feed
+}
 
 // SyncService collects all L1 messages and stores them in a local database.
 type SyncService struct {
@@ -49,10 +67,11 @@ type SyncService struct {
 	msgCountFeed         event.Feed
 	pollInterval         time.Duration
 	latestProcessedBlock uint64
+	l1BlocksPool         L1BlocksPool
 	scope                event.SubscriptionScope
 }
 
-func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
+func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, bc *core.BlockChain, l1Client EthClient) (*SyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 sync service will not run")
@@ -76,6 +95,13 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		latestProcessedBlock = *block
 	}
 
+	// read the latestL1BlockNumOnL2 from the L1Blocks contract
+	state, err := bc.StateAt(bc.CurrentBlock().Root())
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the state db: %w", err)
+	}
+	latestL1BlockNumOnL2 := state.GetState(rcfg.L1BlocksAddress, rcfg.LatestBlockNumberSlot).Big().Uint64()
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
@@ -85,6 +111,10 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		db:                   db,
 		pollInterval:         DefaultPollInterval,
 		latestProcessedBlock: latestProcessedBlock,
+		l1BlocksPool:         L1BlocksPool{
+			enabled:              genesisConfig.Scroll.SystemTx.Enabled,
+			latestL1BlockNumOnL2: latestL1BlockNumOnL2,
+		},
 	}
 
 	return &service, nil
@@ -145,6 +175,41 @@ func (s *SyncService) SubscribeNewL1MsgsEvent(ch chan<- core.NewL1MsgsEvent) eve
 	return s.scope.Track(s.msgCountFeed.Subscribe(ch))
 }
 
+func (s *SyncService) SubscribeNewL1BlocksTx(ch chan<- core.NewL1MsgsEvent) event.Subscription {
+	return s.scope.Track(s.l1BlocksPool.l1BlocksFeed.Subscribe(ch))
+}
+
+func (s *SyncService) CollectL1BlocksTxs(latestL1BlockNumberOnL2, maxNumTxs uint64) []*types.SystemTx {
+	if len(s.l1BlocksPool.pendingL1BlocksTxs) > 0 {
+		// pop the txs from the pending txs in the pool
+		i := 0
+		for ; i < len(s.l1BlocksPool.pendingL1BlocksTxs); i++ {
+			if s.l1BlocksPool.pendingL1BlocksTxs[i].blockNumber > latestL1BlockNumberOnL2 {
+				break
+			}
+		}
+		failedTxs := s.l1BlocksPool.pendingL1BlocksTxs[i:]
+		if len(failedTxs) > 0 {
+			log.Warn("Failed to process L1Blocks txs", "cnt", len(failedTxs))
+			s.l1BlocksPool.l1BlocksTxs = append(failedTxs, s.l1BlocksPool.l1BlocksTxs...)
+		}
+		s.l1BlocksPool.pendingL1BlocksTxs = nil
+	}
+
+	cnt := int(maxNumTxs)
+	if cnt > len(s.l1BlocksPool.l1BlocksTxs) {
+		cnt = len(s.l1BlocksPool.l1BlocksTxs)
+	}
+	ret := make([]*types.SystemTx, cnt)
+	for i := 0; i < cnt; i++ {
+		ret[i] = s.l1BlocksPool.l1BlocksTxs[i].tx
+	}
+	s.l1BlocksPool.pendingL1BlocksTxs = s.l1BlocksPool.l1BlocksTxs[:cnt]
+	s.l1BlocksPool.l1BlocksTxs = s.l1BlocksPool.l1BlocksTxs[cnt:]
+
+	return ret
+}
+
 func (s *SyncService) fetchMessages() {
 	latestConfirmed, err := s.client.getLatestConfirmedBlockNumber(s.ctx)
 	if err != nil {
@@ -152,6 +217,53 @@ func (s *SyncService) fetchMessages() {
 		return
 	}
 
+	if s.l1BlocksPool.enabled {
+		s.fetchL1Blocks(latestConfirmed)
+	}
+
+	s.fetchL1Messages(latestConfirmed)
+}
+
+func (s *SyncService) fetchL1Blocks(latestConfirmed uint64) {
+	var latestProcessedBlock uint64
+	if len(s.l1BlocksPool.l1BlocksTxs) != 0 {
+		latestProcessedBlock = s.l1BlocksPool.l1BlocksTxs[len(s.l1BlocksPool.l1BlocksTxs)-1].blockNumber
+	} else {
+		latestProcessedBlock = s.l1BlocksPool.latestL1BlockNumOnL2
+	}
+	if latestProcessedBlock == 0 {
+		// This is the first L1 blocks system tx on L2, only fetch the latest confirmed L1 block
+		latestProcessedBlock = latestConfirmed - 1
+	}
+	// query in batches
+	num := 0
+	for from := latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
+		cnt := DefaultFetchBlockRange
+		if cnt + uint64(len(s.l1BlocksPool.l1BlocksTxs)) > MaxNumCachedL1BlocksTx {
+			cnt = MaxNumCachedL1BlocksTx - uint64(len(s.l1BlocksPool.l1BlocksTxs))
+		}
+		to := from + cnt - 1
+		if to > latestConfirmed {
+			to = latestConfirmed
+		}
+		l1BlocksTxs, err := s.client.fetchL1Blocks(s.ctx, from, to)
+		if err != nil {
+			log.Warn("Failed to fetch L1Blocks in range", "fromBlock", from, "toBlock", to, "err", err)
+			return
+		}
+		log.Debug("Received new L1 blocks", "fromBlock", from, "toBlock", to, "count", len(l1BlocksTxs))
+		for i, tx := range l1BlocksTxs {
+			s.l1BlocksPool.l1BlocksTxs = append(s.l1BlocksPool.l1BlocksTxs, L1BlocksTx{tx, from + uint64(i)})
+		}
+		num += len(l1BlocksTxs)
+	}
+
+	if num > 0 {
+		s.l1BlocksPool.l1BlocksFeed.Send(core.NewL1MsgsEvent{Count: num})
+	}
+}
+
+func (s *SyncService) fetchL1Messages(latestConfirmed uint64) {
 	log.Trace("Sync service fetchMessages", "latestProcessedBlock", s.latestProcessedBlock, "latestConfirmed", latestConfirmed)
 
 	// keep track of next queue index we're expecting to see

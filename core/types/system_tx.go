@@ -11,7 +11,6 @@ import (
 type SystemTx struct {
 	Sender common.Address  // pre-determined sender
 	To     common.Address  // system contract address
-	Nonce  uint64          // nonce of sender account
 	Data   []byte          // calldata
 }
 
@@ -36,7 +35,7 @@ func (tx *SystemTx) gasPrice() *big.Int     { return new(big.Int) }
 func (tx *SystemTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (tx *SystemTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (tx *SystemTx) value() *big.Int        { return new(big.Int) }
-func (tx *SystemTx) nonce() uint64          { return tx.Nonce }
+func (tx *SystemTx) nonce() uint64          { return 0 }
 func (tx *SystemTx) to() *common.Address    { return &tx.To }
 
 func (tx *SystemTx) rawSignatureValues() (v, r, s *big.Int) {

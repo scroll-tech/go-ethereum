@@ -31,6 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -177,14 +178,7 @@ func (v *BlockValidator) ValidateSystemTxs(block *types.Block) error {
 		stx := tx.AsSystemTx()
 
 		found := false
-		for _, sender := range v.config.Scroll.SystemTx.Senders {
-			if stx.Sender == sender {
-				found = true
-				break
-			}
-		}
-
-		if !found {
+		if stx.Sender != rcfg.SystemSenderAddress {
 			return ErrUnknownSystemSigner
 		}
 

@@ -57,7 +57,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/system_contracts"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -74,6 +73,7 @@ type Ethereum struct {
 	txPool             *core.TxPool
 	syncService        *sync_service.SyncService
 	rollupSyncService  *rollup_sync_service.RollupSyncService
+	l1Client           sync_service.EthClient
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -149,6 +149,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth := &Ethereum{
 		config:            config,
+		l1Client:          l1Client,
 		chainDb:           chainDb,
 		eventMux:          stack.EventMux(),
 		accountManager:    stack.AccountManager(),
@@ -219,7 +220,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
 	// initialize and start L1 message sync service
-	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
+	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, eth.blockchain, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
@@ -254,11 +255,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 
-	l1BlocksWorker, err := system_contracts.NewL1BlocksWorker(context.Background(), l1Client, chainConfig.Scroll.L1Config.L1ChainId, stack.Config().L1Confirmations)
-	if err != nil {
-		return nil, fmt.Errorf("cannot initialize L1BlocksWorker: %w", err)
-	}
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, l1BlocksWorker, eth.isLocalBlock)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
@@ -549,6 +546,7 @@ func (s *Ethereum) Synced() bool                           { return atomic.LoadU
 func (s *Ethereum) ArchiveMode() bool                      { return s.config.NoPruning }
 func (s *Ethereum) BloomIndexer() *core.ChainIndexer       { return s.bloomIndexer }
 func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncService }
+func (s *Ethereum) L1Client() sync_service.EthClient       { return s.l1Client }
 
 // Protocols returns all the currently configured
 // network protocols to start.

@@ -111,8 +111,8 @@ func (c *BridgeClient) fetchL1Blocks(ctx context.Context, from, to uint64) ([]*t
 	}
 	msgs := make([]*types.SystemTx, (to - from + 1))
 	var i uint64
-	for i = 0; i < to - from + 1; i++ {
-		msg, err := c.buildL1BlocksTx(ctx, from + i)
+	for i = 0; i < to-from+1; i++ {
+		msg, err := c.buildL1BlocksTx(ctx, from+i)
 		if err != nil {
 			return nil, err
 		}

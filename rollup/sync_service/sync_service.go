@@ -53,7 +53,7 @@ type L1BlocksTx struct {
 type L1BlocksPool struct {
 	enabled              bool
 	latestL1BlockNumOnL2 uint64
-	l1BlocksTxs	 		 []L1BlocksTx // The L1Blocks txs to be included in the blocks
+	l1BlocksTxs          []L1BlocksTx // The L1Blocks txs to be included in the blocks
 	pendingL1BlocksTxs   []L1BlocksTx // The L1Blocks txs that are pending confirmation in the blocks
 	l1BlocksFeed         event.Feed
 }
@@ -111,7 +111,7 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		db:                   db,
 		pollInterval:         DefaultPollInterval,
 		latestProcessedBlock: latestProcessedBlock,
-		l1BlocksPool:         L1BlocksPool{
+		l1BlocksPool: L1BlocksPool{
 			enabled:              genesisConfig.Scroll.SystemTx.Enabled,
 			latestL1BlockNumOnL2: latestL1BlockNumOnL2,
 		},
@@ -239,7 +239,7 @@ func (s *SyncService) fetchL1Blocks(latestConfirmed uint64) {
 	num := 0
 	for from := latestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		cnt := DefaultFetchBlockRange
-		if cnt + uint64(len(s.l1BlocksPool.l1BlocksTxs)) > MaxNumCachedL1BlocksTx {
+		if cnt+uint64(len(s.l1BlocksPool.l1BlocksTxs)) > MaxNumCachedL1BlocksTx {
 			cnt = MaxNumCachedL1BlocksTx - uint64(len(s.l1BlocksPool.l1BlocksTxs))
 		}
 		to := from + cnt - 1

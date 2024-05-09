@@ -367,11 +367,11 @@ var (
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
 			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			L1Config: &L1Config{
-				L1ChainId:             1,
-				L1MessageQueueAddress: common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
-				NumL1MessagesPerBlock: 10,
+				L1ChainId:                1,
+				L1MessageQueueAddress:    common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
+				NumL1MessagesPerBlock:    10,
 				MaxNumL1BlocksTxPerBlock: 5,
-				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
+				ScrollChainAddress:       common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
 			},
 		},
 	}

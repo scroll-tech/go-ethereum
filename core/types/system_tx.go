@@ -9,9 +9,9 @@ import (
 )
 
 type SystemTx struct {
-	Sender common.Address  // pre-determined sender
-	To     common.Address  // system contract address
-	Data   []byte          // calldata
+	Sender common.Address // pre-determined sender
+	To     common.Address // system contract address
+	Data   []byte         // calldata
 }
 
 // not accountend

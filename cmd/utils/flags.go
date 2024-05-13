@@ -527,6 +527,11 @@ var (
 		Name:  "miner.storeskippedtxtraces",
 		Usage: "Store the wrapped traces when storing a skipped tx",
 	}
+	MinerMaxAccountsNumFlag = cli.IntFlag{
+		Name:  "miner.maxaccountsnum",
+		Usage: "Maximum number of accounts that miner will fetch the pending transactions of when building a new block",
+		Value: math.MaxInt,
+	}
 
 	// Account settings
 	UnlockedAccountFlag = &cli.StringFlag{
@@ -1696,6 +1701,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.IsSet(MinerStoreSkippedTxTracesFlag.Name) {
 		cfg.StoreSkippedTxTraces = ctx.Bool(MinerStoreSkippedTxTracesFlag.Name)
+	}
+	if ctx.IsSet(MinerMaxAccountsNumFlag.Name) {
+		cfg.MaxAccountsNum = ctx.Int(MinerMaxAccountsNumFlag.Name)
 	}
 }
 

@@ -160,16 +160,19 @@ var (
 		Category: flags.EthCategory,
 	}
 	ScrollFlag = &cli.BoolFlag{
-		Name:  "scroll",
-		Usage: "Scroll mainnet",
+		Name:     "scroll",
+		Usage:    "Scroll mainnet",
+		Category: flags.EthCategory,
 	}
 	ScrollAlphaFlag = &cli.BoolFlag{
-		Name:  "scroll-alpha",
-		Usage: "Scroll Alpha test network",
+		Name:     "scroll-alpha",
+		Usage:    "Scroll Alpha test network",
+		Category: flags.EthCategory,
 	}
 	ScrollSepoliaFlag = &cli.BoolFlag{
-		Name:  "scroll-sepolia",
-		Usage: "Scroll Sepolia test network",
+		Name:     "scroll-sepolia",
+		Usage:    "Scroll Sepolia test network",
+		Category: flags.EthCategory,
 	}
 	// Dev mode
 	DeveloperFlag = &cli.BoolFlag{

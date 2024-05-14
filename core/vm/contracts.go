@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -125,6 +126,23 @@ var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2FDisabled{},
 }
 
+// PrecompiledContractsDescartes returns the default set of precompiled contracts,
+// including the L1SLoad precompile.
+func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledContract {
+	return map[common.Address]PrecompiledContract{
+		common.BytesToAddress([]byte{1}):  &ecrecover{},
+		common.BytesToAddress([]byte{2}):  &sha256hash{},
+		common.BytesToAddress([]byte{3}):  &ripemd160hashDisabled{},
+		common.BytesToAddress([]byte{4}):  &dataCopy{},
+		common.BytesToAddress([]byte{5}):  &bigModExp{eip2565: true},
+		common.BytesToAddress([]byte{6}):  &bn256AddIstanbul{},
+		common.BytesToAddress([]byte{7}):  &bn256ScalarMulIstanbul{},
+		common.BytesToAddress([]byte{8}):  &bn256PairingIstanbul{},
+		common.BytesToAddress([]byte{9}):  &blake2FDisabled{},
+		common.BytesToAddress([]byte{20}): &l1sload{l1client: cfg.L1Client},
+	}
+}
+
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
 // contracts specified in EIP-2537. These are exported for testing purposes.
 var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
@@ -140,6 +158,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 }
 
 var (
+	PrecompiledAddressesDescartes  []common.Address
 	PrecompiledAddressesBernoulli  []common.Address
 	PrecompiledAddressesArchimedes []common.Address
 	PrecompiledAddressesBerlin     []common.Address
@@ -167,11 +186,17 @@ func init() {
 	for k := range PrecompiledContractsBernoulli {
 		PrecompiledAddressesBernoulli = append(PrecompiledAddressesBernoulli, k)
 	}
+	for k := range PrecompiledContractsDescartes(Config{}) {
+		PrecompiledAddressesDescartes = append(PrecompiledAddressesDescartes, k)
+	}
+
 }
 
 // ActivePrecompiles returns the precompiles enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
+	case rules.IsDescartes:
+		return PrecompiledAddressesDescartes
 	case rules.IsBernoulli:
 		return PrecompiledAddressesBernoulli
 	case rules.IsArchimedes:
@@ -1129,4 +1154,18 @@ func (c *bls12381MapG2) Run(input []byte) ([]byte, error) {
 
 	// Encode the G2 point to 256 bytes
 	return g.EncodePoint(r), nil
+}
+
+// L1SLoad precompiled
+type l1sload struct {
+	l1client L1Client
+}
+
+func (c *l1sload) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 1234567
+}
+
+func (c *l1sload) Run(input []byte) ([]byte, error) {
+	return c.l1client.SLoad(context.TODO(), input)
 }

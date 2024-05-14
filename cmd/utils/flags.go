@@ -159,6 +159,18 @@ var (
 		Usage:    "Holesky network: pre-configured proof-of-stake test network",
 		Category: flags.EthCategory,
 	}
+	ScrollFlag = &cli.BoolFlag{
+		Name:  "scroll",
+		Usage: "Scroll mainnet",
+	}
+	ScrollAlphaFlag = &cli.BoolFlag{
+		Name:  "scroll-alpha",
+		Usage: "Scroll Alpha test network",
+	}
+	ScrollSepoliaFlag = &cli.BoolFlag{
+		Name:  "scroll-sepolia",
+		Usage: "Scroll Sepolia test network",
+	}
 	// Dev mode
 	DeveloperFlag = &cli.BoolFlag{
 		Name:     "dev",
@@ -991,9 +1003,11 @@ var (
 		GoerliFlag,
 		SepoliaFlag,
 		HoleskyFlag,
+		ScrollAlphaFlag,
+		ScrollSepoliaFlag,
 	}
 	// NetworkFlags is the flag group of all built-in supported networks.
-	NetworkFlags = append([]cli.Flag{MainnetFlag}, TestnetFlags...)
+	NetworkFlags = append([]cli.Flag{MainnetFlag, ScrollFlag}, TestnetFlags...)
 
 	// DatabaseFlags is the flag group of all database flags.
 	DatabaseFlags = []cli.Flag{

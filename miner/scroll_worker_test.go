@@ -230,6 +230,7 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 		chainConfig = params.AllEthashProtocolChanges
 		engine = ethash.NewFaker()
 	}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 
 	chainConfig.LondonBlock = big.NewInt(0)
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
@@ -295,6 +296,7 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 	chainConfig.Scroll.L1Config = &params.L1Config{
 		NumL1MessagesPerBlock: 1,
 	}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 
 	chainConfig.LondonBlock = big.NewInt(0)
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
@@ -342,6 +344,7 @@ func TestAcceptableTxlimit(t *testing.T) {
 	)
 	chainConfig = params.AllCliqueProtocolChanges
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 	engine = clique.New(chainConfig.Clique, db)
 
 	// Set maxTxPerBlock = 4, which >= non-l1msg + non-skipped l1msg txs
@@ -401,6 +404,7 @@ func TestUnacceptableTxlimit(t *testing.T) {
 	)
 	chainConfig = params.AllCliqueProtocolChanges
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 	engine = clique.New(chainConfig.Clique, db)
 
 	// Set maxTxPerBlock = 3, which < non-l1msg + l1msg txs
@@ -459,6 +463,7 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 	)
 	chainConfig = params.AllCliqueProtocolChanges
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 	engine = clique.New(chainConfig.Clique, db)
 
 	maxTxPerBlock := 4
@@ -832,6 +837,7 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	chainConfig.LondonBlock = big.NewInt(0)
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 	engine := clique.New(chainConfig.Clique, db)
 
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
@@ -963,6 +969,7 @@ func TestSealBlockAfterCliquePeriod(t *testing.T) {
 	)
 	chainConfig = params.AllCliqueProtocolChanges
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
 	engine = clique.New(chainConfig.Clique, db)
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
 	defer w.close()

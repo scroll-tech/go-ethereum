@@ -45,7 +45,6 @@ var (
 type Pipeline struct {
 	chain    *core.BlockChain
 	vmConfig *vm.Config
-	coinbase *common.Address
 	parent   *types.Block
 	start    time.Time
 
@@ -73,7 +72,6 @@ func NewPipeline(
 	chain *core.BlockChain,
 	vmConfig *vm.Config,
 	state *state.StateDB,
-	coinbase *common.Address,
 
 	header *types.Header,
 	ccc *circuitcapacitychecker.CircuitCapacityChecker,
@@ -86,7 +84,6 @@ func NewPipeline(
 		nextL1MsgIndex: *rawdb.ReadFirstQueueIndexNotInL2Block(chain.Database(), parent.Hash()),
 		Header:         *header,
 		ccc:            ccc,
-		coinbase:       coinbase,
 		state:          state,
 		gasPool:        new(core.GasPool).AddGas(header.GasLimit),
 	}
@@ -401,7 +398,7 @@ func (p *Pipeline) traceAndApply(tx *types.Transaction) (*types.Receipt, *types.
 	snap := p.state.Snapshot()
 
 	var receipt *types.Receipt
-	receipt, err = core.ApplyTransaction(p.chain.Config(), p.chain, p.coinbase, p.gasPool,
+	receipt, err = core.ApplyTransaction(p.chain.Config(), p.chain, nil /* coinbase will default to chainConfig.Scroll.FeeVaultAddress */, p.gasPool,
 		p.state, &p.Header, tx, &p.Header.GasUsed, *p.vmConfig)
 	if err != nil {
 		p.state.RevertToSnapshot(snap)

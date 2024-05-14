@@ -711,7 +711,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	collectL2Timer.UpdateSince(tidyPendingStart)
 
 	w.currentPipelineStart = time.Now()
-	w.currentPipeline = pipeline.NewPipeline(w.chain, w.chain.GetVMConfig(), parentState, &w.coinbase, header, w.getCCC()).WithBeforeTxHook(w.beforeTxHook)
+	w.currentPipeline = pipeline.NewPipeline(w.chain, w.chain.GetVMConfig(), parentState, header, w.getCCC()).WithBeforeTxHook(w.beforeTxHook)
 	if err := w.currentPipeline.Start(time.Unix(int64(header.Time), 0)); err != nil {
 		log.Error("failed to start pipeline", "err", err)
 		return

@@ -1800,12 +1800,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "4038000")
 		stack.Config().L1DeploymentBlock = 4038000
-		// disable pruning
-		if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
-			log.Crit("Must use --gcmode=archive")
-		}
-		log.Info("Pruning disabled")
-		cfg.NoPruning = true
 		// disable prefetch
 		log.Info("Prefetch disabled")
 		cfg.NoPrefetch = true
@@ -1819,12 +1813,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "18306000")
 		stack.Config().L1DeploymentBlock = 18306000
-		// disable pruning
-		if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
-			log.Crit("Must use --gcmode=archive")
-		}
-		log.Info("Pruning disabled")
-		cfg.NoPruning = true
 		// disable prefetch
 		log.Info("Prefetch disabled")
 		cfg.NoPrefetch = true

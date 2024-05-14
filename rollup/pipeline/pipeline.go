@@ -347,7 +347,7 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 					lastAccRows = accRows
 				}
 
-				// immediately close the block if deadline reached or apply staged is done
+				// immediately close the block if deadline reached or apply stage is done
 				if candidate == nil || deadlineReached {
 					resultCh <- &Result{
 						Rows:       lastAccRows,

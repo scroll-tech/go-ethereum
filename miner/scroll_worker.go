@@ -605,7 +605,7 @@ func (w *worker) resultLoop() {
 
 // updateSnapshot updates pending snapshot block and state.
 // Note this function assumes the current variable is thread safe.
-func (w *worker) updateSnapshot(current *pipeline.PendingBlockIncrement) {
+func (w *worker) updateSnapshot(current *pipeline.BlockCandidate) {
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
 

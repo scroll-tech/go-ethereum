@@ -100,13 +100,13 @@ func (p *Pipeline) WithBeforeTxHook(beforeTxHook func()) *Pipeline {
 func (p *Pipeline) Start(deadline time.Time) error {
 	p.start = time.Now()
 	p.TxnQueue = make(chan *types.Transaction)
-	applyStageRespCh, incrementCh, err := p.traceAndApplyStage(p.TxnQueue)
+	applyStageRespCh, candidateCh, err := p.traceAndApplyStage(p.TxnQueue)
 	if err != nil {
 		log.Error("Failed starting traceAndApplyStage", "err", err)
 		return err
 	}
 	p.applyStageRespCh = applyStageRespCh
-	p.ResultCh = p.cccStage(incrementCh, deadline)
+	p.ResultCh = p.cccStage(candidateCh, deadline)
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (p *Pipeline) Kill() {
 	}
 }
 
-type PendingBlockIncrement struct {
+type BlockCandidate struct {
 	LastTrace      *types.BlockTrace
 	NextL1MsgIndex uint64
 
@@ -186,13 +186,13 @@ type PendingBlockIncrement struct {
 	CoalescedLogs []*types.Log
 }
 
-func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (chan error, chan *PendingBlockIncrement, error) {
+func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (chan error, chan *BlockCandidate, error) {
 	p.state.StartPrefetcher("miner")
-	incrementCh := make(chan *PendingBlockIncrement)
+	newCandidateCh := make(chan *BlockCandidate)
 	resCh := make(chan error)
 	go func() {
 		defer func() {
-			close(incrementCh)
+			close(newCandidateCh)
 			close(resCh)
 			p.state.StopPrefetcher()
 		}()
@@ -255,7 +255,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (chan err
 
 				stallStart := time.Now()
 				select {
-				case incrementCh <- &PendingBlockIncrement{
+				case newCandidateCh <- &BlockCandidate{
 					LastTrace:      trace,
 					NextL1MsgIndex: p.nextL1MsgIndex,
 
@@ -284,7 +284,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (chan err
 			resCh <- err
 		}
 	}()
-	return resCh, incrementCh, nil
+	return resCh, newCandidateCh, nil
 }
 
 type Result struct {
@@ -293,13 +293,13 @@ type Result struct {
 	CCCErr           error
 
 	Rows       *types.RowConsumption
-	FinalBlock *PendingBlockIncrement
+	FinalBlock *BlockCandidate
 }
 
-func (p *Pipeline) cccStage(increments <-chan *PendingBlockIncrement, deadline time.Time) chan *Result {
+func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Time) chan *Result {
 	p.ccc.Reset()
 	resultCh := make(chan *Result)
-	var lastIncrement *PendingBlockIncrement
+	var lastCandidate *BlockCandidate
 	var lastAccRows *types.RowConsumption
 	var deadlineReached bool
 
@@ -313,45 +313,45 @@ func (p *Pipeline) cccStage(increments <-chan *PendingBlockIncrement, deadline t
 			select {
 			case <-time.After(time.Until(deadline)):
 				cccIdleTimer.UpdateSince(idleStart)
-				if lastIncrement != nil {
+				if lastCandidate != nil {
 					resultCh <- &Result{
 						Rows:       lastAccRows,
-						FinalBlock: lastIncrement,
+						FinalBlock: lastCandidate,
 					}
 					return
 				}
 				deadlineReached = true
 				// avoid deadline case being triggered again and again
 				deadline = time.Now().Add(time.Hour)
-			case increment := <-increments:
+			case candidate := <-candidates:
 				cccIdleTimer.UpdateSince(idleStart)
 				cccStart := time.Now()
 				var accRows *types.RowConsumption
 				var err error
-				if increment != nil {
-					accRows, err = p.ccc.ApplyTransaction(increment.LastTrace)
-					lastTxn := increment.Txs[increment.Txs.Len()-1]
+				if candidate != nil {
+					accRows, err = p.ccc.ApplyTransaction(candidate.LastTrace)
+					lastTxn := candidate.Txs[candidate.Txs.Len()-1]
 					cccTimer.UpdateSince(cccStart)
 					if err != nil {
 						resultCh <- &Result{
 							OverflowingTx:    lastTxn,
-							OverflowingTrace: increment.LastTrace,
+							OverflowingTrace: candidate.LastTrace,
 							CCCErr:           err,
 							Rows:             lastAccRows,
-							FinalBlock:       lastIncrement,
+							FinalBlock:       lastCandidate,
 						}
 						return
 					}
 
-					lastIncrement = increment
+					lastCandidate = candidate
 					lastAccRows = accRows
 				}
 
 				// immediately close the block if deadline reached or apply staged is done
-				if increment == nil || deadlineReached {
+				if candidate == nil || deadlineReached {
 					resultCh <- &Result{
 						Rows:       lastAccRows,
-						FinalBlock: lastIncrement,
+						FinalBlock: lastCandidate,
 					}
 					return
 				}

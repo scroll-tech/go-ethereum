@@ -328,20 +328,18 @@ func (p *Pipeline) cccStage(increments <-chan *PendingBlockIncrement, deadline t
 				var accRows *types.RowConsumption
 				var err error
 				if increment != nil {
-					if increment.LastTrace != nil {
-						accRows, err = p.ccc.ApplyTransaction(increment.LastTrace)
-						lastTxn := increment.Txs[increment.Txs.Len()-1]
-						cccTimer.UpdateSince(cccStart)
-						if err != nil {
-							resultCh <- &Result{
-								OverflowingTx:    lastTxn,
-								OverflowingTrace: increment.LastTrace,
-								CCCErr:           err,
-								Rows:             lastAccRows,
-								FinalBlock:       lastIncrement,
-							}
-							return
+					accRows, err = p.ccc.ApplyTransaction(increment.LastTrace)
+					lastTxn := increment.Txs[increment.Txs.Len()-1]
+					cccTimer.UpdateSince(cccStart)
+					if err != nil {
+						resultCh <- &Result{
+							OverflowingTx:    lastTxn,
+							OverflowingTrace: increment.LastTrace,
+							CCCErr:           err,
+							Rows:             lastAccRows,
+							FinalBlock:       lastIncrement,
 						}
+						return
 					}
 
 					lastIncrement = increment

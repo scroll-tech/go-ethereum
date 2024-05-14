@@ -62,8 +62,8 @@ type Pipeline struct {
 
 	// com channels
 	TxnQueue         chan *types.Transaction
-	applyStageRespCh chan error
-	ResultCh         chan *Result
+	applyStageRespCh <-chan error
+	ResultCh         <-chan *Result
 
 	// Test hooks
 	beforeTxHook func() // Method to call before processing a transaction.
@@ -186,7 +186,7 @@ type BlockCandidate struct {
 	CoalescedLogs []*types.Log
 }
 
-func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (chan error, chan *BlockCandidate, error) {
+func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan error, <-chan *BlockCandidate, error) {
 	p.state.StartPrefetcher("miner")
 	newCandidateCh := make(chan *BlockCandidate)
 	resCh := make(chan error)
@@ -296,7 +296,7 @@ type Result struct {
 	FinalBlock *BlockCandidate
 }
 
-func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Time) chan *Result {
+func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Time) <-chan *Result {
 	p.ccc.Reset()
 	resultCh := make(chan *Result)
 	var lastCandidate *BlockCandidate

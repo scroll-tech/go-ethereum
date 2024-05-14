@@ -387,7 +387,7 @@ func (w *worker) mainLoop() {
 	defer w.chainSideSub.Unsubscribe()
 
 	deadCh := make(chan *pipeline.Result)
-	pipelineResultCh := func() chan *pipeline.Result {
+	pipelineResultCh := func() <-chan *pipeline.Result {
 		if w.currentPipeline == nil {
 			return deadCh
 		}

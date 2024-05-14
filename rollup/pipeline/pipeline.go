@@ -321,6 +321,7 @@ func (p *Pipeline) cccStage(increments <-chan *PendingBlockIncrement, deadline t
 					return
 				}
 				deadlineReached = true
+				// avoid deadline case being triggered again and again
 				deadline = time.Now().Add(time.Hour)
 			case increment := <-increments:
 				cccIdleTimer.UpdateSince(idleStart)

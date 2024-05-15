@@ -389,7 +389,12 @@ var (
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+				NumL1MessagesPerBlock: 0,
+				ScrollChainAddress:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			},
 		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -403,7 +408,12 @@ var (
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+				NumL1MessagesPerBlock: 0,
+				ScrollChainAddress:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			},
 		}}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
@@ -412,7 +422,12 @@ var (
 			FeeVaultAddress:           &common.Address{123},
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+				NumL1MessagesPerBlock: 0,
+				ScrollChainAddress:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			},
 		}}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
@@ -422,7 +437,12 @@ var (
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+				NumL1MessagesPerBlock: 0,
+				ScrollChainAddress:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			},
 		}}
 )
 

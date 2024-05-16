@@ -1184,5 +1184,10 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	address := common.BytesToAddress(input[32:64])
 	key := common.BytesToHash(input[64:96])
 
-	return c.l1client.StorageAt(context.TODO(), address, key, block)
+	res, err := c.l1client.StorageAt(context.TODO(), address, key, block)
+	if err != nil {
+		return nil, &ErrL1RPCError{err: err}
+	}
+
+	return res, nil
 }

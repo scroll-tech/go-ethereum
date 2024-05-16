@@ -37,6 +37,8 @@ var (
 	ErrGasUintOverflow          = errors.New("gas uint64 overflow")
 	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
 	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
+	ErrInvalidBlockNumber       = errors.New("invalid block number")
+	ErrInvalidInput             = errors.New("invalid input")
 )
 
 // ErrStackUnderflow wraps an evm error when the items on the stack less

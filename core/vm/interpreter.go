@@ -19,6 +19,7 @@ package vm
 import (
 	"context"
 	"hash"
+	"math/big"
 	"sync/atomic"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -28,7 +29,7 @@ import (
 
 // L1Client provides functionality provided by L1
 type L1Client interface {
-	SLoad(ctx context.Context, input []byte) ([]byte, error)
+	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 }
 
 // Config are the configuration options for the Interpreter

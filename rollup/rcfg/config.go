@@ -34,6 +34,7 @@ var (
 	// see scroll-tech/scroll/contracts/src/L2/predeploys/L1Blocks.sol
 	L1BlocksAddress       = common.HexToAddress("0x5300000000000000000000000000000000000001")
 	LatestBlockNumberSlot = common.BigToHash(big.NewInt(0))
+	L1BlockBufferSize     = 8192
 
 	SystemSenderAddress = common.HexToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
 )

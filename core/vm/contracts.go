@@ -22,7 +22,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/big"
-	"reflect"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
@@ -131,10 +130,6 @@ var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
 // PrecompiledContractsDescartes returns the default set of precompiled contracts,
 // including the L1SLoad precompile.
 func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledContract {
-	if cfg.L1Client == nil || (reflect.ValueOf(cfg.L1Client).Kind() == reflect.Ptr && reflect.ValueOf(cfg.L1Client).IsNil()) {
-		// TODO: have a better way to handle this error
-		panic("No L1 client provided in the vm config")
-	}
 	return map[common.Address]PrecompiledContract{
 		common.BytesToAddress([]byte{1}): &ecrecover{},
 		common.BytesToAddress([]byte{2}): &sha256hash{},
@@ -146,7 +141,7 @@ func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledCon
 		common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
 		common.BytesToAddress([]byte{9}): &blake2FDisabled{},
 		// TODO final contract address to be decided
-		common.BytesToAddress([]byte{1, 1}): &l1sload{l1client: cfg.L1Client},
+		common.BytesToAddress([]byte{1, 1}): &l1sload{l1Client: cfg.L1Client},
 	}
 }
 
@@ -1165,7 +1160,7 @@ func (c *bls12381MapG2) Run(state StateDB, input []byte) ([]byte, error) {
 
 // L1SLoad precompiled
 type l1sload struct {
-	l1client L1Client
+	l1Client L1Client
 }
 
 func (c *l1sload) RequiredGas(input []byte) uint64 {
@@ -1173,7 +1168,10 @@ func (c *l1sload) RequiredGas(input []byte) uint64 {
 }
 
 func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
-	if len(input) != 96 {
+	if c.l1Client == nil {
+		return nil, ErrNoL1Client
+	}
+	if len(input) != 84 {
 		return nil, ErrInvalidInput
 	}
 
@@ -1183,13 +1181,16 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	block.SetBytes(input[:32])
 
 	if block.Uint64() > latestL1BlockNumberOnL2 {
-		return nil, ErrInvalidBlockNumber
+		return nil, ErrInvalidL1BlockNumber
+	}
+	if block.Uint64() <= latestL1BlockNumberOnL2 - uint64(rcfg.L1BlockBufferSize) {
+		return nil, ErrInvalidL1BlockNumber
 	}
 
-	address := common.BytesToAddress(input[32:64])
-	key := common.BytesToHash(input[64:96])
+	address := common.BytesToAddress(input[32:52])
+	key := common.BytesToHash(input[52:84])
 
-	res, err := c.l1client.StorageAt(context.TODO(), address, key, block)
+	res, err := c.l1Client.StorageAt(context.Background(), address, key, block)
 	if err != nil {
 		return nil, &ErrL1RPCError{err: err}
 	}

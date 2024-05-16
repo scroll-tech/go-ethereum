@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/big"
+	"reflect"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
@@ -130,6 +131,10 @@ var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
 // PrecompiledContractsDescartes returns the default set of precompiled contracts,
 // including the L1SLoad precompile.
 func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledContract {
+	if cfg.L1Client == nil || (reflect.ValueOf(cfg.L1Client).Kind() == reflect.Ptr && reflect.ValueOf(cfg.L1Client).IsNil()) {
+		// TODO: have a better way to handle this error
+		panic("No L1 client provided in the vm config")
+	}
 	return map[common.Address]PrecompiledContract{
 		common.BytesToAddress([]byte{1}): &ecrecover{},
 		common.BytesToAddress([]byte{2}): &sha256hash{},
@@ -141,7 +146,7 @@ func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledCon
 		common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
 		common.BytesToAddress([]byte{9}): &blake2FDisabled{},
 		// TODO final contract address to be decided
-		common.BytesToAddress([]byte{20}): &l1sload{l1client: cfg.L1Client},
+		common.BytesToAddress([]byte{1, 1}): &l1sload{l1client: cfg.L1Client},
 	}
 }
 

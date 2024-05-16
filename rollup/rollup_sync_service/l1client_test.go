@@ -72,3 +72,7 @@ func (m *mockEthClient) TransactionByHash(ctx context.Context, txHash common.Has
 func (m *mockEthClient) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return nil, nil
 }
+
+func (m *mockEthClient) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
+}

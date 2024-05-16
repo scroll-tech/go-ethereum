@@ -699,7 +699,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	tidyPendingStart := time.Now()
 	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().Pending(false)
+	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
 	for _, account := range w.eth.TxPool().Locals() {

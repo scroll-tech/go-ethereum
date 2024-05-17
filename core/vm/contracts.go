@@ -1183,7 +1183,7 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	if block.Uint64() > latestL1BlockNumberOnL2 {
 		return nil, ErrInvalidL1BlockNumber
 	}
-	if block.Uint64() <= latestL1BlockNumberOnL2 - uint64(rcfg.L1BlockBufferSize) {
+	if block.Uint64() <= latestL1BlockNumberOnL2-uint64(rcfg.L1BlockBufferSize) {
 		return nil, ErrInvalidL1BlockNumber
 	}
 

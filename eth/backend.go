@@ -183,7 +183,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	var (
 		vmConfig = vm.Config{
 			EnablePreimageRecording: config.EnablePreimageRecording,
-			L1Client: l1Client,
+			L1Client:                l1Client,
 		}
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:      config.TrieCleanCache,

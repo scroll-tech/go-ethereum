@@ -353,6 +353,12 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	}
 	worker.newpayloadTimeout = newpayloadTimeout
 
+	// Sanitize account fetch limit.
+	if worker.config.MaxAccountsNum == 0 {
+		log.Warn("Sanitizing miner account fetch limit", "provided", worker.config.MaxAccountsNum, "updated", math.MaxInt)
+		worker.config.MaxAccountsNum = math.MaxInt
+	}
+
 	worker.wg.Add(4)
 	go worker.mainLoop()
 	go worker.newWorkLoop(recommit)

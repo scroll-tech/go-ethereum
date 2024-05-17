@@ -241,7 +241,7 @@ func (s *SyncService) fetchL1Blocks(latestConfirmed uint64) {
 	// query in batches
 	num := 0
 	from := latestProcessedBlock + 1
-	for ; from <= latestConfirmed; {
+	for from <= latestConfirmed {
 		cnt := DefaultFetchBlockRange
 		if cnt+uint64(len(s.l1BlocksPool.l1BlocksTxs)) > MaxNumCachedL1BlocksTx {
 			cnt = MaxNumCachedL1BlocksTx - uint64(len(s.l1BlocksPool.l1BlocksTxs))

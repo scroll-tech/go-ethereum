@@ -148,6 +148,10 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		chainConfig.DAOForkBlock.Cmp(new(big.Int).SetUint64(pre.Env.Number)) == 0 {
 		misc.ApplyDAOHardFork(statedb)
 	}
+	// Apply Curie hard fork
+	if chainConfig.CurieBlock != nil && chainConfig.CurieBlock.Cmp(new(big.Int).SetUint64(pre.Env.Number)) == 0 {
+		misc.ApplyCurieHardFork(statedb)
+	}
 
 	for i, tx := range txs {
 		msg, err := tx.AsMessage(signer, pre.Env.BaseFee)

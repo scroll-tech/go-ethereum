@@ -166,7 +166,6 @@ func calculateEncodedL1DataFeeCurie(data []byte, overhead, l1GasPrice *big.Int, 
 	l1DataFee = new(big.Int).Quo(l1DataFee, rcfg.Precision)
 
 	return l1DataFee
-
 }
 
 // calculateL1GasUsed computes the L1 gas used based on the calldata and

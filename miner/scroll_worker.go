@@ -83,6 +83,7 @@ var (
 
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)
+	commitGasCounter            = metrics.NewRegisteredCounter("miner/commit_gas", nil)
 )
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -841,6 +842,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 	} else {
 		commitReasonDeadlineCounter.Inc(1)
 	}
+	commitGasCounter.Inc(int64(res.FinalBlock.Header.GasUsed))
 
 	block, err := w.engine.FinalizeAndAssemble(w.chain, res.FinalBlock.Header, res.FinalBlock.State,
 		res.FinalBlock.Txs, nil, res.FinalBlock.Receipts)

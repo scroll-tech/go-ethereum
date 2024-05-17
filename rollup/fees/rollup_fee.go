@@ -144,17 +144,18 @@ func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int
 }
 
 // calculateEncodedL1DataFee computes the L1 fee for an RLP-encoded tx
-func calculateEncodedL1DataFee(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Int) *big.Int {
+func calculateEncodedL1DataFee(data []byte, overhead, l1BaseFee *big.Int, scalar *big.Int) *big.Int {
 	l1GasUsed := calculateL1GasUsed(data, overhead)
-	l1DataFee := new(big.Int).Mul(l1GasUsed, l1GasPrice)
+	l1DataFee := new(big.Int).Mul(l1GasUsed, l1BaseFee)
 	return mulAndScale(l1DataFee, scalar, rcfg.Precision)
 }
 
 // calculateEncodedL1DataFeeCurie computes the L1 fee for an RLP-encoded tx, post Curie
-func calculateEncodedL1DataFeeCurie(data []byte, overhead, l1GasPrice *big.Int, scalar *big.Int, l1BlobBaseFee *big.Int, blobScalar *big.Int) *big.Int {
+func calculateEncodedL1DataFeeCurie(data []byte, overhead, l1BaseFee *big.Int, scalar *big.Int, l1BlobBaseFee *big.Int, blobScalar *big.Int) *big.Int {
 	// calldata component
-	calldataGas := new(big.Int).Add(l1GasPrice, overhead)
-	calldataGas = new(big.Int).Add(calldataGas, scalar)
+	calldataGas := overhead
+	calldataGas = new(big.Int).Mul(calldataGas, l1BaseFee)
+	calldataGas = new(big.Int).Mul(calldataGas, scalar)
 
 	// blob component
 	blobGas := big.NewInt(int64(len(data)))

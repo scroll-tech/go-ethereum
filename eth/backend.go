@@ -73,7 +73,6 @@ type Ethereum struct {
 	txPool             *core.TxPool
 	syncService        *sync_service.SyncService
 	rollupSyncService  *rollup_sync_service.RollupSyncService
-	l1Client           sync_service.EthClient
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -149,7 +148,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth := &Ethereum{
 		config:            config,
-		l1Client:          l1Client,
 		chainDb:           chainDb,
 		eventMux:          stack.EventMux(),
 		accountManager:    stack.AccountManager(),
@@ -547,7 +545,6 @@ func (s *Ethereum) Synced() bool                           { return atomic.LoadU
 func (s *Ethereum) ArchiveMode() bool                      { return s.config.NoPruning }
 func (s *Ethereum) BloomIndexer() *core.ChainIndexer       { return s.bloomIndexer }
 func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncService }
-func (s *Ethereum) L1Client() sync_service.EthClient       { return s.l1Client }
 
 // Protocols returns all the currently configured
 // network protocols to start.

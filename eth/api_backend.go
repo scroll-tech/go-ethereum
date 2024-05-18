@@ -390,3 +390,7 @@ func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Blo
 func (b *EthAPIBackend) StateAt(root common.Hash) (*state.StateDB, error) {
 	return b.eth.BlockChain().StateAt(root)
 }
+
+func (b *EthAPIBackend) L1Client() vm.L1Client {
+	return b.eth.BlockChain().GetVMConfig().L1Client
+}

@@ -77,6 +77,7 @@ type Backend interface {
 	CacheConfig() *core.CacheConfig
 	Engine() consensus.Engine
 	ChainDb() ethdb.Database
+	L1Client() vm.L1Client
 	// StateAtBlock returns the state corresponding to the stateroot of the block.
 	// N.B: For executing transactions on block N, the required stateRoot is block N-1,
 	// so this method should be called with the parent.
@@ -766,6 +767,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 				EnablePreimageRecording: true,
 			}
 		}
+		vmConf.L1Client = api.backend.L1Client()
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.SetTxContext(tx.Hash(), i)
@@ -940,7 +942,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 		tracer = vm.NewStructLogger(config.LogConfig)
 	}
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(vmctx, txContext, statedb, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
+	vmenv := vm.NewEVM(vmctx, txContext, statedb, api.backend.ChainConfig(), vm.Config{L1Client: api.backend.L1Client(), Debug: true, Tracer: tracer, NoBaseFee: true})
 
 	// If gasPrice is 0, make sure that the account has sufficient balance to cover `l1DataFee`.
 	if message.GasPrice().Cmp(big.NewInt(0)) == 0 {

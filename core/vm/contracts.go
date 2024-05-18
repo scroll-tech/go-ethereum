@@ -29,6 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/blake2b"
 	"github.com/scroll-tech/go-ethereum/crypto/bls12381"
 	"github.com/scroll-tech/go-ethereum/crypto/bn256"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 
@@ -130,6 +131,9 @@ var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
 // PrecompiledContractsDescartes returns the default set of precompiled contracts,
 // including the L1SLoad precompile.
 func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledContract {
+	if (cfg.L1Client == nil) {
+		log.Warn("PrecompiledContractsDescartes: no L1 client")
+	}
 	return map[common.Address]PrecompiledContract{
 		common.BytesToAddress([]byte{1}): &ecrecover{},
 		common.BytesToAddress([]byte{2}): &sha256hash{},
@@ -1169,6 +1173,7 @@ func (c *l1sload) RequiredGas(input []byte) uint64 {
 
 func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	if c.l1Client == nil {
+		log.Error("No L1Client in the l1sload")
 		return nil, ErrNoL1Client
 	}
 	if len(input) != 84 {
@@ -1181,9 +1186,11 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	block.SetBytes(input[:32])
 
 	if block.Uint64() > latestL1BlockNumberOnL2 {
+		log.Error("L1 block number too big", "blockNum", block.Uint64(), "latestL1BlockNumberOnL2", latestL1BlockNumberOnL2)
 		return nil, ErrInvalidL1BlockNumber
 	}
 	if block.Uint64() <= latestL1BlockNumberOnL2-uint64(rcfg.L1BlockBufferSize) {
+		log.Error("L1 block number too small", "blockNum", block.Uint64(), "latestL1BlockNumberOnL2", latestL1BlockNumberOnL2)
 		return nil, ErrInvalidL1BlockNumber
 	}
 

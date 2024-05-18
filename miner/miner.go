@@ -43,7 +43,6 @@ type Backend interface {
 	TxPool() *core.TxPool
 	ChainDb() ethdb.Database
 	SyncService() *sync_service.SyncService
-	L1Client() sync_service.EthClient
 }
 
 // Config is the configuration parameters of mining.

@@ -131,7 +131,7 @@ var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
 // PrecompiledContractsDescartes returns the default set of precompiled contracts,
 // including the L1SLoad precompile.
 func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledContract {
-	if (cfg.L1Client == nil) {
+	if cfg.L1Client == nil {
 		log.Warn("PrecompiledContractsDescartes: no L1 client")
 	}
 	return map[common.Address]PrecompiledContract{

@@ -41,7 +41,7 @@ type StateAccount struct {
 func NewEmptyStateAccount() *StateAccount {
 	return &StateAccount{
 		Balance:          new(big.Int),
-		Root:             EmptyRootHash,
+		Root:             common.Hash{},
 		KeccakCodeHash:   EmptyKeccakCodeHash.Bytes(),
 		PoseidonCodeHash: EmptyPoseidonCodeHash.Bytes(),
 		CodeSize:         0,

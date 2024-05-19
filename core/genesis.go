@@ -129,7 +129,8 @@ func (ga *GenesisAlloc) hash(isUsingZktrie bool) (common.Hash, error) {
 		trieConfig = trie.HashDefaultsWithZktrie
 	}
 	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), trieConfig)
-	statedb, err := state.New(types.EmptyRootHash, db, nil)
+	// statedb, err := state.New(types.EmptyRootHash, db, nil)
+	statedb, err := state.New(common.Hash{}, db, nil) // TODO: maybe we should accept `types.EmptyRootHash`?
 	if err != nil {
 		return common.Hash{}, err
 	}

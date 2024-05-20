@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -154,7 +155,18 @@ func (ga *GenesisAlloc) flush(db ethdb.Database, triedb *trie.Database, blockhas
 	if err != nil {
 		return err
 	}
-	for addr, account := range *ga {
+
+	keys := make([]string, 0, len(*ga))
+	for k := range *ga {
+		keys = append(keys, k.Hex())
+	}
+	sort.Strings(keys)
+
+	// for addr, account := range *ga {
+	for _, k := range keys {
+		addr := common.HexToAddress(k)
+		account := (*ga)[addr]
+
 		if account.Balance != nil {
 			statedb.AddBalance(addr, account.Balance)
 		}

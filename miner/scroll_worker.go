@@ -392,7 +392,7 @@ func (w *worker) mainLoop() {
 		case req := <-w.newWorkCh:
 			w.startNewPipeline(req.timestamp)
 		case result := <-pipelineResultCh():
-			w.handleCCCResult(result)
+			w.handlePipelineResult(result)
 		case ev := <-w.txsCh:
 			// Apply transactions to the pending state
 			//
@@ -408,7 +408,7 @@ func (w *worker) mainLoop() {
 				}
 				txset := types.NewTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
 				if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
-					w.handleCCCResult(result)
+					w.handlePipelineResult(result)
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
@@ -721,7 +721,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		}
 
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handleCCCResult(result)
+			w.handlePipelineResult(result)
 			return
 		}
 	}
@@ -735,7 +735,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
 		txs := types.NewTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handleCCCResult(result)
+			w.handlePipelineResult(result)
 			return
 		}
 	}
@@ -743,20 +743,20 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	if len(localTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handleCCCResult(result)
+			w.handlePipelineResult(result)
 			return
 		}
 	}
 	if len(remoteTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handleCCCResult(result)
+			w.handlePipelineResult(result)
 			return
 		}
 	}
 }
 
-func (w *worker) handleCCCResult(res *pipeline.Result) error {
+func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 	if res != nil && res.OverflowingTx != nil {
 		if res.FinalBlock == nil {
 			// first txn overflowed the circuit, skip

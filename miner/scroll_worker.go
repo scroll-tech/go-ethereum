@@ -399,7 +399,7 @@ func (w *worker) mainLoop() {
 			// Note all transactions received may not be continuous with transactions
 			// already included in the current mining block. These transactions will
 			// be automatically eliminated.
-			if w.currentPipeline != nil && w.currentPipeline.TxnQueue != nil {
+			if w.currentPipeline != nil {
 				txs := make(map[common.Address]types.Transactions)
 				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number)
 				for _, tx := range ev.Txs {

@@ -60,7 +60,7 @@ type Pipeline struct {
 	gasPool        *core.GasPool
 
 	// com channels
-	TxnQueue         chan *types.Transaction
+	txnQueue         chan *types.Transaction
 	applyStageRespCh <-chan error
 	ResultCh         <-chan *Result
 
@@ -101,8 +101,8 @@ func (p *Pipeline) WithBeforeTxHook(beforeTxHook func()) *Pipeline {
 
 func (p *Pipeline) Start(deadline time.Time) error {
 	p.start = time.Now()
-	p.TxnQueue = make(chan *types.Transaction)
-	applyStageRespCh, candidateCh, err := p.traceAndApplyStage(p.TxnQueue)
+	p.txnQueue = make(chan *types.Transaction)
+	applyStageRespCh, candidateCh, err := p.traceAndApplyStage(p.txnQueue)
 	if err != nil {
 		log.Error("Failed starting traceAndApplyStage", "err", err)
 		return err
@@ -129,8 +129,8 @@ func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn fun
 			txs.Shift()
 		default:
 			if errors.Is(err, ErrApplyStageDone) || onFailingTxn(p.txs.Len(), tx, err) {
-				close(p.TxnQueue)
-				p.TxnQueue = nil
+				close(p.txnQueue)
+				p.txnQueue = nil
 				return nil
 			}
 
@@ -146,8 +146,12 @@ func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn fun
 }
 
 func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
+	if p.txnQueue == nil {
+		return nil, ErrApplyStageDone
+	}
+
 	select {
-	case p.TxnQueue <- tx:
+	case p.txnQueue <- tx:
 	case res := <-p.ResultCh:
 		return res, nil
 	}
@@ -164,8 +168,8 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 }
 
 func (p *Pipeline) Kill() {
-	if p.TxnQueue != nil {
-		close(p.TxnQueue)
+	if p.txnQueue != nil {
+		close(p.txnQueue)
 	}
 
 	select {

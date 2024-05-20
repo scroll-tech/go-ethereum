@@ -76,12 +76,17 @@ func NewPipeline(
 	header *types.Header,
 	ccc *circuitcapacitychecker.CircuitCapacityChecker,
 ) *Pipeline {
+	var nextL1MsgIndex uint64
 	parent := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
+	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chain.Database(), parent.Hash()); dbIndex != nil {
+		nextL1MsgIndex = *dbIndex
+	}
+
 	return &Pipeline{
 		chain:          chain,
 		vmConfig:       vmConfig,
 		parent:         parent,
-		nextL1MsgIndex: *rawdb.ReadFirstQueueIndexNotInL2Block(chain.Database(), parent.Hash()),
+		nextL1MsgIndex: nextL1MsgIndex,
 		Header:         *header,
 		ccc:            ccc,
 		state:          state,

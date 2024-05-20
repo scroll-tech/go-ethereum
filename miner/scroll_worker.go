@@ -130,8 +130,6 @@ type worker struct {
 	chainHeadSub event.Subscription
 	chainSideCh  chan core.ChainSideEvent
 	chainSideSub event.Subscription
-	l1MsgsCh     chan core.NewL1MsgsEvent
-	l1MsgsSub    event.Subscription
 
 	// Channels
 	newWorkCh chan *newWorkReq
@@ -199,7 +197,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		unconfirmed:            newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 		pendingTasks:           make(map[common.Hash]*task),
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
-		l1MsgsCh:               make(chan core.NewL1MsgsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
 		chainSideCh:            make(chan core.ChainSideEvent, chainSideChanSize),
 		newWorkCh:              make(chan *newWorkReq),
@@ -213,17 +210,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
-
-	// Subscribe NewL1MsgsEvent for sync service
-	if s := eth.SyncService(); s != nil {
-		worker.l1MsgsSub = s.SubscribeNewL1MsgsEvent(worker.l1MsgsCh)
-	} else {
-		// create an empty subscription so that the tests won't fail
-		worker.l1MsgsSub = event.NewSubscription(func(quit <-chan struct{}) error {
-			<-quit
-			return nil
-		})
-	}
 
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -390,7 +376,6 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
 	defer w.txsSub.Unsubscribe()
-	defer w.l1MsgsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 	defer w.chainSideSub.Unsubscribe()
 
@@ -428,15 +413,10 @@ func (w *worker) mainLoop() {
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
 
-		case ev := <-w.l1MsgsCh:
-			atomic.AddInt32(&w.newL1Msgs, int32(ev.Count))
-
 		// System stopped
 		case <-w.exitCh:
 			return
 		case <-w.txsSub.Err():
-			return
-		case <-w.l1MsgsSub.Err():
 			return
 		case <-w.chainHeadSub.Err():
 			return

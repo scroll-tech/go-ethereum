@@ -166,6 +166,13 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 			enc.Commitments = itx.Sidecar.Commitments
 			enc.Proofs = itx.Sidecar.Proofs
 		}
+
+	case *SystemTx:
+		gas := itx.gas()
+		enc.Gas = (*hexutil.Uint64)(&gas)
+		enc.To = tx.To()
+		enc.Input = (*hexutil.Bytes)(&itx.Data)
+		enc.Sender = &itx.Sender
 	}
 	return json.Marshal(&enc)
 }
@@ -440,6 +447,22 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 			return errors.New("missing required field 'value' in transaction")
 		}
 		itx.Value = (*big.Int)(dec.Value)
+		if dec.Input == nil {
+			return errors.New("missing required field 'input' in transaction")
+		}
+		itx.Data = *dec.Input
+		if dec.Sender == nil {
+			return errors.New("missing required field 'sender' in transaction")
+		}
+		itx.Sender = *dec.Sender
+
+	case SystemTxType:
+		var itx SystemTx
+		inner = &itx
+		if dec.To == nil {
+			return errors.New("missing required field 'to' in transaction")
+		}
+		itx.To = *dec.To
 		if dec.Input == nil {
 			return errors.New("missing required field 'input' in transaction")
 		}

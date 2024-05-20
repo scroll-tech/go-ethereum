@@ -177,6 +177,7 @@ func (b *testWorkerBackend) BlockChain() *core.BlockChain           { return b.c
 func (b *testWorkerBackend) TxPool() *core.TxPool                   { return b.txPool }
 func (b *testWorkerBackend) ChainDb() ethdb.Database                { return b.db }
 func (b *testWorkerBackend) SyncService() *sync_service.SyncService { return nil }
+func (b *testWorkerBackend) L1Client() sync_service.EthClient       { return nil }
 
 func (b *testWorkerBackend) newRandomUncle() *types.Block {
 	var parent *types.Block

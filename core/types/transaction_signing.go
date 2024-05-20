@@ -256,6 +256,9 @@ func (s londonSigner) Sender(tx *Transaction) (common.Address, error) {
 	if tx.IsL1MessageTx() {
 		return tx.AsL1MessageTx().Sender, nil
 	}
+	if tx.IsSystemTx() {
+		return tx.AsSystemTx().Sender, nil
+	}
 	if tx.Type() != DynamicFeeTxType {
 		return s.eip2930Signer.Sender(tx)
 	}
@@ -275,9 +278,14 @@ func (s londonSigner) Equal(s2 Signer) bool {
 }
 
 func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
-	if tx.IsL1MessageTx() {
-		return nil, nil, nil, fmt.Errorf("l1 message tx do not have a signature")
+	if tx.IsSystemTx() {
+		return nil, nil, nil, fmt.Errorf("system tx does not have a signature")
 	}
+
+	if tx.IsL1MessageTx() {
+		return nil, nil, nil, fmt.Errorf("l1 message tx does not have a signature")
+	}
+
 	txdata, ok := tx.inner.(*DynamicFeeTx)
 	if !ok {
 		return s.eip2930Signer.SignatureValues(tx, sig)
@@ -295,6 +303,10 @@ func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s londonSigner) Hash(tx *Transaction) common.Hash {
+	if tx.IsSystemTx() {
+		panic("system tx cannot be signed and do not have a signing hash")
+	}
+
 	if tx.IsL1MessageTx() {
 		panic("l1 message tx cannot be signed and do not have a signing hash")
 	}

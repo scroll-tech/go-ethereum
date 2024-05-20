@@ -41,6 +41,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
@@ -103,10 +104,12 @@ var (
 	l2CommitTxApplyTimer            = metrics.NewRegisteredTimer("miner/commit/tx_apply", nil)
 
 	l2CommitNewWorkTimer                    = metrics.NewRegisteredTimer("miner/commit/new_work_all", nil)
+	l2CommitNewWorkSystemTxTimer            = metrics.NewRegisteredTimer("miner/commit/new_work_system_tx", nil)
 	l2CommitNewWorkL1CollectTimer           = metrics.NewRegisteredTimer("miner/commit/new_work_collect_l1", nil)
 	l2CommitNewWorkPrepareTimer             = metrics.NewRegisteredTimer("miner/commit/new_work_prepare", nil)
 	l2CommitNewWorkCommitUncleTimer         = metrics.NewRegisteredTimer("miner/commit/new_work_uncle", nil)
 	l2CommitNewWorkTidyPendingTxTimer       = metrics.NewRegisteredTimer("miner/commit/new_work_tidy_pending", nil)
+	l2CommitNewWorkCommitSystemTxTimer      = metrics.NewRegisteredTimer("miner/commit/new_work_commit_system_tx", nil)
 	l2CommitNewWorkCommitL1MsgTimer         = metrics.NewRegisteredTimer("miner/commit/new_work_commit_l1_msg", nil)
 	l2CommitNewWorkPrioritizedTxCommitTimer = metrics.NewRegisteredTimer("miner/commit/new_work_prioritized", nil)
 	l2CommitNewWorkRemoteLocalCommitTimer   = metrics.NewRegisteredTimer("miner/commit/new_work_remote_local", nil)
@@ -200,6 +203,8 @@ type worker struct {
 	chainSideSub event.Subscription
 	l1MsgsCh     chan core.NewL1MsgsEvent
 	l1MsgsSub    event.Subscription
+	l1BlocksCh   chan core.NewL1MsgsEvent
+	l1BlocksSub  event.Subscription
 
 	// Channels
 	newWorkCh          chan *newWorkReq
@@ -230,9 +235,10 @@ type worker struct {
 	snapshotState    *state.StateDB
 
 	// atomic status counters
-	running   int32 // The indicator whether the consensus engine is running or not.
-	newTxs    int32 // New arrival transaction count since last sealing work submitting.
-	newL1Msgs int32 // New arrival L1 message count since last sealing work submitting.
+	running        int32 // The indicator whether the consensus engine is running or not.
+	newTxs         int32 // New arrival transaction count since last sealing work submitting.
+	newL1Msgs      int32 // New arrival L1 message count since last sealing work submitting.
+	newL1BlocksTxs int32 // New arrival L1Blocks tx count since last sealing work submitting.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -270,6 +276,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		pendingTasks:           make(map[common.Hash]*task),
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
 		l1MsgsCh:               make(chan core.NewL1MsgsEvent, txChanSize),
+		l1BlocksCh:             make(chan core.NewL1MsgsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
 		chainSideCh:            make(chan core.ChainSideEvent, chainSideChanSize),
 		newWorkCh:              make(chan *newWorkReq),
@@ -292,6 +299,17 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	} else {
 		// create an empty subscription so that the tests won't fail
 		worker.l1MsgsSub = event.NewSubscription(func(quit <-chan struct{}) error {
+			<-quit
+			return nil
+		})
+	}
+
+	// Subscribe NewL1BlocksEvent from sync service
+	if s := eth.SyncService(); s != nil && chainConfig.Scroll.SystemTx.Enabled {
+		worker.l1BlocksSub = s.SubscribeNewL1BlocksTx(worker.l1BlocksCh)
+	} else {
+		// create an empty subscription so that the tests won't fail
+		worker.l1BlocksSub = event.NewSubscription(func(quit <-chan struct{}) error {
 			<-quit
 			return nil
 		})
@@ -468,6 +486,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		timer.Reset(recommit)
 		atomic.StoreInt32(&w.newTxs, 0)
 		atomic.StoreInt32(&w.newL1Msgs, 0)
+		atomic.StoreInt32(&w.newL1BlocksTxs, 0)
 	}
 	// clearPending cleans the stale pending tasks.
 	clearPending := func(number uint64) {
@@ -497,7 +516,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// higher priced transactions. Disable this overhead for pending blocks.
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
 				// Short circuit if no new transaction arrives.
-				if atomic.LoadInt32(&w.newTxs) == 0 && atomic.LoadInt32(&w.newL1Msgs) == 0 {
+				if atomic.LoadInt32(&w.newTxs) == 0 && atomic.LoadInt32(&w.newL1Msgs) == 0 && atomic.LoadInt32(&w.newL1BlocksTxs) == 0 {
 					timer.Reset(recommit)
 					continue
 				}
@@ -638,6 +657,9 @@ func (w *worker) mainLoop() {
 
 		case ev := <-w.l1MsgsCh:
 			atomic.AddInt32(&w.newL1Msgs, int32(ev.Count))
+
+		case ev := <-w.l1BlocksCh:
+			atomic.AddInt32(&w.newL1BlocksTxs, int32(ev.Count))
 
 		// System stopped
 		case <-w.exitCh:
@@ -831,7 +853,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
 	// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
 	commitStateAfterApply := false
-	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, parent,
+	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, w.chain.GetVMConfig().L1Client, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
 		commitStateAfterApply)
@@ -1335,6 +1357,12 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
 }
 
+func (w *worker) emitSystemTxs(env *environment) []*types.SystemTx {
+	latestL1BlockNumberOnL2 := env.state.GetState(rcfg.L1BlocksAddress, rcfg.LatestBlockNumberSlot).Big().Uint64()
+	log.Info("Latest L1 block number on L2", "l1BlockNum", latestL1BlockNumberOnL2, "l2BlockNum", env.header.Number.Uint64())
+	return w.eth.SyncService().CollectL1BlocksTxs(latestL1BlockNumberOnL2, w.chainConfig.Scroll.L1Config.MaxNumL1BlocksTxPerBlock)
+}
+
 // commitNewWork generates several new sealing tasks based on the parent block.
 func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) {
 	w.mu.RLock()
@@ -1443,6 +1471,15 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if !noempty && atomic.LoadUint32(&w.noempty) == 0 {
 		w.commit(uncles, nil, false, tstart)
 	}
+
+	// emit system txs
+	var systemTxs []*types.SystemTx
+	if w.chainConfig.Scroll.SystemTxEnabled() {
+		common.WithTimer(l2CommitNewWorkSystemTxTimer, func() {
+			systemTxs = w.emitSystemTxs(env)
+		})
+	}
+
 	// fetch l1Txs
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
@@ -1457,11 +1494,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Short circuit if there is no available pending transactions.
 	// But if we disable empty precommit already, ignore it. Since
 	// empty block is necessary to keep the liveness of the network.
-	if len(pending) == 0 && len(l1Messages) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
+	if len(pending) == 0 && len(systemTxs) == 0 && len(l1Messages) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
 		w.updateSnapshot()
 		l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
 		return
 	}
+
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
 	for _, account := range w.eth.TxPool().Locals() {
@@ -1473,8 +1511,23 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
 
 	var skipCommit, circuitCapacityOrBlockTimeReached bool
+
+	commitSystemTxStart := time.Now()
+	if w.chainConfig.Scroll.SystemTxEnabled() {
+		log.Trace("Processing SystemTxs for inclusion", "count", len(systemTxs))
+
+		txs := types.NewOrderedSystemTxs(systemTxs)
+		skipCommit, circuitCapacityOrBlockTimeReached = w.commitTransactions(txs, w.coinbase, interrupt)
+		// Todo: system txs should not be reverted. We probably need to handle if revert happens
+		if skipCommit {
+			l2CommitNewWorkCommitSystemTxTimer.UpdateSince(commitSystemTxStart)
+			return
+		}
+	}
+	l2CommitNewWorkCommitSystemTxTimer.UpdateSince(commitSystemTxStart)
+
 	commitL1MsgStart := time.Now()
-	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 && !circuitCapacityOrBlockTimeReached {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
 		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
 		if err != nil {

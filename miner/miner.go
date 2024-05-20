@@ -76,6 +76,7 @@ type Miner struct {
 }
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+	//system_contracts.NewL1BlocksWorker(context.Background(), )
 	miner := &Miner{
 		eth:     eth,
 		mux:     mux,

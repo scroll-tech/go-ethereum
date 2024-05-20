@@ -370,10 +370,11 @@ var (
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
 			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			L1Config: &L1Config{
-				L1ChainId:             1,
-				L1MessageQueueAddress: common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
-				NumL1MessagesPerBlock: 10,
-				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
+				L1ChainId:                1,
+				L1MessageQueueAddress:    common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
+				NumL1MessagesPerBlock:    10,
+				MaxNumL1BlocksTxPerBlock: 5,
+				ScrollChainAddress:       common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
 			},
 		},
 	}
@@ -389,7 +390,7 @@ var (
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -403,7 +404,7 @@ var (
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil,
@@ -412,7 +413,7 @@ var (
 			FeeVaultAddress:           &common.Address{123},
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
@@ -422,7 +423,7 @@ var (
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 )
 
@@ -535,14 +536,25 @@ type ScrollConfig struct {
 
 	// L1 config
 	L1Config *L1Config `json:"l1Config,omitempty"`
+
+	// System contract config
+	SystemTx *SystemTxConfig `json:"systemTxConfig,omitempty"`
+}
+
+type SystemTxConfig struct {
+	Enabled bool `json:"enabled"`
+
+	// TODO maybe move these in state (system contract)
+	Contracts []common.Address `json:"contracts"`
 }
 
 // L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer
 type L1Config struct {
-	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
-	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
-	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
-	ScrollChainAddress    common.Address `json:"scrollChainAddress,omitempty"`
+	L1ChainId                uint64         `json:"l1ChainId,string,omitempty"`
+	L1MessageQueueAddress    common.Address `json:"l1MessageQueueAddress,omitempty"`
+	NumL1MessagesPerBlock    uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+	MaxNumL1BlocksTxPerBlock uint64         `json:"maxNumL1BlocksTxPerBlock,string,omitempty"`
+	ScrollChainAddress       common.Address `json:"scrollChainAddress,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -564,6 +576,10 @@ func (s ScrollConfig) ZktrieEnabled() bool {
 
 func (s ScrollConfig) ShouldIncludeL1Messages() bool {
 	return s.L1Config != nil && s.L1Config.NumL1MessagesPerBlock > 0
+}
+
+func (s ScrollConfig) SystemTxEnabled() bool {
+	return s.SystemTx != nil && s.SystemTx.Enabled
 }
 
 func (s ScrollConfig) String() string {

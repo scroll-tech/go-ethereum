@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/abis"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -20,6 +24,7 @@ type BridgeClient struct {
 	confirmations         rpc.BlockNumber
 	l1MessageQueueAddress common.Address
 	filterer              *L1MessageQueueFilterer
+	l1BlocksABI           *abi.ABI
 }
 
 func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address) (*BridgeClient, error) {
@@ -41,11 +46,18 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 		return nil, fmt.Errorf("failed to initialize L1MessageQueueFilterer, err = %w", err)
 	}
 
+	// get the L1Blocks ABI
+	l1BlocksAbi, err := abis.L1BlocksMetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load L1Blocks ABI, err: %w", err)
+	}
+
 	client := BridgeClient{
 		client:                l1Client,
 		confirmations:         confirmations,
 		l1MessageQueueAddress: l1MessageQueueAddress,
 		filterer:              filterer,
+		l1BlocksABI:           l1BlocksAbi,
 	}
 
 	return &client, nil
@@ -91,6 +103,51 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 	}
 
 	return msgs, nil
+}
+
+func (c *BridgeClient) fetchL1Blocks(ctx context.Context, from, to uint64) ([]*types.SystemTx, error) {
+	if to < from {
+		return nil, fmt.Errorf("invalid block range from %v to %v", from, to)
+	}
+	msgs := make([]*types.SystemTx, (to - from + 1))
+	var i uint64
+	for i = 0; i < to-from+1; i++ {
+		msg, err := c.buildL1BlocksTx(ctx, from+i)
+		if err != nil {
+			return nil, err
+		}
+		msgs[i] = msg
+	}
+	return msgs, nil
+}
+
+func (c *BridgeClient) buildL1BlocksTx(ctx context.Context, l1BlockNumber uint64) (*types.SystemTx, error) {
+	headerRlp, err := c.getL1BlockHeaderRlp(ctx, l1BlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.l1BlocksABI.Pack("setL1BlockHeader", headerRlp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack the calldata for setL1BlockHeader, err: %w", err)
+	}
+
+	return &types.SystemTx{
+		Sender: rcfg.SystemSenderAddress,
+		To:     rcfg.L1BlocksAddress,
+		Data:   data,
+	}, nil
+}
+
+func (c *BridgeClient) getL1BlockHeaderRlp(ctx context.Context, l1BlockNumber uint64) ([]byte, error) {
+	header, err := c.client.HeaderByNumber(ctx, big.NewInt(int64(l1BlockNumber)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get L1 block header, err: %w", err)
+	}
+	headerRlp, err := rlp.EncodeToBytes(header)
+	if err != nil {
+		return nil, fmt.Errorf("failed in RLP encoding of L1 block header, err: %w", err)
+	}
+	return headerRlp, nil
 }
 
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {

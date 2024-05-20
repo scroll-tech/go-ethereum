@@ -90,6 +90,7 @@ type Message interface {
 	Data() []byte
 	AccessList() types.AccessList
 	IsL1MessageTx() bool
+	IsSystemTx() bool
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -227,6 +228,11 @@ func (st *StateTransition) to() common.Address {
 }
 
 func (st *StateTransition) buyGas() error {
+	if st.msg.IsSystemTx() {
+		// no gas accounting for system txs
+		return nil
+	}
+
 	mgval := new(big.Int).SetUint64(st.msg.Gas())
 	mgval = mgval.Mul(mgval, st.gasPrice)
 
@@ -266,6 +272,13 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
+	if st.msg.IsSystemTx() {
+		// system tx gas is free and not accounted for.
+		st.gas += st.msg.Gas()
+		st.initialGas = st.msg.Gas()
+		return nil
+	}
+
 	if st.msg.IsL1MessageTx() {
 		// No fee fields to check, no nonce to check, and no need to check if EOA (L1 already verified it for us)
 		// Gas is free, but no refunds!
@@ -400,8 +413,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		stateTransitionEvmCallExecutionTimer.Update(time.Since(evmCallStart))
 	}
 
-	// no refunds for l1 messages
-	if st.msg.IsL1MessageTx() {
+	// no refunds for l1 messages and system txs
+	if st.msg.IsL1MessageTx() || st.msg.IsSystemTx() {
 		return &ExecutionResult{
 			L1DataFee:  big.NewInt(0),
 			UsedGas:    st.gasUsed(),

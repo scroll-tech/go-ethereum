@@ -37,6 +37,9 @@ var (
 	ErrGasUintOverflow          = errors.New("gas uint64 overflow")
 	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
 	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
+	ErrInvalidL1BlockNumber     = errors.New("invalid L1 block number")
+	ErrInvalidInput             = errors.New("invalid input")
+	ErrNoL1Client               = errors.New("no available L1 client")
 )
 
 // ErrStackUnderflow wraps an evm error when the items on the stack less
@@ -67,3 +70,10 @@ type ErrInvalidOpCode struct {
 }
 
 func (e *ErrInvalidOpCode) Error() string { return fmt.Sprintf("invalid opcode: %s", e.opcode) }
+
+// ErrL1RPCError warps an RPC error through the L1 client
+type ErrL1RPCError struct {
+	err error
+}
+
+func (e *ErrL1RPCError) Error() string { return fmt.Sprintf("L1 RPC error: %s", e.err.Error()) }

@@ -340,3 +340,8 @@ func (b *LesApiBackend) StateAtTransaction(ctx context.Context, block *types.Blo
 func (b *LesApiBackend) StateAt(root common.Hash) (*state.StateDB, error) {
 	return nil, fmt.Errorf("StateAt is not supported in LES protocol")
 }
+
+func (b *LesApiBackend) L1Client() vm.L1Client {
+	// TODO: support L1 client in LesApiBackend
+	return nil
+}

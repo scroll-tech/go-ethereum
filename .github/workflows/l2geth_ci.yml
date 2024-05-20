@@ -75,6 +75,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - run: goimports -local github.com/scroll-tech/go-ethereum/ -w .
+    - run: git diff
     # If there are any diffs from goimports, fail.
     - name: Verify no changes from goimports
       run: |

@@ -17,13 +17,20 @@
 package vm
 
 import (
+	"context"
 	"hash"
+	"math/big"
 	"sync/atomic"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/log"
 )
+
+// L1Client provides functionality provided by L1
+type L1Client interface {
+	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
+}
 
 // Config are the configuration options for the Interpreter
 type Config struct {
@@ -36,6 +43,8 @@ type Config struct {
 	JumpTable [256]*operation // EVM instruction table, automatically populated if unset
 
 	ExtraEips []int // Additional EIPS that are to be enabled
+
+	L1Client L1Client // L1 RPC client
 }
 
 // ScopeContext contains the things that are per-call, such as stack and memory,

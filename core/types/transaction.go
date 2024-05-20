@@ -54,6 +54,7 @@ const (
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
 
+	SystemTxType    = 0x7D
 	L1MessageTxType = 0x7E
 )
 
@@ -200,6 +201,8 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		inner = new(BlobTx)
 	case L1MessageTxType:
 		inner = new(L1MessageTx)
+	case SystemTxType:
+		inner = new(SystemTx)
 	default:
 		return nil, ErrTxTypeNotSupported
 	}
@@ -365,6 +368,19 @@ func (tx *Transaction) WithoutBlobTxSidecar() *Transaction {
 	return cpy
 }
 
+// IsSystemTx returns true if the transaction is a system tx
+func (tx *Transaction) IsSystemTx() bool {
+	return tx.Type() == SystemTxType
+}
+
+func (tx *Transaction) AsSystemTx() *SystemTx {
+	if tx.IsSystemTx() {
+		return tx.inner.(*SystemTx)
+	}
+
+	return nil
+}
+
 // IsL1MessageTx returns true if the transaction is an L1 cross-domain tx.
 func (tx *Transaction) IsL1MessageTx() bool {
 	return tx.Type() == L1MessageTxType
@@ -424,7 +440,7 @@ func (tx *Transaction) GasTipCapIntCmp(other *big.Int) int {
 // Note: if the effective gasTipCap is negative, this method returns both error
 // the actual negative value, _and_ ErrGasFeeCapTooLow
 func (tx *Transaction) EffectiveGasTip(baseFee *big.Int) (*big.Int, error) {
-	if tx.IsL1MessageTx() {
+	if tx.IsL1MessageTx() || tx.IsSystemTx() {
 		return new(big.Int), nil
 	}
 	if baseFee == nil {
@@ -748,6 +764,7 @@ type Message struct {
 	accessList    AccessList
 	isFake        bool
 	isL1MessageTx bool
+	isSystemTx    bool
 }
 
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool) Message {
@@ -764,6 +781,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		accessList:    accessList,
 		isFake:        isFake,
 		isL1MessageTx: false,
+		isSystemTx:    false,
 	}
 }
 
@@ -781,6 +799,7 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 		accessList:    tx.AccessList(),
 		isFake:        false,
 		isL1MessageTx: tx.IsL1MessageTx(),
+		isSystemTx:    tx.IsSystemTx(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -803,6 +822,7 @@ func (m Message) Data() []byte           { return m.data }
 func (m Message) AccessList() AccessList { return m.accessList }
 func (m Message) IsFake() bool           { return m.isFake }
 func (m Message) IsL1MessageTx() bool    { return m.isL1MessageTx }
+func (m Message) IsSystemTx() bool       { return m.isSystemTx }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

@@ -94,6 +94,7 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
+	L1Client() vm.L1Client
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

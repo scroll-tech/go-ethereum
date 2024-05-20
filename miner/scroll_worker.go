@@ -884,8 +884,7 @@ func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err e
 
 	switch {
 	case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
-		// If this block already contains some L1 messages,
-		// terminate here and try again in the next block.
+		// If this block already contains some L1 messages try again in the next block.
 		if txIndex > 0 {
 			break
 		}

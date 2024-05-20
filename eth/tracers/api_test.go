@@ -143,6 +143,10 @@ func (b *testBackend) ChainDb() ethdb.Database {
 	return b.chaindb
 }
 
+func (b *testBackend) L1Client() vm.L1Client {
+	return nil
+}
+
 func (b *testBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (*state.StateDB, error) {
 	statedb, err := b.chain.StateAt(block.Root())
 	if err != nil {

@@ -164,17 +164,32 @@ func (ga *GenesisAlloc) flush(db ethdb.Database, triedb *trie.Database, blockhas
 
 	// for addr, account := range *ga {
 	for _, k := range keys {
+		fmt.Println("address", k)
 		addr := common.HexToAddress(k)
 		account := (*ga)[addr]
 
+		var root common.Hash
+
 		if account.Balance != nil {
 			statedb.AddBalance(addr, account.Balance)
+			root, _ = statedb.Commit(0, false)
+			fmt.Println("root_balance", root)
 		}
+
 		statedb.SetCode(addr, account.Code)
+		root, _ = statedb.Commit(0, false)
+		fmt.Println("root_code", root)
+
 		statedb.SetNonce(addr, account.Nonce)
+		root, _ = statedb.Commit(0, false)
+		fmt.Println("root_nonce", root)
+
 		for key, value := range account.Storage {
 			statedb.SetState(addr, key, value)
+			root, _ = statedb.Commit(0, false)
+			fmt.Println("root_state", root)
 		}
+		fmt.Println("--------------------------")
 	}
 	root, err := statedb.Commit(0, false)
 	if err != nil {

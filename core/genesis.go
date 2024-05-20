@@ -185,8 +185,12 @@ func (ga *GenesisAlloc) flush(db ethdb.Database, triedb *trie.Database, blockhas
 		fmt.Println("root_nonce", root)
 
 		for key, value := range account.Storage {
+			fmt.Println(addr, key, value)
 			statedb.SetState(addr, key, value)
-			root, _ = statedb.Commit(0, false)
+			// statedb.SetState(addr, common.Hash{2}, common.Hash{3})
+			// statedb.SetState(common.Address{1}, common.Hash{2}, common.Hash{3})
+			// root, _ = statedb.Commit(0, false)
+			root = statedb.IntermediateRoot(false)
 			fmt.Println("root_state", root)
 		}
 		fmt.Println("--------------------------")

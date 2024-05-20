@@ -23,8 +23,10 @@ import (
 )
 
 var (
+	EmptyZkTrieHash = common.Hash{}
+
 	// EmptyRootHash is the known root hash of an empty trie.
-	EmptyRootHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	EmptyRootHash = EmptyZkTrieHash
 
 	// EmptyUncleHash is the known hash of the empty uncle set.
 	EmptyUncleHash = rlpHash([]*Header(nil)) // 1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
@@ -39,13 +41,13 @@ var (
 	EmptyPoseidonCodeHash = codehash.EmptyPoseidonCodeHash
 
 	// EmptyTxsHash is the known hash of the empty transaction set.
-	EmptyTxsHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	EmptyTxsHash = EmptyZkTrieHash
 
 	// EmptyReceiptsHash is the known hash of the empty receipt set.
-	EmptyReceiptsHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	EmptyReceiptsHash = EmptyZkTrieHash
 
 	// EmptyWithdrawalsHash is the known hash of the empty withdrawal set.
-	EmptyWithdrawalsHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	EmptyWithdrawalsHash = EmptyZkTrieHash
 )
 
 // TrieRootHash returns the hash itself if it's non-empty or the predefined

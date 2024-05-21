@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -284,15 +285,43 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if err != nil {
 		panic(err)
 	}
-	for addr, account := range g.Alloc {
+
+	keys := make([]string, 0, len(g.Alloc))
+	for k := range g.Alloc {
+		keys = append(keys, k.Hex())
+	}
+	sort.Strings(keys)
+
+	// for addr, account := range g.Alloc {
+	for _, k := range keys {
+		fmt.Println("address", k)
+		addr := common.HexToAddress(k)
+		account := (g.Alloc)[addr]
+
+		var root common.Hash
+
 		statedb.AddBalance(addr, account.Balance)
+		root = statedb.IntermediateRoot(false)
+		fmt.Println("root_balance", root)
+
 		statedb.SetCode(addr, account.Code)
+		root = statedb.IntermediateRoot(false)
+		fmt.Println("root_code", root)
+
 		statedb.SetNonce(addr, account.Nonce)
+		root = statedb.IntermediateRoot(false)
+		fmt.Println("root_nonce", root)
+
 		for key, value := range account.Storage {
 			statedb.SetState(addr, key, value)
+			fmt.Println(addr, key, value)
+			root = statedb.IntermediateRoot(false)
+			fmt.Println("root_state", root)
 		}
+		fmt.Println("--------------------------")
 	}
 	root := statedb.IntermediateRoot(false)
+	fmt.Println("root", root)
 	head := &types.Header{
 		Number:     new(big.Int).SetUint64(g.Number),
 		Nonce:      types.EncodeNonce(g.Nonce),

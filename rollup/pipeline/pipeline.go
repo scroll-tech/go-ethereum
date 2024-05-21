@@ -313,6 +313,7 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 			select {
 			case <-time.After(time.Until(deadline)):
 				cccIdleTimer.UpdateSince(idleStart)
+				// note: currently we don't allow empty blocks, but if we ever do; make sure to CCC check it first
 				if lastCandidate != nil {
 					resultCh <- &Result{
 						Rows:       lastAccRows,

@@ -6,7 +6,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core"
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
@@ -74,18 +73,13 @@ func NewPipeline(
 	state *state.StateDB,
 
 	header *types.Header,
+	nextL1MsgIndex uint64,
 	ccc *circuitcapacitychecker.CircuitCapacityChecker,
 ) *Pipeline {
-	var nextL1MsgIndex uint64
-	parent := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
-	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chain.Database(), parent.Hash()); dbIndex != nil {
-		nextL1MsgIndex = *dbIndex
-	}
-
 	return &Pipeline{
 		chain:          chain,
 		vmConfig:       vmConfig,
-		parent:         parent,
+		parent:         chain.GetBlock(header.ParentHash, header.Number.Uint64()-1),
 		nextL1MsgIndex: nextL1MsgIndex,
 		Header:         *header,
 		ccc:            ccc,

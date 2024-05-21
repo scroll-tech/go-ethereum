@@ -67,7 +67,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 	if !config.IsCurie(blockNumber) {
 		l1DataFee = calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, overhead, l1BaseFee, scalar, l1BlobBaseFee, blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, l1BaseFee, scalar, l1BlobBaseFee, blobScalar)
 	}
 
 	return l1DataFee, nil
@@ -151,11 +151,9 @@ func calculateEncodedL1DataFee(data []byte, overhead, l1BaseFee *big.Int, scalar
 }
 
 // calculateEncodedL1DataFeeCurie computes the L1 fee for an RLP-encoded tx, post Curie
-func calculateEncodedL1DataFeeCurie(data []byte, overhead, l1BaseFee *big.Int, scalar *big.Int, l1BlobBaseFee *big.Int, blobScalar *big.Int) *big.Int {
+func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, commitScalar *big.Int, l1BlobBaseFee *big.Int, blobScalar *big.Int) *big.Int {
 	// calldata component
-	calldataGas := overhead
-	calldataGas = new(big.Int).Mul(calldataGas, l1BaseFee)
-	calldataGas = new(big.Int).Mul(calldataGas, scalar)
+	calldataGas := new(big.Int).Mul(commitScalar, l1BaseFee)
 
 	// blob component
 	blobGas := big.NewInt(int64(len(data)))
@@ -219,7 +217,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	if !config.IsCurie(blockNumber) {
 		l1DataFee = calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, overhead, l1BaseFee, scalar, l1BlobBaseFee, blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, l1BaseFee, scalar, l1BlobBaseFee, blobScalar)
 	}
 
 	return l1DataFee, nil

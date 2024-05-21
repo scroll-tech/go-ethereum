@@ -554,13 +554,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	if c.config.RelaxedPeriod {
+	header.Time = parent.Time + c.config.Period
+	if c.config.RelaxedPeriod || header.Time < uint64(time.Now().Unix()) {
 		header.Time = uint64(time.Now().Unix())
-	} else {
-		header.Time = parent.Time + c.config.Period
-		if header.Time < uint64(time.Now().Unix()) {
-			header.Time = uint64(time.Now().Unix())
-		}
 	}
 	return nil
 }

@@ -16,10 +16,12 @@
 
 package miner
 
+/*
 import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -305,6 +307,12 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	if recommit < minRecommitInterval {
 		log.Warn("Sanitizing miner recommit interval", "provided", recommit, "updated", minRecommitInterval)
 		recommit = minRecommitInterval
+	}
+
+	// Sanitize account fetch limit.
+	if worker.config.MaxAccountsNum == 0 {
+		log.Warn("Sanitizing miner account fetch limit", "provided", worker.config.MaxAccountsNum, "updated", math.MaxInt)
+		worker.config.MaxAccountsNum = math.MaxInt
 	}
 
 	worker.wg.Add(4)
@@ -1643,3 +1651,4 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 	}
 	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
 }
+*/

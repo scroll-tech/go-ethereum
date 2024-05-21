@@ -313,8 +313,10 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		fmt.Println("root_nonce", root)
 
 		for key, value := range account.Storage {
-			statedb.SetState(addr, key, value)
 			fmt.Println(addr, key, value)
+			statedb.SetState(addr, key, value)
+			// statedb.SetState(addr, common.Hash{2}, common.Hash{3})
+			// statedb.SetState(common.Address{1}, common.Hash{2}, common.Hash{3})
 			root = statedb.IntermediateRoot(false)
 			fmt.Println("root_state", root)
 		}

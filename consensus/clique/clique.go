@@ -328,7 +328,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
-	if parent.Time+c.config.Period > header.Time {
+	if header.Time < parent.Time {
 		return errInvalidTimestamp
 	}
 	// Verify that the gasUsed is <= gasLimit
@@ -554,9 +554,13 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + c.config.Period
-	if header.Time < uint64(time.Now().Unix()) {
+	if c.config.RelaxedPeriod {
 		header.Time = uint64(time.Now().Unix())
+	} else {
+		header.Time = parent.Time + c.config.Period
+		if header.Time < uint64(time.Now().Unix()) {
+			header.Time = uint64(time.Now().Unix())
+		}
 	}
 	return nil
 }

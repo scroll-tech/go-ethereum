@@ -201,6 +201,7 @@ var genesis = &core.Genesis{
 				rcfg.OverheadSlot:      common.BigToHash(big.NewInt(10000)),
 				rcfg.ScalarSlot:        common.BigToHash(big.NewInt(10000)),
 				rcfg.L1BlobBaseFeeSlot: common.BigToHash(big.NewInt(10000)),
+				rcfg.CommitScalarSlot:  common.BigToHash(big.NewInt(10000)),
 				rcfg.BlobScalarSlot:    common.BigToHash(big.NewInt(10000)),
 			},
 		},

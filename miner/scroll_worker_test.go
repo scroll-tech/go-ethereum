@@ -866,7 +866,7 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 	tx3, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testUserAddress)+1, testBankAddress, big.NewInt(0), params.TxGas, big.NewInt(20*params.InitialBaseFee), nil), types.HomesteadSigner{}, testUserKey)
 	// B --> A (nonce: 2, gas: 20)
 	tx4, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testUserAddress)+2, testBankAddress, big.NewInt(0), params.TxGas, big.NewInt(20*params.InitialBaseFee), nil), types.HomesteadSigner{}, testUserKey)
-	// A --> B (nonce: 1, gas: 5)
+	// A --> B (nonce: 2, gas: 5)
 	tx5, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress)+2, testUserAddress, big.NewInt(0), params.TxGas, big.NewInt(5*params.InitialBaseFee), nil), types.HomesteadSigner{}, testBankKey)
 
 	// Process 2 transactions with gas order: tx0 > tx1, tx1 will overflow.

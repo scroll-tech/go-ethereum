@@ -555,6 +555,8 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		return consensus.ErrUnknownAncestor
 	}
 	header.Time = parent.Time + c.config.Period
+	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
+	// we don't know when it will be sealed
 	if c.config.RelaxedPeriod || header.Time < uint64(time.Now().Unix()) {
 		header.Time = uint64(time.Now().Unix())
 	}

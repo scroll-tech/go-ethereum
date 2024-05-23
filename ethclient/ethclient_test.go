@@ -203,6 +203,7 @@ var genesis = &core.Genesis{
 				rcfg.L1BlobBaseFeeSlot: common.BigToHash(big.NewInt(10000)),
 				rcfg.CommitScalarSlot:  common.BigToHash(big.NewInt(10000)),
 				rcfg.BlobScalarSlot:    common.BigToHash(big.NewInt(10000)),
+				rcfg.IsCurieSlot:       common.BytesToHash([]byte{1}),
 			},
 		},
 	},

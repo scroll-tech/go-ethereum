@@ -533,6 +533,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			rcfg.L1BlobBaseFeeSlot,
 			rcfg.CommitScalarSlot,
 			rcfg.BlobScalarSlot,
+			rcfg.IsCurieSlot,
 		},
 	}
 

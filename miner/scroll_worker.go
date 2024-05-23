@@ -680,7 +680,12 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	// Apply special state transition at Curie block
 	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
 		misc.ApplyCurieHardFork(parentState)
+
+		// zkEVM requirement: Curie transition block contains 0 transactions, bypass pipeline.
 		err = w.commit(&pipeline.Result{
+			// Note: Signer nodes will not store CCC results for empty blocks in their database.
+			// In practice, this is acceptable, since this block will never overflow, and follower
+			// nodes will still store CCC results.
 			Rows: &types.RowConsumption{},
 			FinalBlock: &pipeline.BlockCandidate{
 				Header:        header,
@@ -694,6 +699,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		if err != nil {
 			log.Error("failed to commit Curie fork block", "reason", err)
 		}
+
 		return
 	}
 

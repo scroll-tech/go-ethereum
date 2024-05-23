@@ -43,9 +43,6 @@ import (
 )
 
 const (
-	// resultQueueSize is the size of channel listening to sealing result.
-	resultQueueSize = 10
-
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
@@ -56,15 +53,9 @@ const (
 	// chainSideChanSize is the size of channel listening to ChainSideEvent.
 	chainSideChanSize = 10
 
-	// miningLogAtDepth is the number of confirmations before logging successful mining.
-	miningLogAtDepth = 7
-
 	// minRecommitInterval is the minimal time interval to recreate the mining block with
 	// any newly arrived transactions.
 	minRecommitInterval = 1 * time.Second
-
-	// staleThreshold is the maximum depth of the acceptable stale block.
-	staleThreshold = 7
 )
 
 var (
@@ -80,7 +71,6 @@ var (
 	prepareTimer       = metrics.NewRegisteredTimer("miner/prepare", nil)
 	collectL2Timer     = metrics.NewRegisteredTimer("miner/collect_l2_txns", nil)
 	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit", nil)
-	resultTimer        = metrics.NewRegisteredTimer("miner/result", nil)
 
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)

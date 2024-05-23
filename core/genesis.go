@@ -450,6 +450,7 @@ func (g *Genesis) ToBlock() *types.Block {
 	if g.Difficulty == nil && g.Mixhash == (common.Hash{}) {
 		head.Difficulty = params.GenesisDifficulty
 	}
+	// TODO: fix basefee
 	// if g.Config != nil && g.Config.IsLondon(common.Big0) {
 	// 	if g.BaseFee != nil {
 	// 		head.BaseFee = g.BaseFee

@@ -47,7 +47,7 @@ type Pipeline struct {
 	parent   *types.Block
 	start    time.Time
 
-	// accumalators
+	// accumulators
 	ccc            *circuitcapacitychecker.CircuitCapacityChecker
 	Header         types.Header
 	state          *state.StateDB

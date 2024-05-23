@@ -43,6 +43,15 @@ type StateDB interface {
 	GetBalance(addr common.Address) *big.Int
 }
 
+type gpoState struct {
+	l1BaseFee     *big.Int
+	overhead      *big.Int
+	scalar        *big.Int
+	l1BlobBaseFee *big.Int
+	commitScalar  *big.Int
+	blobScalar    *big.Int
+}
+
 func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.ChainConfig, signer types.Signer, state StateDB, blockNumber *big.Int) (*big.Int, error) {
 	if msg.IsL1MessageTx() {
 		return big.NewInt(0), nil
@@ -60,14 +69,14 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 		return nil, err
 	}
 
-	l1BaseFee, overhead, scalar, l1BlobBaseFee, commitScalar, blobScalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
 	var l1DataFee *big.Int
 
 	if !config.IsCurie(blockNumber) {
-		l1DataFee = calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
+		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, l1BaseFee, l1BlobBaseFee, commitScalar, blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	}
 
 	return l1DataFee, nil
@@ -134,14 +143,15 @@ func rlpEncode(tx *types.Transaction) ([]byte, error) {
 	return raw.Bytes(), nil
 }
 
-func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int, *big.Int, *big.Int, *big.Int, *big.Int) {
-	l1BaseFee := state.GetState(addr, rcfg.L1BaseFeeSlot)
-	overhead := state.GetState(addr, rcfg.OverheadSlot)
-	scalar := state.GetState(addr, rcfg.ScalarSlot)
-	l1BlobBaseFee := state.GetState(addr, rcfg.L1BlobBaseFeeSlot)
-	commitScalar := state.GetState(addr, rcfg.CommitScalarSlot)
-	blobScalar := state.GetState(addr, rcfg.BlobScalarSlot)
-	return l1BaseFee.Big(), overhead.Big(), scalar.Big(), l1BlobBaseFee.Big(), commitScalar.Big(), blobScalar.Big()
+func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
+	var gpoState gpoState
+	gpoState.l1BaseFee = state.GetState(addr, rcfg.L1BaseFeeSlot).Big()
+	gpoState.overhead = state.GetState(addr, rcfg.OverheadSlot).Big()
+	gpoState.scalar = state.GetState(addr, rcfg.ScalarSlot).Big()
+	gpoState.l1BlobBaseFee = state.GetState(addr, rcfg.L1BlobBaseFeeSlot).Big()
+	gpoState.commitScalar = state.GetState(addr, rcfg.CommitScalarSlot).Big()
+	gpoState.blobScalar = state.GetState(addr, rcfg.BlobScalarSlot).Big()
+	return gpoState
 }
 
 // calculateEncodedL1DataFee computes the L1 fee for an RLP-encoded tx
@@ -211,14 +221,14 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 		return nil, err
 	}
 
-	l1BaseFee, overhead, scalar, l1BlobBaseFee, commitScalar, blobScalar := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
 	var l1DataFee *big.Int
 
 	if !config.IsCurie(blockNumber) {
-		l1DataFee = calculateEncodedL1DataFee(raw, overhead, l1BaseFee, scalar)
+		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, l1BaseFee, l1BlobBaseFee, commitScalar, blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	}
 
 	return l1DataFee, nil

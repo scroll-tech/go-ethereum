@@ -680,9 +680,21 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	// Apply special state transition at Curie block
 	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
 		misc.ApplyCurieHardFork(parentState)
+		err = w.commit(&pipeline.Result{
+			Rows: &types.RowConsumption{},
+			FinalBlock: &pipeline.BlockCandidate{
+				Header:        header,
+				State:         parentState,
+				Txs:           types.Transactions{},
+				Receipts:      types.Receipts{},
+				CoalescedLogs: []*types.Log{},
+			},
+		})
 
-		// zkEVM requirement: Curie transition block contains 0 transactions, bypass pipeline
-		// TODO
+		if err != nil {
+			log.Error("failed to commit Curie fork block", "reason", err)
+		}
+		return
 	}
 
 	// fetch l1Txs

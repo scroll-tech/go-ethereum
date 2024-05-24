@@ -35,7 +35,7 @@ type DAChunk struct {
 	Transactions [][]*types.TransactionData
 }
 
-// DAChunk groups consecutive DABlocks with their transactions.
+// DAChunkRawTx groups consecutive DABlocks with their transactions.
 type DAChunkRawTx struct {
 	Blocks       []*DABlock
 	Transactions []types.Transactions

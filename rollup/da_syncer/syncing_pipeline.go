@@ -44,8 +44,12 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		cancel()
 		return nil, err
 	}
-
-	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, db)
+	blobClient, err := newBlobScanClient()
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
 	// todo: keep synced l1 height somewhere
 	var syncedL1Height uint64 = l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)

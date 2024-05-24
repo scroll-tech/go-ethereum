@@ -11,6 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rpc"
 
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
@@ -55,7 +56,6 @@ func newL1Client(ctx context.Context, genesisConfig *params.ChainConfig, l1Clien
 		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
 		l1FinalizeBatchEventSignature: scrollChainABI.Events["FinalizeBatch"].ID,
 	}
-
 	return &client, nil
 }
 
@@ -108,4 +108,42 @@ func (c *L1Client) fetchTxData(ctx context.Context, vLog *types.Log) ([]byte, er
 	}
 
 	return tx.Data(), nil
+}
+
+// fetchTxBlobHash fetches tx blob hash corresponding to given event log
+func (c *L1Client) fetchTxBlobHash(ctx context.Context, vLog *types.Log) (common.Hash, error) {
+	tx, _, err := c.client.TransactionByHash(ctx, vLog.TxHash)
+	if err != nil {
+		log.Debug("failed to get transaction by hash, probably an unindexed transaction, fetching the whole block to get the transaction",
+			"tx hash", vLog.TxHash.Hex(), "block number", vLog.BlockNumber, "block hash", vLog.BlockHash.Hex(), "err", err)
+		block, err := c.client.BlockByHash(ctx, vLog.BlockHash)
+		if err != nil {
+			return common.Hash{}, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
+		}
+
+		found := false
+		for _, txInBlock := range block.Transactions() {
+			if txInBlock.Hash() == vLog.TxHash {
+				tx = txInBlock
+				found = true
+				break
+			}
+		}
+		if !found {
+			return common.Hash{}, fmt.Errorf("transaction not found in the block, tx hash: %v, block number: %v, block hash: %v", vLog.TxHash.Hex(), vLog.BlockNumber, vLog.BlockHash.Hex())
+		}
+	}
+	blobHashes := tx.BlobHashes()
+	if len(blobHashes) == 0 {
+		return common.Hash{}, fmt.Errorf("transaction does not contain any blobs, tx hash: %v", vLog.TxHash.Hex())
+	}
+	return blobHashes[0], nil
+}
+
+func (c *L1Client) getFinalizedBlockNumber(ctx context.Context) (*big.Int, error) {
+	h, err := c.client.HeaderByNumber(ctx, big.NewInt(int64(rpc.FinalizedBlockNumber)))
+	if err != nil {
+		return nil, err
+	}
+	return h.Number, nil
 }

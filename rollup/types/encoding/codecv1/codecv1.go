@@ -55,6 +55,7 @@ func init() {
 
 // CodecV1Version denotes the version of the codec.
 const CodecV1Version = 1
+const blockContextByteSize = 60
 
 // DABlock represents a Data Availability Block.
 type DABlock struct {
@@ -70,6 +71,12 @@ type DABlock struct {
 type DAChunk struct {
 	Blocks       []*DABlock
 	Transactions [][]*types.TransactionData
+}
+
+// DAChunkRawTx groups consecutive DABlocks with their transactions.
+type DAChunkRawTx struct {
+	Blocks       []*DABlock
+	Transactions []types.Transactions
 }
 
 // DABatch contains metadata about a batch of DAChunks.
@@ -186,6 +193,40 @@ func (c *DAChunk) Encode() []byte {
 	}
 
 	return chunkBytes
+}
+
+// DecodeDAChunksRawTx takes a byte slice and decodes it into a []DAChunkRawTx.
+func DecodeDAChunksRawTx(bytes [][]byte) ([]*DAChunkRawTx, error) {
+	var chunks []*DAChunkRawTx
+	for _, chunk := range bytes {
+		if len(chunk) < 1 {
+			return nil, fmt.Errorf("invalid chunk, length is less than 1")
+		}
+
+		numBlocks := int(chunk[0])
+		if len(chunk) < 1+numBlocks*blockContextByteSize {
+			return nil, fmt.Errorf("chunk size doesn't match with numBlocks, byte length of chunk: %v, expected length: %v", len(chunk), 1+numBlocks*blockContextByteSize)
+		}
+
+		blocks := make([]*DABlock, numBlocks)
+		for i := 0; i < numBlocks; i++ {
+			startIdx := 1 + i*blockContextByteSize // add 1 to skip numBlocks byte
+			endIdx := startIdx + blockContextByteSize
+			block, err := DecodeDABlock(chunk[startIdx:endIdx])
+			if err != nil {
+				return nil, err
+			}
+			blocks[i] = block
+		}
+
+		var transactions []types.Transactions
+
+		chunks = append(chunks, &DAChunkRawTx{
+			Blocks:       blocks,
+			Transactions: transactions,
+		})
+	}
+	return chunks, nil
 }
 
 // Hash computes the hash of the DAChunk data.
@@ -375,6 +416,98 @@ func constructBlobPayload(chunks []*encoding.Chunk) (*kzg4844.Blob, common.Hash,
 	copy(z[start:], pointBytes)
 
 	return blob, blobVersionedHash, &z, nil
+}
+
+func DecodeTxsFromBlob(blob *kzg4844.Blob, chunks []*DAChunkRawTx) error {
+	blobBytes := bytesFromBlobCanonical(blob)
+	numChunks := int(binary.BigEndian.Uint16(blobBytes[0:2]))
+	if numChunks != len(chunks) {
+		return fmt.Errorf("blob chunk number is not same as calldata, blob num chunks: %d, calldata num chunks: %d", numChunks, len(chunks))
+	}
+	index := 2
+	for _, chunk := range chunks {
+		var transactions []types.Transactions
+		chunkSize := int(binary.BigEndian.Uint32(blobBytes[index : index+4]))
+		chunkBytes := blobBytes[index+4 : index+4+chunkSize]
+		curIndex := 0
+		for _, block := range chunk.Blocks {
+			var blockTransactions types.Transactions
+			var txNum = int(block.NumTransactions - block.NumL1Messages)
+			for i := 0; i < txNum; i++ {
+				tx, nextIndex, err := getNextTx(chunkBytes, curIndex)
+				if err != nil {
+					return fmt.Errorf("couldn't decode next tx from blob bytes: %w", err)
+				}
+				curIndex = nextIndex
+				blockTransactions = append(blockTransactions, tx)
+			}
+			transactions = append(transactions, blockTransactions)
+		}
+		chunk.Transactions = transactions
+		index += 4 + chunkSize
+	}
+	return nil
+}
+
+var errSmallLength error = fmt.Errorf("length of blob bytes is too small")
+
+// getNextTx parses blob bytes to find length of payload of next Tx and decode it
+func getNextTx(bytes []byte, index int) (*types.Transaction, int, error) {
+	var nextIndex int
+	length := len(bytes)
+	if length < index+1 {
+		return nil, 0, errSmallLength
+	}
+	var txBytes []byte
+	if bytes[index] <= 0x7f {
+		// the first byte is transaction type, rlp encoding begins from next byte
+		txBytes = append(txBytes, bytes[index])
+		index++
+
+	}
+	if length < index+1 {
+		return nil, 0, errSmallLength
+	}
+	if bytes[index] >= 0xc0 && bytes[index] <= 0xf7 {
+		// length of payload is simply bytes[index] - 0xc0
+		payloadLen := int(bytes[index] - 0xc0)
+		if length < index+1+payloadLen {
+			return nil, 0, errSmallLength
+		}
+		txBytes = append(txBytes, bytes[index:index+1+payloadLen]...)
+		nextIndex = index + 1 + payloadLen
+	} else if bytes[index] > 0xf7 {
+		// the length of payload is encoded in next bytes[index] - 0xf7 bytes
+		// length of bytes representation of length of payload
+		lenPayloadLen := int(bytes[index] - 0xf7)
+		if length < index+1+lenPayloadLen {
+			return nil, 0, errSmallLength
+		}
+		lenBytes := bytes[index+1 : index+1+lenPayloadLen]
+		for len(lenBytes) < 8 {
+			lenBytes = append([]byte{0x0}, lenBytes...)
+		}
+		payloadLen := binary.BigEndian.Uint64(lenBytes)
+
+		if length < index+1+lenPayloadLen+int(payloadLen) {
+			return nil, 0, errSmallLength
+		}
+		txBytes = append(txBytes, bytes[index:index+1+lenPayloadLen+int(payloadLen)]...)
+		nextIndex = index + 1 + lenPayloadLen + int(payloadLen)
+	} else {
+		return nil, 0, fmt.Errorf("incorrect format of rlp encoding")
+	}
+	tx := &types.Transaction{}
+	tx.UnmarshalBinary(txBytes)
+	return tx, nextIndex, nil
+}
+
+func bytesFromBlobCanonical(blob *kzg4844.Blob) [126976]byte {
+	var blobBytes [126976]byte
+	for from := 0; from < len(blob); from += 32 {
+		copy(blobBytes[from*31:], blob[from+1:from+32])
+	}
+	return blobBytes
 }
 
 // makeBlobCanonical converts the raw blob data into the canonical blob representation of 4096 BLSFieldElements.

@@ -3,13 +3,16 @@ package da_syncer
 import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/rollup/types/encoding/codecv0"
+	"github.com/scroll-tech/go-ethereum/rollup/types/encoding/codecv1"
 )
 
 type DAType int
 
 const (
-	// CommitBatch contains data of event of CommitBatch
+	// CommitBatchV0 contains data of event of CommitBatchV0
 	CommitBatchV0 DAType = iota
+	// CommitBatchV1 contains data of event of CommitBatchV1
+	CommitBatchV1
 	// RevertBatch contains data of event of RevertBatch
 	RevertBatch
 	// FinalizeBatch contains data of event of FinalizeBatch
@@ -45,6 +48,32 @@ func NewCommitBatchDaV0(version uint8, batchIndex uint64, parentBatchHeader *cod
 }
 
 func (f *CommitBatchDaV0) DAType() DAType {
+	return f.DaType
+}
+
+type CommitBatchDaV1 struct {
+	DaType                 DAType
+	Version                uint8
+	BatchIndex             uint64
+	ParentBatchHeader      *codecv1.DABatch
+	SkippedL1MessageBitmap []byte
+	Chunks                 []*codecv1.DAChunkRawTx
+	L1Txs                  []*types.L1MessageTx
+}
+
+func NewCommitBatchDaV1(version uint8, batchIndex uint64, parentBatchHeader *codecv1.DABatch, skippedL1MessageBitmap []byte, chunks []*codecv1.DAChunkRawTx, l1Txs []*types.L1MessageTx) DAEntry {
+	return &CommitBatchDaV1{
+		DaType:                 CommitBatchV1,
+		Version:                version,
+		BatchIndex:             batchIndex,
+		ParentBatchHeader:      parentBatchHeader,
+		SkippedL1MessageBitmap: skippedL1MessageBitmap,
+		Chunks:                 chunks,
+		L1Txs:                  l1Txs,
+	}
+}
+
+func (f *CommitBatchDaV1) DAType() DAType {
 	return f.DaType
 }
 

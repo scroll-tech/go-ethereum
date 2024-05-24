@@ -352,7 +352,7 @@ func (st *StateTransition) preCheck() error {
 			}
 			// This will panic if baseFee is nil, but basefee presence is verified
 			// as part of header validation.
-			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
+			if st.evm.Context.BaseFee != nil && msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
 					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
 			}
@@ -479,7 +479,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
 	effectiveTip := msg.GasPrice
-	if rules.IsLondon {
+	if rules.IsLondon && st.evm.Context.BaseFee != nil {
 		effectiveTip = cmath.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 	}
 

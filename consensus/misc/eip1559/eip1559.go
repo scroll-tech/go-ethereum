@@ -17,7 +17,6 @@
 package eip1559
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -42,7 +41,8 @@ func VerifyEIP1559Header(config *params.ChainConfig, parent, header *types.Heade
 	}
 	// Verify the header is not malformed
 	if header.BaseFee == nil {
-		return errors.New("header is missing baseFee")
+		// return errors.New("header is missing baseFee")
+		return nil
 	}
 	// Verify the baseFee is correct based on the parent header.
 	expectedBaseFee := CalcBaseFee(config, parent)

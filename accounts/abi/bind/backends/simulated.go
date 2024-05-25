@@ -646,7 +646,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	if call.GasPrice != nil && (call.GasFeeCap != nil || call.GasTipCap != nil) {
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
-	if !b.blockchain.Config().IsLondon(header.Number) {
+	if !b.blockchain.Config().IsCurie(header.Number) {
 		// If there's no basefee, then it must be a non-1559 execution
 		if call.GasPrice == nil {
 			call.GasPrice = new(big.Int)

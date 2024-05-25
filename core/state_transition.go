@@ -335,7 +335,7 @@ func (st *StateTransition) preCheck() error {
 	}
 
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
-	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
+	if st.evm.ChainConfig().IsCurie(st.evm.Context.BlockNumber) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 		if !st.evm.Config.NoBaseFee || msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
 			if l := msg.GasFeeCap.BitLen(); l > 256 {
@@ -479,7 +479,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
 	effectiveTip := msg.GasPrice
-	if rules.IsLondon {
+
+	// only burn the base fee if the fee vault is not enabled
+	if rules.IsCurie && !st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		effectiveTip = cmath.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 	}
 

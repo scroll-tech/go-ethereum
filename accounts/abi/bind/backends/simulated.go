@@ -980,3 +980,7 @@ func nullSubscription() event.Subscription {
 		return nil
 	})
 }
+
+func (fb *filterBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return fb.bc.StateAt(root)
+}

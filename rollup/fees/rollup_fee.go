@@ -163,10 +163,10 @@ func calculateEncodedL1DataFee(data []byte, overhead, l1BaseFee *big.Int, scalar
 
 // calculateEncodedL1DataFeeCurie computes the L1 fee for an RLP-encoded tx, post Curie
 func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseFee *big.Int, commitScalar *big.Int, blobScalar *big.Int) *big.Int {
-	// calldata component
+	// calldata component of commit fees (calldata gas + execution)
 	calldataGas := new(big.Int).Mul(commitScalar, l1BaseFee)
 
-	// blob component
+	// blob component of commit fees
 	blobGas := big.NewInt(int64(len(data)))
 	blobGas = new(big.Int).Mul(blobGas, l1BlobBaseFee)
 	blobGas = new(big.Int).Mul(blobGas, blobScalar)

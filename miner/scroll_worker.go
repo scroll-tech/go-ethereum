@@ -461,6 +461,32 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		return
 	}
 
+	// Apply special state transition at Curie block
+	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
+		misc.ApplyCurieHardFork(parentState)
+
+		// zkEVM requirement: Curie transition block contains 0 transactions, bypass pipeline.
+		err = w.commit(&pipeline.Result{
+			// Note: Signer nodes will not store CCC results for empty blocks in their database.
+			// In practice, this is acceptable, since this block will never overflow, and follower
+			// nodes will still store CCC results.
+			Rows: &types.RowConsumption{},
+			FinalBlock: &pipeline.BlockCandidate{
+				Header:        header,
+				State:         parentState,
+				Txs:           types.Transactions{},
+				Receipts:      types.Receipts{},
+				CoalescedLogs: []*types.Log{},
+			},
+		})
+
+		if err != nil {
+			log.Error("failed to commit Curie fork block", "reason", err)
+		}
+
+		return
+	}
+
 	// fetch l1Txs
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
@@ -556,6 +582,14 @@ func (w *worker) startNewPipeline(timestamp int64) {
 }
 
 func (w *worker) handlePipelineResult(res *pipeline.Result) error {
+	if !w.isRunning() {
+		if res != nil && res.FinalBlock != nil {
+			w.updateSnapshot(res.FinalBlock)
+		}
+		w.currentPipeline = nil
+		return nil
+	}
+
 	if res != nil && res.OverflowingTx != nil {
 		if res.FinalBlock == nil {
 			// first txn overflowed the circuit, skip
@@ -602,14 +636,6 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 		}
 	}
 
-	if !w.isRunning() {
-		if res != nil && res.FinalBlock != nil {
-			w.updateSnapshot(res.FinalBlock)
-		}
-		w.currentPipeline = nil
-		return nil
-	}
-
 	var commitError error
 	if res != nil && res.FinalBlock != nil {
 		if commitError = w.commit(res); commitError == nil {
@@ -651,8 +677,12 @@ func (w *worker) commit(res *pipeline.Result) error {
 	if err := w.engine.Seal(w.chain, block, resultCh, stopCh); err != nil {
 		return err
 	}
-
+	// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
+	// or a call that blocks between the call to Seal and the line below
 	block = <-resultCh
+	if block == nil {
+		return errors.New("missed seal response from consensus engine")
+	}
 
 	// verify the generated block with local consensus engine to make sure everything is as expected
 	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
@@ -743,6 +773,10 @@ func (w *worker) postSideBlock(event core.ChainSideEvent) {
 }
 
 func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err error) bool {
+	if !w.isRunning() {
+		return false
+	}
+
 	writeTrace := func() {
 		var trace *types.BlockTrace
 		var errWithTrace *pipeline.ErrorWithTrace

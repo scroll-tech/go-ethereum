@@ -25,4 +25,4 @@ go test -test.run TestCustomGenesis
 
 # Run module tests
 cd $ROOT_DIR
-go run build/ci.go test ./consensus ./core ./eth ./miner ./node ./trie ./rollup/rollup_sync_service
+go run build/ci.go test ./consensus ./core ./eth ./miner ./node ./trie ./rollup/...

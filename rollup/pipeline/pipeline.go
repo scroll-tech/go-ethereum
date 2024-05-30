@@ -313,9 +313,7 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 		deadlineTimer := time.NewTimer(time.Until(deadline))
 		defer func() {
 			close(resultCh)
-			if !deadlineReached && !deadlineTimer.Stop() {
-				<-deadlineTimer.C
-			}
+			deadlineTimer.Stop()
 			lifetimeTimer.UpdateSince(p.start)
 		}()
 		for {
@@ -323,7 +321,6 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 			select {
 			case <-deadlineTimer.C:
 				cccIdleTimer.UpdateSince(idleStart)
-				deadlineReached = true
 				// note: currently we don't allow empty blocks, but if we ever do; make sure to CCC check it first
 				if lastCandidate != nil {
 					resultCh <- &Result{
@@ -332,6 +329,7 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 					}
 					return
 				}
+				deadlineReached = true
 			case candidate := <-candidates:
 				cccIdleTimer.UpdateSince(idleStart)
 				cccStart := time.Now()

@@ -384,12 +384,12 @@ func (p *Pipeline) traceAndApply(tx *types.Transaction) (*types.Receipt, *types.
 		p.beforeTxHook()
 	}
 
-	if p.ccc != nil {
-		// do gas limit check up-front and do not run CCC if it fails
-		if p.gasPool.Gas() < tx.Gas() {
-			return nil, nil, core.ErrGasLimitReached
-		}
+	// do gas limit check up-front and do not run CCC if it fails
+	if p.gasPool.Gas() < tx.Gas() {
+		return nil, nil, core.ErrGasLimitReached
+	}
 
+	if p.ccc != nil {
 		// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
 		// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
 		commitStateAfterApply := false

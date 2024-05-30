@@ -165,9 +165,11 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 	}
 }
 
-func (p *Pipeline) Kill() {
+// Release releases all resources related to the pipeline
+func (p *Pipeline) Release() {
 	if p.txnQueue != nil {
 		close(p.txnQueue)
+		p.txnQueue = nil
 	}
 
 	select {
@@ -308,14 +310,16 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 	var deadlineReached bool
 
 	go func() {
+		deadlineTimer := time.NewTimer(time.Until(deadline))
 		defer func() {
 			close(resultCh)
+			deadlineTimer.Stop()
 			lifetimeTimer.UpdateSince(p.start)
 		}()
 		for {
 			idleStart := time.Now()
 			select {
-			case <-time.After(time.Until(deadline)):
+			case <-deadlineTimer.C:
 				cccIdleTimer.UpdateSince(idleStart)
 				// note: currently we don't allow empty blocks, but if we ever do; make sure to CCC check it first
 				if lastCandidate != nil {
@@ -326,8 +330,6 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 					return
 				}
 				deadlineReached = true
-				// avoid deadline case being triggered again and again
-				deadline = time.Now().Add(time.Hour)
 			case candidate := <-candidates:
 				cccIdleTimer.UpdateSince(idleStart)
 				cccStart := time.Now()

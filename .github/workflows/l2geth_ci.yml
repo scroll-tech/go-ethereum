@@ -46,6 +46,7 @@ jobs:
       run: |
         make libzkp
         sudo cp ./rollup/circuitcapacitychecker/libzkp/libzkp.so /usr/local/lib/
+        sudo cp ./rollup/circuitcapacitychecker/libzkp/libzktrie.so /usr/local/lib/
         make geth
   check:
     if: github.event.pull_request.draft == false

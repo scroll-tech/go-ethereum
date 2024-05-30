@@ -368,7 +368,7 @@ var Forks = map[string]*params.ChainConfig{
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   big.NewInt(0),
 		ArchimedesBlock:     big.NewInt(0),
-		ShanghaiTime:        new(uint64),
+		ShanghaiTime:        u64(0),
 		BernoulliBlock:      big.NewInt(0),
 		CurieBlock:          big.NewInt(0),
 	},

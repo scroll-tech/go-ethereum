@@ -23,8 +23,8 @@ nccc_geth: libzstd ## geth without circuit capacity checker
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
 geth: libzkp libzstd
-	@sudo cp ./rollup/circuitcapacitychecker/libzkp/libzkp.so $(SCROLL_LIB_PATH)
-	@sudo cp ./rollup/circuitcapacitychecker/libzkp/libzktrie.so $(SCROLL_LIB_PATH)
+	@sudo cp $(PWD)/rollup/circuitcapacitychecker/libzkp/libzkp.so $(SCROLL_LIB_PATH)
+	@sudo cp $(PWD)/rollup/circuitcapacitychecker/libzkp/libzktrie.so $(SCROLL_LIB_PATH)
 	@LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):$(SCROLL_LIB_PATH)" CGO_LDFLAGS="-L$(SCROLL_LIB_PATH) -Wl,-rpath,$(SCROLL_LIB_PATH)" $(GORUN) build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."

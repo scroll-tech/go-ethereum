@@ -105,7 +105,8 @@ func newCancunInstructionSet() JumpTable {
 	enable7516(&instructionSet) // EIP-7516 (BLOBBASEFEE opcode)
 	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
 	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
-	enable6780(&instructionSet) // EIP-6780 SELFDESTRUCT only in same transaction
+	// SELFDESTRUCT is disabled in Scroll.
+	// enable6780(&instructionSet) // EIP-6780 SELFDESTRUCT only in same transaction
 	return validate(instructionSet)
 }
 
@@ -1065,12 +1066,9 @@ func newFrontierInstructionSet() JumpTable {
 			maxStack:   maxStack(2, 0),
 			memorySize: memoryReturn,
 		},
-		SELFDESTRUCT: {
-			execute:    opSelfdestruct,
-			dynamicGas: gasSelfdestruct,
-			minStack:   minStack(1, 0),
-			maxStack:   maxStack(1, 0),
-		},
+		// SELFDESTRUCT is disabled in Scroll.
+		// SELFDESTRUCT has the same behavior as INVALID.
+		SELFDESTRUCT: nil,
 	}
 
 	// Fill all unassigned slots with opUndefined.

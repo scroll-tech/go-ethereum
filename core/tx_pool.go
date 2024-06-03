@@ -672,18 +672,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		// Transactor should have enough funds to cover the costs
 		// cost == L1 data fee + V + GP * GL
 		if b := pool.currentState.GetBalance(from); b.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0 {
-			return fmt.Errorf(
-				"invalid transaction: insufficient funds for l1fee + gas * price + value. "+
-					"Sender address: %s, Sender balance: %v, L1 data fee: %v, Gas: %v, Gas price: %v, Gas tip cap: %v, Gas fee cap: %v, Transaction cost: %v",
-				from.Hex(),
-				b.Uint64(),
-				l1DataFee.Uint64(),
-				tx.Gas(),
-				tx.GasPrice().Uint64(),
-				tx.GasTipCap().Uint64(),
-				tx.GasFeeCap().Uint64(),
-				tx.Cost().Uint64(),
-			)
+			return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
 		}
 	}
 	// Ensure the transaction has more gas than the basic tx fee.

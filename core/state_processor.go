@@ -83,10 +83,13 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessBeaconBlockRoot(*beaconRoot, vmenv, statedb)
 	}
 
-	log.Info("signer", "block", block.Number(), "IsCurie", p.config.IsCurie(block.Number()))
-	log.Info("signer", "block", block.Number(), "IsCancun", p.config.IsCancun(block.Number(), block.Time()))
-	log.Info("signer", "block", block.Number(), "IsLondon", p.config.IsLondon(block.Number()))
-	log.Info("signer", "block", block.Number(), "IsBerlin", p.config.IsBerlin(block.Number()))
+	if block.Number().Uint64() == 6 {
+		log.Info("signer", "block", block.Number(), "IsCurie", p.config.IsCurie(block.Number()))
+		log.Info("signer", "block", block.Number(), "IsCancun", p.config.IsCancun(block.Number(), block.Time()))
+		log.Info("signer", "block", block.Number(), "IsLondon", p.config.IsLondon(block.Number()))
+		log.Info("signer", "block", block.Number(), "IsBerlin", p.config.IsBerlin(block.Number()))
+		log.Info("signer", "block", block.Number(), "gp", gp)
+	}
 
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {

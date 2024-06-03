@@ -439,14 +439,14 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, err
 	}
 
-	log.Warn("TransitionDb", "rules", rules, "Intrinsic gas", gas)
+	log.Warn("TransitionDb", "rules", rules, "contractCreation", contractCreation)
 
 	if st.gasRemaining < gas {
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
 	}
 	st.gasRemaining -= gas
 
-	log.Warn("Subtract intrinsic gas", "st.gas", st.gasRemaining)
+	log.Warn("Subtract intrinsic gas", "Intrinsic gas", gas, "st.gas", st.gasRemaining)
 
 	// Check clause 6
 	if msg.Value.Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From, msg.Value) {

@@ -23,6 +23,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -438,12 +439,14 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, err
 	}
 
-	log.Warn("Intrinsic gas", "gas", gas)
+	log.Warn("TransitionDb", "rules", rules, "Intrinsic gas", gas)
 
 	if st.gasRemaining < gas {
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
 	}
 	st.gasRemaining -= gas
+
+	log.Warn("Subtract intrinsic gas", "st.gas", st.gasRemaining)
 
 	// Check clause 6
 	if msg.Value.Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From, msg.Value) {
@@ -500,6 +503,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// Skip fee payment when NoBaseFee is set and the fee fields
 		// are 0. This avoids a negative effectiveTip being applied to
 		// the coinbase when simulating calls.
+		log.Error("NoBaseFee", "NoBaseFee", "?????????")
 	} else {
 		// The L2 Fee is the same as the fee that is charged in the normal geth
 		// codepath. Add the L1DataFee to the L2 fee for the total fee that is sent
@@ -509,6 +513,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		fee.Add(fee, st.l1DataFee)
 		st.state.AddBalance(st.evm.Context.Coinbase, fee) // TODO: change to `st.evm.FeeRecipient()`
 	}
+
+	log.Warn("ExecutionResult", "vmerr", vmerr, "ret", hexutil.Encode(ret))
 
 	return &ExecutionResult{
 		L1DataFee:  st.l1DataFee,

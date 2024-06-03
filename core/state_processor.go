@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rollup/fees"
 )
@@ -82,6 +83,31 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
+
+		if block.Number().Uint64() == 6 {
+			log.Info("tx", "i", i, "tx.AccessList()", tx.AccessList())
+			log.Info("tx", "i", i, "tx.BlobGas()", tx.BlobGas())
+			log.Info("tx", "i", i, "tx.BlobGasFeeCap()", tx.BlobGasFeeCap())
+			log.Info("tx", "i", i, "tx.BlobHashes()", tx.BlobHashes())
+			log.Info("tx", "i", i, "tx.BlobTxSidecar()", tx.BlobTxSidecar())
+			log.Info("tx", "i", i, "tx.ChainId()", tx.ChainId())
+			log.Info("tx", "i", i, "tx.Cost()", tx.Cost())
+			log.Info("tx", "i", i, "tx.Data()", tx.Data())
+			log.Info("tx", "i", i, "tx.Gas()", tx.Gas())
+			log.Info("tx", "i", i, "tx.GasFeeCap()", tx.GasFeeCap())
+			log.Info("tx", "i", i, "tx.GasPrice()", tx.GasPrice())
+			log.Info("tx", "i", i, "tx.GasTipCap()", tx.GasTipCap())
+			log.Info("tx", "i", i, "tx.Hash()", tx.Hash())
+			log.Info("tx", "i", i, "tx.IsL1MessageTx()", tx.IsL1MessageTx())
+			log.Info("tx", "i", i, "tx.Nonce()", tx.Nonce())
+			log.Info("tx", "i", i, "tx.Protected()", tx.Protected())
+			log.Info("tx", "i", i, "tx.Size()", tx.Size())
+			log.Info("tx", "i", i, "tx.Time()", tx.Time())
+			log.Info("tx", "i", i, "tx.To()", tx.To())
+			log.Info("tx", "i", i, "tx.Type()", tx.Type())
+			log.Info("tx", "i", i, "tx.Value()", tx.Value())
+		}
+
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)

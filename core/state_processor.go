@@ -22,6 +22,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -92,7 +93,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			log.Info("tx", "i", i, "tx.BlobTxSidecar()", tx.BlobTxSidecar())
 			log.Info("tx", "i", i, "tx.ChainId()", tx.ChainId())
 			log.Info("tx", "i", i, "tx.Cost()", tx.Cost())
-			log.Info("tx", "i", i, "tx.Data()", tx.Data())
+			log.Info("tx", "i", i, "tx.Data()", hexutil.Encode(tx.Data()))
 			log.Info("tx", "i", i, "tx.Gas()", tx.Gas())
 			log.Info("tx", "i", i, "tx.GasFeeCap()", tx.GasFeeCap())
 			log.Info("tx", "i", i, "tx.GasPrice()", tx.GasPrice())
@@ -112,6 +113,23 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
+
+		if block.Number().Uint64() == 6 {
+			log.Info("msg", "i", i, "msg.AccessList", msg.AccessList)
+			log.Info("msg", "i", i, "msg.BlobGasFeeCap", msg.BlobGasFeeCap)
+			log.Info("msg", "i", i, "msg.BlobHashes", msg.BlobHashes)
+			log.Info("msg", "i", i, "msg.Data", hexutil.Encode(msg.Data))
+			log.Info("msg", "i", i, "msg.From", msg.From)
+			log.Info("msg", "i", i, "msg.GasFeeCap", msg.GasFeeCap)
+			log.Info("msg", "i", i, "msg.GasLimit", msg.GasLimit)
+			log.Info("msg", "i", i, "msg.GasPrice", msg.GasPrice)
+			log.Info("msg", "i", i, "msg.GasTipCap", msg.GasTipCap)
+			log.Info("msg", "i", i, "msg.IsL1MessageTx", msg.IsL1MessageTx)
+			log.Info("msg", "i", i, "msg.Nonce", msg.Nonce)
+			log.Info("msg", "i", i, "msg.To", msg.To)
+			log.Info("msg", "i", i, "msg.Value", msg.Value)
+		}
+
 		statedb.SetTxContext(tx.Hash(), i)
 		receipt, err := applyTransaction(msg, p.config, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {

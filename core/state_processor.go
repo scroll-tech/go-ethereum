@@ -135,6 +135,26 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
+
+		if block.Number().Uint64() == 6 {
+			log.Info("receipt", "i", i, "receipt.BlobGasPrice", receipt.BlobGasPrice)
+			log.Info("receipt", "i", i, "receipt.BlobGasUsed", receipt.BlobGasUsed)
+			log.Info("receipt", "i", i, "receipt.BlockHash", receipt.BlockHash)
+			log.Info("receipt", "i", i, "receipt.BlockNumber", receipt.BlockNumber)
+			log.Info("receipt", "i", i, "receipt.Bloom", hexutil.Encode(receipt.Bloom.Bytes()))
+			log.Info("receipt", "i", i, "receipt.ContractAddress", receipt.ContractAddress)
+			log.Info("receipt", "i", i, "receipt.CumulativeGasUsed", receipt.CumulativeGasUsed)
+			log.Info("receipt", "i", i, "receipt.EffectiveGasPrice", receipt.EffectiveGasPrice)
+			log.Info("receipt", "i", i, "receipt.GasUsed", receipt.GasUsed)
+			log.Info("receipt", "i", i, "receipt.L1Fee", receipt.L1Fee)
+			log.Info("receipt", "i", i, "receipt.Logs", receipt.Logs)
+			log.Info("receipt", "i", i, "receipt.PostState", hexutil.Encode(receipt.PostState))
+			log.Info("receipt", "i", i, "receipt.Status", receipt.Status)
+			log.Info("receipt", "i", i, "receipt.TransactionIndex", receipt.TransactionIndex)
+			log.Info("receipt", "i", i, "receipt.TxHash", receipt.TxHash)
+			log.Info("receipt", "i", i, "receipt.Type", receipt.Type)
+		}
+
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}

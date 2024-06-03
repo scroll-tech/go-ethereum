@@ -100,6 +100,26 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			params.Debug = false
 		}
 
+		// if params.Debug {
+		// 	parent := p.bc.GetBlockByHash(block.Header().ParentHash).Header()
+		// 	traceEnv, err := tracing.CreateTraceEnv(p.config, p.bc, p.engine, p.bc.db, statedb, parent,
+		// 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
+		// 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
+		// 		false)
+		// 	if err != nil {
+		// 		log.Error("failed to create traceEnv", "err", err)
+		// 	}
+
+		// 	traces, err := traceEnv.GetBlockTrace(
+		// 		types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{tx}, nil),
+		// 	)
+		// 	if err != nil {
+		// 		log.Error("failed to get BlockTrace", "err", err)
+		// 	}
+
+		// 	log.Info("tracing", "traces", traces)
+		// }
+
 		if params.Debug {
 			log.Info("tx", "i", i, "tx.AccessList()", tx.AccessList())
 			log.Info("tx", "i", i, "tx.BlobGas()", tx.BlobGas())

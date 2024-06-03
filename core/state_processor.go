@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -106,7 +107,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 		if params.Debug {
 			logConfig := &logger.Config{
-				EnableMemory:     false,
+				EnableMemory:     true,
+				DisableStack:     false,
+				DisableStorage:   false,
 				EnableReturnData: true,
 				Debug:            true,
 			}
@@ -208,7 +211,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 			lll := logger.FormatLogs(structLogger.StructLogs())
 			b, _ := json.Marshal(lll)
-			log.Info("traces", "traces", string(b))
+			log.Info("traces", "traces", string(b), "len", len(lll))
+
+			err := ioutil.WriteFile("traces.json", b, 0644)
+			if err != nil {
+				log.Error("failed to write to file", "error", err)
+			}
 		}
 
 		receipts = append(receipts, receipt)

@@ -107,7 +107,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			log.Info("tx", "i", i, "tx.GasFeeCap()", tx.GasFeeCap())
 			log.Info("tx", "i", i, "tx.GasPrice()", tx.GasPrice())
 			log.Info("tx", "i", i, "tx.GasTipCap()", tx.GasTipCap())
-			log.Info("tx", "i", i, "tx.Hash()", tx.Hash())
+			log.Info("tx", "i", i, "tx.Hash()", tx.Hash().Hex())
 			log.Info("tx", "i", i, "tx.IsL1MessageTx()", tx.IsL1MessageTx())
 			log.Info("tx", "i", i, "tx.Nonce()", tx.Nonce())
 			log.Info("tx", "i", i, "tx.Protected()", tx.Protected())
@@ -160,7 +160,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			log.Info("receipt", "i", i, "receipt.PostState", hexutil.Encode(receipt.PostState))
 			log.Info("receipt", "i", i, "receipt.Status", receipt.Status)
 			log.Info("receipt", "i", i, "receipt.TransactionIndex", receipt.TransactionIndex)
-			log.Info("receipt", "i", i, "receipt.TxHash", receipt.TxHash)
+			log.Info("receipt", "i", i, "receipt.TxHash", receipt.TxHash.Hex())
 			log.Info("receipt", "i", i, "receipt.Type", receipt.Type)
 		}
 
@@ -186,6 +186,10 @@ func applyTransaction(msg *Message, config *params.ChainConfig, gp *GasPool, sta
 	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 	if err != nil {
 		return nil, err
+	}
+
+	if tx.Hash().Hex() == "0x8bd67a187853a6d5f88ce7d82fdf92a4c0627cb09339c7de718d04da5e1c0c86" {
+		log.Info("applyTransaction", "tx", tx.Hash().Hex(), "l1DataFee", l1DataFee)
 	}
 
 	// Apply the transaction to the current state (included in the env).

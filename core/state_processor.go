@@ -17,6 +17,7 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -29,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rollup/fees"
@@ -69,6 +71,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		blockNumber = block.Number()
 		allLogs     []*types.Log
 		gp          = new(GasPool).AddGas(block.GasLimit())
+
+		structLogger *logger.StructLogger
 	)
 	// Mutate the block and state according to any hard-fork specs
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
@@ -98,6 +102,19 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			params.Debug = true
 		} else {
 			params.Debug = false
+		}
+
+		if params.Debug {
+			logConfig := &logger.Config{
+				EnableMemory:     false,
+				EnableReturnData: true,
+				Debug:            true,
+			}
+			structLogger = logger.NewStructLogger(logConfig)
+			vmenv.Config.Tracer = structLogger
+		} else {
+			structLogger = nil
+			vmenv.Config.Tracer = nil
 		}
 
 		// if params.Debug {
@@ -188,6 +205,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			log.Info("receipt", "i", i, "receipt.TransactionIndex", receipt.TransactionIndex)
 			log.Info("receipt", "i", i, "receipt.TxHash", receipt.TxHash.Hex())
 			log.Info("receipt", "i", i, "receipt.Type", receipt.Type)
+
+			lll := logger.FormatLogs(structLogger.StructLogs())
+			b, _ := json.Marshal(lll)
+			log.Info("traces", "traces", string(b))
 		}
 
 		receipts = append(receipts, receipt)

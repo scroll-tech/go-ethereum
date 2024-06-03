@@ -21,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 // Config are the configuration options for the Interpreter
@@ -183,9 +182,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// enough stack items available to perform the operation.
 		op = contract.GetOp(pc)
 
-		if params.Debug {
-			log.Info("for", "depth", in.evm.depth, "op", op.String())
-		}
+		// if params.Debug {
+		// 	log.Info("for", "depth", in.evm.depth, "op", op.String())
+		// }
 
 		operation := in.table[op]
 		cost = operation.constantGas // For tracing

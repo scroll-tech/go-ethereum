@@ -94,7 +94,13 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 
-		if block.Number().Uint64() == 6 {
+		if block.Number().Uint64() == 6 && i == 0 {
+			params.Debug = true
+		} else {
+			params.Debug = false
+		}
+
+		if params.Debug {
 			log.Info("tx", "i", i, "tx.AccessList()", tx.AccessList())
 			log.Info("tx", "i", i, "tx.BlobGas()", tx.BlobGas())
 			log.Info("tx", "i", i, "tx.BlobGasFeeCap()", tx.BlobGasFeeCap())
@@ -123,7 +129,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 
-		if block.Number().Uint64() == 6 {
+		if params.Debug {
 			log.Info("msg", "i", i, "msg.AccessList", msg.AccessList)
 			log.Info("msg", "i", i, "msg.BlobGasFeeCap", msg.BlobGasFeeCap)
 			log.Info("msg", "i", i, "msg.BlobHashes", msg.BlobHashes)
@@ -139,19 +145,13 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			log.Info("msg", "i", i, "msg.Value", msg.Value)
 		}
 
-		if block.Number().Uint64() == 6 && i == 0 {
-			params.Debug = true
-		} else {
-			params.Debug = false
-		}
-
 		statedb.SetTxContext(tx.Hash(), i)
 		receipt, err := applyTransaction(msg, p.config, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 
-		if block.Number().Uint64() == 6 {
+		if params.Debug {
 			log.Info("receipt", "i", i, "receipt.BlobGasPrice", receipt.BlobGasPrice)
 			log.Info("receipt", "i", i, "receipt.BlobGasUsed", receipt.BlobGasUsed)
 			log.Info("receipt", "i", i, "receipt.BlockHash", receipt.BlockHash)

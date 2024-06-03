@@ -139,6 +139,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			log.Info("msg", "i", i, "msg.Value", msg.Value)
 		}
 
+		if block.Number().Uint64() == 6 && i == 0 {
+			params.Debug = true
+		} else {
+			params.Debug = false
+		}
+
 		statedb.SetTxContext(tx.Hash(), i)
 		receipt, err := applyTransaction(msg, p.config, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {

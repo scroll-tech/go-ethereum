@@ -23,6 +23,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -438,7 +439,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, err
 	}
 
-	log.Warn("TransitionDb", "rules", rules, "contractCreation", contractCreation)
+	if params.Debug {
+		log.Warn("TransitionDb", "rules", rules)
+	}
+	log.Warn("TransitionDb", "contractCreation", contractCreation)
 
 	if st.gasRemaining < gas {
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
@@ -515,7 +519,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.AddBalance(st.evm.Context.Coinbase, fee) // TODO: change to `st.evm.FeeRecipient()`
 	}
 
-	// log.Warn("ExecutionResult", "vmerr", vmerr, "ret", hexutil.Encode(ret))
+	if params.Debug {
+		log.Warn("ExecutionResult", "vmerr", vmerr, "ret", hexutil.Encode(ret))
+	}
 
 	return &ExecutionResult{
 		L1DataFee:  st.l1DataFee,

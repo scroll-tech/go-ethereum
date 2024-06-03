@@ -23,7 +23,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -516,7 +515,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.AddBalance(st.evm.Context.Coinbase, fee) // TODO: change to `st.evm.FeeRecipient()`
 	}
 
-	log.Warn("ExecutionResult", "vmerr", vmerr, "ret", hexutil.Encode(ret))
+	// log.Warn("ExecutionResult", "vmerr", vmerr, "ret", hexutil.Encode(ret))
 
 	return &ExecutionResult{
 		L1DataFee:  st.l1DataFee,

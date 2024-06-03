@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -195,9 +196,15 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if debug {
 				if evm.depth == 0 {
+					if params.Debug {
+						log.Info("which_capture", "1", "1")
+					}
 					evm.Config.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)
 					evm.Config.Tracer.CaptureEnd(ret, 0, nil)
 				} else {
+					if params.Debug {
+						log.Info("which_capture", "2", "2")
+					}
 					evm.Config.Tracer.CaptureEnter(CALL, caller.Address(), addr, input, gas, value)
 					evm.Config.Tracer.CaptureExit(ret, 0, nil)
 				}
@@ -211,11 +218,17 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Capture the tracer start/end events in debug mode
 	if debug {
 		if evm.depth == 0 {
+			if params.Debug {
+				log.Info("which_capture", "3", "3")
+			}
 			evm.Config.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)
 			defer func(startGas uint64) { // Lazy evaluation of the parameters
 				evm.Config.Tracer.CaptureEnd(ret, startGas-gas, err)
 			}(gas)
 		} else {
+			if params.Debug {
+				log.Info("which_capture", "4", "4")
+			}
 			// Handle tracer events for entering and exiting a call frame
 			evm.Config.Tracer.CaptureEnter(CALL, caller.Address(), addr, input, gas, value)
 			defer func(startGas uint64) {

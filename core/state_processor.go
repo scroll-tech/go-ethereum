@@ -194,7 +194,7 @@ func applyTransaction(msg *Message, config *params.ChainConfig, gp *GasPool, sta
 		return nil, err
 	}
 
-	if tx.Hash().Hex() == "0x8bd67a187853a6d5f88ce7d82fdf92a4c0627cb09339c7de718d04da5e1c0c86" {
+	if params.Debug {
 		log.Info("applyTransaction", "tx", tx.Hash().Hex(), "l1DataFee", l1DataFee)
 	}
 

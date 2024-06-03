@@ -301,7 +301,9 @@ func (st *StateTransition) buyGas() error {
 	st.initialGas = st.msg.GasLimit
 	st.state.SubBalance(st.msg.From, mgval)
 
-	log.Warn("Buying gas", "st.gas", st.gasRemaining, "st.initialGas", st.initialGas, "st.msg.From()", st.msg.From, "mgval", mgval)
+	if params.Debug {
+		log.Warn("Buying gas", "st.gas", st.gasRemaining, "st.initialGas", st.initialGas, "st.msg.From()", st.msg.From, "mgval", mgval)
+	}
 
 	return nil
 }
@@ -441,15 +443,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	if params.Debug {
 		log.Warn("TransitionDb", "rules", rules)
+		log.Warn("TransitionDb", "contractCreation", contractCreation)
 	}
-	log.Warn("TransitionDb", "contractCreation", contractCreation)
 
 	if st.gasRemaining < gas {
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
 	}
 	st.gasRemaining -= gas
 
-	log.Warn("Subtract intrinsic gas", "Intrinsic gas", gas, "st.gas", st.gasRemaining)
+	if params.Debug {
+		log.Warn("Subtract intrinsic gas", "Intrinsic gas", gas, "st.gas", st.gasRemaining)
+	}
 
 	// Check clause 6
 	if msg.Value.Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From, msg.Value) {
@@ -466,7 +470,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 
-	log.Error("Prepare", "vm.ActivePrecompiles(rules)", vm.ActivePrecompiles(rules))
+	if params.Debug {
+		log.Error("Prepare", "vm.ActivePrecompiles(rules)", vm.ActivePrecompiles(rules))
+	}
 
 	var (
 		ret   []byte

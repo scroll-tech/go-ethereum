@@ -224,7 +224,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	// ensure l1DataFee fits into uint64 for circuit compatibility
 	// (note: in practice this value should never be this big)
 	if !l1DataFee.IsUint64() {
-		l1DataFee = new(big.Int).SetUint64(math.MaxUint64)
+		l1DataFee.SetUint64(math.MaxUint64)
 	}
 
 	return l1DataFee, nil

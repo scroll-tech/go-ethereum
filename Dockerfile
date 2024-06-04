@@ -35,7 +35,7 @@ COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
 COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
-ENV CGO_LDFLAGS="-ldl,-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
+ENV CGO_LDFLAGS="-ldl -L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
 
 RUN cd /go-ethereum && env GO111MODULE=on go run build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 
@@ -55,7 +55,7 @@ COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
 COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
-ENV CGO_LDFLAGS="-ldl,-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
+ENV CGO_LDFLAGS="-ldl -L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
 
 EXPOSE 8545 8546 30303 30303/udp
 ENTRYPOINT ["geth"]

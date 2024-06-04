@@ -99,6 +99,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 
+		log.Info("storage", "block", block.Number(), "i", i,
+			"before", statedb.GetState(
+				common.HexToAddress("0x5300000000000000000000000000000000000000"),
+				common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+			))
+
 		if block.Number().Uint64() == 6 && i == 0 {
 			params.Debug = true
 		} else {
@@ -221,6 +227,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+
+		log.Info("storage", "block", block.Number(), "i", i,
+			"before", statedb.GetState(
+				common.HexToAddress("0x5300000000000000000000000000000000000000"),
+				common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+			))
 	}
 	// Fail if Shanghai not enabled and len(withdrawals) is non-zero.
 	withdrawals := block.Withdrawals()

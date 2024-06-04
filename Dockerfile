@@ -35,9 +35,9 @@ COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
 COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
-ENV CGO_LDFLAGS="-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
+ENV CGO_LDFLAGS="-ldl,-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
 
-RUN cd /go-ethereum && CGO_LDFLAGS="-ldl" env GO111MODULE=on go run build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
+RUN cd /go-ethereum && env GO111MODULE=on go run build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 
 # Pull Geth into a second stage deploy alpine container
 FROM ubuntu:20.04

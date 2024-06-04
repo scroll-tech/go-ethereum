@@ -13,8 +13,6 @@ ARG SCROLL_LIB_PATH
 
 RUN mkdir -p $SCROLL_LIB_PATH
 
-RUN apt-get -qq update && apt-get -qq install -y wget
-
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
 ENV CGO_LDFLAGS="-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
 
@@ -26,8 +24,6 @@ COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 ARG SCROLL_LIB_PATH
 
 RUN mkdir -p $SCROLL_LIB_PATH
-
-RUN apt-get -qq update && apt-get -qq install -y wget
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
 ENV CGO_LDFLAGS="-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"

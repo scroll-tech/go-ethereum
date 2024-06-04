@@ -53,6 +53,9 @@ var (
 	headBlockGauge     = metrics.NewRegisteredGauge("chain/head/block", nil)
 	headHeaderGauge    = metrics.NewRegisteredGauge("chain/head/header", nil)
 	headFastBlockGauge = metrics.NewRegisteredGauge("chain/head/receipt", nil)
+	headTimeGapGauge   = metrics.NewRegisteredGauge("chain/head/timegap", nil)
+
+	l2BaseFeeGauge = metrics.NewRegisteredGauge("chain/fees/l2basefee", nil)
 
 	accountReadTimer   = metrics.NewRegisteredTimer("chain/account/reads", nil)
 	accountHashTimer   = metrics.NewRegisteredTimer("chain/account/hashes", nil)
@@ -220,7 +223,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64, checkCircuitCapacity bool) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -263,7 +266,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		engine:         engine,
 		vmConfig:       vmConfig,
 	}
-	bc.validator = NewBlockValidator(chainConfig, bc, engine, db, checkCircuitCapacity)
+	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
@@ -1245,6 +1248,19 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if bc.insertStopped() {
 		return NonStatTy, errInsertionInterrupted
 	}
+
+	// Note latest seen L2 base fee
+	if block.BaseFee() != nil {
+		l2BaseFeeGauge.Update(block.BaseFee().Int64())
+	} else {
+		l2BaseFeeGauge.Update(0)
+	}
+
+	parent := bc.GetHeaderByHash(block.ParentHash())
+	// block.Time is guaranteed to be larger than parent.Time,
+	// and the time gap should fit into int64.
+	gap := int64(block.Time() - parent.Time)
+	headTimeGapGauge.Update(gap)
 
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
@@ -2269,4 +2285,9 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 	defer bc.chainmu.Unlock()
 	_, err := bc.hc.InsertHeaderChain(chain, start)
 	return 0, err
+}
+
+// Database gives access to the underlying database for convenience
+func (bc *BlockChain) Database() ethdb.Database {
+	return bc.db
 }

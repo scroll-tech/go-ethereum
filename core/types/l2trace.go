@@ -67,6 +67,8 @@ type ExecutionResult struct {
 	// If it is a contract call, the contract code is returned.
 	ByteCode   string          `json:"byteCode,omitempty"`
 	StructLogs []*StructLogRes `json:"structLogs"`
+	CallTrace  json.RawMessage `json:"callTrace"`
+	Prestate   json.RawMessage `json:"prestate"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a
@@ -146,20 +148,23 @@ type StorageWrapper struct {
 }
 
 type TransactionData struct {
-	Type     uint8           `json:"type"`
-	Nonce    uint64          `json:"nonce"`
-	TxHash   string          `json:"txHash"`
-	Gas      uint64          `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	From     common.Address  `json:"from"`
-	To       *common.Address `json:"to"`
-	ChainId  *hexutil.Big    `json:"chainId"`
-	Value    *hexutil.Big    `json:"value"`
-	Data     string          `json:"data"`
-	IsCreate bool            `json:"isCreate"`
-	V        *hexutil.Big    `json:"v"`
-	R        *hexutil.Big    `json:"r"`
-	S        *hexutil.Big    `json:"s"`
+	Type       uint8           `json:"type"`
+	Nonce      uint64          `json:"nonce"`
+	TxHash     string          `json:"txHash"`
+	Gas        uint64          `json:"gas"`
+	GasPrice   *hexutil.Big    `json:"gasPrice"`
+	GasTipCap  *hexutil.Big    `json:"gasTipCap"`
+	GasFeeCap  *hexutil.Big    `json:"gasFeeCap"`
+	From       common.Address  `json:"from"`
+	To         *common.Address `json:"to"`
+	ChainId    *hexutil.Big    `json:"chainId"`
+	Value      *hexutil.Big    `json:"value"`
+	Data       string          `json:"data"`
+	IsCreate   bool            `json:"isCreate"`
+	AccessList AccessList      `json:"accessList"`
+	V          *hexutil.Big    `json:"v"`
+	R          *hexutil.Big    `json:"r"`
+	S          *hexutil.Big    `json:"s"`
 }
 
 // NewTransactionData returns a transaction that will serialize to the trace
@@ -175,20 +180,23 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 	}
 
 	result := &TransactionData{
-		Type:     tx.Type(),
-		TxHash:   tx.Hash().String(),
-		Nonce:    nonce,
-		ChainId:  (*hexutil.Big)(tx.ChainId()),
-		From:     from,
-		Gas:      tx.Gas(),
-		GasPrice: (*hexutil.Big)(tx.GasPrice()),
-		To:       tx.To(),
-		Value:    (*hexutil.Big)(tx.Value()),
-		Data:     hexutil.Encode(tx.Data()),
-		IsCreate: tx.To() == nil,
-		V:        (*hexutil.Big)(v),
-		R:        (*hexutil.Big)(r),
-		S:        (*hexutil.Big)(s),
+		Type:       tx.Type(),
+		TxHash:     tx.Hash().String(),
+		Nonce:      nonce,
+		ChainId:    (*hexutil.Big)(tx.ChainId()),
+		From:       from,
+		Gas:        tx.Gas(),
+		GasPrice:   (*hexutil.Big)(tx.GasPrice()),
+		GasTipCap:  (*hexutil.Big)(tx.GasTipCap()),
+		GasFeeCap:  (*hexutil.Big)(tx.GasFeeCap()),
+		To:         tx.To(),
+		Value:      (*hexutil.Big)(tx.Value()),
+		Data:       hexutil.Encode(tx.Data()),
+		IsCreate:   tx.To() == nil,
+		AccessList: tx.AccessList(),
+		V:          (*hexutil.Big)(v),
+		R:          (*hexutil.Big)(r),
+		S:          (*hexutil.Big)(s),
 	}
 	return result
 }

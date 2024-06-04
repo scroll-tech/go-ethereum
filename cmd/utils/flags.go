@@ -73,6 +73,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/nat"
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -499,6 +500,11 @@ var (
 		Name:  "miner.storeskippedtxtraces",
 		Usage: "Store the wrapped traces when storing a skipped tx",
 	}
+	MinerMaxAccountsNumFlag = cli.IntFlag{
+		Name:  "miner.maxaccountsnum",
+		Usage: "Maximum number of accounts that miner will fetch the pending transactions of when building a new block",
+		Value: math.MaxInt,
+	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
 		Name:  "unlock",
@@ -728,6 +734,11 @@ var (
 		Name:  "gpo.ignoreprice",
 		Usage: "Gas price below which gpo will ignore transactions",
 		Value: ethconfig.Defaults.GPO.IgnorePrice.Int64(),
+	}
+	GpoCongestionThresholdFlag = cli.IntFlag{
+		Name:  "gpo.congestionthreshold",
+		Usage: "Number of pending transactions to consider the network congested and suggest a minimum tip cap",
+		Value: ethconfig.Defaults.GPO.CongestedThreshold,
 	}
 
 	// Metrics flags
@@ -1423,6 +1434,9 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config, light bool) {
 	if ctx.GlobalIsSet(GpoIgnoreGasPriceFlag.Name) {
 		cfg.IgnorePrice = big.NewInt(ctx.GlobalInt64(GpoIgnoreGasPriceFlag.Name))
 	}
+	if ctx.GlobalIsSet(GpoCongestionThresholdFlag.Name) {
+		cfg.CongestedThreshold = ctx.GlobalInt(GpoCongestionThresholdFlag.Name)
+	}
 }
 
 func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
@@ -1517,6 +1531,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.GlobalIsSet(MinerStoreSkippedTxTracesFlag.Name) {
 		cfg.StoreSkippedTxTraces = ctx.GlobalBool(MinerStoreSkippedTxTracesFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerMaxAccountsNumFlag.Name) {
+		cfg.MaxAccountsNum = ctx.GlobalInt(MinerMaxAccountsNumFlag.Name)
 	}
 	if ctx.GlobalIsSet(LegacyMinerGasTargetFlag.Name) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
@@ -1904,7 +1921,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 		if err != nil {
 			Fatalf("Failed to register the Ethereum service: %v", err)
 		}
-		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend))
+		scrollTracerWrapper := tracing.NewTracerWrapper()
+		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, scrollTracerWrapper))
 		return backend.ApiBackend, nil
 	}
 
@@ -1933,7 +1951,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 			Fatalf("Failed to create the LES server: %v", err)
 		}
 	}
-	stack.RegisterAPIs(tracers.APIs(backend.APIBackend))
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	stack.RegisterAPIs(tracers.APIs(backend.APIBackend, scrollTracerWrapper))
 	return backend.APIBackend, backend
 }
 
@@ -2130,7 +2149,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 
 	// TODO(rjl493456442) disable snapshot generation/wiping if the chain is read only.
 	// Disable transaction indexing/unindexing by default.
-	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg, nil, nil, false)
+	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg, nil, nil)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

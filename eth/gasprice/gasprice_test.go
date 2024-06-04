@@ -26,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/consensus/ethash"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
@@ -37,8 +38,9 @@ import (
 const testHead = 32
 
 type testBackend struct {
-	chain   *core.BlockChain
-	pending bool // pending block available
+	chain          *core.BlockChain
+	pending        bool // pending block available
+	pendingTxCount int
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
@@ -95,7 +97,11 @@ func (b *testBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) eve
 	return nil
 }
 
-func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBackend {
+func (b *testBackend) Stats() (int, int) {
+	return b.pendingTxCount, 0
+}
+
+func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool, pendingTxCount int) *testBackend {
 	var (
 		key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr   = crypto.PubkeyToAddress(key.PublicKey)
@@ -108,6 +114,11 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	)
 	config.LondonBlock = londonBlock
 	config.ArrowGlacierBlock = londonBlock
+	config.ArchimedesBlock = londonBlock
+	config.ShanghaiBlock = londonBlock
+	config.BernoulliBlock = londonBlock
+	config.CurieBlock = londonBlock
+	config.DescartesBlock = londonBlock
 	engine := ethash.NewFaker()
 	db := rawdb.NewMemoryDatabase()
 	genesis, err := gspec.Commit(db)
@@ -144,12 +155,12 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	// Construct testing chain
 	diskdb := rawdb.NewMemoryDatabase()
 	gspec.Commit(diskdb)
-	chain, err := core.NewBlockChain(diskdb, &core.CacheConfig{TrieCleanNoPrefetch: true}, &config, engine, vm.Config{}, nil, nil, false)
+	chain, err := core.NewBlockChain(diskdb, &core.CacheConfig{TrieCleanNoPrefetch: true}, &config, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create local chain, %v", err)
 	}
 	chain.InsertChain(blocks)
-	return &testBackend{chain: chain, pending: pending}
+	return &testBackend{chain: chain, pending: pending, pendingTxCount: pendingTxCount}
 }
 
 func (b *testBackend) CurrentHeader() *types.Header {
@@ -158,6 +169,10 @@ func (b *testBackend) CurrentHeader() *types.Header {
 
 func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
 	return b.chain.GetBlockByNumber(number)
+}
+
+func (b *testBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return nil, nil
 }
 
 func TestSuggestTipCap(t *testing.T) {
@@ -177,7 +192,67 @@ func TestSuggestTipCap(t *testing.T) {
 		{big.NewInt(33), big.NewInt(params.GWei * int64(30))}, // Fork point in the future
 	}
 	for _, c := range cases {
-		backend := newTestBackend(t, c.fork, false)
+		backend := newTestBackend(t, c.fork, false, 0)
+		oracle := NewOracle(backend, config)
+
+		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G
+		got, err := oracle.SuggestTipCap(context.Background())
+		if err != nil {
+			t.Fatalf("Failed to retrieve recommended gas price: %v", err)
+		}
+		if got.Cmp(c.expect) != 0 {
+			t.Fatalf("Gas price mismatch, want %d, got %d", c.expect, got)
+		}
+	}
+}
+
+func TestSuggestTipCapCongestedThreshold(t *testing.T) {
+	expectedDefaultBasePricePreCurie := big.NewInt(2000)
+	expectedDefaultBasePricePostCurie := big.NewInt(1)
+
+	config := Config{
+		Blocks:             3,
+		Percentile:         60,
+		Default:            big.NewInt(params.GWei),
+		CongestedThreshold: 50,
+		DefaultBasePrice:   expectedDefaultBasePricePreCurie,
+	}
+	var cases = []struct {
+		fork      *big.Int // London fork number
+		pendingTx int      // Number of pending transactions in the mempool
+		expect    *big.Int // Expected gasprice suggestion
+	}{
+		{nil, 0, expectedDefaultBasePricePreCurie},      // No congestion - default base price
+		{nil, 49, expectedDefaultBasePricePreCurie},     // No congestion - default base price
+		{nil, 50, big.NewInt(params.GWei * int64(30))},  // Congestion - normal behavior
+		{nil, 100, big.NewInt(params.GWei * int64(30))}, // Congestion - normal behavior
+
+		// Fork point in genesis
+		{big.NewInt(0), 0, expectedDefaultBasePricePostCurie},     // No congestion - default base price
+		{big.NewInt(0), 49, expectedDefaultBasePricePostCurie},    // No congestion - default base price
+		{big.NewInt(0), 50, big.NewInt(params.GWei * int64(30))},  // Congestion - normal behavior
+		{big.NewInt(0), 100, big.NewInt(params.GWei * int64(30))}, // Congestion - normal behavior
+
+		// Fork point in first block
+		{big.NewInt(1), 0, expectedDefaultBasePricePostCurie},     // No congestion - default base price
+		{big.NewInt(1), 49, expectedDefaultBasePricePostCurie},    // No congestion - default base price
+		{big.NewInt(1), 50, big.NewInt(params.GWei * int64(30))},  // Congestion - normal behavior
+		{big.NewInt(1), 100, big.NewInt(params.GWei * int64(30))}, // Congestion - normal behavior
+
+		// Fork point in last block
+		{big.NewInt(32), 0, expectedDefaultBasePricePostCurie},     // No congestion - default base price
+		{big.NewInt(32), 49, expectedDefaultBasePricePostCurie},    // No congestion - default base price
+		{big.NewInt(32), 50, big.NewInt(params.GWei * int64(30))},  // Congestion - normal behavior
+		{big.NewInt(32), 100, big.NewInt(params.GWei * int64(30))}, // Congestion - normal behavior
+
+		// Fork point in the future
+		{big.NewInt(33), 0, expectedDefaultBasePricePreCurie},      // No congestion - default base price
+		{big.NewInt(33), 49, expectedDefaultBasePricePreCurie},     // No congestion - default base price
+		{big.NewInt(33), 50, big.NewInt(params.GWei * int64(30))},  // Congestion - normal behavior
+		{big.NewInt(33), 100, big.NewInt(params.GWei * int64(30))}, // Congestion - normal behavior
+	}
+	for _, c := range cases {
+		backend := newTestBackend(t, c.fork, false, c.pendingTx)
 		oracle := NewOracle(backend, config)
 
 		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G

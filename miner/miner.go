@@ -58,6 +58,7 @@ type Config struct {
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
 
 	StoreSkippedTxTraces bool // Whether store the wrapped traces when storing a skipped tx
+	MaxAccountsNum       int  // Maximum number of accounts that miner will fetch the pending transactions of when building a new block
 }
 
 // Miner creates blocks and searches for proof-of-work values.
@@ -185,11 +186,6 @@ func (miner *Miner) SetExtra(extra []byte) error {
 	}
 	miner.worker.setExtra(extra)
 	return nil
-}
-
-// SetRecommitInterval sets the interval for sealing work resubmitting.
-func (miner *Miner) SetRecommitInterval(interval time.Duration) {
-	miner.worker.setRecommitInterval(interval)
 }
 
 // Pending returns the currently pending block and associated state.

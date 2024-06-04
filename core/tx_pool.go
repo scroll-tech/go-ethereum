@@ -131,19 +131,6 @@ var (
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
 )
 
-var (
-	addrsPool = sync.Pool{
-		New: func() interface{} {
-			return make([]common.Address, 0, 8)
-		},
-	}
-	addrBeatPool = sync.Pool{
-		New: func() interface{} {
-			return make(addressesByHeartbeat, 0, 8)
-		},
-	}
-)
-
 // TxStatus is the current status of a transaction as seen by the pool.
 type TxStatus uint
 
@@ -261,6 +248,7 @@ type TxPool struct {
 	shanghai bool // Fork indicator whether we are in the Shanghai stage.
 
 	currentState  *state.StateDB // Current state in the blockchain head
+	currentHead   *big.Int       // Current blockchain head
 	pendingNonces *txNoncer      // Pending state tracking virtual nonces
 	currentMaxGas uint64         // Current gas limit for transaction caps
 
@@ -282,8 +270,6 @@ type TxPool struct {
 	reorgShutdownCh chan struct{}  // requests shutdown of scheduleReorgLoop
 	wg              sync.WaitGroup // tracks loop, scheduleReorgLoop
 	initDoneCh      chan struct{}  // is closed once the pool is initialized (for tests)
-
-	spammers *prque.Prque
 
 	changesSinceReorg int // A counter for how many drops we've performed in-between reorg.
 }
@@ -316,7 +302,6 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		reorgShutdownCh: make(chan struct{}),
 		initDoneCh:      make(chan struct{}),
 		gasPrice:        new(big.Int).SetUint64(config.PriceLimit),
-		spammers:        prque.New(nil),
 	}
 	pool.locals = newAccountSet(pool.signer)
 	for _, addr := range config.Locals {
@@ -553,6 +538,16 @@ func (pool *TxPool) ContentFrom(addr common.Address) (types.Transactions, types.
 // transactions and only return those whose **effective** tip is large enough in
 // the next pending execution environment.
 func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transactions {
+	return pool.pendingWithMax(enforceTips, math.MaxInt)
+}
+
+// PendingWithMax works similar to Pending but allows setting an upper limit on how many
+// accounts to return
+func (pool *TxPool) PendingWithMax(enforceTips bool, maxAccountsNum int) map[common.Address]types.Transactions {
+	return pool.pendingWithMax(enforceTips, maxAccountsNum)
+}
+
+func (pool *TxPool) pendingWithMax(enforceTips bool, maxAccountsNum int) map[common.Address]types.Transactions {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
@@ -571,6 +566,9 @@ func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transacti
 		}
 		if len(txs) > 0 {
 			pending[addr] = txs
+			if len(pending) >= maxAccountsNum {
+				break
+			}
 		}
 	}
 	return pending
@@ -658,10 +656,24 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
 		return ErrNonceTooLow
 	}
+	// 1. Check balance >= transaction cost (V + GP * GL) to maintain compatibility with the logic without considering L1 data fee.
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
 	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
+	}
+	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.
+	if pool.chainconfig.Scroll.FeeVaultEnabled() {
+		// Get L1 data fee in current state
+		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+		if err != nil {
+			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+		}
+		// Transactor should have enough funds to cover the costs
+		// cost == L1 data fee + V + GP * GL
+		if b := pool.currentState.GetBalance(from); b.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0 {
+			return errors.New("invalid transaction: insufficient funds for l1fee + gas * price + value")
+		}
 	}
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul, pool.shanghai)
@@ -692,14 +704,6 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	// Make the local flag. If it's from local source or it's from the network but
 	// the sender is marked as local previously, treat it as the local transaction.
 	isLocal := local || pool.locals.containsTx(tx)
-
-	if pool.chainconfig.Scroll.FeeVaultEnabled() {
-		if err := fees.VerifyFee(pool.signer, tx, pool.currentState); err != nil {
-			log.Trace("Discarding insufficient l1DataFee transaction", "hash", hash, "err", err)
-			invalidTxMeter.Mark(1)
-			return false, err
-		}
-	}
 
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, isLocal); err != nil {
@@ -748,7 +752,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	from, _ := types.Sender(pool.signer, tx) // already validated
 	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
 		// Nonce already pending, check if required price bump is met
-		inserted, old := list.Add(tx, pool.config.PriceBump)
+		inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
 		if !inserted {
 			pendingDiscardMeter.Mark(1)
 			return false, ErrReplaceUnderpriced
@@ -798,7 +802,8 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 	if pool.queue[from] == nil {
 		pool.queue[from] = newTxList(false)
 	}
-	inserted, old := pool.queue[from].Add(tx, pool.config.PriceBump)
+
+	inserted, old := pool.queue[from].Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
 	if !inserted {
 		// An older transaction was better, discard this
 		queuedDiscardMeter.Mark(1)
@@ -852,7 +857,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	}
 	list := pool.pending[addr]
 
-	inserted, old := list.Add(tx, pool.config.PriceBump)
+	inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
 	if !inserted {
 		// An older transaction was better, discard this
 		pool.all.Remove(hash)
@@ -1211,22 +1216,22 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			}
 		}
 		// Reset needs promote for all addresses
-		promoteAddrs = addrsPool.Get().([]common.Address)
+		promoteAddrs = make([]common.Address, 0, len(pool.queue))
 		for addr := range pool.queue {
 			promoteAddrs = append(promoteAddrs, addr)
 		}
 	}
 	// Check for pending transactions for every account that sent new ones
 	promoted := pool.promoteExecutables(promoteAddrs)
-	defer addrsPool.Put(promoteAddrs[:0])
 
 	// If a new block appeared, validate the pool of pending transactions. This will
 	// remove any transaction that has been included in the block or was invalidated
 	// because of another transaction (e.g. higher gas price).
 	if reset != nil {
 		pool.demoteUnexecutables()
-		if reset.newHead != nil && pool.chainconfig.IsLondon(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
-			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead)
+		if reset.newHead != nil && pool.chainconfig.IsCurie(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
+			l1BaseFee := fees.GetL1BaseFee(pool.currentState)
+			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead, l1BaseFee)
 			pool.priced.SetBaseFee(pendingBaseFee)
 		}
 		// Update all accounts to the latest known pending nonce
@@ -1350,9 +1355,12 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
 	pool.istanbul = pool.chainconfig.IsIstanbul(next)
 
-	pool.eip2718 = pool.chainconfig.Scroll.EnableEIP2718 && pool.chainconfig.IsBerlin(next)
-	pool.eip1559 = pool.chainconfig.Scroll.EnableEIP1559 && pool.chainconfig.IsLondon(next)
+	pool.eip2718 = pool.chainconfig.IsCurie(next)
+	pool.eip1559 = pool.chainconfig.IsCurie(next)
 	pool.shanghai = pool.chainconfig.IsShanghai(next)
+
+	// Update current head
+	pool.currentHead = next
 }
 
 // promoteExecutables moves transactions that have become processable from the
@@ -1375,8 +1383,10 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 			pool.all.Remove(hash)
 		}
 		log.Trace("Removed old queued transactions", "count", len(forwards))
+
 		// Drop all transactions that are too costly (low balance or out of gas)
-		drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
+		costLimit := pool.currentState.GetBalance(addr)
+		drops, _ := list.FilterF(costLimit, pool.currentMaxGas, pool.executableTxFilter(costLimit))
 		for _, tx := range drops {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
@@ -1421,6 +1431,26 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 	return promoted
 }
 
+func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transaction) bool {
+	return func(tx *types.Transaction) bool {
+		if tx.Gas() > pool.currentMaxGas || tx.Cost().Cmp(costLimit) > 0 {
+			return true
+		}
+
+		if pool.chainconfig.Scroll.FeeVaultEnabled() {
+			// recheck L1 data fee, as the oracle price may have changed
+			l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+			if err != nil {
+				log.Error("Failed to calculate L1 data fee", "err", err, "tx", tx)
+				return false
+			}
+			return costLimit.Cmp(new(big.Int).Add(tx.Cost(), l1DataFee)) < 0
+		}
+
+		return false
+	}
+}
+
 // truncatePending removes transactions from the pending queue if the pool is above the
 // pending limit. The algorithm tries to reduce transaction counts by an approximately
 // equal number for all for accounts with many pending transactions.
@@ -1435,19 +1465,18 @@ func (pool *TxPool) truncatePending() {
 
 	pendingBeforeCap := pending
 	// Assemble a spam order to penalize large transactors first
-	pool.spammers.Reset()
+	spammers := prque.New(nil)
 	for addr, list := range pool.pending {
 		// Only evict transactions from high rollers
 		if !pool.locals.contains(addr) && uint64(list.Len()) > pool.config.AccountSlots {
-			pool.spammers.Push(addr, int64(list.Len()))
+			spammers.Push(addr, int64(list.Len()))
 		}
 	}
 	// Gradually drop transactions from offenders
-	offenders := addrsPool.Get().([]common.Address)
-	defer addrsPool.Put(offenders[:0])
-	for pending > pool.config.GlobalSlots && !pool.spammers.Empty() {
+	offenders := []common.Address{}
+	for pending > pool.config.GlobalSlots && !spammers.Empty() {
 		// Retrieve the next offender if not local address
-		offender, _ := pool.spammers.Pop()
+		offender, _ := spammers.Pop()
 		offenders = append(offenders, offender.(common.Address))
 
 		// Equalize balances until all the same or below threshold
@@ -1520,8 +1549,7 @@ func (pool *TxPool) truncateQueue() {
 	}
 
 	// Sort all accounts with queued transactions by heartbeat
-	addresses := addrBeatPool.Get().(addressesByHeartbeat)
-	defer addrBeatPool.Put(addresses[:0])
+	addresses := make(addressesByHeartbeat, 0, len(pool.queue))
 	for addr := range pool.queue {
 		if !pool.locals.contains(addr) { // don't drop locals
 			addresses = append(addresses, addressByHeartbeat{addr, pool.beats[addr]})
@@ -1575,7 +1603,8 @@ func (pool *TxPool) demoteUnexecutables() {
 			log.Trace("Removed old pending transaction", "hash", hash)
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
-		drops, invalids := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
+		costLimit := pool.currentState.GetBalance(addr)
+		drops, invalids := list.FilterF(costLimit, pool.currentMaxGas, pool.executableTxFilter(costLimit))
 		for _, tx := range drops {
 			hash := tx.Hash()
 			log.Trace("Removed unpayable pending transaction", "hash", hash)
@@ -1670,10 +1699,7 @@ func (as *accountSet) containsTx(tx *types.Transaction) bool {
 // add inserts a new address into the set to track.
 func (as *accountSet) add(addr common.Address) {
 	as.accounts[addr] = struct{}{}
-	if as.cache != nil {
-		addrsPool.Put((*as.cache)[:0])
-		as.cache = nil
-	}
+	as.cache = nil
 }
 
 // addTx adds the sender of tx into the set.
@@ -1687,7 +1713,7 @@ func (as *accountSet) addTx(tx *types.Transaction) {
 // reuse. The returned slice should not be changed!
 func (as *accountSet) flatten() []common.Address {
 	if as.cache == nil {
-		accounts := addrsPool.Get().([]common.Address)
+		accounts := make([]common.Address, 0, len(as.accounts))
 		for account := range as.accounts {
 			accounts = append(accounts, account)
 		}
@@ -1701,10 +1727,7 @@ func (as *accountSet) merge(other *accountSet) {
 	for addr := range other.accounts {
 		as.accounts[addr] = struct{}{}
 	}
-	if as.cache != nil {
-		addrsPool.Put((*as.cache)[:0])
-		as.cache = nil
-	}
+	as.cache = nil
 }
 
 // txLookup is used internally by TxPool to track transactions while allowing

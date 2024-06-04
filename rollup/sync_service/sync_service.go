@@ -11,6 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -33,6 +34,10 @@ const (
 	// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
 	// this secion.
 	DbWriteThresholdBlocks = 1000
+)
+
+var (
+	l1MessageTotalCounter = metrics.NewRegisteredCounter("rollup/l1/message", nil)
 )
 
 // SyncService collects all L1 messages and stores them in a local database.
@@ -149,6 +154,9 @@ func (s *SyncService) fetchMessages() {
 
 	log.Trace("Sync service fetchMessages", "latestProcessedBlock", s.latestProcessedBlock, "latestConfirmed", latestConfirmed)
 
+	// keep track of next queue index we're expecting to see
+	queueIndex := rawdb.ReadHighestSyncedQueueIndex(s.db)
+
 	batchWriter := s.db.NewBatch()
 	numBlocksPendingDbWrite := uint64(0)
 	numMessagesPendingDbWrite := 0
@@ -169,6 +177,7 @@ func (s *SyncService) fetchMessages() {
 		numBlocksPendingDbWrite = 0
 
 		if numMessagesPendingDbWrite > 0 {
+			l1MessageTotalCounter.Inc(int64(numMessagesPendingDbWrite))
 			s.msgCountFeed.Send(core.NewL1MsgsEvent{Count: numMessagesPendingDbWrite})
 			numMessagesPendingDbWrite = 0
 		}
@@ -216,7 +225,18 @@ func (s *SyncService) fetchMessages() {
 			numMsgsCollected += len(msgs)
 		}
 
-		numBlocksPendingDbWrite += to - from
+		for _, msg := range msgs {
+			if msg.QueueIndex > 0 {
+				queueIndex++
+			}
+			// check if received queue index matches expected queue index
+			if msg.QueueIndex != queueIndex {
+				log.Error("Unexpected queue index in SyncService", "expected", queueIndex, "got", msg.QueueIndex, "msg", msg)
+				return // do not flush inconsistent data to disk
+			}
+		}
+
+		numBlocksPendingDbWrite += to - from + 1
 		numMessagesPendingDbWrite += len(msgs)
 
 		// flush new messages to database periodically

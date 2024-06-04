@@ -148,6 +148,10 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		chainConfig.DAOForkBlock.Cmp(new(big.Int).SetUint64(pre.Env.Number)) == 0 {
 		misc.ApplyDAOHardFork(statedb)
 	}
+	// Apply Curie hard fork
+	if chainConfig.CurieBlock != nil && chainConfig.CurieBlock.Cmp(new(big.Int).SetUint64(pre.Env.Number)) == 0 {
+		misc.ApplyCurieHardFork(statedb)
+	}
 
 	for i, tx := range txs {
 		msg, err := tx.AsMessage(signer, pre.Env.BaseFee)
@@ -162,12 +166,12 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		}
 		vmConfig.Tracer = tracer
 		vmConfig.Debug = (tracer != nil)
-		statedb.Prepare(tx.Hash(), txIndex)
+		statedb.SetTxContext(tx.Hash(), txIndex)
 		txContext := core.NewEVMTxContext(msg)
 		snapshot := statedb.Snapshot()
 		evm := vm.NewEVM(vmContext, txContext, statedb, chainConfig, vmConfig)
 
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, chainConfig, new(big.Int).SetUint64(pre.Env.Number))
 		if err != nil {
 			log.Info("rejected tx due to fees.CalculateL1DataFee", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)
 			rejectedTxs = append(rejectedTxs, &rejectedTx{i, err.Error()})

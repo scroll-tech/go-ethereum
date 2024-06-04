@@ -79,7 +79,7 @@ type SimulatedBackend struct {
 func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.GenesisAlloc, gasLimit uint64) *SimulatedBackend {
 	genesis := core.Genesis{Config: params.AllEthashProtocolChanges, GasLimit: gasLimit, Alloc: alloc}
 	genesis.MustCommit(database)
-	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{}, nil, nil, false)
+	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{}, nil, nil)
 
 	backend := &SimulatedBackend{
 		database:   database,
@@ -590,7 +590,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
 	head := b.blockchain.CurrentHeader()
-	if !b.blockchain.Config().IsLondon(head.Number) {
+	if !b.blockchain.Config().IsCurie(head.Number) {
 		// If there's no basefee, then it must be a non-1559 execution
 		if call.GasPrice == nil {
 			call.GasPrice = new(big.Int)
@@ -640,7 +640,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	vmEnv := vm.NewEVM(evmContext, txContext, stateDB, b.config, vm.Config{NoBaseFee: true})
 	gasPool := new(core.GasPool).AddGas(math.MaxUint64)
 	signer := types.MakeSigner(b.blockchain.Config(), head.Number)
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, head.BaseFee, b.blockchain.Config().ChainID, signer, stateDB)
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, head.BaseFee, b.blockchain.Config(), signer, stateDB, head.Number)
 	if err != nil {
 		return nil, err
 	}

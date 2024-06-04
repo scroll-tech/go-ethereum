@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	cmath "github.com/scroll-tech/go-ethereum/common/math"
@@ -27,10 +28,16 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
 var emptyKeccakCodeHash = codehash.EmptyKeccakCodeHash
+
+var (
+	stateTransitionEvmCallExecutionTimer = metrics.NewRegisteredTimer("state/transition/call_execution", nil)
+	stateTransitionApplyMessageTimer     = metrics.NewRegisteredTimer("state/transition/apply_message", nil)
+)
 
 /*
 The State Transitioning Model
@@ -204,6 +211,10 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.In
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, l1DataFee *big.Int) (*ExecutionResult, error) {
+	defer func(t time.Time) {
+		stateTransitionApplyMessageTimer.Update(time.Since(t))
+	}(time.Now())
+
 	return NewStateTransition(evm, msg, gp, l1DataFee).TransitionDb()
 }
 
@@ -284,6 +295,7 @@ func (st *StateTransition) preCheck() error {
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
+	// Note: Logically, this should be `IsCurie`, but we keep `IsLondon` to ensure backward compatibility.
 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 		if !st.evm.Config.NoBaseFee || st.gasFeeCap.BitLen() > 0 || st.gasTipCap.BitLen() > 0 {
@@ -369,11 +381,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if rules.IsShanghai && contractCreation && len(st.data) > params.MaxInitCodeSize {
 		return nil, fmt.Errorf("%w: code size %v limit %v", ErrMaxInitCodeSizeExceeded, len(st.data), params.MaxInitCodeSize)
 	}
-
-	// Set up the initial access list.
-	if rules.IsBerlin {
-		st.state.PrepareAccessList(rules, msg.From(), st.evm.Context.Coinbase, msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
-	}
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin)
+	// - reset transient storage(eip 1153)
+	st.state.Prepare(rules, msg.From(), st.evm.Context.Coinbase, msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 
 	var (
 		ret   []byte
@@ -384,7 +395,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		evmCallStart := time.Now()
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		stateTransitionEvmCallExecutionTimer.Update(time.Since(evmCallStart))
 	}
 
 	// no refunds for l1 messages
@@ -405,12 +418,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
 	effectiveTip := st.gasPrice
-	if rules.IsLondon {
-		if st.evm.Context.BaseFee != nil {
-			effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
-		} else {
-			effectiveTip = cmath.BigMin(st.gasTipCap, st.gasFeeCap)
-		}
+
+	// only burn the base fee if the fee vault is not enabled
+	if rules.IsCurie && !st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
+		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
 	}
 
 	// The L2 Fee is the same as the fee that is charged in the normal geth

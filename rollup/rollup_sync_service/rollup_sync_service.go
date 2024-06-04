@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"syscall"
 	"time"
+
+	"github.com/scroll-tech/da-codec/encoding"
+	"github.com/scroll-tech/da-codec/encoding/codecv0"
+	"github.com/scroll-tech/da-codec/encoding/codecv1"
+	"github.com/scroll-tech/da-codec/encoding/codecv2"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -16,6 +20,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
@@ -54,9 +59,10 @@ type RollupSyncService struct {
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 	bc                            *core.BlockChain
+	stack                         *node.Node
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, l1DeploymentBlock uint64) (*RollupSyncService, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, stack *node.Node) (*RollupSyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -80,8 +86,8 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 	// Initialize the latestProcessedBlock with the block just before the L1 deployment block.
 	// This serves as a default value when there's no L1 rollup events synced in the database.
 	var latestProcessedBlock uint64
-	if l1DeploymentBlock > 0 {
-		latestProcessedBlock = l1DeploymentBlock - 1
+	if stack.Config().L1DeploymentBlock > 0 {
+		latestProcessedBlock = stack.Config().L1DeploymentBlock - 1
 	}
 
 	block := rawdb.ReadRollupEventSyncedL1BlockNumber(db)
@@ -103,6 +109,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
 		l1FinalizeBatchEventSignature: scrollChainABI.Events["FinalizeBatch"].ID,
 		bc:                            bc,
+		stack:                         stack,
 	}
 
 	return &service, nil
@@ -148,7 +155,7 @@ func (s *RollupSyncService) Stop() {
 }
 
 func (s *RollupSyncService) fetchRollupEvents() {
-	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber(s.ctx)
+	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber()
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)
 		return
@@ -168,7 +175,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 			to = latestConfirmed
 		}
 
-		logs, err := s.client.fetchRollupEventsInRange(s.ctx, from, to)
+		logs, err := s.client.fetchRollupEventsInRange(from, to)
 		if err != nil {
 			log.Error("failed to fetch rollup events in range", "from block", from, "to block", to, "err", err)
 			return
@@ -223,7 +230,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks)
+			endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
 			if err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 			}
@@ -247,7 +254,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 	return nil
 }
 
-func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
+func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*encoding.Chunk, error) {
 	chunkBlockRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
 	if len(chunkBlockRanges) == 0 {
 		return nil, nil, fmt.Errorf("failed to get batch chunk ranges, empty chunk block ranges")
@@ -275,21 +282,21 @@ func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.Fina
 		return nil, nil, fmt.Errorf("local node is not synced up to the required block height: %v, local synced block height: %v", endBlockNumber, localSyncedBlockHeight)
 	}
 
-	chunks := make([]*Chunk, len(chunkBlockRanges))
+	chunks := make([]*encoding.Chunk, len(chunkBlockRanges))
 	for i, cr := range chunkBlockRanges {
-		chunks[i] = &Chunk{Blocks: make([]*WrappedBlock, cr.EndBlockNumber-cr.StartBlockNumber+1)}
+		chunks[i] = &encoding.Chunk{Blocks: make([]*encoding.Block, cr.EndBlockNumber-cr.StartBlockNumber+1)}
 		for j := cr.StartBlockNumber; j <= cr.EndBlockNumber; j++ {
 			block := s.bc.GetBlockByNumber(j)
 			if block == nil {
 				return nil, nil, fmt.Errorf("failed to get block by number: %v", i)
 			}
-			txData := txsToTxsData(block.Transactions())
+			txData := encoding.TxsToTxsData(block.Transactions())
 			state, err := s.bc.StateAt(block.Root())
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get block state, block: %v, err: %w", block.Hash().Hex(), err)
 			}
 			withdrawRoot := withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, state)
-			chunks[i].Blocks[j-cr.StartBlockNumber] = &WrappedBlock{
+			chunks[i].Blocks[j-cr.StartBlockNumber] = &encoding.Block{
 				Header:       block.Header(),
 				Transactions: txData,
 				WithdrawRoot: withdrawRoot,
@@ -318,6 +325,10 @@ func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) (
 		block, err := s.client.client.BlockByHash(s.ctx, vLog.BlockHash)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
+		}
+
+		if block == nil {
+			return nil, fmt.Errorf("failed to get block by hash, block not found, block number: %v, block hash: %v", vLog.BlockNumber, vLog.BlockHash.Hex())
 		}
 
 		found := false
@@ -360,22 +371,17 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 		SkippedL1MessageBitmap []byte
 	}
 	var args commitBatchArgs
-	err = method.Inputs.Copy(&args, values)
-	if err != nil {
+	if err = method.Inputs.Copy(&args, values); err != nil {
 		return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 	}
 
-	if args.Version != batchHeaderVersion {
-		return nil, fmt.Errorf("unexpected batch version, expected: %v, got: %v", batchHeaderVersion, args.Version)
-	}
-
-	return DecodeChunkBlockRanges(args.Chunks)
+	return decodeBlockRangesFromEncodedChunks(encoding.CodecVersion(args.Version), args.Chunks)
 }
 
 // validateBatch verifies the consistency between the L1 contract and L2 node data.
 // The function will terminate the node and exit if any consistency check fails.
 // It returns the number of the end block, a finalized batch meta data, and an error if any.
-func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) (uint64, *rawdb.FinalizedBatchMeta, error) {
+func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
 		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", event.BatchIndex.Uint64())
 	}
@@ -395,26 +401,48 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	localStateRoot := endBlock.Header.Root
 	if localStateRoot != event.StateRoot {
 		log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
-		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return 0, nil, fmt.Errorf("state root mismatch")
+		stack.Close()
+		os.Exit(1)
 	}
 
 	localWithdrawRoot := endBlock.WithdrawRoot
 	if localWithdrawRoot != event.WithdrawRoot {
 		log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
-		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return 0, nil, fmt.Errorf("withdraw root mismatch")
+		stack.Close()
+		os.Exit(1)
 	}
 
-	// Note: All params for NewBatchHeader are calculated locally based on the block data.
-	batchHeader, err := NewBatchHeader(batchHeaderVersion, event.BatchIndex.Uint64(), parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to construct batch header, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+	// Note: All params of batch are calculated locally based on the block data.
+	batch := &encoding.Batch{
+		Index:                      event.BatchIndex.Uint64(),
+		TotalL1MessagePoppedBefore: parentBatchMeta.TotalL1MessagePopped,
+		ParentBatchHash:            parentBatchMeta.BatchHash,
+		Chunks:                     chunks,
+	}
+
+	var localBatchHash common.Hash
+	if startBlock.Header.Number.Uint64() == 0 || !chainCfg.IsBernoulli(startBlock.Header.Number) { // codecv0: genesis batch or batches before Bernoulli
+		daBatch, err := codecv0.NewDABatch(batch)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to create codecv0 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+		}
+		localBatchHash = daBatch.Hash()
+	} else if !chainCfg.IsCurie(startBlock.Header.Number) { // codecv1: batches after Bernoulli and before Curie
+		daBatch, err := codecv1.NewDABatch(batch)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+		}
+		localBatchHash = daBatch.Hash()
+	} else { // codecv2: batches after Curie
+		daBatch, err := codecv2.NewDABatch(batch)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+		}
+		localBatchHash = daBatch.Hash()
 	}
 
 	// Note: If the batch headers match, this ensures the consistency of blocks and transactions
 	// (including skipped transactions) between L1 and L2.
-	localBatchHash := batchHeader.Hash()
 	if localBatchHash != event.BatchHash {
 		log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
 		chunksJson, err := json.Marshal(chunks)
@@ -422,8 +450,8 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 			log.Error("marshal chunks failed", "err", err)
 		}
 		log.Error("Chunks", "chunks", string(chunksJson))
-		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return 0, nil, fmt.Errorf("batch hash mismatch")
+		stack.Close()
+		os.Exit(1)
 	}
 
 	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
@@ -437,4 +465,76 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		WithdrawRoot:         localWithdrawRoot,
 	}
 	return endBlock.Header.Number.Uint64(), finalizedBatchMeta, nil
+}
+
+// decodeBlockRangesFromEncodedChunks decodes the provided chunks into a list of block ranges.
+func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
+	var chunkBlockRanges []*rawdb.ChunkBlockRange
+	for _, chunk := range chunks {
+		if len(chunk) < 1 {
+			return nil, fmt.Errorf("invalid chunk, length is less than 1")
+		}
+
+		numBlocks := int(chunk[0])
+
+		switch codecVersion {
+		case encoding.CodecV0:
+			if len(chunk) < 1+numBlocks*60 {
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
+			}
+			daBlocks := make([]*codecv0.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlocks[i] = &codecv0.DABlock{}
+				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
+					return nil, err
+				}
+			}
+
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
+		case encoding.CodecV1:
+			if len(chunk) != 1+numBlocks*60 {
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
+			}
+			daBlocks := make([]*codecv1.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlocks[i] = &codecv1.DABlock{}
+				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
+					return nil, err
+				}
+			}
+
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
+		case encoding.CodecV2:
+			if len(chunk) != 1+numBlocks*60 {
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
+			}
+			daBlocks := make([]*codecv2.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlocks[i] = &codecv2.DABlock{}
+				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
+					return nil, err
+				}
+			}
+
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
+		default:
+			return nil, fmt.Errorf("unexpected batch version %v", codecVersion)
+		}
+	}
+	return chunkBlockRanges, nil
 }

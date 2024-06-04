@@ -24,7 +24,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -89,11 +88,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 
 	if block.Number().Uint64() == 6 {
-		log.Info("signer", "block", block.Number(), "IsCurie", p.config.IsCurie(block.Number()))
-		log.Info("signer", "block", block.Number(), "IsCancun", p.config.IsCancun(block.Number(), block.Time()))
-		log.Info("signer", "block", block.Number(), "IsLondon", p.config.IsLondon(block.Number()))
-		log.Info("signer", "block", block.Number(), "IsBerlin", p.config.IsBerlin(block.Number()))
-		log.Info("signer", "block", block.Number(), "gp", gp)
+		// log.Info("signer", "block", block.Number(), "IsCurie", p.config.IsCurie(block.Number()))
+		// log.Info("signer", "block", block.Number(), "IsCancun", p.config.IsCancun(block.Number(), block.Time()))
+		// log.Info("signer", "block", block.Number(), "IsLondon", p.config.IsLondon(block.Number()))
+		// log.Info("signer", "block", block.Number(), "IsBerlin", p.config.IsBerlin(block.Number()))
+		// log.Info("signer", "block", block.Number(), "gp", gp)
 	}
 
 	// Iterate over and process the individual transactions
@@ -147,27 +146,27 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		// }
 
 		if params.Debug {
-			log.Info("tx", "i", i, "tx.AccessList()", tx.AccessList())
-			log.Info("tx", "i", i, "tx.BlobGas()", tx.BlobGas())
-			log.Info("tx", "i", i, "tx.BlobGasFeeCap()", tx.BlobGasFeeCap())
-			log.Info("tx", "i", i, "tx.BlobHashes()", tx.BlobHashes())
-			log.Info("tx", "i", i, "tx.BlobTxSidecar()", tx.BlobTxSidecar())
-			log.Info("tx", "i", i, "tx.ChainId()", tx.ChainId())
-			log.Info("tx", "i", i, "tx.Cost()", tx.Cost())
-			log.Info("tx", "i", i, "tx.Data()", hexutil.Encode(tx.Data()))
-			log.Info("tx", "i", i, "tx.Gas()", tx.Gas())
-			log.Info("tx", "i", i, "tx.GasFeeCap()", tx.GasFeeCap())
-			log.Info("tx", "i", i, "tx.GasPrice()", tx.GasPrice())
-			log.Info("tx", "i", i, "tx.GasTipCap()", tx.GasTipCap())
-			log.Info("tx", "i", i, "tx.Hash()", tx.Hash().Hex())
-			log.Info("tx", "i", i, "tx.IsL1MessageTx()", tx.IsL1MessageTx())
-			log.Info("tx", "i", i, "tx.Nonce()", tx.Nonce())
-			log.Info("tx", "i", i, "tx.Protected()", tx.Protected())
-			log.Info("tx", "i", i, "tx.Size()", tx.Size())
-			log.Info("tx", "i", i, "tx.Time()", tx.Time())
-			log.Info("tx", "i", i, "tx.To()", tx.To())
-			log.Info("tx", "i", i, "tx.Type()", tx.Type())
-			log.Info("tx", "i", i, "tx.Value()", tx.Value())
+			// log.Info("tx", "i", i, "tx.AccessList()", tx.AccessList())
+			// log.Info("tx", "i", i, "tx.BlobGas()", tx.BlobGas())
+			// log.Info("tx", "i", i, "tx.BlobGasFeeCap()", tx.BlobGasFeeCap())
+			// log.Info("tx", "i", i, "tx.BlobHashes()", tx.BlobHashes())
+			// log.Info("tx", "i", i, "tx.BlobTxSidecar()", tx.BlobTxSidecar())
+			// log.Info("tx", "i", i, "tx.ChainId()", tx.ChainId())
+			// log.Info("tx", "i", i, "tx.Cost()", tx.Cost())
+			// log.Info("tx", "i", i, "tx.Data()", hexutil.Encode(tx.Data()))
+			// log.Info("tx", "i", i, "tx.Gas()", tx.Gas())
+			// log.Info("tx", "i", i, "tx.GasFeeCap()", tx.GasFeeCap())
+			// log.Info("tx", "i", i, "tx.GasPrice()", tx.GasPrice())
+			// log.Info("tx", "i", i, "tx.GasTipCap()", tx.GasTipCap())
+			// log.Info("tx", "i", i, "tx.Hash()", tx.Hash().Hex())
+			// log.Info("tx", "i", i, "tx.IsL1MessageTx()", tx.IsL1MessageTx())
+			// log.Info("tx", "i", i, "tx.Nonce()", tx.Nonce())
+			// log.Info("tx", "i", i, "tx.Protected()", tx.Protected())
+			// log.Info("tx", "i", i, "tx.Size()", tx.Size())
+			// log.Info("tx", "i", i, "tx.Time()", tx.Time())
+			// log.Info("tx", "i", i, "tx.To()", tx.To())
+			// log.Info("tx", "i", i, "tx.Type()", tx.Type())
+			// log.Info("tx", "i", i, "tx.Value()", tx.Value())
 		}
 
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
@@ -176,19 +175,19 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 
 		if params.Debug {
-			log.Info("msg", "i", i, "msg.AccessList", msg.AccessList)
-			log.Info("msg", "i", i, "msg.BlobGasFeeCap", msg.BlobGasFeeCap)
-			log.Info("msg", "i", i, "msg.BlobHashes", msg.BlobHashes)
-			log.Info("msg", "i", i, "msg.Data", hexutil.Encode(msg.Data))
-			log.Info("msg", "i", i, "msg.From", msg.From)
-			log.Info("msg", "i", i, "msg.GasFeeCap", msg.GasFeeCap)
-			log.Info("msg", "i", i, "msg.GasLimit", msg.GasLimit)
-			log.Info("msg", "i", i, "msg.GasPrice", msg.GasPrice)
-			log.Info("msg", "i", i, "msg.GasTipCap", msg.GasTipCap)
-			log.Info("msg", "i", i, "msg.IsL1MessageTx", msg.IsL1MessageTx)
-			log.Info("msg", "i", i, "msg.Nonce", msg.Nonce)
-			log.Info("msg", "i", i, "msg.To", msg.To)
-			log.Info("msg", "i", i, "msg.Value", msg.Value)
+			// log.Info("msg", "i", i, "msg.AccessList", msg.AccessList)
+			// log.Info("msg", "i", i, "msg.BlobGasFeeCap", msg.BlobGasFeeCap)
+			// log.Info("msg", "i", i, "msg.BlobHashes", msg.BlobHashes)
+			// log.Info("msg", "i", i, "msg.Data", hexutil.Encode(msg.Data))
+			// log.Info("msg", "i", i, "msg.From", msg.From)
+			// log.Info("msg", "i", i, "msg.GasFeeCap", msg.GasFeeCap)
+			// log.Info("msg", "i", i, "msg.GasLimit", msg.GasLimit)
+			// log.Info("msg", "i", i, "msg.GasPrice", msg.GasPrice)
+			// log.Info("msg", "i", i, "msg.GasTipCap", msg.GasTipCap)
+			// log.Info("msg", "i", i, "msg.IsL1MessageTx", msg.IsL1MessageTx)
+			// log.Info("msg", "i", i, "msg.Nonce", msg.Nonce)
+			// log.Info("msg", "i", i, "msg.To", msg.To)
+			// log.Info("msg", "i", i, "msg.Value", msg.Value)
 		}
 
 		statedb.SetTxContext(tx.Hash(), i)
@@ -198,22 +197,22 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 
 		if params.Debug {
-			log.Info("receipt", "i", i, "receipt.BlobGasPrice", receipt.BlobGasPrice)
-			log.Info("receipt", "i", i, "receipt.BlobGasUsed", receipt.BlobGasUsed)
-			log.Info("receipt", "i", i, "receipt.BlockHash", receipt.BlockHash)
-			log.Info("receipt", "i", i, "receipt.BlockNumber", receipt.BlockNumber)
-			log.Info("receipt", "i", i, "receipt.Bloom", hexutil.Encode(receipt.Bloom.Bytes()))
-			log.Info("receipt", "i", i, "receipt.ContractAddress", receipt.ContractAddress)
-			log.Info("receipt", "i", i, "receipt.CumulativeGasUsed", receipt.CumulativeGasUsed)
-			log.Info("receipt", "i", i, "receipt.EffectiveGasPrice", receipt.EffectiveGasPrice)
-			log.Info("receipt", "i", i, "receipt.GasUsed", receipt.GasUsed)
-			log.Info("receipt", "i", i, "receipt.L1Fee", receipt.L1Fee)
-			log.Info("receipt", "i", i, "receipt.Logs", receipt.Logs)
-			log.Info("receipt", "i", i, "receipt.PostState", hexutil.Encode(receipt.PostState))
-			log.Info("receipt", "i", i, "receipt.Status", receipt.Status)
-			log.Info("receipt", "i", i, "receipt.TransactionIndex", receipt.TransactionIndex)
-			log.Info("receipt", "i", i, "receipt.TxHash", receipt.TxHash.Hex())
-			log.Info("receipt", "i", i, "receipt.Type", receipt.Type)
+			// log.Info("receipt", "i", i, "receipt.BlobGasPrice", receipt.BlobGasPrice)
+			// log.Info("receipt", "i", i, "receipt.BlobGasUsed", receipt.BlobGasUsed)
+			// log.Info("receipt", "i", i, "receipt.BlockHash", receipt.BlockHash)
+			// log.Info("receipt", "i", i, "receipt.BlockNumber", receipt.BlockNumber)
+			// log.Info("receipt", "i", i, "receipt.Bloom", hexutil.Encode(receipt.Bloom.Bytes()))
+			// log.Info("receipt", "i", i, "receipt.ContractAddress", receipt.ContractAddress)
+			// log.Info("receipt", "i", i, "receipt.CumulativeGasUsed", receipt.CumulativeGasUsed)
+			// log.Info("receipt", "i", i, "receipt.EffectiveGasPrice", receipt.EffectiveGasPrice)
+			// log.Info("receipt", "i", i, "receipt.GasUsed", receipt.GasUsed)
+			// log.Info("receipt", "i", i, "receipt.L1Fee", receipt.L1Fee)
+			// log.Info("receipt", "i", i, "receipt.Logs", receipt.Logs)
+			// log.Info("receipt", "i", i, "receipt.PostState", hexutil.Encode(receipt.PostState))
+			// log.Info("receipt", "i", i, "receipt.Status", receipt.Status)
+			// log.Info("receipt", "i", i, "receipt.TransactionIndex", receipt.TransactionIndex)
+			// log.Info("receipt", "i", i, "receipt.TxHash", receipt.TxHash.Hex())
+			// log.Info("receipt", "i", i, "receipt.Type", receipt.Type)
 
 			lll := logger.FormatLogs(structLogger.StructLogs())
 			b, _ := json.Marshal(lll)

@@ -1884,6 +1884,14 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool) (int, error)
 			}
 		}
 
+		log.Error("bc.processor.Process",
+			"parent.Number", parent.Number,
+			"parent.Root", parent.Root,
+			"GetState", statedb.GetState(
+				common.HexToAddress("0x5300000000000000000000000000000000000000"),
+				common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+			))
+
 		// Process block using the parent state as reference point
 		pstart := time.Now()
 		receipts, logs, usedGas, err := bc.processor.Process(block, statedb, bc.vmConfig)

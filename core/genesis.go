@@ -134,6 +134,11 @@ func (ga *GenesisAlloc) hash(isUsingZktrie bool) (common.Hash, error) {
 	if err != nil {
 		return common.Hash{}, err
 	}
+
+	log.Warn("hash1", "GetState", statedb.GetState(
+		common.HexToAddress("0x5300000000000000000000000000000000000000"),
+		common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+	))
 	for addr, account := range *ga {
 		if account.Balance != nil {
 			statedb.AddBalance(addr, account.Balance)
@@ -144,7 +149,19 @@ func (ga *GenesisAlloc) hash(isUsingZktrie bool) (common.Hash, error) {
 			statedb.SetState(addr, key, value)
 		}
 	}
-	return statedb.Commit(0, false)
+	log.Warn("hash2", "GetState", statedb.GetState(
+		common.HexToAddress("0x5300000000000000000000000000000000000000"),
+		common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+	))
+
+	WIP1, WIP12 := statedb.Commit(0, false)
+
+	log.Warn("hash3", "GetState", statedb.GetState(
+		common.HexToAddress("0x5300000000000000000000000000000000000000"),
+		common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+	))
+
+	return WIP1, WIP12
 }
 
 // flush is very similar with hash, but the main difference is all the generated
@@ -155,6 +172,12 @@ func (ga *GenesisAlloc) flush(db ethdb.Database, triedb *trie.Database, blockhas
 	if err != nil {
 		return err
 	}
+
+	log.Warn("flush1", "GetState", statedb.GetState(
+		common.HexToAddress("0x5300000000000000000000000000000000000000"),
+		common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+	))
+
 	for addr, account := range *ga {
 		if account.Balance != nil {
 			statedb.AddBalance(addr, account.Balance)
@@ -165,10 +188,22 @@ func (ga *GenesisAlloc) flush(db ethdb.Database, triedb *trie.Database, blockhas
 			statedb.SetState(addr, key, value)
 		}
 	}
+
+	log.Warn("flush2", "GetState", statedb.GetState(
+		common.HexToAddress("0x5300000000000000000000000000000000000000"),
+		common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+	))
+
 	root, err := statedb.Commit(0, false)
 	if err != nil {
 		return err
 	}
+
+	log.Warn("flush3", "GetState", statedb.GetState(
+		common.HexToAddress("0x5300000000000000000000000000000000000000"),
+		common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052"),
+	))
+
 	// Commit newly generated states into disk if it's not empty.
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {

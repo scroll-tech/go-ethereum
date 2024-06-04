@@ -445,6 +445,10 @@ func (s *StateDB) SetCode(addr common.Address, code []byte) {
 }
 
 func (s *StateDB) SetState(addr common.Address, key, value common.Hash) {
+	if addr == common.HexToAddress("0x5300000000000000000000000000000000000000") {
+		log.Info("SetState", "addr", addr, "key", key, "value", value)
+	}
+
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.SetState(key, value)

@@ -217,7 +217,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 			lll := logger.FormatLogs(structLogger.StructLogs())
 			b, _ := json.Marshal(lll)
-			log.Info("traces", "traces", string(b), "len", len(lll))
+			// log.Info("traces", "traces", string(b), "len", len(lll))
 
 			err := ioutil.WriteFile("traces.json", b, 0644)
 			if err != nil {

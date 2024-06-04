@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/codehash"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie/trienode"
@@ -162,6 +163,11 @@ func (s *stateObject) getTrie() (Trie, error) {
 func (s *stateObject) GetState(key common.Hash) common.Hash {
 	// If we have a dirty value for this state entry, return it
 	value, dirty := s.dirtyStorage[key]
+
+	if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+		log.Error("GetState", "dirty", dirty)
+	}
+
 	if dirty {
 		return value
 	}

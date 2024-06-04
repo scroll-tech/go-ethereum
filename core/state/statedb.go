@@ -354,15 +354,10 @@ func (s *StateDB) GetKeccakCodeHash(addr common.Address) common.Hash {
 
 // GetState retrieves a value from the given account's storage trie.
 func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
-
-	if addr == common.HexToAddress("0x5300000000000000000000000000000000000000") {
-		log.Info("GetState", "addr", addr, "hash", hash)
-	}
-
 	stateObject := s.getStateObject(addr)
 
-	if params.Debug {
-		log.Error("GetState", "addr", addr.Hex(), "hash", hash.Hex(), "stateObject != nil", stateObject != nil)
+	if addr == common.HexToAddress("0x5300000000000000000000000000000000000000") {
+		log.Info("GetState", "addr", addr, "hash", hash, "stateObject != nil", stateObject != nil)
 	}
 
 	if stateObject != nil {

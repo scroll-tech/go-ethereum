@@ -128,7 +128,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle congested threshold", "provided", params.CongestedThreshold, "updated", congestedThreshold)
 	}
 	defaultBasePrice := params.DefaultBasePrice
-	if defaultBasePrice == nil || defaultBasePrice.Int64() <= 0 {
+	if defaultBasePrice == nil || defaultBasePrice.Int64() < 0 {
 		defaultBasePrice = DefaultBasePrice
 		log.Warn("Sanitizing invalid gasprice oracle default base price", "provided", params.DefaultBasePrice, "updated", defaultBasePrice)
 	}
@@ -196,7 +196,7 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	if pendingTxCount < oracle.congestedThreshold {
 		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return 1 wei as the tip cap,
 		// as the base fee is set separately or added manually for legacy transactions.
-		// Set price to one as otherwise tx with a 0 tip might be filtered out by the default mempool config.
+		// Set price to 1 as otherwise tx with a 0 tip might be filtered out by the default mempool config.
 		price := big.NewInt(1)
 		if !oracle.backend.ChainConfig().IsCurie(head.Number) {
 			price = oracle.defaultBasePrice

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/codehash"
@@ -221,23 +222,23 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 			s.db.SnapshotStorageReads += time.Since(start)
 		}
 		if s.db.db.TrieDB().IsUsingZktrie() {
-
-			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
-				log.Error("GetCommittedState", "4", 4)
-			}
-
 			value = common.BytesToHash(enc)
-		} else if len(enc) > 0 {
 
 			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
-				log.Error("GetCommittedState", "5", 5)
+				log.Error("GetCommittedState", "4", 4, "enc", hexutil.Encode(enc), "value", value.Hex())
 			}
 
+		} else if len(enc) > 0 {
 			_, content, _, err := rlp.Split(enc)
 			if err != nil {
 				s.db.setError(err)
 			}
 			value.SetBytes(content)
+
+			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+				log.Error("GetCommittedState", "5", 5, "enc", hexutil.Encode(enc), "content", hexutil.Encode(content))
+			}
+
 		}
 	}
 	// If the snapshot is unavailable or reading from it fails, load from the database.
@@ -272,10 +273,14 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 			return common.Hash{}
 		}
 		value.SetBytes(val)
+
+		if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+			log.Error("GetCommittedState", "10", 10, "val", hexutil.Encode(val))
+		}
 	}
 
 	if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
-		log.Error("GetCommittedState", "9", 9)
+		log.Error("GetCommittedState", "9", 9, "value", value.Hex())
 	}
 
 	s.originStorage[key] = value

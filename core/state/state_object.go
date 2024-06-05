@@ -179,9 +179,19 @@ func (s *stateObject) GetState(key common.Hash) common.Hash {
 func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 	// If we have a pending write or clean cached, return that
 	if value, pending := s.pendingStorage[key]; pending {
+
+		if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+			log.Error("GetCommittedState", "1", 1)
+		}
+
 		return value
 	}
 	if value, cached := s.originStorage[key]; cached {
+
+		if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+			log.Error("GetCommittedState", "2", 2)
+		}
+
 		return value
 	}
 	// If the object was destructed in *this* block (and potentially resurrected),
@@ -191,6 +201,11 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 	//      have been handles via pendingStorage above.
 	//   2) we don't have new values, and can deliver empty response back
 	if _, destructed := s.db.stateObjectsDestruct[s.address]; destructed {
+
+		if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+			log.Error("GetCommittedState", "3", 3)
+		}
+
 		return common.Hash{}
 	}
 	// If no live objects are available, attempt to use snapshots
@@ -206,8 +221,18 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 			s.db.SnapshotStorageReads += time.Since(start)
 		}
 		if s.db.db.TrieDB().IsUsingZktrie() {
+
+			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+				log.Error("GetCommittedState", "4", 4)
+			}
+
 			value = common.BytesToHash(enc)
 		} else if len(enc) > 0 {
+
+			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+				log.Error("GetCommittedState", "5", 5)
+			}
+
 			_, content, _, err := rlp.Split(enc)
 			if err != nil {
 				s.db.setError(err)
@@ -217,9 +242,19 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 	}
 	// If the snapshot is unavailable or reading from it fails, load from the database.
 	if s.db.snap == nil || err != nil {
+
+		if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+			log.Error("GetCommittedState", "6", 6)
+		}
+
 		start := time.Now()
 		tr, err := s.getTrie()
 		if err != nil {
+
+			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+				log.Error("GetCommittedState", "7", 7)
+			}
+
 			s.db.setError(err)
 			return common.Hash{}
 		}
@@ -228,11 +263,21 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 			s.db.StorageReads += time.Since(start)
 		}
 		if err != nil {
+
+			if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+				log.Error("GetCommittedState", "8", 8)
+			}
+
 			s.db.setError(err)
 			return common.Hash{}
 		}
 		value.SetBytes(val)
 	}
+
+	if key == common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000052") {
+		log.Error("GetCommittedState", "9", 9)
+	}
+
 	s.originStorage[key] = value
 	return value
 }

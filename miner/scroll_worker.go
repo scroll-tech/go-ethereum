@@ -43,9 +43,6 @@ import (
 )
 
 const (
-	// resultQueueSize is the size of channel listening to sealing result.
-	resultQueueSize = 10
-
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
@@ -56,15 +53,9 @@ const (
 	// chainSideChanSize is the size of channel listening to ChainSideEvent.
 	chainSideChanSize = 10
 
-	// miningLogAtDepth is the number of confirmations before logging successful mining.
-	miningLogAtDepth = 7
-
 	// minRecommitInterval is the minimal time interval to recreate the mining block with
 	// any newly arrived transactions.
 	minRecommitInterval = 1 * time.Second
-
-	// staleThreshold is the maximum depth of the acceptable stale block.
-	staleThreshold = 7
 )
 
 var (
@@ -80,22 +71,11 @@ var (
 	prepareTimer       = metrics.NewRegisteredTimer("miner/prepare", nil)
 	collectL2Timer     = metrics.NewRegisteredTimer("miner/collect_l2_txns", nil)
 	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit", nil)
-	resultTimer        = metrics.NewRegisteredTimer("miner/result", nil)
 
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)
 	commitGasCounter            = metrics.NewRegisteredCounter("miner/commit_gas", nil)
 )
-
-// task contains all information for consensus engine sealing and result submitting.
-type task struct {
-	receipts       []*types.Receipt
-	state          *state.StateDB
-	block          *types.Block
-	createdAt      time.Time
-	accRows        *types.RowConsumption // accumulated row consumption in the circuit side
-	nextL1MsgIndex uint64                // next L1 queue index to be processed
-}
 
 // newWorkReq represents a request for new sealing work submitting with relative interrupt notifier.
 type newWorkReq struct {
@@ -133,8 +113,6 @@ type worker struct {
 
 	// Channels
 	newWorkCh chan *newWorkReq
-	taskCh    chan *task
-	resultCh  chan *types.Block
 	startCh   chan struct{}
 	exitCh    chan struct{}
 
@@ -143,16 +121,9 @@ type worker struct {
 	currentPipelineStart time.Time
 	currentPipeline      *pipeline.Pipeline
 
-	localUncles  map[common.Hash]*types.Block // A set of side blocks generated locally as the possible uncle blocks.
-	remoteUncles map[common.Hash]*types.Block // A set of side blocks as the possible uncle blocks.
-	unconfirmed  *unconfirmedBlocks           // A set of locally mined blocks pending canonicalness confirmations.
-
 	mu       sync.RWMutex // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
 	extra    []byte
-
-	pendingMu    sync.RWMutex
-	pendingTasks map[common.Hash]*task
 
 	snapshotMu       sync.RWMutex // The lock used to protect the snapshots below
 	snapshotBlock    *types.Block
@@ -178,9 +149,7 @@ type worker struct {
 	prioritizedTx          *prioritizedTransaction
 
 	// Test hooks
-	newTaskHook  func(*task)      // Method to call upon receiving a new sealing task.
-	skipSealHook func(*task) bool // Method to decide whether skipping the sealing.
-	beforeTxHook func()           // Method to call before processing a transaction.
+	beforeTxHook func() // Method to call before processing a transaction.
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
@@ -192,16 +161,10 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		mux:                    mux,
 		chain:                  eth.BlockChain(),
 		isLocalBlock:           isLocalBlock,
-		localUncles:            make(map[common.Hash]*types.Block),
-		remoteUncles:           make(map[common.Hash]*types.Block),
-		unconfirmed:            newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
-		pendingTasks:           make(map[common.Hash]*task),
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
 		chainSideCh:            make(chan core.ChainSideEvent, chainSideChanSize),
 		newWorkCh:              make(chan *newWorkReq),
-		taskCh:                 make(chan *task),
-		resultCh:               make(chan *types.Block, resultQueueSize),
 		exitCh:                 make(chan struct{}),
 		startCh:                make(chan struct{}, 1),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
@@ -228,11 +191,9 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		worker.config.MaxAccountsNum = math.MaxInt
 	}
 
-	worker.wg.Add(4)
+	worker.wg.Add(2)
 	go worker.mainLoop()
 	go worker.newWorkLoop(recommit)
-	go worker.resultLoop()
-	go worker.taskLoop()
 
 	// Submit first work to initialize pending state.
 	if init {
@@ -345,25 +306,13 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		atomic.StoreInt32(&w.newTxs, 0)
 		atomic.StoreInt32(&w.newL1Msgs, 0)
 	}
-	// clearPending cleans the stale pending tasks.
-	clearPending := func(number uint64) {
-		w.pendingMu.Lock()
-		for h, t := range w.pendingTasks {
-			if t.block.NumberU64()+staleThreshold <= number {
-				delete(w.pendingTasks, h)
-			}
-		}
-		w.pendingMu.Unlock()
-	}
 
 	for {
 		select {
 		case <-w.startCh:
-			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false)
-		case head := <-w.chainHeadCh:
-			clearPending(head.Block.NumberU64())
+		case <-w.chainHeadCh:
 			timestamp = time.Now().Unix()
 			commit(true)
 		case <-w.exitCh:
@@ -426,171 +375,6 @@ func (w *worker) mainLoop() {
 	}
 }
 
-// taskLoop is a standalone goroutine to fetch sealing task from the generator and
-// push them to consensus engine.
-func (w *worker) taskLoop() {
-	defer w.wg.Done()
-	var (
-		stopCh chan struct{}
-		prev   common.Hash
-	)
-
-	// interrupt aborts the in-flight sealing task.
-	interrupt := func() {
-		if stopCh != nil {
-			close(stopCh)
-			stopCh = nil
-		}
-	}
-	for {
-		select {
-		case task := <-w.taskCh:
-			if w.newTaskHook != nil {
-				w.newTaskHook(task)
-			}
-			// Reject duplicate sealing work due to resubmitting.
-			sealHash := w.engine.SealHash(task.block.Header())
-			if sealHash == prev {
-				continue
-			}
-			// Interrupt previous sealing operation
-			interrupt()
-			stopCh, prev = make(chan struct{}), sealHash
-
-			if w.skipSealHook != nil && w.skipSealHook(task) {
-				continue
-			}
-			w.pendingMu.Lock()
-			w.pendingTasks[sealHash] = task
-			w.pendingMu.Unlock()
-
-			if err := w.engine.Seal(w.chain, task.block, w.resultCh, stopCh); err != nil {
-				log.Warn("Block sealing failed", "err", err)
-				w.pendingMu.Lock()
-				delete(w.pendingTasks, sealHash)
-				w.pendingMu.Unlock()
-			}
-		case <-w.exitCh:
-			interrupt()
-			return
-		}
-	}
-}
-
-// resultLoop is a standalone goroutine to handle sealing result submitting
-// and flush relative data to the database.
-func (w *worker) resultLoop() {
-	defer w.wg.Done()
-	for {
-		select {
-		case block := <-w.resultCh:
-			// Short circuit when receiving empty result.
-			if block == nil {
-				continue
-			}
-			// Short circuit when receiving duplicate result caused by resubmitting.
-			if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
-				continue
-			}
-
-			var (
-				sealhash = w.engine.SealHash(block.Header())
-				hash     = block.Hash()
-			)
-
-			w.pendingMu.RLock()
-			task, exist := w.pendingTasks[sealhash]
-			w.pendingMu.RUnlock()
-
-			if !exist {
-				log.Error("Block found but no relative pending task", "number", block.Number(), "sealhash", sealhash, "hash", hash)
-				continue
-			}
-
-			startTime := time.Now()
-
-			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
-			var (
-				receipts = make([]*types.Receipt, len(task.receipts))
-				logs     []*types.Log
-			)
-			for i, taskReceipt := range task.receipts {
-				receipt := new(types.Receipt)
-				receipts[i] = receipt
-				*receipt = *taskReceipt
-
-				// add block location fields
-				receipt.BlockHash = hash
-				receipt.BlockNumber = block.Number()
-				receipt.TransactionIndex = uint(i)
-
-				// Update the block hash in all logs since it is now available and not when the
-				// receipt/log of individual transactions were created.
-				receipt.Logs = make([]*types.Log, len(taskReceipt.Logs))
-				for i, taskLog := range taskReceipt.Logs {
-					log := new(types.Log)
-					receipt.Logs[i] = log
-					*log = *taskLog
-					log.BlockHash = hash
-				}
-				logs = append(logs, receipt.Logs...)
-			}
-			// It's possible that we've stored L1 queue index for this block previously,
-			// in this case do not overwrite it.
-			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
-				// Store first L1 queue index not processed by this block.
-				// Note: This accounts for both included and skipped messages. This
-				// way, if a block only skips messages, we won't reprocess the same
-				// messages from the next block.
-				log.Trace(
-					"Worker WriteFirstQueueIndexNotInL2Block",
-					"number", block.Number(),
-					"hash", hash.String(),
-					"task.nextL1MsgIndex", task.nextL1MsgIndex,
-				)
-				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
-			} else {
-				log.Trace(
-					"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
-					"number", block.Number(),
-					"hash", hash.String(),
-					"index", *index,
-					"task.nextL1MsgIndex", task.nextL1MsgIndex,
-				)
-			}
-			// Store circuit row consumption.
-			log.Trace(
-				"Worker write block row consumption",
-				"id", w.circuitCapacityChecker.ID,
-				"number", block.Number(),
-				"hash", hash.String(),
-				"accRows", task.accRows,
-			)
-			rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), hash, task.accRows)
-			// Commit block and state to database.
-			_, err := w.chain.WriteBlockWithState(block, receipts, logs, task.state, true)
-			if err != nil {
-				resultTimer.Update(time.Since(startTime))
-				log.Error("Failed writing block to chain", "err", err)
-				continue
-			}
-			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
-				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
-
-			// Broadcast the block and announce chain insertion event
-			w.mux.Post(core.NewMinedBlockEvent{Block: block})
-
-			// Insert the block into the set of pending ones to resultLoop for confirmations
-			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
-
-			resultTimer.Update(time.Since(startTime))
-
-		case <-w.exitCh:
-			return
-		}
-	}
-}
-
 // updateSnapshot updates pending snapshot block and state.
 // Note this function assumes the current variable is thread safe.
 func (w *worker) updateSnapshot(current *pipeline.BlockCandidate) {
@@ -617,7 +401,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 func (w *worker) startNewPipeline(timestamp int64) {
 
 	if w.currentPipeline != nil {
-		w.currentPipeline.Kill()
+		w.currentPipeline.Release()
 		w.currentPipeline = nil
 	}
 
@@ -677,6 +461,32 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		return
 	}
 
+	// Apply special state transition at Curie block
+	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
+		misc.ApplyCurieHardFork(parentState)
+
+		// zkEVM requirement: Curie transition block contains 0 transactions, bypass pipeline.
+		err = w.commit(&pipeline.Result{
+			// Note: Signer nodes will not store CCC results for empty blocks in their database.
+			// In practice, this is acceptable, since this block will never overflow, and follower
+			// nodes will still store CCC results.
+			Rows: &types.RowConsumption{},
+			FinalBlock: &pipeline.BlockCandidate{
+				Header:        header,
+				State:         parentState,
+				Txs:           types.Transactions{},
+				Receipts:      types.Receipts{},
+				CoalescedLogs: []*types.Log{},
+			},
+		})
+
+		if err != nil {
+			log.Error("failed to commit Curie fork block", "reason", err)
+		}
+
+		return
+	}
+
 	// fetch l1Txs
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
@@ -707,7 +517,11 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 
 	w.currentPipelineStart = time.Now()
-	w.currentPipeline = pipeline.NewPipeline(w.chain, *w.chain.GetVMConfig(), parentState, header, nextL1MsgIndex, w.getCCC()).WithBeforeTxHook(w.beforeTxHook)
+	pipelineCCC := w.getCCC()
+	if !w.isRunning() {
+		pipelineCCC = nil
+	}
+	w.currentPipeline = pipeline.NewPipeline(w.chain, *w.chain.GetVMConfig(), parentState, header, nextL1MsgIndex, pipelineCCC).WithBeforeTxHook(w.beforeTxHook)
 
 	deadline := time.Unix(int64(header.Time), 0)
 	if w.chainConfig.Clique != nil && w.chainConfig.Clique.RelaxedPeriod {
@@ -769,13 +583,32 @@ func (w *worker) startNewPipeline(timestamp int64) {
 			return
 		}
 	}
+
+	// pipelineCCC was nil, so the block was built for RPC purposes only. Stop the pipeline immediately
+	// and update the pending block.
+	if pipelineCCC == nil {
+		w.currentPipeline.Stop()
+	}
 }
 
 func (w *worker) handlePipelineResult(res *pipeline.Result) error {
-	if res != nil && res.OverflowingTx != nil {
+	startingHeader := w.currentPipeline.Header
+	w.currentPipeline.Release()
+	w.currentPipeline = nil
+
+	// Rows being nil without an OverflowingTx means that block didn't go thru CCC,
+	// which means that we are not the sequencer. Do not attempt to commit.
+	if res.Rows == nil && res.OverflowingTx == nil {
+		if res.FinalBlock != nil {
+			w.updateSnapshot(res.FinalBlock)
+		}
+		return nil
+	}
+
+	if res.OverflowingTx != nil {
 		if res.FinalBlock == nil {
 			// first txn overflowed the circuit, skip
-			log.Trace("Circuit capacity limit reached for a single tx", "tx", res.OverflowingTx.Hash().String(),
+			log.Info("Circuit capacity limit reached for a single tx", "tx", res.OverflowingTx.Hash().String(),
 				"isL1Message", res.OverflowingTx.IsL1MessageTx(), "reason", res.CCCErr.Error())
 
 			// Store skipped transaction in local db
@@ -784,11 +617,12 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 				overflowingTrace = nil
 			}
 			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), res.OverflowingTx, overflowingTrace, res.CCCErr.Error(),
-				w.currentPipeline.Header.Number.Uint64(), nil)
+				startingHeader.Number.Uint64(), nil)
 
 			if overflowingL1MsgTx := res.OverflowingTx.AsL1MessageTx(); overflowingL1MsgTx != nil {
-				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), w.currentPipeline.Header.ParentHash, overflowingL1MsgTx.QueueIndex+1)
+				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), startingHeader.ParentHash, overflowingL1MsgTx.QueueIndex+1)
 			} else {
+				w.prioritizedTx = nil
 				w.eth.TxPool().RemoveTx(res.OverflowingTx.Hash(), true)
 			}
 		} else if !res.OverflowingTx.IsL1MessageTx() {
@@ -796,7 +630,7 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 			// no need to prioritize L1 messages, they are fetched in order
 			// and processed first in every block anyways
 			w.prioritizedTx = &prioritizedTransaction{
-				blockNumber: w.currentPipeline.Header.Number.Uint64() + 1,
+				blockNumber: startingHeader.Number.Uint64() + 1,
 				tx:          res.OverflowingTx,
 			}
 		}
@@ -817,19 +651,31 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 		}
 	}
 
-	if !w.isRunning() {
-		if res != nil && res.FinalBlock != nil {
-			w.updateSnapshot(res.FinalBlock)
+	var commitError error
+	if res.FinalBlock != nil {
+		if commitError = w.commit(res); commitError == nil {
+			return nil
 		}
-		w.currentPipeline = nil
-		return nil
+		log.Error("Commit failed", "header", res.FinalBlock.Header, "reason", commitError)
+		if _, isRetryable := commitError.(retryableCommitError); !isRetryable {
+			return commitError
+		}
 	}
+	w.startNewPipeline(time.Now().Unix())
+	return nil
+}
 
-	if res == nil || res.FinalBlock == nil {
-		w.startNewPipeline(time.Now().Unix())
-		return nil
-	}
-	return w.commit(res)
+// retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
+type retryableCommitError struct {
+	inner error
+}
+
+func (e retryableCommitError) Error() string {
+	return e.inner.Error()
+}
+
+func (e retryableCommitError) Unwrap() error {
+	return e.inner
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
@@ -852,19 +698,89 @@ func (w *worker) commit(res *pipeline.Result) error {
 		return err
 	}
 
-	select {
-	case w.taskCh <- &task{receipts: res.FinalBlock.Receipts, state: res.FinalBlock.State, block: block, createdAt: time.Now(),
-		accRows: res.Rows, nextL1MsgIndex: res.FinalBlock.NextL1MsgIndex}:
-		w.unconfirmed.Shift(block.NumberU64() - 1)
-		log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
-			"txs", res.FinalBlock.Txs.Len(),
-			"gas", block.GasUsed(), "fees", totalFees(block, res.FinalBlock.Receipts),
-			"elapsed", common.PrettyDuration(time.Since(w.currentPipelineStart)))
-	case <-w.exitCh:
-		log.Info("Worker has exited")
+	sealHash := w.engine.SealHash(block.Header())
+	log.Info("Committing new mining work", "number", block.Number(), "sealhash", sealHash,
+		"txs", res.FinalBlock.Txs.Len(),
+		"gas", block.GasUsed(), "fees", totalFees(block, res.FinalBlock.Receipts),
+		"elapsed", common.PrettyDuration(time.Since(w.currentPipelineStart)))
+
+	resultCh, stopCh := make(chan *types.Block), make(chan struct{})
+	if err := w.engine.Seal(w.chain, block, resultCh, stopCh); err != nil {
+		return err
+	}
+	// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
+	// or a call that blocks between the call to Seal and the line below
+	block = <-resultCh
+	if block == nil {
+		return errors.New("missed seal response from consensus engine")
 	}
 
-	w.currentPipeline = nil
+	// verify the generated block with local consensus engine to make sure everything is as expected
+	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
+		return retryableCommitError{inner: err}
+	}
+
+	blockHash := block.Hash()
+
+	for i, receipt := range res.FinalBlock.Receipts {
+		// add block location fields
+		receipt.BlockHash = blockHash
+		receipt.BlockNumber = block.Number()
+		receipt.TransactionIndex = uint(i)
+
+		for _, log := range receipt.Logs {
+			log.BlockHash = blockHash
+		}
+	}
+
+	for _, log := range res.FinalBlock.CoalescedLogs {
+		log.BlockHash = blockHash
+	}
+
+	// It's possible that we've stored L1 queue index for this block previously,
+	// in this case do not overwrite it.
+	if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), blockHash); index == nil {
+		// Store first L1 queue index not processed by this block.
+		// Note: This accounts for both included and skipped messages. This
+		// way, if a block only skips messages, we won't reprocess the same
+		// messages from the next block.
+		log.Trace(
+			"Worker WriteFirstQueueIndexNotInL2Block",
+			"number", block.Number(),
+			"hash", blockHash.String(),
+			"nextL1MsgIndex", res.FinalBlock.NextL1MsgIndex,
+		)
+		rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), blockHash, res.FinalBlock.NextL1MsgIndex)
+	} else {
+		log.Trace(
+			"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
+			"number", block.Number(),
+			"hash", blockHash.String(),
+			"index", *index,
+			"nextL1MsgIndex", res.FinalBlock.NextL1MsgIndex,
+		)
+	}
+	// Store circuit row consumption.
+	log.Trace(
+		"Worker write block row consumption",
+		"id", w.circuitCapacityChecker.ID,
+		"number", block.Number(),
+		"hash", blockHash.String(),
+		"accRows", res.Rows,
+	)
+
+	rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), blockHash, res.Rows)
+	// Commit block and state to database.
+	_, err = w.chain.WriteBlockWithState(block, res.FinalBlock.Receipts, res.FinalBlock.CoalescedLogs, res.FinalBlock.State, true)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealHash, "hash", blockHash)
+
+	// Broadcast the block and announce chain insertion event
+	w.mux.Post(core.NewMinedBlockEvent{Block: block})
+
 	return nil
 }
 
@@ -887,6 +803,10 @@ func (w *worker) postSideBlock(event core.ChainSideEvent) {
 }
 
 func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err error) bool {
+	if !w.isRunning() {
+		return false
+	}
+
 	writeTrace := func() {
 		var trace *types.BlockTrace
 		var errWithTrace *pipeline.ErrorWithTrace

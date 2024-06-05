@@ -33,7 +33,11 @@ var (
 	ErrApplyStageDone           = errors.New("apply stage is done")
 	ErrUnexpectedL1MessageIndex = errors.New("unexpected L1 message index")
 
-	lifetimeTimer   = metrics.NewRegisteredTimer("pipeline/lifetime", nil)
+	lifetimeTimer = func() metrics.Timer {
+		t := metrics.NewCustomTimer(metrics.NewHistogram(metrics.NewExpDecaySample(128, 0.015)), metrics.NewMeter())
+		metrics.DefaultRegistry.Register("pipeline/lifetime", t)
+		return t
+	}()
 	applyTimer      = metrics.NewRegisteredTimer("pipeline/apply", nil)
 	applyIdleTimer  = metrics.NewRegisteredTimer("pipeline/apply_idle", nil)
 	applyStallTimer = metrics.NewRegisteredTimer("pipeline/apply_stall", nil)
@@ -47,7 +51,7 @@ type Pipeline struct {
 	parent   *types.Block
 	start    time.Time
 
-	// accumalators
+	// accumulators
 	ccc            *circuitcapacitychecker.CircuitCapacityChecker
 	Header         types.Header
 	state          *state.StateDB
@@ -109,6 +113,14 @@ func (p *Pipeline) Start(deadline time.Time) error {
 	return nil
 }
 
+// Stop forces pipeline to stop its operation and return whatever progress it has so far
+func (p *Pipeline) Stop() {
+	if p.txnQueue != nil {
+		close(p.txnQueue)
+		p.txnQueue = nil
+	}
+}
+
 func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn func(txnIndex int, tx *types.Transaction, err error) bool) *Result {
 	for {
 		tx := txs.Peek()
@@ -126,8 +138,7 @@ func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn fun
 			txs.Shift()
 		default:
 			if errors.Is(err, ErrApplyStageDone) || onFailingTxn(p.txs.Len(), tx, err) {
-				close(p.txnQueue)
-				p.txnQueue = nil
+				p.Stop()
 				return nil
 			}
 
@@ -164,10 +175,9 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 	}
 }
 
-func (p *Pipeline) Kill() {
-	if p.txnQueue != nil {
-		close(p.txnQueue)
-	}
+// Release releases all resources related to the pipeline
+func (p *Pipeline) Release() {
+	p.Stop()
 
 	select {
 	case <-p.applyStageRespCh:
@@ -300,21 +310,25 @@ type Result struct {
 }
 
 func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Time) <-chan *Result {
-	p.ccc.Reset()
+	if p.ccc != nil {
+		p.ccc.Reset()
+	}
 	resultCh := make(chan *Result)
 	var lastCandidate *BlockCandidate
 	var lastAccRows *types.RowConsumption
 	var deadlineReached bool
 
 	go func() {
+		deadlineTimer := time.NewTimer(time.Until(deadline))
 		defer func() {
 			close(resultCh)
+			deadlineTimer.Stop()
 			lifetimeTimer.UpdateSince(p.start)
 		}()
 		for {
 			idleStart := time.Now()
 			select {
-			case <-time.After(time.Until(deadline)):
+			case <-deadlineTimer.C:
 				cccIdleTimer.UpdateSince(idleStart)
 				// note: currently we don't allow empty blocks, but if we ever do; make sure to CCC check it first
 				if lastCandidate != nil {
@@ -325,14 +339,12 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 					return
 				}
 				deadlineReached = true
-				// avoid deadline case being triggered again and again
-				deadline = time.Now().Add(time.Hour)
 			case candidate := <-candidates:
 				cccIdleTimer.UpdateSince(idleStart)
 				cccStart := time.Now()
 				var accRows *types.RowConsumption
 				var err error
-				if candidate != nil {
+				if candidate != nil && p.ccc != nil {
 					accRows, err = p.ccc.ApplyTransaction(candidate.LastTrace)
 					lastTxn := candidate.Txs[candidate.Txs.Len()-1]
 					cccTimer.UpdateSince(cccStart)
@@ -349,6 +361,8 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 
 					lastCandidate = candidate
 					lastAccRows = accRows
+				} else if candidate != nil && p.ccc == nil {
+					lastCandidate = candidate
 				}
 
 				// immediately close the block if deadline reached or apply stage is done
@@ -378,29 +392,31 @@ func (p *Pipeline) traceAndApply(tx *types.Transaction) (*types.Receipt, *types.
 		return nil, nil, core.ErrGasLimitReached
 	}
 
-	// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
-	// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
-	commitStateAfterApply := false
-	snap := p.state.Snapshot()
+	if p.ccc != nil {
+		// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
+		// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
+		commitStateAfterApply := false
+		snap := p.state.Snapshot()
 
-	// 1. we have to check circuit capacity before `core.ApplyTransaction`,
-	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert.
-	// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
-	// the `refund` value will still be correct, because:
-	// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
-	// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
-	// 2.3 when starting handling the following txs, `state.refund` comes as 0
-	trace, err = tracing.NewTracerWrapper().CreateTraceEnvAndGetBlockTrace(p.chain.Config(), p.chain, p.chain.Engine(), p.chain.Database(),
-		p.state, p.parent, types.NewBlockWithHeader(&p.Header).WithBody([]*types.Transaction{tx}, nil), commitStateAfterApply)
-	// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
-	// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
-	p.state.RevertToSnapshot(snap)
-	if err != nil {
-		return nil, nil, err
+		// 1. we have to check circuit capacity before `core.ApplyTransaction`,
+		// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert.
+		// 2. even if we don't commit to the state during the tracing (which means `clearJournalAndRefund` is not called during the tracing),
+		// the `refund` value will still be correct, because:
+		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
+		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
+		// 2.3 when starting handling the following txs, `state.refund` comes as 0
+		trace, err = tracing.NewTracerWrapper().CreateTraceEnvAndGetBlockTrace(p.chain.Config(), p.chain, p.chain.Engine(), p.chain.Database(),
+			p.state, p.parent, types.NewBlockWithHeader(&p.Header).WithBody([]*types.Transaction{tx}, nil), commitStateAfterApply)
+		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
+		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
+		p.state.RevertToSnapshot(snap)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// create new snapshot for `core.ApplyTransaction`
-	snap = p.state.Snapshot()
+	snap := p.state.Snapshot()
 
 	var receipt *types.Receipt
 	receipt, err = core.ApplyTransaction(p.chain.Config(), p.chain, nil /* coinbase will default to chainConfig.Scroll.FeeVaultAddress */, p.gasPool,

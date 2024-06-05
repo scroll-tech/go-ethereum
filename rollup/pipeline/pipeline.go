@@ -263,6 +263,8 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 					p.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
 				}
 
+				p.state.IntermediateRoot(p.chain.Config().IsEIP158(p.Header.Number))
+
 				stallStart := time.Now()
 				select {
 				case newCandidateCh <- &BlockCandidate{

@@ -711,7 +711,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 	}
 	// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
 	// or a call that blocks between the call to Seal and the line below. Seal might introduce some delay, so we keep track of
-	// that artificially added delay and substract that from overall runtime of commit().
+	// that artificially added delay and subtract it from overall runtime of commit().
 	sealStart := time.Now()
 	block = <-resultCh
 	sealDelay = time.Since(sealStart)

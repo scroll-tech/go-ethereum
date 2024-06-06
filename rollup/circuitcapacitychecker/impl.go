@@ -79,8 +79,14 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
+	rustTrace := C.parse_json_to_rust_trace(tracesStr)
+	if rustTrace == nil {
+		log.Error("fail to parse json in to rust trace", "id", ccc.ID, "TxHash", traces.Transactions[0].TxHash)
+		return nil, ErrUnknown
+	}
+
 	log.Debug("start to check circuit capacity for tx", "id", ccc.ID, "TxHash", traces.Transactions[0].TxHash)
-	rawResult := C.apply_tx(C.uint64_t(ccc.ID), tracesStr)
+	rawResult := C.apply_tx(C.uint64_t(ccc.ID), rustTrace)
 	defer func() {
 		C.free_c_chars(rawResult)
 	}()
@@ -126,8 +132,14 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
+	rustTrace := C.parse_json_to_rust_trace(tracesStr)
+	if rustTrace == nil {
+		log.Error("fail to parse json in to rust trace", "id", ccc.ID, "TxHash", traces.Transactions[0].TxHash)
+		return nil, ErrUnknown
+	}
+
 	log.Debug("start to check circuit capacity for block", "id", ccc.ID, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
-	rawResult := C.apply_block(C.uint64_t(ccc.ID), tracesStr)
+	rawResult := C.apply_block(C.uint64_t(ccc.ID), rustTrace)
 	defer func() {
 		C.free_c_chars(rawResult)
 	}()

@@ -267,7 +267,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 				}
 
 				// We are calculating state roots here per txn (which is more expensive) because metrics show
-				// that CCC stage is slower apply stage stalls for a considerable amount of time. Instead of
+				// that CCC stage is slower, so apply stage stalls for a considerable amount of time. Instead of
 				// stalling, we can spend that time calculating state roots. This can be removed when CCC is optimized
 				// to not be the bottleneck anymore.
 				p.state.IntermediateRoot(p.chain.Config().IsEIP158(p.Header.Number))

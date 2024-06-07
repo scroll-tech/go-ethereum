@@ -319,7 +319,7 @@ var (
 		ArchimedesBlock:     big.NewInt(0),
 		ShanghaiBlock:       big.NewInt(0),
 		BernoulliBlock:      big.NewInt(3747132),
-		CurieBlock:          nil,
+		CurieBlock:          big.NewInt(4767850),
 		DescartesBlock:      nil,
 		Clique: &CliqueConfig{
 			Period: 3,
@@ -358,7 +358,7 @@ var (
 		ArchimedesBlock:     big.NewInt(0),
 		ShanghaiBlock:       big.NewInt(0),
 		BernoulliBlock:      big.NewInt(5220340),
-		CurieBlock:          nil,
+		CurieBlock:          big.NewInt(7066870),
 		DescartesBlock:      nil,
 		Clique: &CliqueConfig{
 			Period: 3,

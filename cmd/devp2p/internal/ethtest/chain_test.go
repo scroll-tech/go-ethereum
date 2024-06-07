@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/eth/protocols/eth"
 	"github.com/scroll-tech/go-ethereum/p2p"
 )
@@ -111,6 +112,27 @@ func TestEthProtocolNegotiation(t *testing.T) {
 				{Name: "wrongProto", Version: 65},
 			},
 			expected: uint32(64),
+		},
+		{
+			conn: &Conn{
+				ourHighestProtoVersion: 68,
+			},
+			caps: []p2p.Cap{
+				{Name: "eth", Version: 65},
+				{Name: "eth", Version: 66},
+				{Name: "wrongProto", Version: 68},
+			},
+			expected: uint32(66),
+		},
+		{
+			conn: &Conn{
+				ourHighestProtoVersion: 68,
+			},
+			caps: []p2p.Cap{
+				{Name: "eth", Version: 63},
+				{Name: "eth", Version: 68},
+			},
+			expected: uint32(68),
 		},
 	}
 

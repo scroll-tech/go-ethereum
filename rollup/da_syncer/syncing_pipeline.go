@@ -57,7 +57,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		syncedL1Height = *from
 	}
 	daQueue := NewDaQueue(syncedL1Height, dataSourceFactory)
-	batchQueue := NewBatchQueue(daQueue)
+	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
 	daSyncer := NewDaSyncer(blockchain)
 

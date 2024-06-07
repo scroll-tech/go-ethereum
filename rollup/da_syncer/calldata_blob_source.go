@@ -128,7 +128,7 @@ type commitBatchArgs struct {
 
 func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Log) (DAEntry, error) {
 	if batchIndex == 0 {
-		return NewCommitBatchDaV0(0, batchIndex, nil, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}), nil
+		return NewCommitBatchDaV0(0, batchIndex, nil, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}, 0), nil
 	}
 
 	txData, err := ds.l1Client.fetchTxData(ds.ctx, vLog)
@@ -202,7 +202,7 @@ func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV0(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs)
+	da := NewCommitBatchDaV0(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }
 
@@ -213,6 +213,7 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
+
 	parentBatchHeader, err := codecv1.NewDABatchFromBytes(args.ParentBatchHeader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode batch bytes into batch, values: %v, err: %w", args.ParentBatchHeader, err)
@@ -263,6 +264,6 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV1(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs)
+	da := NewCommitBatchDaV1(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }

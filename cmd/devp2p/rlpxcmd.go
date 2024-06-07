@@ -24,27 +24,26 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/cmd/devp2p/internal/ethtest"
 	"github.com/scroll-tech/go-ethereum/crypto"
-	"github.com/scroll-tech/go-ethereum/internal/utesting"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/p2p/rlpx"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 var (
-	rlpxCommand = &cli.Command{
+	rlpxCommand = cli.Command{
 		Name:  "rlpx",
 		Usage: "RLPx Commands",
-		Subcommands: []*cli.Command{
+		Subcommands: []cli.Command{
 			rlpxPingCommand,
 			rlpxEthTestCommand,
 		},
 	}
-	rlpxPingCommand = &cli.Command{
+	rlpxPingCommand = cli.Command{
 		Name:   "ping",
 		Usage:  "ping <node>",
 		Action: rlpxPing,
 	}
-	rlpxEthTestCommand = &cli.Command{
+	rlpxEthTestCommand = cli.Command{
 		Name:      "eth-test",
 		Usage:     "Runs tests against a node",
 		ArgsUsage: "<node> <chain.rlp> <genesis.json>",

@@ -290,7 +290,7 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 	// re-requesting them and dropping the peer in case of malicious transfers.
 	var (
 		added       = make([]common.Hash, 0, len(txs))
-		metas = make([]txMetadata, 0, len(txs))
+		metas       = make([]txMetadata, 0, len(txs))
 		duplicate   int64
 		underpriced int64
 		otherreject int64

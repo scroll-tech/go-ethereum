@@ -48,6 +48,7 @@ pub mod checker {
     #[no_mangle]
     pub unsafe extern "C" fn parse_json_to_rust_trace(trace_json_ptr: *const c_char) -> *mut BlockTrace {
         let trace_json_cstr = unsafe { CStr::from_ptr(trace_json_ptr) };
+        println!("rust len {}", trace_json_cstr.to_bytes().len())
         let trace = serde_json::from_slice::<BlockTrace>(trace_json_cstr.to_bytes());
         match trace {
             Err(_) => return null_mut(),

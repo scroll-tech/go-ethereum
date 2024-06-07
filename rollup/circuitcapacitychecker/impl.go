@@ -135,6 +135,7 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 		return nil, ErrUnknown
 	}
 
+	log.Info("go json", "len", len(ccc.jsonBuffer.Bytes()))
 	tracesStr := C.CString(string(ccc.jsonBuffer.Bytes()))
 	defer func() {
 		C.free(unsafe.Pointer(tracesStr))

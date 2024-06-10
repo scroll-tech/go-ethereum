@@ -1,8 +1,11 @@
 package pipeline
 
 import (
+	"bytes"
 	"errors"
+	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -30,7 +33,7 @@ func (e *ErrorWithTrace) Unwrap() error {
 }
 
 var (
-	ErrApplyStageDone           = errors.New("apply stage is done")
+	ErrPipelineDone             = errors.New("pipeline is done")
 	ErrUnexpectedL1MessageIndex = errors.New("unexpected L1 message index")
 
 	lifetimeTimer = func() metrics.Timer {
@@ -38,11 +41,14 @@ var (
 		metrics.DefaultRegistry.Register("pipeline/lifetime", t)
 		return t
 	}()
-	applyTimer      = metrics.NewRegisteredTimer("pipeline/apply", nil)
-	applyIdleTimer  = metrics.NewRegisteredTimer("pipeline/apply_idle", nil)
-	applyStallTimer = metrics.NewRegisteredTimer("pipeline/apply_stall", nil)
-	cccTimer        = metrics.NewRegisteredTimer("pipeline/ccc", nil)
-	cccIdleTimer    = metrics.NewRegisteredTimer("pipeline/ccc_idle", nil)
+	applyTimer       = metrics.NewRegisteredTimer("pipeline/apply", nil)
+	applyIdleTimer   = metrics.NewRegisteredTimer("pipeline/apply_idle", nil)
+	applyStallTimer  = metrics.NewRegisteredTimer("pipeline/apply_stall", nil)
+	encodeTimer      = metrics.NewRegisteredTimer("pipeline/encode", nil)
+	encodeIdleTimer  = metrics.NewRegisteredTimer("pipeline/encode_idle", nil)
+	encodeStallTimer = metrics.NewRegisteredTimer("pipeline/encode_stall", nil)
+	cccTimer         = metrics.NewRegisteredTimer("pipeline/ccc", nil)
+	cccIdleTimer     = metrics.NewRegisteredTimer("pipeline/ccc_idle", nil)
 )
 
 type Pipeline struct {
@@ -50,6 +56,8 @@ type Pipeline struct {
 	vmConfig vm.Config
 	parent   *types.Block
 	start    time.Time
+	wg       sync.WaitGroup
+	doneCh   chan struct{}
 
 	// accumulators
 	ccc            *circuitcapacitychecker.CircuitCapacityChecker
@@ -92,6 +100,7 @@ func NewPipeline(
 		ccc:            ccc,
 		state:          state,
 		gasPool:        new(core.GasPool).AddGas(header.GasLimit),
+		doneCh:         make(chan struct{}),
 	}
 }
 
@@ -103,22 +112,20 @@ func (p *Pipeline) WithBeforeTxHook(beforeTxHook func()) *Pipeline {
 func (p *Pipeline) Start(deadline time.Time) error {
 	p.start = time.Now()
 	p.txnQueue = make(chan *types.Transaction)
-	applyStageRespCh, candidateCh, err := p.traceAndApplyStage(p.txnQueue)
+	applyStageRespCh, applyDownstreamCh, err := p.traceAndApplyStage(p.txnQueue)
 	if err != nil {
 		log.Error("Failed starting traceAndApplyStage", "err", err)
 		return err
 	}
 	p.applyStageRespCh = applyStageRespCh
-	p.ResultCh = p.cccStage(candidateCh, deadline)
+	encodeDownstreamCh := p.encodeStage(applyDownstreamCh)
+	p.ResultCh = p.cccStage(encodeDownstreamCh, deadline)
 	return nil
 }
 
 // Stop forces pipeline to stop its operation and return whatever progress it has so far
 func (p *Pipeline) Stop() {
-	if p.txnQueue != nil {
-		close(p.txnQueue)
-		p.txnQueue = nil
-	}
+	close(p.txnQueue)
 }
 
 func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn func(txnIndex int, tx *types.Transaction, err error) bool) *Result {
@@ -137,7 +144,7 @@ func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn fun
 		case err == nil, errors.Is(err, core.ErrNonceTooLow):
 			txs.Shift()
 		default:
-			if errors.Is(err, ErrApplyStageDone) || onFailingTxn(p.txs.Len(), tx, err) {
+			if errors.Is(err, ErrPipelineDone) || onFailingTxn(p.txs.Len(), tx, err) {
 				p.Stop()
 				return nil
 			}
@@ -154,12 +161,11 @@ func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn fun
 }
 
 func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
-	if p.txnQueue == nil {
-		return nil, ErrApplyStageDone
-	}
 
 	select {
 	case p.txnQueue <- tx:
+	case <-p.doneCh:
+		return nil, ErrPipelineDone
 	case res := <-p.ResultCh:
 		return res, nil
 	}
@@ -167,7 +173,7 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 	select {
 	case err, valid := <-p.applyStageRespCh:
 		if !valid {
-			return nil, ErrApplyStageDone
+			return nil, ErrPipelineDone
 		}
 		return nil, err
 	case res := <-p.ResultCh:
@@ -177,18 +183,18 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 
 // Release releases all resources related to the pipeline
 func (p *Pipeline) Release() {
-	p.Stop()
-
 	select {
-	case <-p.applyStageRespCh:
-		<-p.ResultCh
-	case <-p.ResultCh:
-		<-p.applyStageRespCh
+	case <-p.doneCh:
+		// already released
+	default:
+		close(p.doneCh)
 	}
+	p.wg.Wait()
 }
 
 type BlockCandidate struct {
 	LastTrace      *types.BlockTrace
+	RustTrace      unsafe.Pointer
 	NextL1MsgIndex uint64
 
 	// accumulated state
@@ -199,25 +205,47 @@ type BlockCandidate struct {
 	CoalescedLogs []*types.Log
 }
 
+// sendCancellable tries to send msg to resCh but allows send operation to be cancelled
+// by closing cancelCh. Returns true if cancelled.
+func sendCancellable[T any, C comparable](resCh chan T, msg T, cancelCh <-chan C) bool {
+	var zeroC C
+
+	select {
+	case resCh <- msg:
+		return false
+	case cancelSignal := <-cancelCh:
+		if cancelSignal != zeroC {
+			panic("shouldn't have happened")
+		}
+		return true
+	}
+}
+
 func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan error, <-chan *BlockCandidate, error) {
 	p.state.StartPrefetcher("miner")
-	newCandidateCh := make(chan *BlockCandidate)
+	downstreamCh := make(chan *BlockCandidate, p.downstreamChCapacity())
 	resCh := make(chan error)
+	p.wg.Add(1)
 	go func() {
 		defer func() {
-			close(newCandidateCh)
+			close(downstreamCh)
 			close(resCh)
 			p.state.StopPrefetcher()
+			p.wg.Done()
 		}()
 
 		var tx *types.Transaction
 		for {
-			applyIdleTimer.Time(func() {
-				tx = <-txsIn
-			})
-			if tx == nil {
+			idleStart := time.Now()
+			select {
+			case tx = <-txsIn:
+				if tx == nil {
+					return
+				}
+			case <-p.doneCh:
 				return
 			}
+			applyIdleTimer.UpdateSince(idleStart)
 
 			applyStart := time.Now()
 
@@ -234,13 +262,13 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 
 			if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != p.nextL1MsgIndex {
 				// Continue, we might still be able to include some L2 messages
-				resCh <- ErrUnexpectedL1MessageIndex
+				sendCancellable(resCh, ErrUnexpectedL1MessageIndex, p.doneCh)
 				continue
 			}
 
 			if !tx.IsL1MessageTx() && !p.chain.Config().Scroll.IsValidBlockSize(p.blockSize+tx.Size()) {
 				// can't fit this txn in this block, silently ignore and continue looking for more txns
-				resCh <- nil
+				sendCancellable(resCh, nil, p.doneCh)
 				continue
 			}
 
@@ -267,21 +295,16 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 				}
 
 				stallStart := time.Now()
-				select {
-				case newCandidateCh <- &BlockCandidate{
-					LastTrace:      trace,
+				if sendCancellable(downstreamCh, &BlockCandidate{
 					NextL1MsgIndex: p.nextL1MsgIndex,
+					LastTrace:      trace,
 
 					Header:        types.CopyHeader(&p.Header),
 					State:         p.state.Copy(),
 					Txs:           p.txs,
 					Receipts:      p.receipts,
 					CoalescedLogs: p.coalescedLogs,
-				}:
-				case tx = <-txsIn:
-					if tx != nil {
-						panic("shouldn't have happened")
-					}
+				}, p.doneCh) {
 					// next stage terminated and caller terminated us as well
 					return
 				}
@@ -294,10 +317,10 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 				}
 			}
 			applyTimer.UpdateSince(applyStart)
-			resCh <- err
+			sendCancellable(resCh, err, p.doneCh)
 		}
 	}()
-	return resCh, newCandidateCh, nil
+	return resCh, downstreamCh, nil
 }
 
 type Result struct {
@@ -309,25 +332,70 @@ type Result struct {
 	FinalBlock *BlockCandidate
 }
 
+func (p *Pipeline) encodeStage(traces <-chan *BlockCandidate) <-chan *BlockCandidate {
+	downstreamCh := make(chan *BlockCandidate, p.downstreamChCapacity())
+	p.wg.Add(1)
+	buffer := new(bytes.Buffer)
+
+	go func() {
+		defer func() {
+			close(downstreamCh)
+			p.wg.Done()
+		}()
+		for {
+			idleStart := time.Now()
+			select {
+			case trace := <-traces:
+				if trace == nil {
+					return
+				}
+				encodeIdleTimer.UpdateSince(idleStart)
+
+				encodeStart := time.Now()
+				if p.ccc != nil {
+					trace.RustTrace = circuitcapacitychecker.MakeRustTrace(trace.LastTrace, buffer)
+					if trace.RustTrace == nil {
+						log.Error("making rust trace", "txHash", trace.LastTrace.Transactions[0].TxHash)
+						return
+					}
+				}
+				encodeTimer.UpdateSince(encodeStart)
+
+				stallStart := time.Now()
+				sendCancellable(downstreamCh, trace, p.doneCh)
+				encodeStallTimer.UpdateSince(stallStart)
+			case <-p.doneCh:
+				return
+			}
+
+		}
+	}()
+	return downstreamCh
+}
+
 func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Time) <-chan *Result {
 	if p.ccc != nil {
 		p.ccc.Reset()
 	}
-	resultCh := make(chan *Result)
+	resultCh := make(chan *Result, 1)
 	var lastCandidate *BlockCandidate
 	var lastAccRows *types.RowConsumption
 	var deadlineReached bool
 
+	p.wg.Add(1)
 	go func() {
 		deadlineTimer := time.NewTimer(time.Until(deadline))
 		defer func() {
 			close(resultCh)
 			deadlineTimer.Stop()
 			lifetimeTimer.UpdateSince(p.start)
+			p.wg.Done()
 		}()
 		for {
 			idleStart := time.Now()
 			select {
+			case <-p.doneCh:
+				return
 			case <-deadlineTimer.C:
 				cccIdleTimer.UpdateSince(idleStart)
 				// note: currently we don't allow empty blocks, but if we ever do; make sure to CCC check it first
@@ -345,7 +413,7 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 				var accRows *types.RowConsumption
 				var err error
 				if candidate != nil && p.ccc != nil {
-					accRows, err = p.ccc.ApplyTransaction(candidate.LastTrace)
+					accRows, err = p.ccc.ApplyTransactionRustTrace(candidate.RustTrace)
 					lastTxn := candidate.Txs[candidate.Txs.Len()-1]
 					cccTimer.UpdateSince(cccStart)
 					if err != nil {
@@ -426,4 +494,14 @@ func (p *Pipeline) traceAndApply(tx *types.Transaction) (*types.Receipt, *types.
 		return nil, trace, err
 	}
 	return receipt, trace, nil
+}
+
+// downstreamChCapacity returns the channel capacity that should be used for downstream channels.
+// It aims to minimize stalls caused by different computational costs of different transactions
+func (p *Pipeline) downstreamChCapacity() int {
+	cap := 1
+	if p.chain.Config().Scroll.MaxTxPerBlock != nil {
+		cap = *p.chain.Config().Scroll.MaxTxPerBlock
+	}
+	return cap
 }

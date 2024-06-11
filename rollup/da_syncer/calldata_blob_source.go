@@ -5,6 +5,9 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/scroll-tech/da-codec/encoding"
+	"github.com/scroll-tech/da-codec/encoding/codecv0"
+	"github.com/scroll-tech/da-codec/encoding/codecv1"
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -12,9 +15,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rollup/types/encoding"
-	"github.com/scroll-tech/go-ethereum/rollup/types/encoding/codecv0"
-	"github.com/scroll-tech/go-ethereum/rollup/types/encoding/codecv1"
 )
 
 var (
@@ -159,9 +159,9 @@ func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Lo
 		return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 	}
 	switch args.Version {
-	case codecv0.CodecV0Version:
+	case 0:
 		return ds.decodeDAV0(batchIndex, vLog, &args)
-	case codecv1.CodecV1Version:
+	case 1:
 		return ds.decodeDAV1(batchIndex, vLog, &args)
 	default:
 		return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)

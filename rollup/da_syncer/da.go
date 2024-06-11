@@ -1,9 +1,9 @@
 package da_syncer
 
 import (
+	"github.com/scroll-tech/da-codec/encoding/codecv0"
+	"github.com/scroll-tech/da-codec/encoding/codecv1"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/rollup/types/encoding/codecv0"
-	"github.com/scroll-tech/go-ethereum/rollup/types/encoding/codecv1"
 )
 
 type DAType int

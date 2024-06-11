@@ -43,6 +43,11 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	case *CommitBatchDaV1:
+		bq.blocks, err = bq.processDaV1ToBlocks(daEntry)
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unexpected type of daEntry: %T", daEntry)
 	}
@@ -51,7 +56,11 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 
 func (bq *BlockQueue) processDaV0ToBlocks(daEntry *CommitBatchDaV0) ([]*types.Block, error) {
 	var blocks []*types.Block
-	l1TxIndex := 0
+	l1TxPointer := 0
+	var curL1TxIndex uint64 = 0
+	if daEntry.ParentBatchHeader != nil {
+		curL1TxIndex = daEntry.ParentBatchHeader.TotalL1MessagePopped
+	}
 	for _, chunk := range daEntry.Chunks {
 		for blockId, daBlock := range chunk.Blocks {
 			// create header
@@ -65,11 +74,47 @@ func (bq *BlockQueue) processDaV0ToBlocks(daEntry *CommitBatchDaV0) ([]*types.Bl
 			// var txs types.Transactions
 			txs := make(types.Transactions, 0, daBlock.NumTransactions)
 			// insert l1 msgs
-			for id := 0; id < int(daBlock.NumL1Messages); id++ {
-				l1Tx := types.NewTx(daEntry.L1Txs[l1TxIndex])
+			for l1TxPointer < len(daEntry.L1Txs) && daEntry.L1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages) {
+				l1Tx := types.NewTx(daEntry.L1Txs[l1TxPointer])
 				txs = append(txs, l1Tx)
-				l1TxIndex++
+				l1TxPointer++
 			}
+			curL1TxIndex += uint64(daBlock.NumL1Messages)
+			// insert l2 txs
+			txs = append(txs, chunk.Transactions[blockId]...)
+			block := types.NewBlockWithHeader(&header).WithBody(txs, make([]*types.Header, 0))
+			blocks = append(blocks, block)
+		}
+	}
+	return blocks, nil
+}
+
+func (bq *BlockQueue) processDaV1ToBlocks(daEntry *CommitBatchDaV1) ([]*types.Block, error) {
+	var blocks []*types.Block
+	l1TxPointer := 0
+	var curL1TxIndex uint64 = 0
+	if daEntry.ParentBatchHeader != nil {
+		curL1TxIndex = daEntry.ParentBatchHeader.TotalL1MessagePopped
+	}
+	for _, chunk := range daEntry.Chunks {
+		for blockId, daBlock := range chunk.Blocks {
+			// create header
+			header := types.Header{
+				Number:   big.NewInt(0).SetUint64(daBlock.BlockNumber),
+				Time:     daBlock.Timestamp,
+				BaseFee:  daBlock.BaseFee,
+				GasLimit: daBlock.GasLimit,
+			}
+			// create txs
+			// var txs types.Transactions
+			txs := make(types.Transactions, 0, daBlock.NumTransactions)
+			// insert l1 msgs
+			for l1TxPointer < len(daEntry.L1Txs) && daEntry.L1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages) {
+				l1Tx := types.NewTx(daEntry.L1Txs[l1TxPointer])
+				txs = append(txs, l1Tx)
+				l1TxPointer++
+			}
+			curL1TxIndex += uint64(daBlock.NumL1Messages)
 			// insert l2 txs
 			txs = append(txs, chunk.Transactions[blockId]...)
 			block := types.NewBlockWithHeader(&header).WithBody(txs, make([]*types.Header, 0))

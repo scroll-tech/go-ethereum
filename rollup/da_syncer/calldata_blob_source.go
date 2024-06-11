@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	callDataBlobSourceFetchBlockRange uint64 = 100
+	callDataBlobSourceFetchBlockRange uint64 = 500
 )
 
 type CalldataBlobSource struct {
@@ -67,8 +67,11 @@ func (ds *CalldataBlobSource) NextData() (DA, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get events, l1height: %d, error: %v", ds.l1height, err)
 	}
-	ds.l1height = to + 1
-	return ds.processLogsToDA(logs)
+	da, err := ds.processLogsToDA(logs)
+	if err == nil {
+		ds.l1height = to + 1
+	}
+	return da, err
 }
 
 func (ds *CalldataBlobSource) L1Height() uint64 {
@@ -192,8 +195,9 @@ func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, arg
 	// get all necessary l1msgs without skipped
 	currentIndex := parentTotalL1MessagePopped
 	for index := 0; index < int(totalL1MessagePopped); index++ {
-		for encoding.IsL1MessageSkipped(skippedBitmap, currentIndex-parentTotalL1MessagePopped) {
+		if encoding.IsL1MessageSkipped(skippedBitmap, currentIndex-parentTotalL1MessagePopped) {
 			currentIndex++
+			continue
 		}
 		l1Tx := rawdb.ReadL1Message(ds.db, currentIndex)
 		if l1Tx == nil {

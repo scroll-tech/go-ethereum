@@ -424,11 +424,12 @@ func DecodeTxsFromBlob(blob *kzg4844.Blob, chunks []*DAChunkRawTx) error {
 	if numChunks != len(chunks) {
 		return fmt.Errorf("blob chunk number is not same as calldata, blob num chunks: %d, calldata num chunks: %d", numChunks, len(chunks))
 	}
-	index := 2
-	for _, chunk := range chunks {
+	index := 2 + MaxNumChunks*4
+	for chunkID, chunk := range chunks {
 		var transactions []types.Transactions
-		chunkSize := int(binary.BigEndian.Uint32(blobBytes[index : index+4]))
-		chunkBytes := blobBytes[index+4 : index+4+chunkSize]
+		chunkSize := int(binary.BigEndian.Uint32(blobBytes[2+4*chunkID : 2+4*chunkID+4]))
+
+		chunkBytes := blobBytes[index : index+chunkSize]
 		curIndex := 0
 		for _, block := range chunk.Blocks {
 			var blockTransactions types.Transactions
@@ -436,7 +437,7 @@ func DecodeTxsFromBlob(blob *kzg4844.Blob, chunks []*DAChunkRawTx) error {
 			for i := 0; i < txNum; i++ {
 				tx, nextIndex, err := getNextTx(chunkBytes, curIndex)
 				if err != nil {
-					return fmt.Errorf("couldn't decode next tx from blob bytes: %w", err)
+					return fmt.Errorf("couldn't decode next tx from blob bytes: %w, index: %d", err, index+curIndex+4)
 				}
 				curIndex = nextIndex
 				blockTransactions = append(blockTransactions, tx)
@@ -444,7 +445,7 @@ func DecodeTxsFromBlob(blob *kzg4844.Blob, chunks []*DAChunkRawTx) error {
 			transactions = append(transactions, blockTransactions)
 		}
 		chunk.Transactions = transactions
-		index += 4 + chunkSize
+		index += chunkSize
 	}
 	return nil
 }
@@ -505,7 +506,7 @@ func getNextTx(bytes []byte, index int) (*types.Transaction, int, error) {
 func bytesFromBlobCanonical(blob *kzg4844.Blob) [126976]byte {
 	var blobBytes [126976]byte
 	for from := 0; from < len(blob); from += 32 {
-		copy(blobBytes[from*31:], blob[from+1:from+32])
+		copy(blobBytes[from/32*31:], blob[from+1:from+32])
 	}
 	return blobBytes
 }

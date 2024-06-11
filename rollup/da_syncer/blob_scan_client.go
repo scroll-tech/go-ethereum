@@ -12,44 +12,52 @@ import (
 )
 
 const (
-	blobScanApiUrl string = "https://api.blobscan.com/blobs/"
-	okStatusCode   int    = 200
-	lenBlobBytes   int    = 131072
+	okStatusCode int = 200
+	lenBlobBytes int = 131072
 )
 
 type BlobScanClient struct {
-	client *http.Client
+	client              *http.Client
+	blobScanApiEndpoint string
 }
 
-func newBlobScanClient() (*BlobScanClient, error) {
+func newBlobScanClient(blobScanApiEndpoint string) (*BlobScanClient, error) {
 	return &BlobScanClient{
-		client: http.DefaultClient,
+		client:              http.DefaultClient,
+		blobScanApiEndpoint: blobScanApiEndpoint,
 	}, nil
 }
 
 func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
-	// some api call
-	req, err := http.NewRequestWithContext(ctx, "GET", blobScanApiUrl+versionedHash.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.blobScanApiEndpoint+versionedHash.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create request, err: %v", err)
+		return nil, fmt.Errorf("cannot create request, err: %w", err)
 	}
 	req.Header.Set("accept", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("cannot do request, err: %v", err)
+		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != okStatusCode {
-		return nil, fmt.Errorf("response code is not ok, code: %d", resp.StatusCode)
+		if resp.StatusCode == 404 {
+			return nil, fmt.Errorf("no blob with versioned hash : %s", versionedHash.String())
+		}
+		var res ErrorResp
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode result into struct, err: %w", err)
+		}
+		return nil, fmt.Errorf("error while fetching blob, message: %s, code: %s, versioned hash: %s", res.Message, res.Code, versionedHash.String())
 	}
 	var result BlobResp
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode result into struct, err: %v", err)
+		return nil, fmt.Errorf("failed to decode result into struct, err: %w", err)
 	}
 	blobBytes, err := hex.DecodeString(result.Data[2:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode data to bytes, err: %v", err)
+		return nil, fmt.Errorf("failed to decode data to bytes, err: %w", err)
 	}
 	if len(blobBytes) != lenBlobBytes {
 		return nil, fmt.Errorf("len of blob data is not correct, expected: %d, got: %d", lenBlobBytes, len(blobBytes))
@@ -91,4 +99,12 @@ type BlobResp struct {
 		BlobGasMaxFee         string `json:"blobGasMaxFee"`
 		BlobGasUsed           string `json:"blobGasUsed"`
 	} `json:"transactions"`
+}
+
+type ErrorResp struct {
+	Message string `json:"message"`
+	Code    string `json:"code"`
+	Issues  []struct {
+		Message string `json:"message"`
+	} `json:"issues"`
 }

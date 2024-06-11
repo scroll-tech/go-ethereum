@@ -335,13 +335,13 @@ type Result struct {
 func (p *Pipeline) encodeStage(traces <-chan *BlockCandidate) <-chan *BlockCandidate {
 	downstreamCh := make(chan *BlockCandidate, p.downstreamChCapacity())
 	p.wg.Add(1)
-	buffer := new(bytes.Buffer)
 
 	go func() {
 		defer func() {
 			close(downstreamCh)
 			p.wg.Done()
 		}()
+		buffer := new(bytes.Buffer)
 		for {
 			idleStart := time.Now()
 			select {

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -52,12 +53,13 @@ var (
 )
 
 type Pipeline struct {
-	chain    *core.BlockChain
-	vmConfig vm.Config
-	parent   *types.Block
-	start    time.Time
-	wg       sync.WaitGroup
-	doneCh   chan struct{}
+	chain     *core.BlockChain
+	vmConfig  vm.Config
+	parent    *types.Block
+	start     time.Time
+	wg        sync.WaitGroup
+	ctx       context.Context
+	cancelCtx context.CancelFunc
 
 	// accumulators
 	ccc            *circuitcapacitychecker.CircuitCapacityChecker
@@ -91,6 +93,8 @@ func NewPipeline(
 	// make sure we are not sharing a tracer with the caller and not in debug mode
 	vmConfig.Tracer = nil
 	vmConfig.Debug = false
+
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Pipeline{
 		chain:          chain,
 		vmConfig:       vmConfig,
@@ -100,7 +104,8 @@ func NewPipeline(
 		ccc:            ccc,
 		state:          state,
 		gasPool:        new(core.GasPool).AddGas(header.GasLimit),
-		doneCh:         make(chan struct{}),
+		ctx:            ctx,
+		cancelCtx:      cancel,
 	}
 }
 
@@ -164,7 +169,7 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 
 	select {
 	case p.txnQueue <- tx:
-	case <-p.doneCh:
+	case <-p.ctx.Done():
 		return nil, ErrPipelineDone
 	case res := <-p.ResultCh:
 		return res, nil
@@ -183,12 +188,7 @@ func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
 
 // Release releases all resources related to the pipeline
 func (p *Pipeline) Release() {
-	select {
-	case <-p.doneCh:
-		// already released
-	default:
-		close(p.doneCh)
-	}
+	p.cancelCtx()
 	p.wg.Wait()
 }
 
@@ -242,7 +242,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 				if tx == nil {
 					return
 				}
-			case <-p.doneCh:
+			case <-p.ctx.Done():
 				return
 			}
 			applyIdleTimer.UpdateSince(idleStart)
@@ -262,13 +262,13 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 
 			if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != p.nextL1MsgIndex {
 				// Continue, we might still be able to include some L2 messages
-				sendCancellable(resCh, ErrUnexpectedL1MessageIndex, p.doneCh)
+				sendCancellable(resCh, ErrUnexpectedL1MessageIndex, p.ctx.Done())
 				continue
 			}
 
 			if !tx.IsL1MessageTx() && !p.chain.Config().Scroll.IsValidBlockSize(p.blockSize+tx.Size()) {
 				// can't fit this txn in this block, silently ignore and continue looking for more txns
-				sendCancellable(resCh, nil, p.doneCh)
+				sendCancellable(resCh, nil, p.ctx.Done())
 				continue
 			}
 
@@ -304,7 +304,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 					Txs:           p.txs,
 					Receipts:      p.receipts,
 					CoalescedLogs: p.coalescedLogs,
-				}, p.doneCh) {
+				}, p.ctx.Done()) {
 					// next stage terminated and caller terminated us as well
 					return
 				}
@@ -317,7 +317,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 				}
 			}
 			applyTimer.UpdateSince(applyStart)
-			sendCancellable(resCh, err, p.doneCh)
+			sendCancellable(resCh, err, p.ctx.Done())
 		}
 	}()
 	return resCh, downstreamCh, nil
@@ -362,9 +362,9 @@ func (p *Pipeline) encodeStage(traces <-chan *BlockCandidate) <-chan *BlockCandi
 				encodeTimer.UpdateSince(encodeStart)
 
 				stallStart := time.Now()
-				sendCancellable(downstreamCh, trace, p.doneCh)
+				sendCancellable(downstreamCh, trace, p.ctx.Done())
 				encodeStallTimer.UpdateSince(stallStart)
-			case <-p.doneCh:
+			case <-p.ctx.Done():
 				return
 			}
 
@@ -394,7 +394,7 @@ func (p *Pipeline) cccStage(candidates <-chan *BlockCandidate, deadline time.Tim
 		for {
 			idleStart := time.Now()
 			select {
-			case <-p.doneCh:
+			case <-p.ctx.Done():
 				return
 			case <-deadlineTimer.C:
 				cccIdleTimer.UpdateSince(idleStart)

@@ -112,14 +112,14 @@ func (p *Pipeline) WithBeforeTxHook(beforeTxHook func()) *Pipeline {
 func (p *Pipeline) Start(deadline time.Time) error {
 	p.start = time.Now()
 	p.txnQueue = make(chan *types.Transaction)
-	applyStageRespCh, applyDownstreamCh, err := p.traceAndApplyStage(p.txnQueue)
+	applyStageRespCh, applyToEncodeCh, err := p.traceAndApplyStage(p.txnQueue)
 	if err != nil {
 		log.Error("Failed starting traceAndApplyStage", "err", err)
 		return err
 	}
 	p.applyStageRespCh = applyStageRespCh
-	encodeDownstreamCh := p.encodeStage(applyDownstreamCh)
-	p.ResultCh = p.cccStage(encodeDownstreamCh, deadline)
+	encodeToCccCh := p.encodeStage(applyToEncodeCh)
+	p.ResultCh = p.cccStage(encodeToCccCh, deadline)
 	return nil
 }
 

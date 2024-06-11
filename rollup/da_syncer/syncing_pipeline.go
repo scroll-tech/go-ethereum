@@ -2,7 +2,6 @@ package da_syncer
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core"
@@ -18,10 +17,6 @@ type Config struct {
 	FetcherMode      FetcherMode // mode of fetcher
 	SnapshotFilePath string      // path to snapshot file
 }
-
-var (
-	errInvalidChain = errors.New("retrieved hash chain is invalid")
-)
 
 // defaultSyncInterval is the frequency at which we query for new rollup event.
 const defaultSyncInterval = 1 * time.Millisecond

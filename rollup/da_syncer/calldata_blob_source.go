@@ -194,7 +194,7 @@ func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, arg
 	}
 	// get all necessary l1msgs without skipped
 	currentIndex := parentTotalL1MessagePopped
-	for index := 0; index < int(totalL1MessagePopped); index++ {
+	for index := 0; index < totalL1MessagePopped; index++ {
 		if encoding.IsL1MessageSkipped(skippedBitmap, currentIndex-parentTotalL1MessagePopped) {
 			currentIndex++
 			continue
@@ -257,7 +257,7 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 	}
 	// get all necessary l1msgs without skipped
 	currentIndex := parentTotalL1MessagePopped
-	for index := 0; index < int(totalL1MessagePopped); index++ {
+	for index := 0; index < totalL1MessagePopped; index++ {
 		for encoding.IsL1MessageSkipped(skippedBitmap, currentIndex-parentTotalL1MessagePopped) {
 			currentIndex++
 		}

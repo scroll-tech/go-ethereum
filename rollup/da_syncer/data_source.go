@@ -43,7 +43,3 @@ func (ds *DataSourceFactory) OpenDataSource(ctx context.Context, l1height uint64
 		return nil, errors.New("snapshot_data_source: not implemented")
 	}
 }
-
-func isBernoulliByL1Height(l1height uint64) bool {
-	return false
-}

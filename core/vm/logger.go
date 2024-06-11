@@ -162,6 +162,8 @@ type StructLogger struct {
 	logs            []*StructLog
 	output          []byte
 	err             error
+
+	inflightSload func(common.Hash)
 }
 
 // NewStructLogger returns a new logger
@@ -233,30 +235,30 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	if !l.cfg.DisableStack {
 		structLog.Stack = append(structLog.Stack, stack.Data()...)
 	}
-	var (
-		recordStorageDetail bool
-		storageKey          common.Hash
-		storageValue        common.Hash
-	)
-	if op == SLOAD && stack.len() >= 1 {
-		recordStorageDetail = true
-		storageKey = stack.data[stack.len()-1].Bytes32()
-		storageValue = l.env.StateDB.GetState(contract.Address(), storageKey)
-	} else if op == SSTORE && stack.len() >= 2 {
-		recordStorageDetail = true
-		storageKey = stack.data[stack.len()-1].Bytes32()
-		storageValue = stack.data[stack.len()-2].Bytes32()
-	}
-	if recordStorageDetail {
-		contractAddress := contract.Address()
+
+	logStorage := func(contractAddress common.Address, key, value common.Hash) {
 		if l.storage[contractAddress] == nil {
 			l.storage[contractAddress] = make(Storage)
 		}
-		l.storage[contractAddress][storageKey] = storageValue
+		l.storage[contractAddress][key] = value
 		if !l.cfg.DisableStorage {
 			structLog.Storage = l.storage[contractAddress].Copy()
 		}
 	}
+
+	contractAddress := scope.Contract.Address()
+	if op == SSTORE && stack.len() >= 2 {
+		storageKey := stack.data[stack.len()-1].Bytes32()
+		storageValue := stack.data[stack.len()-2].Bytes32()
+
+		logStorage(contractAddress, storageKey, storageValue)
+	} else if op == SLOAD && stack.len() >= 1 {
+		storageKey := common.Hash(stack.data[stack.len()-1].Bytes32())
+		l.inflightSload = func(storageValue common.Hash) {
+			logStorage(contractAddress, storageKey, storageValue)
+		}
+	}
+
 	if l.cfg.EnableReturnData {
 		structLog.ReturnData.Write(rData)
 	}
@@ -295,6 +297,11 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 }
 
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {
+	stack := scope.Stack
+	if op == SLOAD && stack.len() >= 1 {
+		storageValue := stack.data[stack.len()-1].Bytes32()
+		l.inflightSload(storageValue)
+	}
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault

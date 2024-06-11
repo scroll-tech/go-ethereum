@@ -336,6 +336,9 @@ var (
 				NumL1MessagesPerBlock: 10,
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
 			},
+			DAConfig: &DAConfig{
+				BlobScanApiEndpoint: "https://api.sepolia.blobscan.com/blobs/",
+			},
 		},
 	}
 
@@ -374,6 +377,9 @@ var (
 				L1MessageQueueAddress: common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
 				NumL1MessagesPerBlock: 10,
 				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
+			},
+			DAConfig: &DAConfig{
+				BlobScanApiEndpoint: "https://api.blobscan.com/blobs/",
 			},
 		},
 	}
@@ -535,6 +541,9 @@ type ScrollConfig struct {
 
 	// L1 config
 	L1Config *L1Config `json:"l1Config,omitempty"`
+
+	// DA Config
+	DAConfig *DAConfig `json:"daConfig,omitempty"`
 }
 
 // L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer
@@ -543,6 +552,11 @@ type L1Config struct {
 	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
 	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
 	ScrollChainAddress    common.Address `json:"scrollChainAddress,omitempty"`
+}
+
+// DAConfig contains the parameters to sync from DA
+type DAConfig struct {
+	BlobScanApiEndpoint string `json:"blobScanApiEndpoint,omitempty"`
 }
 
 func (c *L1Config) String() string {

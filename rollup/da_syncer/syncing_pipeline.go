@@ -24,7 +24,7 @@ var (
 )
 
 // defaultSyncInterval is the frequency at which we query for new rollup event.
-const defaultSyncInterval = 1 * time.Second
+const defaultSyncInterval = 1 * time.Millisecond
 
 type SyncingPipeline struct {
 	ctx        context.Context
@@ -44,13 +44,12 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		cancel()
 		return nil, err
 	}
-	blobClient, err := newBlobScanClient()
+	blobClient, err := newBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanApiEndpoint)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
-	// todo: keep synced l1 height somewhere
 	var syncedL1Height uint64 = l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)
 	if from != nil {

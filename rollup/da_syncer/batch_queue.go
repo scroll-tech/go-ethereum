@@ -63,7 +63,7 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 	curBatchL1Height := batch.GetL1BlockNumber()
 	delete(bq.batches, batchIndex)
 	if len(bq.batches) == 0 {
-		rawdb.WriteSyncedL1BlockNumber(bq.db, curBatchL1Height)
+		rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height)
 		return
 	}
 	var minBatchL1Height uint64 = math.MaxUint64
@@ -72,5 +72,5 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 			minBatchL1Height = val.GetL1BlockNumber()
 		}
 	}
-	rawdb.WriteSyncedL1BlockNumber(bq.db, curBatchL1Height-1)
+	rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height-1)
 }

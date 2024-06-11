@@ -1,6 +1,8 @@
 package da_syncer
 
-import "context"
+import (
+	"context"
+)
 
 type DaQueue struct {
 	l1height          uint64

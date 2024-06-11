@@ -2307,3 +2307,8 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 	_, err := bc.hc.InsertHeaderChain(chain, start)
 	return 0, err
 }
+
+// Database gives access to the underlying database for convenience
+func (bc *BlockChain) Database() ethdb.Database {
+	return bc.db
+}

@@ -2,11 +2,10 @@
 ARG COMMIT=""
 ARG VERSION=""
 ARG BUILDNUM=""
-ARG LIBSCROLL_ZSTD_VERSION=v0.1.0-rc0-ubuntu20.04
 ARG SCROLL_LIB_PATH=/scroll/lib
 
 # Build libzkp dependency
-FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as chef
+FROM scrolltech/go-rust-builder:go-1.21-rust-nightly-2023-12-03 as chef
 WORKDIR app
 
 FROM chef as planner
@@ -24,18 +23,16 @@ RUN cargo build --release
 RUN find ./ | grep libzktrie.so | xargs -I{} cp {} /app/target/release/
 
 # Build Geth in a stock Go builder container
-FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as builder
+FROM scrolltech/go-rust-builder:go-1.21-rust-nightly-2023-12-03 as builder
 
 ADD . /go-ethereum
 
-ARG LIBSCROLL_ZSTD_VERSION
 ARG SCROLL_LIB_PATH
 
 RUN mkdir -p $SCROLL_LIB_PATH
 
 COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
 COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
-RUN wget -O $SCROLL_LIB_PATH/libscroll_zstd.so https://github.com/scroll-tech/da-codec/releases/download/$LIBSCROLL_ZSTD_VERSION/libscroll_zstd.so
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
 ENV CGO_LDFLAGS="-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
@@ -46,21 +43,19 @@ RUN cd /go-ethereum && env GO111MODULE=on go run build/ci.go install -buildtags 
 FROM ubuntu:20.04
 
 RUN apt-get -qq update \
-    && apt-get -qq install -y --no-install-recommends ca-certificates wget
+    && apt-get -qq install -y --no-install-recommends ca-certificates
 
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 
-ARG LIBSCROLL_ZSTD_VERSION
 ARG SCROLL_LIB_PATH
 
 RUN mkdir -p $SCROLL_LIB_PATH
 
 COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
 COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
-RUN wget -O $SCROLL_LIB_PATH/libscroll_zstd.so https://github.com/scroll-tech/da-codec/releases/download/$LIBSCROLL_ZSTD_VERSION/libscroll_zstd.so
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
-ENV CGO_LDFLAGS="-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
+ENV CGO_LDFLAGS="-ldl -L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
 
 EXPOSE 8545 8546 30303 30303/udp
 ENTRYPOINT ["geth"]

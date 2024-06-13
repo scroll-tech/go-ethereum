@@ -50,9 +50,6 @@ const (
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
 	chainHeadChanSize = 10
 
-	// chainSideChanSize is the size of channel listening to ChainSideEvent.
-	chainSideChanSize = 10
-
 	// minRecommitInterval is the minimal time interval to recreate the mining block with
 	// any newly arrived transactions.
 	minRecommitInterval = 1 * time.Second
@@ -108,8 +105,6 @@ type worker struct {
 	txsSub       event.Subscription
 	chainHeadCh  chan core.ChainHeadEvent
 	chainHeadSub event.Subscription
-	chainSideCh  chan core.ChainSideEvent
-	chainSideSub event.Subscription
 
 	// Channels
 	newWorkCh chan *newWorkReq
@@ -163,7 +158,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		isLocalBlock:           isLocalBlock,
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
-		chainSideCh:            make(chan core.ChainSideEvent, chainSideChanSize),
 		newWorkCh:              make(chan *newWorkReq),
 		exitCh:                 make(chan struct{}),
 		startCh:                make(chan struct{}, 1),
@@ -176,7 +170,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
-	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	recommit := worker.config.Recommit
@@ -326,7 +319,6 @@ func (w *worker) mainLoop() {
 	defer w.wg.Done()
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
-	defer w.chainSideSub.Unsubscribe()
 
 	deadCh := make(chan *pipeline.Result)
 	pipelineResultCh := func() <-chan *pipeline.Result {
@@ -368,8 +360,6 @@ func (w *worker) mainLoop() {
 		case <-w.txsSub.Err():
 			return
 		case <-w.chainHeadSub.Err():
-			return
-		case <-w.chainSideSub.Err():
 			return
 		}
 	}
@@ -796,14 +786,6 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 		result[i] = &cpy
 	}
 	return result
-}
-
-// postSideBlock fires a side chain event, only use it for testing.
-func (w *worker) postSideBlock(event core.ChainSideEvent) {
-	select {
-	case w.chainSideCh <- event:
-	case <-w.exitCh:
-	}
 }
 
 func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err error) bool {

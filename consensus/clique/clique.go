@@ -195,6 +195,11 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	if conf.Epoch == 0 {
 		conf.Epoch = epochLength
 	}
+
+	if conf.ShadowForkHeight > 0 && conf.ShadowForkHeight%conf.Epoch != 0 {
+		panic("ShadowForkHeight must be a multiple of Epoch")
+	}
+
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	signatures, _ := lru.NewARC(inmemorySignatures)
@@ -375,6 +380,14 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		snap    *Snapshot
 	)
 	for snap == nil {
+		if c.config.ShadowForkHeight > 0 && number == c.config.ShadowForkHeight {
+			c.signatures.Purge()
+			c.recents.Purge()
+			c.proposals = make(map[common.Address]bool)
+			snap = newSnapshot(c.config, c.signatures, number, hash, []common.Address{c.config.ShadowForkSigner})
+			break
+		}
+
 		// If an in-memory snapshot was found, use that
 		if s, ok := c.recents.Get(hash); ok {
 			snap = s.(*Snapshot)

@@ -74,12 +74,6 @@ var (
 	commitGasCounter            = metrics.NewRegisteredCounter("miner/commit_gas", nil)
 )
 
-// newWorkReq represents a request for new sealing work submitting with relative interrupt notifier.
-type newWorkReq struct {
-	noempty   bool
-	timestamp int64
-}
-
 // prioritizedTransaction represents a single transaction that
 // should be processed as the first transaction in the next block.
 type prioritizedTransaction struct {
@@ -107,9 +101,8 @@ type worker struct {
 	chainHeadSub event.Subscription
 
 	// Channels
-	newWorkCh chan *newWorkReq
-	startCh   chan struct{}
-	exitCh    chan struct{}
+	startCh chan struct{}
+	exitCh  chan struct{}
 
 	wg sync.WaitGroup
 
@@ -158,7 +151,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		isLocalBlock:           isLocalBlock,
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
-		newWorkCh:              make(chan *newWorkReq),
 		exitCh:                 make(chan struct{}),
 		startCh:                make(chan struct{}, 1),
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(true),
@@ -184,9 +176,8 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		worker.config.MaxAccountsNum = math.MaxInt
 	}
 
-	worker.wg.Add(2)
+	worker.wg.Add(1)
 	go worker.mainLoop()
-	go worker.newWorkLoop(recommit)
 
 	// Submit first work to initialize pending state.
 	if init {
@@ -282,38 +273,6 @@ func (w *worker) close() {
 	w.wg.Wait()
 }
 
-// newWorkLoop is a standalone goroutine to submit new mining work upon received events.
-func (w *worker) newWorkLoop(recommit time.Duration) {
-	defer w.wg.Done()
-	var (
-		timestamp int64 // timestamp for each round of mining.
-	)
-
-	// commit aborts in-flight transaction execution with given signal and resubmits a new one.
-	commit := func(noempty bool) {
-		select {
-		case w.newWorkCh <- &newWorkReq{noempty: noempty, timestamp: timestamp}:
-		case <-w.exitCh:
-			return
-		}
-		atomic.StoreInt32(&w.newTxs, 0)
-		atomic.StoreInt32(&w.newL1Msgs, 0)
-	}
-
-	for {
-		select {
-		case <-w.startCh:
-			timestamp = time.Now().Unix()
-			commit(false)
-		case <-w.chainHeadCh:
-			timestamp = time.Now().Unix()
-			commit(true)
-		case <-w.exitCh:
-			return
-		}
-	}
-}
-
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
@@ -330,8 +289,10 @@ func (w *worker) mainLoop() {
 
 	for {
 		select {
-		case req := <-w.newWorkCh:
-			w.startNewPipeline(req.timestamp)
+		case <-w.startCh:
+			w.startNewPipeline(time.Now().Unix())
+		case <-w.chainHeadCh:
+			w.startNewPipeline(time.Now().Unix())
 		case result := <-pipelineResultCh():
 			w.handlePipelineResult(result)
 		case ev := <-w.txsCh:

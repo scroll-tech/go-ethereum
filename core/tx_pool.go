@@ -649,6 +649,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	// Drop non-local transactions under our own minimal accepted gas price or tip.
 	pendingBaseFee := pool.priced.urgent.baseFee
+	log.Info("pendingBaseFee for tx", "hash", tx.Hash().Hex(), "tx.gasCap", tx.GasFeeCap(), "tx.gasTip", tx.GasTipCap(), "pool.gasPrice", pool.gasPrice, "pendingBaseFee", pendingBaseFee)
 	if !local && tx.EffectiveGasTipIntCmp(pool.gasPrice, pendingBaseFee) < 0 {
 		return ErrUnderpriced
 	}

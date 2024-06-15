@@ -600,6 +600,7 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			Depth:         trace.Depth,
 			Error:         trace.ErrorString(),
 			RefundCounter: trace.RefundCounter,
+			ExtraData:     trace.ExtraData,
 		}
 		if trace.Stack != nil {
 			stack := make([]string, len(trace.Stack))

@@ -130,7 +130,10 @@ func (p *Pipeline) Start(deadline time.Time) error {
 
 // Stop forces pipeline to stop its operation and return whatever progress it has so far
 func (p *Pipeline) Stop() {
-	close(p.txnQueue)
+	if p.txnQueue != nil {
+		close(p.txnQueue)
+		p.txnQueue = nil
+	}
 }
 
 func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn func(txnIndex int, tx *types.Transaction, err error) bool) *Result {
@@ -166,6 +169,9 @@ func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn fun
 }
 
 func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
+	if p.txnQueue == nil {
+		return nil, ErrPipelineDone
+	}
 
 	select {
 	case p.txnQueue <- tx:

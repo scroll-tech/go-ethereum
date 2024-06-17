@@ -9,6 +9,7 @@ import (
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
 	"github.com/scroll-tech/da-codec/encoding/codecv1"
 	"github.com/scroll-tech/da-codec/encoding/codecv2"
+
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"

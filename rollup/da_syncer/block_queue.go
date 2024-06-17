@@ -163,4 +163,3 @@ func (bq *BlockQueue) processDaV2ToBlocks(daEntry *CommitBatchDaV2) ([]*types.Bl
 	}
 	return blocks, nil
 }
-

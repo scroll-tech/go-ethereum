@@ -37,6 +37,8 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (DAEntry, error) {
 			bq.batches[daEntry.BatchIndex] = daEntry
 		case *CommitBatchDaV1:
 			bq.batches[daEntry.BatchIndex] = daEntry
+		case *CommitBatchDaV2:
+			bq.batches[daEntry.BatchIndex] = daEntry
 		case *RevertBatchDA:
 			bq.deleteBatch(daEntry.BatchIndex)
 		case *FinalizeBatchDA:

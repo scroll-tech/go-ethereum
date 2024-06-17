@@ -8,6 +8,7 @@ import (
 	"github.com/scroll-tech/da-codec/encoding"
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
 	"github.com/scroll-tech/da-codec/encoding/codecv1"
+	"github.com/scroll-tech/da-codec/encoding/codecv2"
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -163,6 +164,8 @@ func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Lo
 		return ds.decodeDAV0(batchIndex, vLog, &args)
 	case 1:
 		return ds.decodeDAV1(batchIndex, vLog, &args)
+	case 2:
+		return ds.decodeDAV2(batchIndex, vLog, &args)
 	default:
 		return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 	}
@@ -269,5 +272,67 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 		currentIndex++
 	}
 	da := NewCommitBatchDaV1(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	return da, nil
+}
+
+func (ds *CalldataBlobSource) decodeDAV2(batchIndex uint64, vLog *types.Log, args *commitBatchArgs) (DAEntry, error) {
+	var chunks []*codecv2.DAChunkRawTx
+	var l1Txs []*types.L1MessageTx
+	chunks, err := codecv2.DecodeDAChunksRawTx(args.Chunks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
+	}
+
+	parentBatchHeader, err := codecv2.NewDABatchFromBytes(args.ParentBatchHeader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode batch bytes into batch, values: %v, err: %w", args.ParentBatchHeader, err)
+	}
+	versionedHash, err := ds.l1Client.fetchTxBlobHash(ds.ctx, vLog)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
+	}
+	blob, err := ds.blobClient.GetBlobByVersionedHash(ds.ctx, versionedHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)
+	}
+	// compute blob versioned hash and compare with one from tx
+	c, err := kzg4844.BlobToCommitment(blob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blob commitment")
+	}
+	blobVersionedHash := common.Hash(kzg4844.CalcBlobHashV1(sha256.New(), &c))
+	if blobVersionedHash != versionedHash {
+		return nil, fmt.Errorf("blobVersionedHash from blob source is not equal to versionedHash from tx, correct versioned hash: %s, fetched blob hash: %s", versionedHash.String(), blobVersionedHash.String())
+	}
+	// decode txs from blob
+	err = codecv2.DecodeTxsFromBlob(blob, chunks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
+	}
+	parentTotalL1MessagePopped := parentBatchHeader.TotalL1MessagePopped
+	totalL1MessagePopped := 0
+	for _, chunk := range chunks {
+		for _, block := range chunk.Blocks {
+			totalL1MessagePopped += int(block.NumL1Messages)
+		}
+	}
+	skippedBitmap, err := encoding.DecodeBitmap(args.SkippedL1MessageBitmap, totalL1MessagePopped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode bitmap: %v, err: %w", batchIndex, err)
+	}
+	// get all necessary l1msgs without skipped
+	currentIndex := parentTotalL1MessagePopped
+	for index := 0; index < totalL1MessagePopped; index++ {
+		for encoding.IsL1MessageSkipped(skippedBitmap, currentIndex-parentTotalL1MessagePopped) {
+			currentIndex++
+		}
+		l1Tx := rawdb.ReadL1Message(ds.db, currentIndex)
+		if l1Tx == nil {
+			return nil, fmt.Errorf("failed to read L1 message from db, l1 message index: %v", currentIndex)
+		}
+		l1Txs = append(l1Txs, l1Tx)
+		currentIndex++
+	}
+	da := NewCommitBatchDaV2(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }

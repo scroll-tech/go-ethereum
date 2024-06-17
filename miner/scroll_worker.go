@@ -400,6 +400,14 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		return
 	}
 
+	var nextL1MsgIndex uint64
+	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.chain.Database(), parent.Hash()); dbIndex != nil {
+		nextL1MsgIndex = *dbIndex
+	} else {
+		log.Error("failed to read nextL1MsgIndex", "parent", parent.Hash())
+		return
+	}
+
 	// Apply special state transition at Curie block
 	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
 		misc.ApplyCurieHardFork(parentState)
@@ -411,11 +419,12 @@ func (w *worker) startNewPipeline(timestamp int64) {
 			// nodes will still store CCC results.
 			Rows: &types.RowConsumption{},
 			FinalBlock: &pipeline.BlockCandidate{
-				Header:        header,
-				State:         parentState,
-				Txs:           types.Transactions{},
-				Receipts:      types.Receipts{},
-				CoalescedLogs: []*types.Log{},
+				Header:         header,
+				State:          parentState,
+				Txs:            types.Transactions{},
+				Receipts:       types.Receipts{},
+				CoalescedLogs:  []*types.Log{},
+				NextL1MsgIndex: nextL1MsgIndex,
 			},
 		})
 
@@ -446,14 +455,6 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		}
 	}
 	collectL2Timer.UpdateSince(tidyPendingStart)
-
-	var nextL1MsgIndex uint64
-	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.chain.Database(), parent.Hash()); dbIndex != nil {
-		nextL1MsgIndex = *dbIndex
-	} else {
-		log.Error("failed to read nextL1MsgIndex", "parent", parent.Hash())
-		return
-	}
 
 	w.currentPipelineStart = time.Now()
 	pipelineCCC := w.getCCC()

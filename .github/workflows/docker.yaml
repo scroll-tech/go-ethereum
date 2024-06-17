@@ -6,7 +6,7 @@ on:
       - '*'
 
 jobs:
-  build-and-push:
+  build-and-push-amd64-image:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -23,10 +23,36 @@ jobs:
     - name: Build docker image
       uses: docker/build-push-action@v2
       with:
+        platforms: linux/amd64
         context: .
         file: Dockerfile
         # push: ${{ startsWith(github.ref, 'refs/tags/') }}
         push: true
-        tags: scrolltech/l2geth:${{github.ref_name}}
+        tags: scrolltech/l2geth:${{github.ref_name}}-amd64
         # cache-from: type=gha,scope=${{ github.workflow }}
         # cache-to: type=gha,scope=${{ github.workflow }}
+  build-and-push-arm64-image:
+    runs-on: [self-hosted, Linux, ARM64, scroll-runner]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build docker image
+        uses: docker/build-push-action@v2
+        with:
+          platforms: linux/arm64
+          context: .
+          file: Dockerfile
+          # push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          push: true
+          tags: scrolltech/l2geth:${{github.ref_name}}-arm64
+          # cache-from: type=gha,scope=${{ github.workflow }}
+          # cache-to: type=gha,scope=${{ github.workflow }}

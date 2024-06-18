@@ -316,7 +316,8 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 		// overwrite triedb IsUsingZktrie config to be safe
 		triedb.SetIsUsingZktrie(storedcfg.Scroll.ZktrieEnabled())
 	}
-	if header.Root != types.EmptyRootHash && !triedb.Initialized(header.Root) {
+	// if header.Root != types.EmptyRootHash && !triedb.Initialized(header.Hash()) {
+	if _, err := state.New(header.Root, state.NewDatabaseWithNodeDB(db, triedb), nil); err != nil {
 		if genesis == nil {
 			genesis = DefaultGenesisBlock()
 		}

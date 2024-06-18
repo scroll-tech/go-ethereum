@@ -556,8 +556,8 @@ func (w *worker) mainLoop() {
 
 	for {
 		select {
-		case _ = <-w.newWorkCh:
-			// w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
+		case req := <-w.newWorkCh:
+			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
 			// new block created.
 
 		case ev := <-w.chainSideCh:
@@ -632,7 +632,7 @@ func (w *worker) mainLoop() {
 				// submit mining work here since all empty submission will be rejected
 				// by clique. Of course the advance sealing(empty submission) is disabled.
 				if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
-					// w.commitNewWork(nil, true, time.Now().Unix())
+					w.commitNewWork(nil, true, time.Now().Unix())
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))

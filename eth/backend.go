@@ -143,6 +143,9 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
+	if chainConfig.Clique != nil && config.EnableDASyncing {
+		chainConfig.Clique.DaSyncingEnabled = true
+	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
@@ -264,7 +267,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		}
 	}
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
@@ -294,7 +297,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 
 	// Register the backend on the node
 	stack.RegisterAPIs(eth.APIs())
-	// stack.RegisterProtocols(eth.Protocols())
+	stack.RegisterProtocols(eth.Protocols())
 	stack.RegisterLifecycle(eth)
 	// Check for unclean shutdown
 	if uncleanShutdowns, discards, err := rawdb.PushUncleanShutdownMarker(chainDb); err != nil {
@@ -336,6 +339,14 @@ func (s *Ethereum) APIs() []rpc.API {
 
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, s.engine.APIs(s.BlockChain())...)
+	if s.handler != nil {
+		apis = append(apis, rpc.API{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
+			Public:    true,
+		})
+	}
 
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
@@ -349,12 +360,7 @@ func (s *Ethereum) APIs() []rpc.API {
 			Version:   "1.0",
 			Service:   NewPublicMinerAPI(s),
 			Public:    true,
-		}, /*{
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
-			Public:    true,
-		},*/{
+		}, {
 			Namespace: "miner",
 			Version:   "1.0",
 			Service:   NewPrivateMinerAPI(s),
@@ -520,7 +526,7 @@ func (s *Ethereum) StartMining(threads int) error {
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
-		// atomic.StoreUint32(&s.handler.acceptTxs, 1)
+		atomic.StoreUint32(&s.handler.acceptTxs, 1)
 
 		go s.miner.Start(eb)
 	}
@@ -560,6 +566,9 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 // Protocols returns all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
+	if s.handler == nil {
+		return nil
+	}
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)
 	if !s.blockchain.Config().Scroll.ZktrieEnabled() && s.config.SnapshotCache > 0 {
 		protos = append(protos, snap.MakeProtocols((*snapHandler)(s.handler), s.snapDialCandidates)...)
@@ -576,7 +585,7 @@ func (s *Ethereum) Start() error {
 	s.startBloomHandlers(params.BloomBitsBlocks)
 
 	// Figure out a max peers count based on the server limits
-	// maxPeers := s.p2pServer.MaxPeers
+	maxPeers := s.p2pServer.MaxPeers
 	//if s.config.LightServ > 0 {
 	//	if s.config.LightPeers >= s.p2pServer.MaxPeers {
 	//		return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, s.p2pServer.MaxPeers)
@@ -584,7 +593,9 @@ func (s *Ethereum) Start() error {
 	//	maxPeers -= s.config.LightPeers
 	//}
 	// Start the networking layer and the light server if requested
-	// s.handler.Start(maxPeers)
+	if s.handler != nil {
+		s.handler.Start(maxPeers)
+	}
 	return nil
 }
 
@@ -594,7 +605,9 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	// s.handler.Stop()
+	if s.handler != nil {
+		s.handler.Stop()
+	}
 
 	// Then stop everything else.
 	s.bloomIndexer.Close()

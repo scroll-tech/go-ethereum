@@ -2,6 +2,7 @@ package da_syncer
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core"
@@ -88,7 +89,11 @@ func (sp *SyncingPipeline) Start() {
 		for {
 			err := sp.Step(sp.ctx)
 			if err != nil {
-				log.Warn("syncing pipeline step failed", "err", err)
+				if strings.HasPrefix(err.Error(), "not consecutive block") {
+					log.Warn("syncing pipeline step failed, probably because of restart", "err", err)
+				} else {
+					log.Crit("syncing pipeline step failed", "err", err)
+				}
 			}
 			select {
 			case <-sp.ctx.Done():

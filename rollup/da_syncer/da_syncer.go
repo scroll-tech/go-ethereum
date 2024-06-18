@@ -26,7 +26,6 @@ func (s *DaSyncer) SyncOneBlock(block *types.Block) error {
 	if big.NewInt(0).Add(s.blockchain.CurrentBlock().Number(), common.Big1).Cmp(block.Number()) != 0 {
 		return fmt.Errorf("not consecutive block, number: %d", block.Number())
 	}
-
 	header := block.Header()
 	txs := block.Transactions()
 
@@ -47,7 +46,6 @@ func (s *DaSyncer) SyncOneBlock(block *types.Block) error {
 	if _, err := s.blockchain.InsertChainWithoutSealVerification(fullBlock); err != nil {
 		return fmt.Errorf("cannot insert block, number: %d, error: %v", block.Number(), err)
 	}
-
 	if s.blockchain.CurrentBlock().Header().Number.Uint64()%100 == 0 {
 		log.Info("inserted block", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash())
 	}

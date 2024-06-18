@@ -145,28 +145,28 @@ type SignerFn func(signer accounts.Account, mimeType string, message []byte) ([]
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
-	return common.BigToAddress(big.NewInt(0).SetUint64(12345)), nil
-	// // If the signature's already cached, return that
-	// hash := header.Hash()
-	// if address, known := sigcache.Get(hash); known {
-	// 	return address.(common.Address), nil
-	// }
-	// // Retrieve the signature from the header extra-data
-	// if len(header.Extra) < extraSeal {
-	// 	return common.Address{}, errMissingSignature
-	// }
-	// signature := header.Extra[len(header.Extra)-extraSeal:]
+	// return common.BigToAddress(big.NewInt(0).SetUint64(12345)), nil
+	// If the signature's already cached, return that
+	hash := header.Hash()
+	if address, known := sigcache.Get(hash); known {
+		return address.(common.Address), nil
+	}
+	// Retrieve the signature from the header extra-data
+	if len(header.Extra) < extraSeal {
+		return common.Address{}, errMissingSignature
+	}
+	signature := header.Extra[len(header.Extra)-extraSeal:]
 
-	// // Recover the public key and the Ethereum address
-	// pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)
-	// if err != nil {
-	// 	return common.Address{}, err
-	// }
-	// var signer common.Address
-	// copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
+	// Recover the public key and the Ethereum address
+	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	var signer common.Address
+	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
 
-	// sigcache.Add(hash, signer)
-	// return signer, nil
+	sigcache.Add(hash, signer)
+	return signer, nil
 }
 
 // Clique is the proof-of-authority consensus engine proposed to support the
@@ -212,8 +212,10 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
 func (c *Clique) Author(header *types.Header) (common.Address, error) {
-	return common.BigToAddress(big.NewInt(0).SetUint64(12345)), nil
-	// return ecrecover(header, c.signatures)
+	if c.config.DaSyncingEnabled {
+		return common.BigToAddress(big.NewInt(0).SetUint64(12345)), nil
+	}
+	return ecrecover(header, c.signatures)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
@@ -268,21 +270,23 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	if checkpoint && !bytes.Equal(header.Nonce[:], nonceDropVote) {
 		return errInvalidCheckpointVote
 	}
-	// // Check that the extra-data contains both the vanity and signature
-	// if len(header.Extra) < extraVanity {
-	// 	return errMissingVanity
-	// }
-	// if len(header.Extra) < extraVanity+extraSeal {
-	// 	return errMissingSignature
-	// }
-	// // Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
-	// signersBytes := len(header.Extra) - extraVanity - extraSeal
-	// if !checkpoint && signersBytes != 0 {
-	// 	return errExtraSigners
-	// }
-	// if checkpoint && signersBytes%common.AddressLength != 0 {
-	// 	return errInvalidCheckpointSigners
-	// }
+	if !c.config.DaSyncingEnabled {
+		// Check that the extra-data contains both the vanity and signature
+		if len(header.Extra) < extraVanity {
+			return errMissingVanity
+		}
+		if len(header.Extra) < extraVanity+extraSeal {
+			return errMissingSignature
+		}
+		// Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
+		signersBytes := len(header.Extra) - extraVanity - extraSeal
+		if !checkpoint && signersBytes != 0 {
+			return errExtraSigners
+		}
+		if checkpoint && signersBytes%common.AddressLength != 0 {
+			return errInvalidCheckpointSigners
+		}
+	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
 		return errInvalidMixDigest
@@ -349,25 +353,27 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		// Verify the header's EIP-1559 attributes.
 		return err
 	}
-	// // Retrieve the snapshot needed to verify this header and cache it
-	// snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
-	// if err != nil {
-	// 	return err
-	// }
-	// // If the block is a checkpoint block, verify the signer list
-	// if number%c.config.Epoch == 0 {
-	// 	signers := make([]byte, len(snap.Signers)*common.AddressLength)
-	// 	for i, signer := range snap.signers() {
-	// 		copy(signers[i*common.AddressLength:], signer[:])
-	// 	}
-	// 	extraSuffix := len(header.Extra) - extraSeal
-	// 	if !bytes.Equal(header.Extra[extraVanity:extraSuffix], signers) {
-	// 		return errMismatchingCheckpointSigners
-	// 	}
-	// }
-	// // All basic checks passed, verify the seal and return
-	//  return c.verifySeal(snap, header, parents)
-	return nil
+	if c.config.DaSyncingEnabled {
+		return nil
+	}
+	// Retrieve the snapshot needed to verify this header and cache it
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
+	if err != nil {
+		return err
+	}
+	// If the block is a checkpoint block, verify the signer list
+	if number%c.config.Epoch == 0 {
+		signers := make([]byte, len(snap.Signers)*common.AddressLength)
+		for i, signer := range snap.signers() {
+			copy(signers[i*common.AddressLength:], signer[:])
+		}
+		extraSuffix := len(header.Extra) - extraSeal
+		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], signers) {
+			return errMismatchingCheckpointSigners
+		}
+	}
+	// All basic checks passed, verify the seal and return
+	return c.verifySeal(snap, header, parents)
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.

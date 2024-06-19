@@ -433,6 +433,9 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			keyStr := key.String()
 			isDelete := bytes.Equal(values.Bytes(), common.Hash{}.Bytes())
 
+			if addrStr == "0x5300000000000000000000000000000000000004" {
+				fmt.Println("WETH", keyStr, isDelete, values.String())
+			}
 			txm := txStorageTrace.StorageProofs[addrStr]
 			env.sMu.Lock()
 			m, existed := env.StorageProofs[addrStr]

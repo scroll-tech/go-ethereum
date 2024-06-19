@@ -26,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -69,7 +70,7 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 }
 
 type tracerWrapper interface {
-	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
+	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, *vm.LogConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
 }
 
 func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper) {
@@ -298,7 +299,7 @@ func (v *BlockValidator) createTraceEnvAndGetBlockTrace(block *types.Block) (*ty
 		return nil, err
 	}
 
-	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.bc.db, statedb, parent, block, true)
+	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, nil, v.bc, v.engine, v.bc.db, statedb, parent, block, true)
 }
 
 func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {

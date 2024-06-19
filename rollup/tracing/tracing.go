@@ -45,8 +45,8 @@ func NewTracerWrapper() *TracerWrapper {
 }
 
 // CreateTraceEnvAndGetBlockTrace wraps the whole block tracing logic for a block
-func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*types.BlockTrace, error) {
-	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parent, block, commitAfterApply)
+func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*types.BlockTrace, error) {
+	traceEnv, err := CreateTraceEnv(chainConfig, logConfig, chainContext, engine, chaindb, statedb, parent, block, commitAfterApply)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +98,15 @@ type txTraceTask struct {
 }
 
 func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+	if logConfig == nil {
+		logConfig = &vm.LogConfig{
+			DisableStorage:   true,
+			DisableStack:     true,
+			EnableMemory:     false,
+			EnableReturnData: true,
+		}
+	}
+
 	return &TraceEnv{
 		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
@@ -119,7 +128,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 	}
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 
 	var err error
@@ -150,12 +159,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 	}
 	env := CreateTraceEnvHelper(
 		chainConfig,
-		&vm.LogConfig{
-			DisableStorage:   true,
-			DisableStack:     true,
-			EnableMemory:     false,
-			EnableReturnData: true,
-		},
+		logConfig,
 		core.NewEVMBlockContext(block.Header(), chainContext, chainConfig, nil),
 		*startL1QueueIndex,
 		coinbase,

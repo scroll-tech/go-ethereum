@@ -421,6 +421,12 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.SepoliaChainConfig
 	case ghash == params.GoerliGenesisHash:
 		return params.GoerliChainConfig
+	case ghash == params.ScrollAlphaGenesisHash:
+		return params.ScrollAlphaChainConfig
+	case ghash == params.ScrollSepoliaGenesisHash:
+		return params.ScrollSepoliaChainConfig
+	case ghash == params.ScrollMainnetGenesisHash:
+		return params.ScrollMainnetChainConfig
 	default:
 		return params.AllEthashProtocolChanges
 	}

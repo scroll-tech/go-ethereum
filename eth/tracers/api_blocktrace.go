@@ -7,6 +7,7 @@ import (
 
 	"dario.cat/mergo"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -114,7 +115,13 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	chainConfig := new(params.ChainConfig)
 	*chainConfig = *api.backend.ChainConfig()
 	if config != nil && config.Overrides != nil {
+		// the merge.Merge seems not work well
 		mergo.Merge(&chainConfig, config.Overrides, mergo.WithOverride)
+		if curie := config.Overrides.CurieBlock; curie != nil {
+			chainConfig.CurieBlock = curie
+			misc.ApplyCurieHardFork(statedb)
+			statedb.Commit(true)
+		}
 		fmt.Printf("trace config overrided: %v, config.Overrides: %v", chainConfig, config.Overrides)
 	}
 	return api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(chainConfig, api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)

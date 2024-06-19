@@ -84,7 +84,7 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	if config == nil {
 		config = &TraceConfig{
 			LogConfig: &vm.LogConfig{
-				DisableStorage:   true,
+				DisableStorage:   false,
 				DisableStack:     true,
 				EnableMemory:     false,
 				EnableReturnData: true,

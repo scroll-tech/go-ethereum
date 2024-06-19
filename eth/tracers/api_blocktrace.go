@@ -3,7 +3,9 @@ package tracers
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"dario.cat/mergo"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -109,5 +111,11 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	}
 
 	chaindb := api.backend.ChainDb()
-	return api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	chainConfig := new(params.ChainConfig)
+	*chainConfig = *api.backend.ChainConfig()
+	if config != nil && config.Overrides != nil {
+		mergo.Merge(&chainConfig, config.Overrides, mergo.WithOverride)
+		fmt.Printf("trace config overrided: %v, config.Overrides: %v", chainConfig, config.Overrides)
+	}
+	return api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(chainConfig, api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
 }

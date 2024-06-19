@@ -472,7 +472,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
 			if zktrieTracer.Available() {
-				if isDelete || key.String() == "0x05ece367e1383ed8a9e1f7b512dd416ea6fbb86ef0a3572ffe45974fe1b2a1e6" {
+				if isDelete {
 					zktrieTracer.MarkDeletion(key)
 				}
 				env.ZkTrieTracer[addrStr].Merge(zktrieTracer)

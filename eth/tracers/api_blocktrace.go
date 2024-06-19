@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"dario.cat/mergo"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -116,7 +115,7 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	*chainConfig = *api.backend.ChainConfig()
 	if config != nil && config.Overrides != nil {
 		// the merge.Merge seems not work well
-		mergo.Merge(&chainConfig, config.Overrides, mergo.WithOverride)
+		// mergo.Merge(&chainConfig, config.Overrides, mergo.WithOverride)
 		if curie := config.Overrides.CurieBlock; curie != nil {
 			chainConfig.CurieBlock = curie
 			misc.ApplyCurieHardFork(statedb)

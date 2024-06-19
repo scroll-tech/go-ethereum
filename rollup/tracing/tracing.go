@@ -448,6 +448,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 				txm[keyStr] = proof
 				// still need to touch tracer for deletion
 				if isDelete && zktrieTracer.Available() {
+					fmt.Println("MarkDeletion1", addrStr, key)
 					env.ZkTrieTracer[addrStr].MarkDeletion(key)
 				}
 				env.sMu.Unlock()
@@ -472,6 +473,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			m[keyStr] = wrappedProof
 			if zktrieTracer.Available() {
 				if isDelete {
+					fmt.Println("MarkDeletion2", addrStr, key)
 					zktrieTracer.MarkDeletion(key)
 				}
 				env.ZkTrieTracer[addrStr].Merge(zktrieTracer)

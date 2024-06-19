@@ -160,7 +160,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 		*startL1QueueIndex,
 		coinbase,
 		statedb,
-		statedb.GetRootHash(),
+		statedb.GetRootHash(), // use `statedb.GetRootHash()` instead of `parent.Root()` because statedb might be overrided
 		block,
 		commitAfterApply,
 	)

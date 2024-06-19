@@ -428,7 +428,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		zktrieTracer := state.NewProofTracer(trie)
 		env.sMu.Unlock()
 
-		for key, _ := range keys {
+		for key := range keys {
 			addrStr := addr.String()
 			keyStr := key.String()
 			value := state.GetState(addr, key)

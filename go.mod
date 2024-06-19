@@ -68,7 +68,6 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/azure-pipeline-go v0.2.2 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.23 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.0.2 // indirect

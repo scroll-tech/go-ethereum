@@ -1700,24 +1700,16 @@ func (pool *TxPool) calculateTxsLifecycle(txs []common.Hash, t uint64) {
 		return
 	}
 
-	var (
-		totalTxsLifecycle uint64
-		txCount           uint64
-	)
 	for _, tx := range txs {
 		addTime, ok := pool.txLifecycles.Get(tx)
 		if !ok {
 			continue
 		}
 		if t > addTime.(uint64) {
-			txCount++
 			txLifecycle := t - addTime.(uint64)
-			totalTxsLifecycle += txLifecycle
+			txLifecycleTimer.Update(time.Duration(txLifecycle) * time.Second)
 		}
 	}
-
-	median := float64(totalTxsLifecycle) / float64(txCount)
-	txLifecycleTimer.Update(time.Duration(median) * time.Second)
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.

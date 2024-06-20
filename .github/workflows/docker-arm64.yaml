@@ -1,4 +1,4 @@
-name: Docker
+name: Docker-arm64
 
 on:
   workflow_dispatch: {}

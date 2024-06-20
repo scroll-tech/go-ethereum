@@ -114,12 +114,10 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	chainConfig := new(params.ChainConfig)
 	*chainConfig = *api.backend.ChainConfig()
 	if config != nil && config.Overrides != nil {
-		// the merge.Merge seems not work well
-		// mergo.Merge(chainConfig, config.Overrides, mergo.WithOverride)
 		if curie := config.Overrides.CurieBlock; curie != nil {
 			chainConfig.CurieBlock = curie
 			misc.ApplyCurieHardFork(statedb)
-			statedb.Commit(true)
+			statedb.IntermediateRoot(true)
 		}
 		log.Info("chainConfig overrided by traceConfig.Overrides", "chainConfig", chainConfig, "config.Overrides", config.Overrides)
 	}

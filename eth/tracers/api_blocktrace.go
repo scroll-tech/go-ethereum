@@ -114,10 +114,15 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	chainConfig := new(params.ChainConfig)
 	*chainConfig = *api.backend.ChainConfig()
 	if config != nil && config.Overrides != nil {
+		// In future we can add more fork related logics here
+		// like upstream: https://github.com/ethereum/go-ethereum/pull/26655
 		if curie := config.Overrides.CurieBlock; curie != nil {
 			chainConfig.CurieBlock = curie
-			misc.ApplyCurieHardFork(statedb)
-			statedb.IntermediateRoot(true)
+			if block.Number().Cmp(curie) > 0 {
+				// set non zero values for these slots
+				misc.ApplyCurieHardFork(statedb)
+				statedb.IntermediateRoot(true)
+			}
 		}
 		log.Info("chainConfig overrided by traceConfig.Overrides", "chainConfig", chainConfig, "config.Overrides", config.Overrides)
 	}

@@ -35,4 +35,4 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: scrolltech/l2geth:${{github.ref_name}}-arm64-ubuntu
+          tags: scrolltech/l2geth:${{github.ref_name}}-arm64

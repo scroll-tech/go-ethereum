@@ -384,7 +384,9 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	// merge bytecodes
 	env.cMu.Lock()
 	for codeHash, codeInfo := range structLogger.TracedBytecodes() {
-		env.Codes[codeHash] = codeInfo
+		if codeHash != (common.Hash{}) {
+			env.Codes[codeHash] = codeInfo
+		}
 	}
 	env.cMu.Unlock()
 

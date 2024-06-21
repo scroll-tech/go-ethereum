@@ -386,7 +386,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	for codeHash, codeInfo := range structLogger.TracedBytecodes() {
 		env.Codes[codeHash] = codeInfo
 	}
-	env.cMu.Lock()
+	env.cMu.Unlock()
 
 	// merge required proof data
 	proofAccounts := structLogger.UpdatedAccounts()

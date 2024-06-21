@@ -118,7 +118,7 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 		// like upstream: https://github.com/ethereum/go-ethereum/pull/26655
 		if curie := config.Overrides.CurieBlock; curie != nil {
 			chainConfig.CurieBlock = curie
-			if block.Number().Cmp(curie) > 0 {
+			if !api.backend.ChainConfig().IsCurie(block.Number()) && block.Number().Cmp(curie) > 0 {
 				// set non zero values for these slots
 				misc.ApplyCurieHardFork(statedb)
 				statedb.IntermediateRoot(true)

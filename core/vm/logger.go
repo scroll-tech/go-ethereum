@@ -168,6 +168,7 @@ type StructLogger struct {
 // NewStructLogger returns a new logger
 func NewStructLogger(cfg *LogConfig) *StructLogger {
 	logger := &StructLogger{
+		bytecodes:      make(map[common.Hash]CodeInfo),
 		storage:        make(map[common.Address]Storage),
 		statesAffected: make(map[common.Address]struct{}),
 	}
@@ -180,6 +181,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 
 // Reset clears the data held by the logger.
 func (l *StructLogger) Reset() {
+	l.bytecodes = make(map[common.Hash]CodeInfo)
 	l.storage = make(map[common.Address]Storage)
 	l.statesAffected = make(map[common.Address]struct{})
 	l.output = make([]byte, 0)

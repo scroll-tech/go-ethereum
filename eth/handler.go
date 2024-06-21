@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -76,15 +77,16 @@ type txPool interface {
 // handlerConfig is the collection of initialization parameters to create a full
 // node network handler.
 type handlerConfig struct {
-	Database   ethdb.Database            // Database for direct sync insertions
-	Chain      *core.BlockChain          // Blockchain to serve data from
-	TxPool     txPool                    // Transaction pool to propagate from
-	Network    uint64                    // Network identifier to adfvertise
-	Sync       downloader.SyncMode       // Whether to fast or full sync
-	BloomCache uint64                    // Megabytes to alloc for fast sync bloom
-	EventMux   *event.TypeMux            // Legacy event mux, deprecate for `feed`
-	Checkpoint *params.TrustedCheckpoint // Hard coded checkpoint for sync challenges
-	Whitelist  map[uint64]common.Hash    // Hard coded whitelist for sync challenged
+	Database          ethdb.Database            // Database for direct sync insertions
+	Chain             *core.BlockChain          // Blockchain to serve data from
+	TxPool            txPool                    // Transaction pool to propagate from
+	Network           uint64                    // Network identifier to adfvertise
+	Sync              downloader.SyncMode       // Whether to fast or full sync
+	BloomCache        uint64                    // Megabytes to alloc for fast sync bloom
+	EventMux          *event.TypeMux            // Legacy event mux, deprecate for `feed`
+	Checkpoint        *params.TrustedCheckpoint // Hard coded checkpoint for sync challenges
+	Whitelist         map[uint64]common.Hash    // Hard coded whitelist for sync challenged
+	ShadowForkPeerIDs []string                  // List of peer ids that take part in the shadow-fork
 }
 
 type handler struct {
@@ -122,6 +124,8 @@ type handler struct {
 	chainSync *chainSyncer
 	wg        sync.WaitGroup
 	peerWG    sync.WaitGroup
+
+	shadowForkPeerIDs []string
 }
 
 // newHandler returns a handler for all Ethereum chain management protocol.
@@ -131,15 +135,16 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		config.EventMux = new(event.TypeMux) // Nicety initialization for tests
 	}
 	h := &handler{
-		networkID:  config.Network,
-		forkFilter: forkid.NewFilter(config.Chain),
-		eventMux:   config.EventMux,
-		database:   config.Database,
-		txpool:     config.TxPool,
-		chain:      config.Chain,
-		peers:      newPeerSet(),
-		whitelist:  config.Whitelist,
-		quitSync:   make(chan struct{}),
+		networkID:         config.Network,
+		forkFilter:        forkid.NewFilter(config.Chain),
+		eventMux:          config.EventMux,
+		database:          config.Database,
+		txpool:            config.TxPool,
+		chain:             config.Chain,
+		peers:             newPeerSet(),
+		whitelist:         config.Whitelist,
+		quitSync:          make(chan struct{}),
+		shadowForkPeerIDs: config.ShadowForkPeerIDs,
 	}
 	if config.Sync == downloader.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the fast
@@ -433,7 +438,7 @@ func (h *handler) Stop() {
 // will only announce its availability (depending what's requested).
 func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 	hash := block.Hash()
-	peers := h.peers.peersWithoutBlock(hash)
+	peers := onlyShadowForkPeers(h.shadowForkPeerIDs, h.peers.peersWithoutBlock(hash))
 
 	// If propagation is requested, send to a subset of the peer
 	if propagate {
@@ -483,7 +488,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		if tx.IsL1MessageTx() {
 			continue
 		}
-		peers := h.peers.peersWithoutTransaction(tx.Hash())
+		peers := onlyShadowForkPeers(h.shadowForkPeerIDs, h.peers.peersWithoutTransaction(tx.Hash()))
 		// Send the tx unconditionally to a subset of our peers
 		numDirect := int(math.Sqrt(float64(len(peers))))
 		for _, peer := range peers[:numDirect] {
@@ -532,4 +537,17 @@ func (h *handler) txBroadcastLoop() {
 			return
 		}
 	}
+}
+
+// onlyShadowForkPeers filters out peers that are not part of the shadow fork
+func onlyShadowForkPeers[peerT interface {
+	ID() string
+}](shadowForkPeerIDs []string, peers []peerT) []peerT {
+	if shadowForkPeerIDs == nil {
+		return peers
+	}
+
+	return slices.DeleteFunc(peers, func(peer peerT) bool {
+		return !slices.Contains(shadowForkPeerIDs, peer.ID())
+	})
 }

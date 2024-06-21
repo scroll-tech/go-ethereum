@@ -113,6 +113,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		},
+		Codes:             make(map[common.Hash]vm.CodeInfo),
 		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
 		ExecutionResults:  make([]*types.ExecutionResult, block.Transactions().Len()),
 		TxStorageTraces:   make([]*types.StorageTrace, block.Transactions().Len()),

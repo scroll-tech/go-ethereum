@@ -32,7 +32,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
-	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -203,16 +202,6 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 			Nonce:   env.StateDB.GetNonce(to),
 			Balance: (*hexutil.Big)(value),
 		}
-
-		code := input
-
-		codeInfo := CodeInfo{
-			CodeSize:         uint64(len(code)),
-			KeccakCodeHash:   codehash.KeccakCodeHash(code),
-			PoseidonCodeHash: codehash.PoseidonCodeHash(code),
-			Code:             code,
-		}
-		l.bytecodes[codeInfo.PoseidonCodeHash] = codeInfo
 	} else {
 		traceCodeWithAddress(l, to)
 	}

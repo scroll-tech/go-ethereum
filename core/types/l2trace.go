@@ -70,11 +70,8 @@ type ExecutionResult struct {
 	// currently they are just `from` and `to` account
 	AccountsAfter []*AccountWrapper `json:"accountAfter"`
 
-	// `PoseidonCodeHash` only exists when tx is a contract call.
-	PoseidonCodeHash *common.Hash    `json:"poseidonCodeHash,omitempty"`
-	StructLogs       []*StructLogRes `json:"structLogs"`
-	CallTrace        json.RawMessage `json:"callTrace"`
-	Prestate         json.RawMessage `json:"prestate"`
+	StructLogs []*StructLogRes `json:"structLogs"`
+	CallTrace  json.RawMessage `json:"callTrace"`
 }
 
 // StructLogRes stores a structured log emitted by the EVM while replaying a

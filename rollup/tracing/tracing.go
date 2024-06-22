@@ -507,7 +507,6 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		ReturnValue:    fmt.Sprintf("%x", returnVal),
 		StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
 		CallTrace:      callTrace,
-		Prestate:       []byte("{}"),
 	}
 	env.TxStorageTraces[index] = txStorageTrace
 

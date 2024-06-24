@@ -1,4 +1,4 @@
-package sync_service
+package l1_msg
 
 import (
 	"context"

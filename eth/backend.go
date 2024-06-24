@@ -55,8 +55,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -71,7 +71,7 @@ type Ethereum struct {
 
 	// Handlers
 	txPool             *core.TxPool
-	syncService        *sync_service.SyncService
+	syncService        *l1_msg.SyncService
 	rollupSyncService  *rollup_sync_service.RollupSyncService
 	blockchain         *core.BlockChain
 	handler            *handler
@@ -105,7 +105,7 @@ type Ethereum struct {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthClient) (*Ethereum, error) {
+func New(stack *node.Node, config *ethconfig.Config, l1Client l1_msg.EthClient) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -217,7 +217,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
 	// initialize and start L1 message sync service
-	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
+	eth.syncService, err = l1_msg.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
@@ -532,18 +532,18 @@ func (s *Ethereum) StopMining() {
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
-func (s *Ethereum) AccountManager() *accounts.Manager      { return s.accountManager }
-func (s *Ethereum) BlockChain() *core.BlockChain           { return s.blockchain }
-func (s *Ethereum) TxPool() *core.TxPool                   { return s.txPool }
-func (s *Ethereum) EventMux() *event.TypeMux               { return s.eventMux }
-func (s *Ethereum) Engine() consensus.Engine               { return s.engine }
-func (s *Ethereum) ChainDb() ethdb.Database                { return s.chainDb }
-func (s *Ethereum) IsListening() bool                      { return true } // Always listening
-func (s *Ethereum) Downloader() *downloader.Downloader     { return s.handler.downloader }
-func (s *Ethereum) Synced() bool                           { return atomic.LoadUint32(&s.handler.acceptTxs) == 1 }
-func (s *Ethereum) ArchiveMode() bool                      { return s.config.NoPruning }
-func (s *Ethereum) BloomIndexer() *core.ChainIndexer       { return s.bloomIndexer }
-func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncService }
+func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager }
+func (s *Ethereum) BlockChain() *core.BlockChain       { return s.blockchain }
+func (s *Ethereum) TxPool() *core.TxPool               { return s.txPool }
+func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
+func (s *Ethereum) Engine() consensus.Engine           { return s.engine }
+func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
+func (s *Ethereum) IsListening() bool                  { return true } // Always listening
+func (s *Ethereum) Downloader() *downloader.Downloader { return s.handler.downloader }
+func (s *Ethereum) Synced() bool                       { return atomic.LoadUint32(&s.handler.acceptTxs) == 1 }
+func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
+func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
+func (s *Ethereum) SyncService() *l1_msg.SyncService   { return s.syncService }
 
 // Protocols returns all the currently configured
 // network protocols to start.

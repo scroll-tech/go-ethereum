@@ -34,7 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
 )
 
 // Backend wraps all methods required for mining.
@@ -42,7 +42,7 @@ type Backend interface {
 	BlockChain() *core.BlockChain
 	TxPool() *core.TxPool
 	ChainDb() ethdb.Database
-	SyncService() *sync_service.SyncService
+	SyncService() *l1_msg.SyncService
 }
 
 // Config is the configuration parameters of mining.

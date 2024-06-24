@@ -5,7 +5,7 @@
 // forge flatten src/L1/rollup/L1MessageQueue.sol > flatten.sol
 // go run github.com/scroll-tech/go-ethereum/cmd/abigen@develop --sol flatten.sol --pkg rollup --out ./L1MessageQueue.go --contract L1MessageQueue
 
-package sync_service
+package l1_msg
 
 import (
 	"math/big"

@@ -33,7 +33,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -59,7 +59,7 @@ func (m *mockBackend) TxPool() *core.TxPool {
 	return m.txPool
 }
 
-func (m *mockBackend) SyncService() *sync_service.SyncService {
+func (m *mockBackend) SyncService() *l1_msg.SyncService {
 	return nil
 }
 

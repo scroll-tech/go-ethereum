@@ -1,4 +1,4 @@
-package rollup_sync_service
+package rollup_event
 
 import (
 	"context"

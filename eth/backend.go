@@ -56,7 +56,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
-	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/rollup_event"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -72,7 +72,7 @@ type Ethereum struct {
 	// Handlers
 	txPool             *core.TxPool
 	syncService        *l1_msg.SyncService
-	rollupSyncService  *rollup_sync_service.RollupSyncService
+	rollupSyncService  *rollup_event.RollupSyncService
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -225,7 +225,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1_msg.EthClient) 
 
 	if config.EnableRollupVerify {
 		// initialize and start rollup event sync service
-		eth.rollupSyncService, err = rollup_sync_service.NewRollupSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack)
+		eth.rollupSyncService, err = rollup_event.NewRollupSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
 		}

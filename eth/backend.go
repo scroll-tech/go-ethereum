@@ -55,8 +55,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
-	"github.com/scroll-tech/go-ethereum/rollup/rollup_event"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service/rollup_event"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )

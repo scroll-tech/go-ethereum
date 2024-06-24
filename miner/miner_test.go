@@ -33,7 +33,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/event"
-	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 

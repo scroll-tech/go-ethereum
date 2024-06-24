@@ -23,8 +23,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 
-	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
 )
 

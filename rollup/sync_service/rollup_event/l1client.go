@@ -11,7 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 

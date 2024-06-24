@@ -39,7 +39,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
-	"github.com/scroll-tech/go-ethereum/rollup/l1_msg"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
 )
 
 const (

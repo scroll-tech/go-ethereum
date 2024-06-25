@@ -163,10 +163,14 @@ func TestShadowFork(t *testing.T) {
 	forkedChain, _ := core.NewBlockChain(db, nil, params.AllCliqueProtocolChanges, forkedEngine, vm.Config{}, nil, nil)
 	defer forkedChain.Stop()
 
-	blocks, _ := core.GenerateChain(params.AllCliqueProtocolChanges, genesis, engine, db, 16, func(i int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(params.AllCliqueProtocolChanges, genesis, forkedEngine, db, 16, func(i int, block *core.BlockGen) {
 		// The chain maker doesn't have access to a chain, so the difficulty will be
 		// lets unset (nil). Set it here to the correct value.
-		block.SetDifficulty(diffInTurn)
+		if block.Number().Uint64() > forkedEngineConf.ShadowForkHeight {
+			block.SetDifficulty(diffShadowFork)
+		} else {
+			block.SetDifficulty(diffInTurn)
+		}
 
 		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr), common.Address{0x00}, new(big.Int), params.TxGas, block.BaseFee(), nil), signer, key)
 		if err != nil {
@@ -191,7 +195,6 @@ func TestShadowFork(t *testing.T) {
 			header.Extra = append(header.Extra, signingAddr.Bytes()...)
 		}
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0}, extraSeal)...)
-		header.Difficulty = diffInTurn
 
 		sig, _ := crypto.Sign(SealHash(header).Bytes(), signingKey)
 		copy(header.Extra[len(header.Extra)-extraSeal:], sig)

@@ -864,6 +864,12 @@ var (
 		Name:  "clique.shadowfork",
 		Usage: "Schedule a shadow fork for a given signer to takeover at a given height",
 	}
+
+	// Shadowfork peers
+	ShadowforkPeersFlag = cli.StringSliceFlag{
+		Name:  "net.shadowforkpeer",
+		Usage: "peer id of a shadow fork peer",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1657,6 +1663,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setCircuitCapacityCheck(ctx, cfg)
 	setEnableRollupVerify(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
+	if ctx.GlobalIsSet(ShadowforkPeersFlag.Name) {
+		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)
+		log.Info("Shadow fork peers", "ids", cfg.ShadowForkPeerIDs)
+	}
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()

@@ -214,6 +214,9 @@ type Config struct {
 
 	// Max block range for eth_getLogs api method
 	MaxBlockRange int64
+
+	//
+	ShadowForkPeerIDs []string
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

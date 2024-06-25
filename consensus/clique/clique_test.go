@@ -132,7 +132,7 @@ func TestShadowFork(t *testing.T) {
 	engineConf := *params.AllCliqueProtocolChanges.Clique
 	engineConf.Epoch = 2
 	forkedEngineConf := engineConf
-	forkedEngineConf.ShadowForkHeight = 4
+	forkedEngineConf.ShadowForkHeight = 3
 	shadowForkKey, _ := crypto.HexToECDSA(strings.Repeat("11", 32))
 	shadowForkAddr := crypto.PubkeyToAddress(shadowForkKey.PublicKey)
 	forkedEngineConf.ShadowForkSigner = shadowForkAddr

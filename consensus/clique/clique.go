@@ -196,10 +196,6 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 		conf.Epoch = epochLength
 	}
 
-	if conf.ShadowForkHeight > 0 && conf.ShadowForkHeight%conf.Epoch != 0 {
-		panic("ShadowForkHeight must be a multiple of Epoch")
-	}
-
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	signatures, _ := lru.NewARC(inmemorySignatures)

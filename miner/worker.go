@@ -34,6 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -1134,6 +1135,7 @@ loop:
 		w.current.state.SetTxContext(tx.Hash(), w.current.tcount)
 
 		logs, traces, err := w.commitTransaction(tx, coinbase)
+		var errL1 *vm.ErrL1RPCError
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
@@ -1167,7 +1169,10 @@ loop:
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Pop()
-
+		case errors.As(err, &errL1):
+			// Skip the current transaction failed on L1Sload precompile with L1RpcError without shifting in the next from the account
+			log.Trace("Skipping transaction failed on L1Sload precompile with L1RpcError", "sender", from)
+			txs.Pop()
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)

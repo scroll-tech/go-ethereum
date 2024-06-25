@@ -17,6 +17,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -411,6 +412,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		evmCallStart := time.Now()
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 		stateTransitionEvmCallExecutionTimer.Update(time.Since(evmCallStart))
+	}
+	var errL1 *vm.ErrL1RPCError
+	if errors.As(vmerr, &errL1) {
+		return nil, vmerr
 	}
 
 	// no refunds for l1 messages and system txs

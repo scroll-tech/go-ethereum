@@ -1172,6 +1172,8 @@ func (c *l1sload) RequiredGas(input []byte) uint64 {
 }
 
 func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
+	const l1ClientRequestAttempts = 3
+
 	if c.l1Client == nil {
 		log.Error("No L1Client in the l1sload")
 		return nil, ErrNoL1Client
@@ -1197,10 +1199,16 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	address := common.BytesToAddress(input[32:52])
 	key := common.BytesToHash(input[52:84])
 
-	res, err := c.l1Client.StorageAt(context.Background(), address, key, block)
-	if err != nil {
-		return nil, &ErrL1RPCError{err: err}
+	var res []byte
+	var err error
+	for i := 0; i < l1ClientRequestAttempts; i++ {
+		res, err = c.l1Client.StorageAt(context.Background(), address, key, block)
+		if err != nil {
+			continue
+		} else {
+			return res, nil
+		}
 	}
+	return nil, &ErrL1RPCError{err: err}
 
-	return res, nil
 }

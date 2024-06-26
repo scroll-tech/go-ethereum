@@ -288,7 +288,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
 
 	// Subscribe NewL1MsgsEvent for sync service
-	if s := eth.SyncService(); s != nil {
+	if s := eth.L1MsgSyncService(); s != nil {
 		worker.l1MsgsSub = s.SubscribeNewL1MsgsEvent(worker.l1MsgsCh)
 	} else {
 		// create an empty subscription so that the tests won't fail

@@ -72,8 +72,8 @@ type Ethereum struct {
 
 	// Handlers
 	txPool             *core.TxPool
-	syncService        *l1_msg.SyncService
-	rollupSyncService  *rollup_event.RollupSyncService
+	l1MsgSyncService   *l1_msg.SyncService
+	rollupSyncService  *rollup_event.SyncService
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -218,15 +218,15 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
 	// initialize and start L1 message sync service
-	eth.syncService, err = l1_msg.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
+	eth.l1MsgSyncService, err = l1_msg.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
-	eth.syncService.Start()
+	eth.l1MsgSyncService.Start()
 
 	if config.EnableRollupVerify {
 		// initialize and start rollup event sync service
-		eth.rollupSyncService, err = rollup_event.NewRollupSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack)
+		eth.rollupSyncService, err = rollup_event.NewSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
 		}
@@ -533,18 +533,18 @@ func (s *Ethereum) StopMining() {
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
-func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager }
-func (s *Ethereum) BlockChain() *core.BlockChain       { return s.blockchain }
-func (s *Ethereum) TxPool() *core.TxPool               { return s.txPool }
-func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
-func (s *Ethereum) Engine() consensus.Engine           { return s.engine }
-func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
-func (s *Ethereum) IsListening() bool                  { return true } // Always listening
-func (s *Ethereum) Downloader() *downloader.Downloader { return s.handler.downloader }
-func (s *Ethereum) Synced() bool                       { return atomic.LoadUint32(&s.handler.acceptTxs) == 1 }
-func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
-func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
-func (s *Ethereum) SyncService() *l1_msg.SyncService   { return s.syncService }
+func (s *Ethereum) AccountManager() *accounts.Manager     { return s.accountManager }
+func (s *Ethereum) BlockChain() *core.BlockChain          { return s.blockchain }
+func (s *Ethereum) TxPool() *core.TxPool                  { return s.txPool }
+func (s *Ethereum) EventMux() *event.TypeMux              { return s.eventMux }
+func (s *Ethereum) Engine() consensus.Engine              { return s.engine }
+func (s *Ethereum) ChainDb() ethdb.Database               { return s.chainDb }
+func (s *Ethereum) IsListening() bool                     { return true } // Always listening
+func (s *Ethereum) Downloader() *downloader.Downloader    { return s.handler.downloader }
+func (s *Ethereum) Synced() bool                          { return atomic.LoadUint32(&s.handler.acceptTxs) == 1 }
+func (s *Ethereum) ArchiveMode() bool                     { return s.config.NoPruning }
+func (s *Ethereum) BloomIndexer() *core.ChainIndexer      { return s.bloomIndexer }
+func (s *Ethereum) L1MsgSyncService() *l1_msg.SyncService { return s.l1MsgSyncService }
 
 // Protocols returns all the currently configured
 // network protocols to start.
@@ -589,7 +589,7 @@ func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	close(s.closeBloomHandler)
 	s.txPool.Stop()
-	s.syncService.Stop()
+	s.l1MsgSyncService.Stop()
 	if s.config.EnableRollupVerify {
 		s.rollupSyncService.Stop()
 	}

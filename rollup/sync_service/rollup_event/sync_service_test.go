@@ -39,7 +39,7 @@ func TestRollupSyncServiceStartAndStop(t *testing.T) {
 		t.Fatalf("Failed to new P2P node: %v", err)
 	}
 	defer stack.Close()
-	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
+	service, err := NewSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
 	if err != nil {
 		t.Fatalf("Failed to new rollup sync service: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
-	service := &RollupSyncService{
+	service := &SyncService{
 		scrollChainABI: scrollChainABI,
 	}
 
@@ -111,7 +111,7 @@ func TestDecodeChunkRangesCodecv1(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
-	service := &RollupSyncService{
+	service := &SyncService{
 		scrollChainABI: scrollChainABI,
 	}
 
@@ -162,7 +162,7 @@ func TestDecodeChunkRangesCodecv2(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
-	service := &RollupSyncService{
+	service := &SyncService{
 		scrollChainABI: scrollChainABI,
 	}
 
@@ -233,7 +233,7 @@ func TestGetChunkRangesCodecv0(t *testing.T) {
 		t.Fatalf("Failed to new P2P node: %v", err)
 	}
 	defer stack.Close()
-	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
+	service, err := NewSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
 	if err != nil {
 		t.Fatalf("Failed to new rollup sync service: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestGetChunkRangesCodecv1(t *testing.T) {
 		t.Fatalf("Failed to new P2P node: %v", err)
 	}
 	defer stack.Close()
-	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
+	service, err := NewSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
 	if err != nil {
 		t.Fatalf("Failed to new rollup sync service: %v", err)
 	}
@@ -335,7 +335,7 @@ func TestGetChunkRangesCodecv2(t *testing.T) {
 		t.Fatalf("Failed to new P2P node: %v", err)
 	}
 	defer stack.Close()
-	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
+	service, err := NewSyncService(context.Background(), genesisConfig, db, l1Client, bc, stack)
 	if err != nil {
 		t.Fatalf("Failed to new rollup sync service: %v", err)
 	}

@@ -47,8 +47,8 @@ const (
 	defaultLogInterval = 5 * time.Minute
 )
 
-// RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
-type RollupSyncService struct {
+// SyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
+type SyncService struct {
 	ctx                           context.Context
 	cancel                        context.CancelFunc
 	client                        *L1Client
@@ -62,7 +62,7 @@ type RollupSyncService struct {
 	stack                         *node.Node
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, stack *node.Node) (*RollupSyncService, error) {
+func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, stack *node.Node) (*SyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -98,7 +98,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	service := RollupSyncService{
+	service := SyncService{
 		ctx:                           ctx,
 		cancel:                        cancel,
 		client:                        client,
@@ -115,7 +115,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 	return &service, nil
 }
 
-func (s *RollupSyncService) Start() {
+func (s *SyncService) Start() {
 	if s == nil {
 		return
 	}
@@ -142,7 +142,7 @@ func (s *RollupSyncService) Start() {
 	}()
 }
 
-func (s *RollupSyncService) Stop() {
+func (s *SyncService) Stop() {
 	if s == nil {
 		return
 	}
@@ -154,7 +154,7 @@ func (s *RollupSyncService) Stop() {
 	}
 }
 
-func (s *RollupSyncService) fetchRollupEvents() {
+func (s *SyncService) fetchRollupEvents() {
 	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber()
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)
@@ -190,7 +190,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 	}
 }
 
-func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlockNumber uint64) error {
+func (s *SyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlockNumber uint64) error {
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case s.l1CommitBatchEventSignature:
@@ -254,7 +254,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 	return nil
 }
 
-func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*encoding.Chunk, error) {
+func (s *SyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*encoding.Chunk, error) {
 	chunkBlockRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
 	if len(chunkBlockRanges) == 0 {
 		return nil, nil, fmt.Errorf("failed to get batch chunk ranges, empty chunk block ranges")
@@ -313,7 +313,7 @@ func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.Fina
 	return parentBatchMeta, chunks, nil
 }
 
-func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) ([]*rawdb.ChunkBlockRange, error) {
+func (s *SyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) ([]*rawdb.ChunkBlockRange, error) {
 	if batchIndex == 0 {
 		return []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
 	}
@@ -348,7 +348,7 @@ func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) (
 }
 
 // decodeChunkBlockRanges decodes chunks in a batch based on the commit batch transaction's calldata.
-func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
+func (s *SyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
 	const methodIDLength = 4
 	if len(txData) < methodIDLength {
 		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)

@@ -59,7 +59,7 @@ func (m *mockBackend) TxPool() *core.TxPool {
 	return m.txPool
 }
 
-func (m *mockBackend) SyncService() *l1_msg.SyncService {
+func (m *mockBackend) L1MsgSyncService() *l1_msg.SyncService {
 	return nil
 }
 

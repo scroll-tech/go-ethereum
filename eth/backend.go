@@ -55,6 +55,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service/rollup_event"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
@@ -105,7 +106,7 @@ type Ethereum struct {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(stack *node.Node, config *ethconfig.Config, l1Client l1_msg.EthClient) (*Ethereum, error) {
+func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthClient) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")

@@ -10,19 +10,20 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 // BridgeClient is a wrapper around EthClient that adds
 // methods for conveniently collecting L1 messages.
 type BridgeClient struct {
-	client                EthClient
+	client                sync_service.EthClient
 	confirmations         rpc.BlockNumber
 	l1MessageQueueAddress common.Address
 	filterer              *L1MessageQueueFilterer
 }
 
-func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address) (*BridgeClient, error) {
+func newBridgeClient(ctx context.Context, l1Client sync_service.EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueAddress common.Address) (*BridgeClient, error) {
 	if l1MessageQueueAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero l1MessageQueueAddress to BridgeClient")
 	}

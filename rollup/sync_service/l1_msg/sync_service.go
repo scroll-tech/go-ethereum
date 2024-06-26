@@ -14,6 +14,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
 const (
@@ -52,7 +53,7 @@ type SyncService struct {
 	scope                event.SubscriptionScope
 }
 
-func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
+func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client sync_service.EthClient) (*SyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 sync service will not run")

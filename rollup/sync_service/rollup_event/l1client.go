@@ -11,7 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service/l1_msg"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -19,7 +19,7 @@ import (
 // methods for conveniently collecting rollup events of ScrollChain contract.
 type L1Client struct {
 	ctx                           context.Context
-	client                        l1_msg.EthClient
+	client                        sync_service.EthClient
 	scrollChainAddress            common.Address
 	l1CommitBatchEventSignature   common.Hash
 	l1RevertBatchEventSignature   common.Hash
@@ -28,7 +28,7 @@ type L1Client struct {
 
 // newL1Client initializes a new L1Client instance with the provided configuration.
 // It checks for a valid scrollChainAddress and verifies the chain ID.
-func newL1Client(ctx context.Context, l1Client l1_msg.EthClient, l1ChainId uint64, scrollChainAddress common.Address, scrollChainABI *abi.ABI) (*L1Client, error) {
+func newL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId uint64, scrollChainAddress common.Address, scrollChainABI *abi.ABI) (*L1Client, error) {
 	if scrollChainAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}

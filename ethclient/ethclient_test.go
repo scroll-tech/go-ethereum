@@ -617,6 +617,17 @@ func testAtFunctions(t *testing.T, client *rpc.Client) {
 	if !bytes.Equal(storage, penStorage) {
 		t.Fatalf("unexpected storage: %v %v", storage, penStorage)
 	}
+	// StoragesAt
+	storages, err := ec.StoragesAt(context.Background(), testAddr, []common.Hash{{}, {}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(storages[0:32], penStorage) {
+		t.Fatalf("unexpected storage: %v %v", storages[0:32], penStorage)
+	}
+	if !bytes.Equal(storages[32:64], penStorage) {
+		t.Fatalf("unexpected storage: %v %v", storages[32:64], penStorage)
+	}
 	// CodeAt
 	code, err := ec.CodeAt(context.Background(), testAddr, nil)
 	if err != nil {

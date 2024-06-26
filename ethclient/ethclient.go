@@ -509,6 +509,31 @@ func (ec *Client) StorageAt(ctx context.Context, account common.Address, key com
 	return result, err
 }
 
+// StoragesAt returns the values of keys in the contract storage of the given account.
+// The block number can be nil, in which case the value is taken from the latest known block.
+func (ec *Client) StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error) {
+	results := make([]hexutil.Bytes, len(keys))
+	reqs := make([]rpc.BatchElem, len(keys))
+	for i := range reqs {
+		reqs[i] = rpc.BatchElem{
+			Method: "eth_getStorageAt",
+			Args:   []interface{}{account, keys[i], toBlockNumArg(blockNumber)},
+			Result: &results[i],
+		}
+	}
+	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+		return nil, err
+	}
+	output := make([]byte, 32 * len(keys))
+	for i := range reqs {
+		if reqs[i].Error != nil {
+			return nil, reqs[i].Error
+		}
+		copy(output[i * 32:], results[i])
+	}
+	return output, nil
+}
+
 // CodeAt returns the contract code of the given account.
 // The block number can be nil, in which case the code is taken from the latest known block.
 func (ec *Client) CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error) {

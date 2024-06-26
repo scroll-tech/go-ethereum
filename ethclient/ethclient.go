@@ -524,12 +524,12 @@ func (ec *Client) StoragesAt(ctx context.Context, account common.Address, keys [
 	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
 		return nil, err
 	}
-	output := make([]byte, 32 * len(keys))
+	output := make([]byte, 32*len(keys))
 	for i := range reqs {
 		if reqs[i].Error != nil {
 			return nil, reqs[i].Error
 		}
-		copy(output[i * 32:], results[i])
+		copy(output[i*32:], results[i])
 	}
 	return output, nil
 }

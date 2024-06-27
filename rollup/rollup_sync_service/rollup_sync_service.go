@@ -226,15 +226,21 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			log.Trace("found new FinalizeBatch event", "batch index", batchIndex)
 
 			lastFinalizedBatchIndex := rawdb.ReadLastFinalizedBatchIndex(s.db)
-			// When failed to get lastFinalizedBatchIndex, set it's value to previous one of current batch index.
-			// It's backward compatible. (works for both before and after darwin)
-			if lastFinalizedBatchIndex == nil {
-				log.Trace("got nil when reading last finalized batch index.")
-				previousBatchIndex := batchIndex - 1
-				lastFinalizedBatchIndex = &previousBatchIndex
+
+			// After darwin, FinalizeBatch event emitted every bundle, which contains multiple batches.
+			// Therefore there are a range of finalized batches need to be saved into db.
+			//
+			// The range logic also applies to the batches before darwin when FinalizeBatch event emitted
+			// per single batch. In this situation, `batchIndex` just equals to `*lastFinalizedBatchIndex + 1`
+			// and only one batch is processed through the for loop.
+			startBatchIndex := batchIndex
+			if lastFinalizedBatchIndex != nil {
+				startBatchIndex = *lastFinalizedBatchIndex + 1
+			} else {
+				log.Trace("got nil when reading last finalized batch index. This can happen only once when upgrade from curie to darwin.")
 			}
 
-			var index = *lastFinalizedBatchIndex + 1
+			var index = startBatchIndex
 			var highestFinalizedBlockNumber uint64
 			for ; index <= batchIndex; index++ {
 				parentBatchMeta, chunks, err := s.getLocalInfoForBatch(index)

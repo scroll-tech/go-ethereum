@@ -225,22 +225,33 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			batchIndex := event.BatchIndex.Uint64()
 			log.Trace("found new FinalizeBatch event", "batch index", batchIndex)
 
-			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(batchIndex)
-			if err != nil {
-				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
+			lastFinalizedBatchIndex := rawdb.ReadLastFinalizedBatchIndex(s.db)
+			if lastFinalizedBatchIndex == nil {
+				lastFinalizedBatchIndex = &batchIndex
 			}
 
-			endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
-			if err != nil {
-				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
-			}
+			for index := *lastFinalizedBatchIndex + 1; index <= batchIndex; index++ {
+				parentBatchMeta, chunks, err := s.getLocalInfoForBatch(index)
+				if err != nil {
+					return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", index, err)
+				}
 
-			rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock)
-			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, finalizedBatchMeta)
+				endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
+				if err != nil {
+					return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
+				}
 
-			if batchIndex%100 == 0 {
-				log.Info("finalized batch progress", "batch index", batchIndex, "finalized l2 block height", endBlock)
+				if index == batchIndex {
+					rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock)
+					log.Info("write finalized l2 block number", "batch index", index, "finalized l2 block height", endBlock)
+				}
+				rawdb.WriteFinalizedBatchMeta(s.db, index, finalizedBatchMeta)
+
+				if index%100 == 0 {
+					log.Info("finalized batch progress", "batch index", index, "finalized l2 block height", endBlock)
+				}
 			}
+			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())

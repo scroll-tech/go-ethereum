@@ -142,7 +142,7 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	config.ArchimedesBlock = londonBlock
 	config.BernoulliBlock = londonBlock
 	config.CurieBlock = londonBlock
-	config.DescartesBlock = londonBlock
+	config.DarwinTime = londonBlock
 	config.ShanghaiTime = nil
 	if londonBlock != nil {
 		shanghaiTime := londonBlock.Uint64() * 12

@@ -71,7 +71,7 @@ func TestLastFinalizedBatchIndex(t *testing.T) {
 
 	// read non-existing value
 	if got := ReadLastFinalizedBatchIndex(db); got != nil {
-		t.Fatal("Expected 0 for non-existing value", "got", *got)
+		t.Fatal("Expected nil for non-existing value", "got", *got)
 	}
 
 	for _, num := range batchIndxes {

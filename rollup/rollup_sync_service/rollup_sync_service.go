@@ -240,9 +240,8 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				log.Trace("got nil when reading last finalized batch index. This can happen only once when upgrade from curie to darwin.")
 			}
 
-			var index = startBatchIndex
 			var highestFinalizedBlockNumber uint64
-			for ; index <= batchIndex; index++ {
+			for index := startBatchIndex; index <= batchIndex; index++ {
 				parentBatchMeta, chunks, err := s.getLocalInfoForBatch(index)
 				if err != nil {
 					return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", index, err)
@@ -262,11 +261,9 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				highestFinalizedBlockNumber = endBlock
 			}
 
-			if index == batchIndex {
-				rawdb.WriteFinalizedL2BlockNumber(s.db, highestFinalizedBlockNumber)
-				rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
-				log.Info("write finalized l2 block number", "batch index", index, "finalized l2 block height", highestFinalizedBlockNumber)
-			}
+			rawdb.WriteFinalizedL2BlockNumber(s.db, highestFinalizedBlockNumber)
+			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
+			log.Info("write finalized l2 block number", "batch index", batchIndex, "finalized l2 block height", highestFinalizedBlockNumber)
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())

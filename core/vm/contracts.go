@@ -1193,7 +1193,7 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	address := common.BytesToAddress(input[0:20])
 	keys := make([]common.Hash, numStorageSlots)
 	for i := range keys {
-		keys[i] = common.BytesToHash(input[20 + 32*i : 52 + 32*i])
+		keys[i] = common.BytesToHash(input[20+32*i : 52+32*i])
 	}
 
 	res, err := c.l1Client.StoragesAt(context.Background(), address, keys, block)

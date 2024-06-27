@@ -81,7 +81,7 @@ type SimulatedBackend struct {
 // A simulated backend always uses chainID 1337.
 func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.GenesisAlloc, gasLimit uint64) *SimulatedBackend {
 	genesis := core.Genesis{
-		Config:   params.AllEthashProtocolChangesWithZktrie,
+		Config:   params.AllEthashProtocolChanges,
 		GasLimit: gasLimit,
 		Alloc:    alloc,
 	}

@@ -183,50 +183,6 @@ var (
 		},
 	}
 
-	AllEthashProtocolChangesWithZktrie = &ChainConfig{
-		ChainID:                       big.NewInt(1337),
-		HomesteadBlock:                big.NewInt(0),
-		DAOForkBlock:                  nil,
-		DAOForkSupport:                false,
-		EIP150Block:                   big.NewInt(0),
-		EIP155Block:                   big.NewInt(0),
-		EIP158Block:                   big.NewInt(0),
-		ByzantiumBlock:                big.NewInt(0),
-		ConstantinopleBlock:           big.NewInt(0),
-		PetersburgBlock:               big.NewInt(0),
-		IstanbulBlock:                 big.NewInt(0),
-		MuirGlacierBlock:              big.NewInt(0),
-		BerlinBlock:                   big.NewInt(0),
-		LondonBlock:                   big.NewInt(0),
-		ArrowGlacierBlock:             big.NewInt(0),
-		GrayGlacierBlock:              big.NewInt(0),
-		MergeNetsplitBlock:            nil,
-		ShanghaiTime:                  newUint64(0),
-		CancunTime:                    nil,
-		PragueTime:                    nil,
-		VerkleTime:                    nil,
-		TerminalTotalDifficulty:       nil,
-		TerminalTotalDifficultyPassed: true,
-		Ethash:                        new(EthashConfig),
-		Clique:                        nil,
-		ArchimedesBlock:               big.NewInt(0),
-		BernoulliBlock:                big.NewInt(0),
-		CurieBlock:                    big.NewInt(0),
-		DescartesBlock:                big.NewInt(0),
-		Scroll: ScrollConfig{
-			UseZktrie:                 true,
-			FeeVaultAddress:           nil,
-			MaxTxPerBlock:             nil,
-			MaxTxPayloadBytesPerBlock: nil,
-			L1Config: &L1Config{
-				L1ChainId:             5,
-				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-				NumL1MessagesPerBlock: 0,
-				ScrollChainAddress:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			},
-		},
-	}
-
 	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
 	ScrollAlphaChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(534353),

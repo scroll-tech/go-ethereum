@@ -247,6 +247,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 
 				if index == batchIndex {
 					rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock)
+					rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
 					log.Info("write finalized l2 block number", "batch index", index, "finalized l2 block height", endBlock)
 				}
 				rawdb.WriteFinalizedBatchMeta(s.db, index, finalizedBatchMeta)
@@ -255,7 +256,6 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 					log.Info("finalized batch progress", "batch index", index, "finalized l2 block height", endBlock)
 				}
 			}
-			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())

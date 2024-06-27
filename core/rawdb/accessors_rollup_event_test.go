@@ -45,7 +45,7 @@ func TestFinalizedL2BlockNumber(t *testing.T) {
 
 	// read non-existing value
 	if got := ReadFinalizedL2BlockNumber(db); got != nil {
-		t.Fatal("Expected 0 for non-existing value", "got", *got)
+		t.Fatal("Expected nil for non-existing value", "got", *got)
 	}
 
 	for _, num := range blockNumbers {

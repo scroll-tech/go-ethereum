@@ -226,8 +226,12 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			log.Trace("found new FinalizeBatch event", "batch index", batchIndex)
 
 			lastFinalizedBatchIndex := rawdb.ReadLastFinalizedBatchIndex(s.db)
+			// When failed to get lastFinalizedBatchIndex, set it's value to previous one of current batch index.
+			// It's forward compatible. (works for both before and after darwin)
 			if lastFinalizedBatchIndex == nil {
-				lastFinalizedBatchIndex = &batchIndex
+				log.Trace("got nil when reading last finalized batch index.")
+				previousBatchIndex := batchIndex - 1
+				lastFinalizedBatchIndex = &previousBatchIndex
 			}
 
 			for index := *lastFinalizedBatchIndex + 1; index <= batchIndex; index++ {

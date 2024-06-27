@@ -876,8 +876,8 @@ func (c *ChainConfig) IsCurie(num *big.Int) bool {
 }
 
 // IsDescartes returns whether num is either equal to the Descartes fork block or greater.
-func (c *ChainConfig) IsDescartes(num *big.Int) bool {
-	return isBlockForked(c.DarwinTime, num)
+func (c *ChainConfig) IsDescartes(num *big.Int, time uint64) bool {
+	return c.IsLondon(num) && isTimestampForked(c.DarwinTime, time)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -1058,8 +1058,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkBlockIncompatible(c.CurieBlock, newcfg.CurieBlock, headNumber) {
 		return newBlockCompatError("Curie fork block", c.CurieBlock, newcfg.CurieBlock)
 	}
-	if isForkBlockIncompatible(c.DarwinTime, newcfg.DarwinTime, headNumber) {
-		return newBlockCompatError("Descartes fork block", c.DarwinTime, newcfg.DarwinTime)
+	if isForkTimestampIncompatible(c.DarwinTime, newcfg.DarwinTime, headTimestamp) {
+		return newTimestampCompatError("Darwin fork block", c.DarwinTime, newcfg.DarwinTime)
 	}
 	return nil
 }
@@ -1207,7 +1207,7 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsVerkle                                                bool
-	IsArchimedes, IsBernoulli, IsCurie, IsDescartes         bool
+	IsArchimedes, IsBernoulli, IsCurie, IsDarwin            bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1236,6 +1236,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsArchimedes:     c.IsArchimedes(num),
 		IsBernoulli:      c.IsBernoulli(num),
 		IsCurie:          c.IsCurie(num),
-		IsDescartes:      c.IsDescartes(num),
+		IsDarwin:         c.IsDescartes(num, timestamp),
 	}
 }

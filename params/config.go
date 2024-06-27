@@ -717,9 +717,6 @@ func (c *ChainConfig) Description() string {
 	if c.CurieBlock != nil {
 		banner += fmt.Sprintf(" - Curie:                       #%-8v\n", c.CurieBlock) // TODO: add Curie execution-specs
 	}
-	if c.DarwinTime != nil {
-		banner += fmt.Sprintf(" - Descartes:                   #%-8v\n", c.DarwinTime) // TODO: add Descartes execution-specs
-	}
 	banner += "\n"
 
 	// Add a special section for the merge as it's non-obvious
@@ -750,6 +747,9 @@ func (c *ChainConfig) Description() string {
 	}
 	if c.VerkleTime != nil {
 		banner += fmt.Sprintf(" - Verkle:                      @%-10v\n", *c.VerkleTime)
+	}
+	if c.DarwinTime != nil {
+		banner += fmt.Sprintf(" - Dawrin:                      @%-10v\n", *c.DarwinTime)
 	}
 	banner += "\n"
 
@@ -875,8 +875,8 @@ func (c *ChainConfig) IsCurie(num *big.Int) bool {
 	return isBlockForked(c.CurieBlock, num)
 }
 
-// IsDescartes returns whether num is either equal to the Descartes fork block or greater.
-func (c *ChainConfig) IsDescartes(num *big.Int, time uint64) bool {
+// IsDarwin returns whether num is either equal to the Darwin fork block or greater.
+func (c *ChainConfig) IsDarwin(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(c.DarwinTime, time)
 }
 
@@ -1236,6 +1236,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsArchimedes:     c.IsArchimedes(num),
 		IsBernoulli:      c.IsBernoulli(num),
 		IsCurie:          c.IsCurie(num),
-		IsDarwin:         c.IsDescartes(num, timestamp),
+		IsDarwin:         c.IsDarwin(num, timestamp),
 	}
 }

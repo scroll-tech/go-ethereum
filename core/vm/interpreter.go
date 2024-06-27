@@ -57,7 +57,7 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 	var table *JumpTable
 	switch {
 	case evm.chainRules.IsDarwin:
-		table = &descartesInstructionSet
+		table = &darwinInstructionSet
 	case evm.chainRules.IsCurie:
 		table = &curieInstructionSet
 	case evm.chainRules.IsCancun:

@@ -237,7 +237,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			if lastFinalizedBatchIndex != nil {
 				startBatchIndex = *lastFinalizedBatchIndex + 1
 			} else {
-				log.Trace("got nil when reading last finalized batch index. This can happen only once when upgrade from curie to darwin.")
+				log.Warn("got nil when reading last finalized batch index. This should happen only once.")
 			}
 
 			var highestFinalizedBlockNumber uint64
@@ -263,7 +263,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 
 			rawdb.WriteFinalizedL2BlockNumber(s.db, highestFinalizedBlockNumber)
 			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
-			log.Info("write finalized l2 block number", "batch index", batchIndex, "finalized l2 block height", highestFinalizedBlockNumber)
+			log.Debug("write finalized l2 block number", "batch index", batchIndex, "finalized l2 block height", highestFinalizedBlockNumber)
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())

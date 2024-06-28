@@ -485,6 +485,7 @@ func (s *Sync) children(req *nodeRequest, object node) ([]*nodeRequest, error) {
 		//
 		// This step is only necessary for path mode, as there is no deletion
 		// in hash mode at all.
+		// TODO: fix me for path mode
 		if _, ok := node.Val.(hashNode); ok && s.scheme == rawdb.PathScheme {
 			owner, inner := ResolvePath(req.path)
 			for i := 1; i < len(key); i++ {

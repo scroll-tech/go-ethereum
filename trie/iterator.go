@@ -237,9 +237,9 @@ func (it *nodeIterator) Path() []byte {
 }
 
 func (it *nodeIterator) NodeBlob() []byte {
-	if it.Hash() == (common.Hash{}) {
-		return nil // skip the non-standalone node
-	}
+	// if it.Hash() == (common.Hash{}) {
+	// 	return nil // skip the non-standalone node
+	// }
 	blob, err := it.resolveBlob(it.Hash().Bytes(), it.Path())
 	if err != nil {
 		it.err = err

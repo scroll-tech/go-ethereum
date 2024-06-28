@@ -16,6 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
 	_ "github.com/scroll-tech/go-ethereum/eth/tracers/native"
 	"github.com/scroll-tech/go-ethereum/ethdb"
@@ -589,6 +590,12 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 		StartL1QueueIndex: env.StartL1QueueIndex,
 	}
 
+	blockTrace.Bytecodes = append(blockTrace.Bytecodes, &types.BytecodeTrace{
+		CodeSize:         0,
+		KeccakCodeHash:   codehash.EmptyKeccakCodeHash,
+		PoseidonCodeHash: codehash.EmptyPoseidonCodeHash,
+		Code:             hexutil.Encode([]byte{}),
+	})
 	for _, codeInfo := range env.Codes {
 		blockTrace.Bytecodes = append(blockTrace.Bytecodes, &types.BytecodeTrace{
 			CodeSize:         codeInfo.CodeSize,

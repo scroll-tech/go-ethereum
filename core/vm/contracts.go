@@ -1171,10 +1171,12 @@ type l1sload struct {
 // FIXED_GAS_COST + (number of storage slots) * PER_LOAD_GAS_COST
 // input has format of 20-byte contract address + some number of 32-byte slots, so (len(input) / 32) is number of storage slots
 func (c *l1sload) RequiredGas(input []byte) uint64 {
-	return params.L1SloadBaseGas + uint64(len(input)/32)*params.L1SloadPerLoadGas
+	numStorageSlots := len(input) / 32
+	if params.L1SloadMaxNumStorageSlots < numStorageSlots {
+		numStorageSlots = params.L1SloadMaxNumStorageSlots
+	}
+	return params.L1SloadBaseGas + uint64(numStorageSlots)*params.L1SloadPerLoadGas
 }
-
-const MAX_NUM_STORAGE_SLOTS = 5
 
 func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	if c.l1Client == nil {
@@ -1183,7 +1185,7 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 	}
 	// verify that the input has 20-byte contract address and 1 to MAX_NUM_STORAGE_SLOTS 32-byte storage slots
 	numStorageSlots := len(input) / 32
-	if numStorageSlots < 1 || numStorageSlots > MAX_NUM_STORAGE_SLOTS || len(input) != 20+32*numStorageSlots {
+	if numStorageSlots < 1 || numStorageSlots > params.L1SloadMaxNumStorageSlots || len(input) != 20+32*numStorageSlots {
 		return nil, ErrInvalidInput
 	}
 

@@ -168,6 +168,8 @@ const (
 	BlobTxBlobGaspriceUpdateFraction = 3338477 // Controls the maximum rate of change for blob gas price
 
 	BlobTxTargetBlobGasPerBlock = 3 * BlobTxBlobGasPerBlob // Target consumable blob gas for data blobs per block (for 1559-like pricing)
+
+	L1SloadMaxNumStorageSlots = 5 // Max number of storage slots requested in L1Sload precompile
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations

@@ -638,7 +638,7 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
 			return nil
 		},
 	}
-	if err := txpool.ValidateTransactionWithState(tx, pool.signer, opts); err != nil {
+	if err := txpool.ValidateTransactionWithState(tx, pool.signer, opts, pool.chainconfig, pool.currentHead.Load().Number); err != nil {
 		return err
 	}
 	return nil

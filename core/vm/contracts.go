@@ -1167,8 +1167,15 @@ type l1sload struct {
 	l1Client L1Client
 }
 
+// RequiredGas returns the gas required to execute the pre-compiled contract.
+// FIXED_GAS_COST + (number of storage slots) * PER_LOAD_GAS_COST
+// input has format of 20-byte contract address + some number of 32-byte slots, so (len(input) / 32) is number of storage slots
 func (c *l1sload) RequiredGas(input []byte) uint64 {
-	return 4000
+	numStorageSlots := len(input) / 32
+	if params.L1SloadMaxNumStorageSlots < numStorageSlots {
+		numStorageSlots = params.L1SloadMaxNumStorageSlots
+	}
+	return params.L1SloadBaseGas + uint64(numStorageSlots)*params.L1SloadPerLoadGas
 }
 
 func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
@@ -1176,28 +1183,22 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 		log.Error("No L1Client in the l1sload")
 		return nil, ErrNoL1Client
 	}
-	if len(input) != 84 {
+	// verify that the input has 20-byte contract address and 1 to MAX_NUM_STORAGE_SLOTS 32-byte storage slots
+	numStorageSlots := len(input) / 32
+	if numStorageSlots < 1 || numStorageSlots > params.L1SloadMaxNumStorageSlots || len(input) != 20+32*numStorageSlots {
 		return nil, ErrInvalidInput
 	}
 
-	latestL1BlockNumberOnL2 := state.GetState(rcfg.L1BlocksAddress, rcfg.LatestBlockNumberSlot).Big().Uint64()
+	// load latest l1 block number known on l2
+	block := state.GetState(rcfg.L1BlocksAddress, rcfg.LatestBlockNumberSlot).Big()
 
-	block := new(big.Int)
-	block.SetBytes(input[:32])
-
-	if block.Uint64() > latestL1BlockNumberOnL2 {
-		log.Error("L1 block number too big", "blockNum", block.Uint64(), "latestL1BlockNumberOnL2", latestL1BlockNumberOnL2)
-		return nil, ErrInvalidL1BlockNumber
-	}
-	if block.Uint64() <= latestL1BlockNumberOnL2-uint64(rcfg.L1BlockBufferSize) {
-		log.Error("L1 block number too small", "blockNum", block.Uint64(), "latestL1BlockNumberOnL2", latestL1BlockNumberOnL2)
-		return nil, ErrInvalidL1BlockNumber
+	address := common.BytesToAddress(input[0:20])
+	keys := make([]common.Hash, numStorageSlots)
+	for i := range keys {
+		keys[i] = common.BytesToHash(input[20+32*i : 52+32*i])
 	}
 
-	address := common.BytesToAddress(input[32:52])
-	key := common.BytesToHash(input[52:84])
-
-	res, err := c.l1Client.StorageAt(context.Background(), address, key, block)
+	res, err := c.l1Client.StoragesAt(context.Background(), address, keys, block)
 	if err != nil {
 		return nil, &ErrL1RPCError{err: err}
 	}

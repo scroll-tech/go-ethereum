@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -69,7 +68,7 @@ var (
 
 	diffInTurn     = big.NewInt(2) // Block difficulty for in-turn signatures
 	diffNoTurn     = big.NewInt(1) // Block difficulty for out-of-turn signatures
-	diffShadowFork = big.NewInt(math.MaxInt64)
+	diffShadowFork = diffNoTurn
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -691,8 +690,7 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 
 func (c *Clique) calcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
 	if c.config.ShadowForkHeight > 0 && snap.Number >= c.config.ShadowForkHeight {
-		// if we are past shadow fork point, set a high difficulty so that forked nodes don't switch to main chain
-		// unexpectedly.
+		// if we are past shadow fork point, set a low difficulty so that mainnet nodes don't try to switch to forked chain
 		return new(big.Int).Set(diffShadowFork)
 	}
 	if snap.inturn(snap.Number+1, signer) {

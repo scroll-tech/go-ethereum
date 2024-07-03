@@ -859,12 +859,6 @@ var (
 		Usage: "Limit max fetched block range for `eth_getLogs` method",
 	}
 
-	// Clique shadowfork
-	ShadowforkFlag = cli.StringFlag{
-		Name:  "clique.shadowfork",
-		Usage: "Schedule a shadow fork for a given signer to takeover at a given height",
-	}
-
 	// Shadowfork peers
 	ShadowforkPeersFlag = cli.StringSliceFlag{
 		Name:  "net.shadowforkpeer",
@@ -1904,7 +1898,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Warn("Using legacy db prefix for L1 messages")
 		rawdb.SetL1MessageLegacyPrefix()
 	}
-	setShadowFork(ctx, cfg.Genesis.Config.Clique)
 }
 
 // SetDNSDiscoveryDefaults configures DNS discovery with the given URL if
@@ -2103,20 +2096,6 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 		Fatalf("Developer chains are ephemeral")
 	}
 	return genesis
-}
-
-func setShadowFork(ctx *cli.Context, cfg *params.CliqueConfig) {
-	if ctx.GlobalIsSet(ShadowforkFlag.Name) {
-		config := ctx.GlobalString(ShadowforkFlag.Name)
-		args := strings.Split(config, ",")
-		var err error
-		cfg.ShadowForkHeight, err = strconv.ParseUint(args[0], 10, 64)
-		if err != nil {
-			Fatalf("cannot parse shadowfork height", "err", err)
-		}
-		cfg.ShadowForkSigner = common.HexToAddress(args[1])
-		log.Info("Shadow fork enabled", "height", cfg.ShadowForkHeight, "signer", cfg.ShadowForkSigner)
-	}
 }
 
 // MakeChain creates a chain manager from set command line flags.

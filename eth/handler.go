@@ -318,7 +318,9 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 
 	// Propagate existing transactions. new transactions appearing
 	// after this will be sent via broadcasts.
-	h.syncTransactions(peer)
+	if h.shadowForkPeerIDs == nil || slices.Contains(h.shadowForkPeerIDs, peer.ID()) {
+		h.syncTransactions(peer)
+	}
 
 	// If we have a trusted CHT, reject all peers below that (avoid fast sync eclipse)
 	if h.checkpointHash != (common.Hash{}) {

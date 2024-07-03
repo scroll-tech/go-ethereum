@@ -169,7 +169,6 @@ var (
 		utils.L1DeploymentBlockFlag,
 		utils.CircuitCapacityCheckEnabledFlag,
 		utils.RollupVerifyEnabledFlag,
-		utils.ShadowforkFlag,
 		utils.ShadowforkPeersFlag,
 	}
 

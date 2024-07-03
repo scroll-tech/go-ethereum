@@ -683,6 +683,9 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 	if msg.GasTipCap != nil {
 		arg["maxPriorityFeePerGas"] = (*hexutil.Big)(msg.GasTipCap)
 	}
+	if msg.AccessList != nil {
+		arg["accessList"] = msg.AccessList
+	}
 	return arg
 }
 

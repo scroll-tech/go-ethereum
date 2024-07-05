@@ -194,10 +194,12 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	// high-priced txs are causing the suggested tip cap to be high.
 	pendingTxCount, _ := oracle.backend.Stats()
 	if pendingTxCount < oracle.congestedThreshold {
-		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return 1 wei as the tip cap,
+		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return 2 wei as the tip cap,
 		// as the base fee is set separately or added manually for legacy transactions.
-		// Set price to 1 as otherwise tx with a 0 tip might be filtered out by the default mempool config.
-		price := big.NewInt(1)
+		// 1. Set price to 2 as otherwise tx with a 0 tip might be filtered out by the default mempool config.
+		// 2. Since oracle.ignoreprice is set to 2 (DefaultIgnorePrice) by default, we need to set the price to 2 to
+		//    avoid filtering in oracle.getBlockValues().
+		price := big.NewInt(2)
 		if !oracle.backend.ChainConfig().IsCurie(head.Number) {
 			price = oracle.defaultBasePrice
 		}

@@ -188,13 +188,16 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		h.stateBloom = trie.NewSyncBloom(config.BloomCache, config.Database)
 	}
 
-	dropPeerFunc := h.removePeer
+	fetcherDropPeerFunc := h.removePeer
+	downloaderDropPeerFunc := h.removePeer
 	// If we are shadowforking, don't drop peers.
 	if config.ShadowForkPeerIDs != nil {
-		dropPeerFunc = func(id string) {}
+		downloaderDropPeerFunc = func(id string) {
+			h.downloader.UnregisterPeer(id)
+		}
+		fetcherDropPeerFunc = func(id string) {}
 	}
-
-	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, dropPeerFunc)
+	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, downloaderDropPeerFunc)
 
 	// Construct the fetcher (short sync)
 	validator := func(header *types.Header) error {
@@ -229,7 +232,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		}
 		return n, err
 	}
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, dropPeerFunc)
+	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, fetcherDropPeerFunc)
 
 	fetchTx := func(peer string, hashes []common.Hash) error {
 		p := h.peers.peer(peer)

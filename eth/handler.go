@@ -193,7 +193,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	// If we are shadowforking, don't drop peers.
 	if config.ShadowForkPeerIDs != nil {
 		downloaderDropPeerFunc = func(id string) {
-			h.downloader.UnregisterPeer(id)
+			h.peers.unregisterPeer(id)
 		}
 		fetcherDropPeerFunc = func(id string) {}
 	}

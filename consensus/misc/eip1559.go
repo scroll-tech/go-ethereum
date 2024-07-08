@@ -51,8 +51,11 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 
 // CalcBaseFee calculates the basefee of the header.
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseFee *big.Int) *big.Int {
-	l2SequencerFee := big.NewInt(1000000) // 0.001 Gwei
-	provingFee := big.NewInt(47700000)    // 0.0477 Gwei
+	if config.Clique != nil && config.Clique.ShadowForkHeight != 0 && parent.Number.Uint64() >= config.Clique.ShadowForkHeight {
+		return big.NewInt(10000000) // 0.01 Gwei
+	}
+	l2SequencerFee := big.NewInt(10000000) // 0.01 Gwei
+	provingFee := big.NewInt(140000000)    // 0.14 Gwei
 
 	// L1_base_fee * 0.0046
 	verificationFee := parentL1BaseFee

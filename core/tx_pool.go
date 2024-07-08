@@ -510,8 +510,7 @@ func (pool *TxPool) StatsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
 func (pool *TxPool) statsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
 	pending := 0
 	for _, list := range pool.pending {
-		txs := list.Flatten()
-		for _, tx := range txs {
+		for _, tx := range list.txs.flatten() {
 			if _, err := tx.EffectiveGasTip(minBaseFee); err != nil {
 				break // basefee too low, discard rest of txs with higher nonces from the account
 			}
@@ -521,8 +520,7 @@ func (pool *TxPool) statsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
 
 	queued := 0
 	for _, list := range pool.queue {
-		txs := list.Flatten()
-		for _, tx := range txs {
+		for _, tx := range list.txs.flatten() {
 			if _, err := tx.EffectiveGasTip(minBaseFee); err != nil {
 				break // basefee too low, discard rest of txs with higher nonces from the account
 			}

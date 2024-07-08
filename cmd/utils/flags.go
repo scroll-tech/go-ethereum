@@ -871,6 +871,12 @@ var (
 		Usage: `Da sync sync mode ("l1rpc" or "snapshot")`,
 		Value: &defaultDa,
 	}
+	defaultBlobSource = ethconfig.Defaults.DA.BLobSource
+	DABlobSourceFlag  = TextMarshalerFlag{
+		Name:  "da.blob.source",
+		Usage: `Blob data source, currently supported "blobscan" or "blocknative"`,
+		Value: &defaultBlobSource,
+	}
 	DASnapshotFileFlag = cli.StringFlag{
 		Name:  "da.snapshot.file",
 		Usage: "Snapshot file to sync from da",
@@ -1600,6 +1606,9 @@ func setDa(ctx *cli.Context, cfg *ethconfig.Config) {
 		}
 		if ctx.GlobalIsSet(DASnapshotFileFlag.Name) {
 			cfg.DA.SnapshotFilePath = ctx.GlobalString(DASnapshotFileFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABlobSourceFlag.Name) {
+			cfg.DA.BLobSource = *GlobalTextMarshaler(ctx, DABlobSourceFlag.Name).(*da_syncer.BLobSource)
 		}
 	}
 }

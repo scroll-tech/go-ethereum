@@ -11,21 +11,16 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 )
 
-const (
-	okStatusCode int = 200
-	lenBlobBytes int = 131072
-)
-
 type BlobScanClient struct {
 	client              *http.Client
 	blobScanApiEndpoint string
 }
 
-func newBlobScanClient(blobScanApiEndpoint string) (*BlobScanClient, error) {
+func newBlobScanClient(blobScanApiEndpoint string) *BlobScanClient {
 	return &BlobScanClient{
 		client:              http.DefaultClient,
 		blobScanApiEndpoint: blobScanApiEndpoint,
-	}, nil
+	}
 }
 
 func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
@@ -43,14 +38,15 @@ func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHa
 		if resp.StatusCode == 404 {
 			return nil, fmt.Errorf("no blob with versioned hash : %s", versionedHash.String())
 		}
-		var res ErrorResp
+		var res ErrorRespBlobScan
 		err = json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode result into struct, err: %w", err)
 		}
 		return nil, fmt.Errorf("error while fetching blob, message: %s, code: %s, versioned hash: %s", res.Message, res.Code, versionedHash.String())
 	}
-	var result BlobResp
+	var result BlobRespBlobScan
+
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode result into struct, err: %w", err)
@@ -66,7 +62,7 @@ func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHa
 	return &blob, nil
 }
 
-type BlobResp struct {
+type BlobRespBlobScan struct {
 	Commitment            string `json:"commitment"`
 	Proof                 string `json:"proof"`
 	Size                  int    `json:"size"`
@@ -101,7 +97,7 @@ type BlobResp struct {
 	} `json:"transactions"`
 }
 
-type ErrorResp struct {
+type ErrorRespBlobScan struct {
 	Message string `json:"message"`
 	Code    string `json:"code"`
 	Issues  []struct {

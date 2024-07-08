@@ -2,6 +2,7 @@ package da_syncer
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 type Config struct {
 	FetcherMode      FetcherMode // mode of fetcher
 	SnapshotFilePath string      // path to snapshot file
+	BLobSource       BLobSource  // blob source
 }
 
 // defaultSyncInterval is the frequency at which we query for new rollup event.
@@ -40,11 +42,17 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		cancel()
 		return nil, err
 	}
-	blobClient, err := newBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanApiEndpoint)
-	if err != nil {
+	var blobClient BlobClient
+	switch config.BLobSource {
+	case BlobScan:
+		blobClient = newBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanApiEndpoint)
+	case BlockNative:
+		blobClient = newBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeApiEndpoint)
+	default:
 		cancel()
-		return nil, err
+		return nil, fmt.Errorf("unknown blob scan client: %d", config.BLobSource)
 	}
+
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
 	var syncedL1Height uint64 = l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)

@@ -380,6 +380,7 @@ var (
 			},
 			DAConfig: &DAConfig{
 				BlobScanApiEndpoint: "https://api.blobscan.com/blobs/",
+				BlockNativeApiEndpoint: "https://api.ethernow.xyz/v1/blob/",
 			},
 		},
 	}
@@ -672,7 +673,8 @@ type L1Config struct {
 
 // DAConfig contains the parameters to sync from DA
 type DAConfig struct {
-	BlobScanApiEndpoint string `json:"blobScanApiEndpoint,omitempty"`
+	BlobScanApiEndpoint    string `json:"blobScanApiEndpoint,omitempty"`
+	BlockNativeApiEndpoint string `json:"blockNativeApiEndpoint,omitempty"`
 }
 
 func (c *L1Config) String() string {

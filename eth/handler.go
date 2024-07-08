@@ -188,16 +188,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		h.stateBloom = trie.NewSyncBloom(config.BloomCache, config.Database)
 	}
 
-	fetcherDropPeerFunc := h.removePeer
-	downloaderDropPeerFunc := h.removePeer
-	// If we are shadowforking, don't drop peers.
-	if config.ShadowForkPeerIDs != nil {
-		downloaderDropPeerFunc = func(id string) {
-			h.peers.unregisterPeer(id)
-		}
-		fetcherDropPeerFunc = func(id string) {}
-	}
-	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, downloaderDropPeerFunc)
+	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, h.removePeer)
 
 	// Construct the fetcher (short sync)
 	validator := func(header *types.Header) error {
@@ -231,6 +222,12 @@ func newHandler(config *handlerConfig) (*handler, error) {
 			atomic.StoreUint32(&h.acceptTxs, 1) // Mark initial sync done on any fetcher import
 		}
 		return n, err
+	}
+
+	fetcherDropPeerFunc := h.removePeer
+	// If we are shadowforking, don't drop peers.
+	if config.ShadowForkPeerIDs != nil {
+		fetcherDropPeerFunc = func(id string) {}
 	}
 	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, fetcherDropPeerFunc)
 

@@ -21,6 +21,8 @@ const (
 	RevertBatch
 	// FinalizeBatch contains data of event of FinalizeBatch
 	FinalizeBatch
+	// FinalizeBatchV3 contains data of event of FinalizeBatch v3
+	FinalizeBatchV3
 )
 
 type DAEntry interface {
@@ -170,5 +172,27 @@ func (f *FinalizeBatchDA) DAType() DAType {
 }
 
 func (f *FinalizeBatchDA) GetL1BlockNumber() uint64 {
+	return f.L1BlockNumber
+}
+
+type FinalizeBatchDAV3 struct {
+	DaType     DAType
+	BatchIndex uint64
+
+	L1BlockNumber uint64
+}
+
+func NewFinalizeBatchDAV3(batchIndex uint64) DAEntry {
+	return &FinalizeBatchDAV3{
+		DaType:     FinalizeBatchV3,
+		BatchIndex: batchIndex,
+	}
+}
+
+func (f *FinalizeBatchDAV3) DAType() DAType {
+	return f.DaType
+}
+
+func (f *FinalizeBatchDAV3) GetL1BlockNumber() uint64 {
 	return f.L1BlockNumber
 }

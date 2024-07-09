@@ -115,6 +115,7 @@ var (
 	batchChunkRangesPrefix            = []byte("R-bcr")
 	batchMetaPrefix                   = []byte("R-bm")
 	finalizedL2BlockNumberKey         = []byte("R-finalized")
+	lastFinalizedBatchIndexKey        = []byte("R-finalizedBatchIndex")
 
 	// Scroll da syncer store
 	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")

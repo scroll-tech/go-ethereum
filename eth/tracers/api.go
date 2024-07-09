@@ -769,7 +769,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.SetTxContext(tx.Hash(), i)
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number())
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, chainConfig, block.Number())
 		if err == nil {
 			_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		}

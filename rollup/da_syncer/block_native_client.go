@@ -22,7 +22,7 @@ func newBlockNativeClient(blockNativeApiEndpoint string) *BlockNativeClient {
 }
 
 func (c *BlockNativeClient) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
-	resp, err := http.Get(c.blockNativeApiEndpoint+versionedHash.String())
+	resp, err := http.Get(c.blockNativeApiEndpoint + versionedHash.String())
 	if err != nil {
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}

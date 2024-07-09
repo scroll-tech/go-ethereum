@@ -379,7 +379,7 @@ var (
 				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
 			},
 			DAConfig: &DAConfig{
-				BlobScanApiEndpoint: "https://api.blobscan.com/blobs/",
+				BlobScanApiEndpoint:    "https://api.blobscan.com/blobs/",
 				BlockNativeApiEndpoint: "https://api.ethernow.xyz/v1/blob/",
 			},
 		},

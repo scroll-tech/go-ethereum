@@ -127,6 +127,10 @@ func (b *testBackend) Stats() (int, int) {
 	return b.pendingTxCount, 0
 }
 
+func (b *testBackend) StatsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
+	return b.pendingTxCount, 0
+}
+
 // newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
 // after use, otherwise the blockchain instance will mem-leak via goroutines.
 func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool, pendingTxCount int) *testBackend {

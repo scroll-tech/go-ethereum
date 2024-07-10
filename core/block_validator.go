@@ -31,11 +31,7 @@ import (
 )
 
 var (
-	validateL1MessagesTimer     = metrics.NewRegisteredTimer("validator/l1msg", nil)
-	validateRowConsumptionTimer = metrics.NewRegisteredTimer("validator/rowconsumption", nil)
-	validateTraceTimer          = metrics.NewRegisteredTimer("validator/trace", nil)
-	validateLockTimer           = metrics.NewRegisteredTimer("validator/lock", nil)
-	validateCccTimer            = metrics.NewRegisteredTimer("validator/ccc", nil)
+	validateL1MessagesTimer = metrics.NewRegisteredTimer("validator/l1msg", nil)
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

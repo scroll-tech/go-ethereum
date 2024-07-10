@@ -12,6 +12,7 @@ import (
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
 	"github.com/scroll-tech/da-codec/encoding/codecv1"
 	"github.com/scroll-tech/da-codec/encoding/codecv2"
+	"github.com/scroll-tech/da-codec/encoding/codecv3"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -225,22 +226,45 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			batchIndex := event.BatchIndex.Uint64()
 			log.Trace("found new FinalizeBatch event", "batch index", batchIndex)
 
-			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(batchIndex)
-			if err != nil {
-				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
+			lastFinalizedBatchIndex := rawdb.ReadLastFinalizedBatchIndex(s.db)
+
+			// After darwin, FinalizeBatch event emitted every bundle, which contains multiple batches.
+			// Therefore there are a range of finalized batches need to be saved into db.
+			//
+			// The range logic also applies to the batches before darwin when FinalizeBatch event emitted
+			// per single batch. In this situation, `batchIndex` just equals to `*lastFinalizedBatchIndex + 1`
+			// and only one batch is processed through the for loop.
+			startBatchIndex := batchIndex
+			if lastFinalizedBatchIndex != nil {
+				startBatchIndex = *lastFinalizedBatchIndex + 1
+			} else {
+				log.Warn("got nil when reading last finalized batch index. This should happen only once.")
 			}
 
-			endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
-			if err != nil {
-				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
+			var highestFinalizedBlockNumber uint64
+			for index := startBatchIndex; index <= batchIndex; index++ {
+				parentBatchMeta, chunks, err := s.getLocalInfoForBatch(index)
+				if err != nil {
+					return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", index, err)
+				}
+
+				endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
+				if err != nil {
+					return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
+				}
+
+				rawdb.WriteFinalizedBatchMeta(s.db, index, finalizedBatchMeta)
+
+				if index%100 == 0 {
+					log.Info("finalized batch progress", "batch index", index, "finalized l2 block height", endBlock)
+				}
+
+				highestFinalizedBlockNumber = endBlock
 			}
 
-			rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock)
-			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, finalizedBatchMeta)
-
-			if batchIndex%100 == 0 {
-				log.Info("finalized batch progress", "batch index", batchIndex, "finalized l2 block height", endBlock)
-			}
+			rawdb.WriteFinalizedL2BlockNumber(s.db, highestFinalizedBlockNumber)
+			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)
+			log.Debug("write finalized l2 block number", "batch index", batchIndex, "finalized l2 block height", highestFinalizedBlockNumber)
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
@@ -433,10 +457,16 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
 		}
 		localBatchHash = daBatch.Hash()
-	} else { // codecv2: batches after Curie
+	} else if !chainCfg.IsDarwin(startBlock.Header.Time) { // codecv2: batches after Curie and before Darwin
 		daBatch, err := codecv2.NewDABatch(batch)
 		if err != nil {
-			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+			return 0, nil, fmt.Errorf("failed to create codecv2 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+		}
+		localBatchHash = daBatch.Hash()
+	} else { // codecv3: batches after Darwin
+		daBatch, err := codecv3.NewDABatch(batch)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to create codecv3 DA batch, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
 		}
 		localBatchHash = daBatch.Hash()
 	}
@@ -532,6 +562,25 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 				StartBlockNumber: daBlocks[0].BlockNumber,
 				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
 			})
+		case encoding.CodecV3:
+			if len(chunk) != 1+numBlocks*60 {
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
+			}
+			daBlocks := make([]*codecv3.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlocks[i] = &codecv3.DABlock{}
+				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
+					return nil, err
+				}
+			}
+
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
+
 		default:
 			return nil, fmt.Errorf("unexpected batch version %v", codecVersion)
 		}

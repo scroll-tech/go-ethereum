@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
@@ -64,5 +65,6 @@ func (p *Processor) Process(block *types.Block, statedb *state.StateDB, cfg vm.C
 		return nil, nil, 0, res.CCCErr
 	}
 
+	rawdb.WriteBlockRowConsumption(p.chain.Database(), block.Hash(), res.Rows)
 	return res.FinalBlock.Receipts, res.FinalBlock.CoalescedLogs, res.FinalBlock.Header.GasUsed, nil
 }

@@ -5,7 +5,7 @@ ARG BUILDNUM=""
 ARG SCROLL_LIB_PATH=/scroll/lib
 
 # Build libzkp dependency
-FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as chef
+FROM scrolltech/go-rust-builder:go-1.21-rust-nightly-2023-12-03 as chef
 WORKDIR app
 
 FROM chef as planner
@@ -20,10 +20,9 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY ./rollup/circuitcapacitychecker/libzkp .
 RUN cargo clean
 RUN cargo build --release
-RUN find ./ | grep libzktrie.so | xargs -I{} cp {} /app/target/release/
 
 # Build Geth in a stock Go builder container
-FROM scrolltech/go-rust-builder:go-1.20-rust-nightly-2022-12-10 as builder
+FROM scrolltech/go-rust-builder:go-1.21-rust-nightly-2023-12-03 as builder
 
 ADD . /go-ethereum
 
@@ -32,7 +31,6 @@ ARG SCROLL_LIB_PATH
 RUN mkdir -p $SCROLL_LIB_PATH
 
 COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
-COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
 ENV CGO_LDFLAGS="-L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"
@@ -52,7 +50,6 @@ ARG SCROLL_LIB_PATH
 RUN mkdir -p $SCROLL_LIB_PATH
 
 COPY --from=zkp-builder /app/target/release/libzkp.so $SCROLL_LIB_PATH
-COPY --from=zkp-builder /app/target/release/libzktrie.so $SCROLL_LIB_PATH
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SCROLL_LIB_PATH
 ENV CGO_LDFLAGS="-ldl -L$SCROLL_LIB_PATH -Wl,-rpath,$SCROLL_LIB_PATH"

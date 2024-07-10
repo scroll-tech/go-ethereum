@@ -25,7 +25,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
-	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
 var (
@@ -429,10 +428,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		zktrieTracer := state.NewProofTracer(trie)
 		env.sMu.Unlock()
 
-		for key, values := range keys {
+		for key := range keys {
 			addrStr := addr.String()
 			keyStr := key.String()
-			isDelete := bytes.Equal(values.Bytes(), common.Hash{}.Bytes())
+			value := state.GetState(addr, key)
+			isDelete := bytes.Equal(value.Bytes(), common.Hash{}.Bytes())
 
 			txm := txStorageTrace.StorageProofs[addrStr]
 			env.sMu.Lock()
@@ -596,15 +596,6 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			// Get tx.to address's code hash.
 			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
 			evmTrace.PoseidonCodeHash = &codeHash
-		}
-	}
-
-	// only zktrie model has the ability to get `mptwitness`.
-	if env.chainConfig.Scroll.ZktrieEnabled() {
-		// we use MPTWitnessNothing by default and do not allow switch among MPTWitnessType atm.
-		// MPTWitness will be removed from traces in the future.
-		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessNothing, blockTrace); err != nil {
-			log.Error("fill mpt witness fail", "error", err)
 		}
 	}
 

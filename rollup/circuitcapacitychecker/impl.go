@@ -3,7 +3,7 @@
 package circuitcapacitychecker
 
 /*
-#cgo LDFLAGS: -lm -ldl -lzkp -lzktrie
+#cgo LDFLAGS: -lm -ldl -lzkp
 #include <stdlib.h>
 #include "./libzkp/libzkp.h"
 */
@@ -222,4 +222,8 @@ func MakeRustTrace(trace *types.BlockTrace, buffer *bytes.Buffer) unsafe.Pointer
 	}()
 
 	return C.parse_json_to_rust_trace(tracesStr)
+}
+
+func FreeRustTrace(ptr unsafe.Pointer) {
+	C.free_rust_trace(ptr)
 }

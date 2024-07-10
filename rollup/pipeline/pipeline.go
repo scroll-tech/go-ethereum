@@ -53,13 +53,14 @@ var (
 )
 
 type Pipeline struct {
-	chain     *core.BlockChain
-	vmConfig  vm.Config
-	parent    *types.Block
-	start     time.Time
-	wg        sync.WaitGroup
-	ctx       context.Context
-	cancelCtx context.CancelFunc
+	chain      *core.BlockChain
+	vmConfig   vm.Config
+	parent     *types.Block
+	start      time.Time
+	wg         sync.WaitGroup
+	ctx        context.Context
+	cancelCtx  context.CancelFunc
+	replayMode bool
 
 	// accumulators
 	ccc            *circuitcapacitychecker.CircuitCapacityChecker
@@ -111,6 +112,12 @@ func NewPipeline(
 
 func (p *Pipeline) WithBeforeTxHook(beforeTxHook func()) *Pipeline {
 	p.beforeTxHook = beforeTxHook
+	return p
+}
+
+// WithReplayMode enables the replay mode that allows L1 messages to be skipped
+func (p *Pipeline) WithReplayMode() *Pipeline {
+	p.replayMode = true
 	return p
 }
 
@@ -266,7 +273,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 				return
 			}
 
-			if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != p.nextL1MsgIndex {
+			if !p.replayMode && tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != p.nextL1MsgIndex {
 				// Continue, we might still be able to include some L2 messages
 				sendCancellable(resCh, ErrUnexpectedL1MessageIndex, p.ctx.Done())
 				continue

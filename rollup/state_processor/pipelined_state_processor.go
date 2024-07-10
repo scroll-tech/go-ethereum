@@ -43,7 +43,7 @@ func (p *Processor) Process(block *types.Block, statedb *state.StateDB, cfg vm.C
 		}
 	}
 
-	pl := pipeline.NewPipeline(p.chain, cfg, statedb, header, nextL1MsgIndex, p.ccc)
+	pl := pipeline.NewPipeline(p.chain, cfg, statedb, header, nextL1MsgIndex, p.ccc).WithReplayMode()
 	pl.Start(time.Now().Add(time.Minute))
 	defer pl.Release()
 

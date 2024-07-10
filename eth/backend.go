@@ -56,8 +56,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
+	stateprocessor "github.com/scroll-tech/go-ethereum/rollup/state_processor"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -199,8 +199,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 	if config.CheckCircuitCapacity {
-		tracer := tracing.NewTracerWrapper()
-		eth.blockchain.Validator().SetupTracerAndCircuitCapacityChecker(tracer)
+		eth.blockchain.WithStateProcessor(stateprocessor.NewProcessor(eth.blockchain))
 	}
 
 	// Rewind the chain in case of an incompatible config upgrade.

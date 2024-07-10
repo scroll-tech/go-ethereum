@@ -97,10 +97,7 @@ func (api *ScrollAPI) GetLatestRelayedQueueIndex(ctx context.Context) (queueInde
 // rpcMarshalBlock uses the generalized output filler, then adds the total difficulty field, which requires
 // a `ScrollAPI`.
 func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, fullTx bool) (map[string]interface{}, error) {
-	fields, err := ethapi.RPCMarshalBlock(b, true, fullTx, api.eth.APIBackend.ChainConfig())
-	if err != nil {
-		return nil, err
-	}
+	fields := ethapi.RPCMarshalBlock(b, true, fullTx, api.eth.APIBackend.ChainConfig())
 	fields["totalDifficulty"] = (*hexutil.Big)(api.eth.APIBackend.GetTd(ctx, b.Hash()))
 	rc := rawdb.ReadBlockRowConsumption(api.eth.ChainDb(), b.Hash())
 	if rc != nil {
@@ -108,7 +105,7 @@ func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, fullT
 	} else {
 		fields["rowConsumption"] = nil
 	}
-	return fields, err
+	return fields, nil
 }
 
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
@@ -208,7 +205,7 @@ func (api *ScrollAPI) GetSkippedTransaction(ctx context.Context, hash common.Has
 		return nil, nil
 	}
 	var rpcTx RPCTransaction
-	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, common.Hash{}, 0, 0, nil, api.eth.blockchain.Config())
+	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, common.Hash{}, 0, 0, 0, nil, api.eth.blockchain.Config())
 	rpcTx.SkipReason = stx.Reason
 	rpcTx.SkipBlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(stx.BlockNumber))
 	rpcTx.SkipBlockHash = stx.BlockHash

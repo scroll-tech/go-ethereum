@@ -572,8 +572,8 @@ github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/ryanuber/columnize v2.1.0+incompatible/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=
 github.com/sclevine/agouti v3.0.0+incompatible/go.mod h1:b4WX9W9L1sfQKXeJf1mUTLZKJ48R1S7H23Ji7oFO5Bw=
-github.com/scroll-tech/da-codec v0.1.1-0.20240703091800-5b6cded48ab7 h1:UfiLBLCAMBk9bsTP3fc1fETpNVFSQapQVdLcZveyV0M=
-github.com/scroll-tech/da-codec v0.1.1-0.20240703091800-5b6cded48ab7/go.mod h1:D6XEESeNVJkQJlv3eK+FyR+ufPkgVQbJzERylQi53Bs=
+github.com/scroll-tech/da-codec v0.0.0-20240703091800-5b6cded48ab7 h1:Mx3fKRszn6CMeJ7YBTdjLSfXoSDd9hkP8BwhIaaUVfQ=
+github.com/scroll-tech/da-codec v0.0.0-20240703091800-5b6cded48ab7/go.mod h1:D6XEESeNVJkQJlv3eK+FyR+ufPkgVQbJzERylQi53Bs=
 github.com/scroll-tech/go-ethereum v1.10.14-0.20240607130425-e2becce6a1a4 h1:gheWXra3HdZsz6q+w4LrXy8ybHOO6/t6Kb/V64bR5wE=
 github.com/scroll-tech/go-ethereum v1.10.14-0.20240607130425-e2becce6a1a4/go.mod h1:byf/mZ8jLYUCnUePTicjJWn+RvKdxDn7buS6glTnMwQ=
 github.com/scroll-tech/zktrie v0.8.4 h1:UagmnZ4Z3ITCk+aUq9NQZJNAwnWl4gSxsLb2Nl7IgRE=

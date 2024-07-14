@@ -62,10 +62,7 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 func (bq *BlockQueue) processDaV0ToBlocks(daEntry *CommitBatchDaV0) ([]*types.Block, error) {
 	var blocks []*types.Block
 	l1TxPointer := 0
-	var curL1TxIndex uint64 = 0
-	if daEntry.ParentBatchHeader != nil {
-		curL1TxIndex = daEntry.ParentBatchHeader.TotalL1MessagePopped
-	}
+	var curL1TxIndex uint64 = daEntry.ParentTotalL1MessagePopped
 	for _, chunk := range daEntry.Chunks {
 		for blockId, daBlock := range chunk.Blocks {
 			// create header
@@ -97,10 +94,7 @@ func (bq *BlockQueue) processDaV0ToBlocks(daEntry *CommitBatchDaV0) ([]*types.Bl
 func (bq *BlockQueue) processDaV1ToBlocks(daEntry *CommitBatchDaV1) ([]*types.Block, error) {
 	var blocks []*types.Block
 	l1TxPointer := 0
-	var curL1TxIndex uint64 = 0
-	if daEntry.ParentBatchHeader != nil {
-		curL1TxIndex = daEntry.ParentBatchHeader.TotalL1MessagePopped
-	}
+	var curL1TxIndex uint64 = daEntry.ParentTotalL1MessagePopped
 	for _, chunk := range daEntry.Chunks {
 		for blockId, daBlock := range chunk.Blocks {
 			// create header
@@ -132,10 +126,7 @@ func (bq *BlockQueue) processDaV1ToBlocks(daEntry *CommitBatchDaV1) ([]*types.Bl
 func (bq *BlockQueue) processDaV2ToBlocks(daEntry *CommitBatchDaV2) ([]*types.Block, error) {
 	var blocks []*types.Block
 	l1TxPointer := 0
-	var curL1TxIndex uint64 = 0
-	if daEntry.ParentBatchHeader != nil {
-		curL1TxIndex = daEntry.ParentBatchHeader.TotalL1MessagePopped
-	}
+	var curL1TxIndex uint64 = daEntry.ParentTotalL1MessagePopped
 	for _, chunk := range daEntry.Chunks {
 		for blockId, daBlock := range chunk.Blocks {
 			// create header

@@ -3,6 +3,7 @@ package da_syncer
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/scroll-tech/da-codec/encoding"
@@ -133,7 +134,7 @@ type commitBatchArgs struct {
 
 func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Log) (DAEntry, error) {
 	if batchIndex == 0 {
-		return NewCommitBatchDaV0(0, batchIndex, nil, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}, 0), nil
+		return NewCommitBatchDaV0(0, batchIndex, 0, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}, 0), nil
 	}
 
 	txData, err := ds.l1Client.fetchTxData(ds.ctx, vLog)
@@ -180,12 +181,8 @@ func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, arg
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
-	parentBatchHeader, err := codecv0.NewDABatchFromBytes(args.ParentBatchHeader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode batch bytes into batch, values: %v, err: %w", args.ParentBatchHeader, err)
-	}
 
-	parentTotalL1MessagePopped := parentBatchHeader.TotalL1MessagePopped
+	parentTotalL1MessagePopped := getBatchTotalL1MessagePopped(args.ParentBatchHeader)
 	totalL1MessagePopped := 0
 	for _, chunk := range chunks {
 		for _, block := range chunk.Blocks {
@@ -210,7 +207,7 @@ func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV0(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	da := NewCommitBatchDaV0(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }
 
@@ -222,10 +219,6 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
 
-	parentBatchHeader, err := codecv1.NewDABatchFromBytes(args.ParentBatchHeader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode batch bytes into batch, values: %v, err: %w", args.ParentBatchHeader, err)
-	}
 	versionedHash, err := ds.l1Client.fetchTxBlobHash(ds.ctx, vLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
@@ -248,7 +241,7 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
-	parentTotalL1MessagePopped := parentBatchHeader.TotalL1MessagePopped
+	parentTotalL1MessagePopped := getBatchTotalL1MessagePopped(args.ParentBatchHeader)
 	totalL1MessagePopped := 0
 	for _, chunk := range chunks {
 		for _, block := range chunk.Blocks {
@@ -272,7 +265,7 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV1(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	da := NewCommitBatchDaV1(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }
 
@@ -284,10 +277,6 @@ func (ds *CalldataBlobSource) decodeDAV2(batchIndex uint64, vLog *types.Log, arg
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
 
-	parentBatchHeader, err := codecv2.NewDABatchFromBytes(args.ParentBatchHeader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode batch bytes into batch, values: %v, err: %w", args.ParentBatchHeader, err)
-	}
 	versionedHash, err := ds.l1Client.fetchTxBlobHash(ds.ctx, vLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
@@ -310,7 +299,7 @@ func (ds *CalldataBlobSource) decodeDAV2(batchIndex uint64, vLog *types.Log, arg
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
-	parentTotalL1MessagePopped := parentBatchHeader.TotalL1MessagePopped
+	parentTotalL1MessagePopped := getBatchTotalL1MessagePopped(args.ParentBatchHeader)
 	totalL1MessagePopped := 0
 	for _, chunk := range chunks {
 		for _, block := range chunk.Blocks {
@@ -334,6 +323,10 @@ func (ds *CalldataBlobSource) decodeDAV2(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV2(args.Version, batchIndex, parentBatchHeader, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	da := NewCommitBatchDaV2(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
+}
+
+func getBatchTotalL1MessagePopped(data []byte) uint64 {
+	return binary.BigEndian.Uint64(data[17:25])
 }

@@ -33,27 +33,27 @@ type DAEntry interface {
 type DA []DAEntry
 
 type CommitBatchDaV0 struct {
-	DaType                 DAType
-	Version                uint8
-	BatchIndex             uint64
-	ParentBatchHeader      *codecv0.DABatch
-	SkippedL1MessageBitmap []byte
-	Chunks                 []*codecv0.DAChunkRawTx
-	L1Txs                  []*types.L1MessageTx
+	DaType                     DAType
+	Version                    uint8
+	BatchIndex                 uint64
+	ParentTotalL1MessagePopped uint64
+	SkippedL1MessageBitmap     []byte
+	Chunks                     []*codecv0.DAChunkRawTx
+	L1Txs                      []*types.L1MessageTx
 
 	L1BlockNumber uint64
 }
 
-func NewCommitBatchDaV0(version uint8, batchIndex uint64, parentBatchHeader *codecv0.DABatch, skippedL1MessageBitmap []byte, chunks []*codecv0.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
+func NewCommitBatchDaV0(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv0.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
 	return &CommitBatchDaV0{
-		DaType:                 CommitBatchV0,
-		Version:                version,
-		BatchIndex:             batchIndex,
-		ParentBatchHeader:      parentBatchHeader,
-		SkippedL1MessageBitmap: skippedL1MessageBitmap,
-		Chunks:                 chunks,
-		L1Txs:                  l1Txs,
-		L1BlockNumber:          l1BlockNumber,
+		DaType:                     CommitBatchV0,
+		Version:                    version,
+		BatchIndex:                 batchIndex,
+		ParentTotalL1MessagePopped: parentTotalL1MessagePopped,
+		SkippedL1MessageBitmap:     skippedL1MessageBitmap,
+		Chunks:                     chunks,
+		L1Txs:                      l1Txs,
+		L1BlockNumber:              l1BlockNumber,
 	}
 }
 
@@ -66,27 +66,27 @@ func (f *CommitBatchDaV0) GetL1BlockNumber() uint64 {
 }
 
 type CommitBatchDaV1 struct {
-	DaType                 DAType
-	Version                uint8
-	BatchIndex             uint64
-	ParentBatchHeader      *codecv1.DABatch
-	SkippedL1MessageBitmap []byte
-	Chunks                 []*codecv1.DAChunkRawTx
-	L1Txs                  []*types.L1MessageTx
+	DaType                     DAType
+	Version                    uint8
+	BatchIndex                 uint64
+	ParentTotalL1MessagePopped uint64
+	SkippedL1MessageBitmap     []byte
+	Chunks                     []*codecv1.DAChunkRawTx
+	L1Txs                      []*types.L1MessageTx
 
 	L1BlockNumber uint64
 }
 
-func NewCommitBatchDaV1(version uint8, batchIndex uint64, parentBatchHeader *codecv1.DABatch, skippedL1MessageBitmap []byte, chunks []*codecv1.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
+func NewCommitBatchDaV1(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv1.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
 	return &CommitBatchDaV1{
-		DaType:                 CommitBatchV1,
-		Version:                version,
-		BatchIndex:             batchIndex,
-		ParentBatchHeader:      parentBatchHeader,
-		SkippedL1MessageBitmap: skippedL1MessageBitmap,
-		Chunks:                 chunks,
-		L1Txs:                  l1Txs,
-		L1BlockNumber:          l1BlockNumber,
+		DaType:                     CommitBatchV1,
+		Version:                    version,
+		BatchIndex:                 batchIndex,
+		ParentTotalL1MessagePopped: parentTotalL1MessagePopped,
+		SkippedL1MessageBitmap:     skippedL1MessageBitmap,
+		Chunks:                     chunks,
+		L1Txs:                      l1Txs,
+		L1BlockNumber:              l1BlockNumber,
 	}
 }
 
@@ -99,27 +99,27 @@ func (f *CommitBatchDaV1) GetL1BlockNumber() uint64 {
 }
 
 type CommitBatchDaV2 struct {
-	DaType                 DAType
-	Version                uint8
-	BatchIndex             uint64
-	ParentBatchHeader      *codecv2.DABatch
-	SkippedL1MessageBitmap []byte
-	Chunks                 []*codecv2.DAChunkRawTx
-	L1Txs                  []*types.L1MessageTx
+	DaType                     DAType
+	Version                    uint8
+	BatchIndex                 uint64
+	ParentTotalL1MessagePopped uint64
+	SkippedL1MessageBitmap     []byte
+	Chunks                     []*codecv2.DAChunkRawTx
+	L1Txs                      []*types.L1MessageTx
 
 	L1BlockNumber uint64
 }
 
-func NewCommitBatchDaV2(version uint8, batchIndex uint64, parentBatchHeader *codecv2.DABatch, skippedL1MessageBitmap []byte, chunks []*codecv2.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
+func NewCommitBatchDaV2(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv2.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
 	return &CommitBatchDaV2{
-		DaType:                 CommitBatchV2,
-		Version:                version,
-		BatchIndex:             batchIndex,
-		ParentBatchHeader:      parentBatchHeader,
-		SkippedL1MessageBitmap: skippedL1MessageBitmap,
-		Chunks:                 chunks,
-		L1Txs:                  l1Txs,
-		L1BlockNumber:          l1BlockNumber,
+		DaType:                     CommitBatchV2,
+		Version:                    version,
+		BatchIndex:                 batchIndex,
+		ParentTotalL1MessagePopped: parentTotalL1MessagePopped,
+		SkippedL1MessageBitmap:     skippedL1MessageBitmap,
+		Chunks:                     chunks,
+		L1Txs:                      l1Txs,
+		L1BlockNumber:              l1BlockNumber,
 	}
 }
 

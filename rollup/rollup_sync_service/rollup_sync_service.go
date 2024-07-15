@@ -248,7 +248,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 					return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", index, err)
 				}
 
-				endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack)
+				endBlock, finalizedBatchMeta, err := validateBatch(event, parentBatchMeta, chunks, s.bc.Config(), s.stack, index == batchIndex)
 				if err != nil {
 					return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 				}
@@ -425,7 +425,7 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 // validateBatch verifies the consistency between the L1 contract and L2 node data.
 // The function will terminate the node and exit if any consistency check fails.
 // It returns the number of the end block, a finalized batch meta data, and an error if any.
-func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
+func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node, lastBatch bool) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
 		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", event.BatchIndex.Uint64())
 	}
@@ -441,20 +441,6 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		return 0, nil, fmt.Errorf("invalid argument: block count of end chunk is 0, batch index: %v", event.BatchIndex.Uint64())
 	}
 	endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
-
-	localStateRoot := endBlock.Header.Root
-	if localStateRoot != event.StateRoot {
-		log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
-		stack.Close()
-		os.Exit(1)
-	}
-
-	localWithdrawRoot := endBlock.WithdrawRoot
-	if localWithdrawRoot != event.WithdrawRoot {
-		log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
-		stack.Close()
-		os.Exit(1)
-	}
 
 	// Note: All params of batch are calculated locally based on the block data.
 	batch := &encoding.Batch{
@@ -491,17 +477,41 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		localBatchHash = daBatch.Hash()
 	}
 
-	// Note: If the batch headers match, this ensures the consistency of blocks and transactions
+	localStateRoot := endBlock.Header.Root
+	localWithdrawRoot := endBlock.WithdrawRoot
+
+	// Note: If the state root, withdraw root, and batch headers match, this ensures the consistency of blocks and transactions
 	// (including skipped transactions) between L1 and L2.
-	if localBatchHash != event.BatchHash {
-		log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
-		chunksJson, err := json.Marshal(chunks)
-		if err != nil {
-			log.Error("marshal chunks failed", "err", err)
+	//
+	// Only check when it's the last batch. This is compatible with both "finalize by batch" and "finalize by bundle":
+	// - finalize by batch: check all batches
+	// - finalize by bundle: check the last batch, because only one event (containing the info of the last batch) is emitted per bundle
+	if lastBatch {
+		if localStateRoot != event.StateRoot {
+			log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+			stack.Close()
+			os.Exit(1)
 		}
-		log.Error("Chunks", "chunks", string(chunksJson))
-		stack.Close()
-		os.Exit(1)
+
+		if localWithdrawRoot != event.WithdrawRoot {
+			log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+			stack.Close()
+			os.Exit(1)
+		}
+
+		// The rollup verifier recalculates all batch hashes locally.
+		// Each batch hash depends on the parent hash, so checking the last batch hash of each bundle when "finalize by bundle"
+		// still ensures all batch hashes are correct.
+		if localBatchHash != event.BatchHash {
+			log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+			chunksJson, err := json.Marshal(chunks)
+			if err != nil {
+				log.Error("marshal chunks failed", "err", err)
+			}
+			log.Error("Chunks", "chunks", string(chunksJson))
+			stack.Close()
+			os.Exit(1)
+		}
 	}
 
 	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped

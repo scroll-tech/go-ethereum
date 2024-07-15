@@ -29,7 +29,7 @@ import (
 
 // L1Client provides functionality provided by L1
 type L1Client interface {
-	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
+	StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error)
 }
 
 // Config are the configuration options for the Interpreter

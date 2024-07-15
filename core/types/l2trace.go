@@ -26,10 +26,10 @@ type BlockTrace struct {
 
 // BytecodeTrace stores all accessed bytecodes
 type BytecodeTrace struct {
-	CodeSize         uint64      `json:"codeSize"`
-	KeccakCodeHash   common.Hash `json:"keccakCodeHash"`
-	PoseidonCodeHash common.Hash `json:"hash"`
-	Code             string      `json:"code"`
+	CodeSize         uint64        `json:"codeSize"`
+	KeccakCodeHash   common.Hash   `json:"keccakCodeHash"`
+	PoseidonCodeHash common.Hash   `json:"hash"`
+	Code             hexutil.Bytes `json:"code"`
 }
 
 // StorageTrace stores proofs of storage needed by storage circuit

@@ -594,14 +594,14 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 		CodeSize:         0,
 		KeccakCodeHash:   codehash.EmptyKeccakCodeHash,
 		PoseidonCodeHash: codehash.EmptyPoseidonCodeHash,
-		Code:             hexutil.Encode([]byte{}),
+		Code:             hexutil.Bytes{},
 	})
 	for _, codeInfo := range env.Codes {
 		blockTrace.Bytecodes = append(blockTrace.Bytecodes, &types.BytecodeTrace{
 			CodeSize:         codeInfo.CodeSize,
 			KeccakCodeHash:   codeInfo.KeccakCodeHash,
 			PoseidonCodeHash: codeInfo.PoseidonCodeHash,
-			Code:             hexutil.Encode(codeInfo.Code),
+			Code:             codeInfo.Code,
 		})
 	}
 

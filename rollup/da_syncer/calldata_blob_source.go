@@ -132,6 +132,14 @@ type commitBatchArgs struct {
 	SkippedL1MessageBitmap []byte
 }
 
+type commitBatchWithBlobProofArgs struct {
+	Version                uint8
+	ParentBatchHeader      []byte
+	Chunks                 [][]byte
+	SkippedL1MessageBitmap []byte
+	BlobDataProof          []byte
+}
+
 func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Log) (DAEntry, error) {
 	if batchIndex == 0 {
 		return NewCommitBatchDaV0(0, batchIndex, 0, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}, 0), nil
@@ -150,26 +158,40 @@ func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Lo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:methodIDLength], err)
 	}
-
 	values, err := method.Inputs.Unpack(txData[methodIDLength:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack transaction data using ABI, tx data: %v, err: %w", txData, err)
 	}
 
-	var args commitBatchArgs
-	err = method.Inputs.Copy(&args, values)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
-	}
-	switch args.Version {
-	case 0:
-		return ds.decodeDAV0(batchIndex, vLog, &args)
-	case 1:
-		return ds.decodeDAV1(batchIndex, vLog, &args)
-	case 2:
-		return ds.decodeDAV2(batchIndex, vLog, &args)
-	default:
-		return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
+	if method.Name == "commitBatch" {
+		var args commitBatchArgs
+		err = method.Inputs.Copy(&args, values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
+		}
+		switch args.Version {
+		case 0:
+			return ds.decodeDAV0(batchIndex, vLog, &args)
+		case 1:
+			return ds.decodeDAV1(batchIndex, vLog, &args)
+		case 2:
+			return ds.decodeDAV2(batchIndex, vLog, &args)
+		default:
+			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
+		}
+	} else {
+		var args commitBatchWithBlobProofArgs
+		err = method.Inputs.Copy(&args, values)
+		var usedArgs commitBatchArgs = commitBatchArgs{
+			Version:                args.Version,
+			ParentBatchHeader:      args.ParentBatchHeader,
+			Chunks:                 args.Chunks,
+			SkippedL1MessageBitmap: args.SkippedL1MessageBitmap,
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
+		}
+		return ds.decodeDAV2(batchIndex, vLog, &usedArgs)
 	}
 
 }

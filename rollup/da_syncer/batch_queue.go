@@ -11,22 +11,26 @@ import (
 
 type BatchQueue struct {
 	// batches is map from batchIndex to batch blocks
-	batches map[uint64]DAEntry
-	daQueue *DaQueue
-	db      ethdb.Database
+	batches                 map[uint64]DAEntry
+	daQueue                 *DaQueue
+	db                      ethdb.Database
+	lastFinalizedBatchIndex uint64
 }
 
 func NewBatchQueue(daQueue *DaQueue, db ethdb.Database) *BatchQueue {
 	return &BatchQueue{
-		batches: make(map[uint64]DAEntry),
-		daQueue: daQueue,
-		db:      db,
+		batches:                 make(map[uint64]DAEntry),
+		daQueue:                 daQueue,
+		db:                      db,
+		lastFinalizedBatchIndex: 0,
 	}
 }
 
 // NextBatch finds next finalized batch and returns data, that was committed in that batch
 func (bq *BatchQueue) NextBatch(ctx context.Context) (DAEntry, error) {
-
+	if batch, ok := bq.getFinalizedBatch(); ok {
+		return batch, nil
+	}
 	for {
 		daEntry, err := bq.daQueue.NextDA(ctx)
 		if err != nil {
@@ -42,20 +46,42 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (DAEntry, error) {
 		case *RevertBatchDA:
 			bq.deleteBatch(daEntry.BatchIndex)
 		case *FinalizeBatchDA:
-			ret, ok := bq.batches[daEntry.BatchIndex]
-			if !ok {
-				// most probable, we met FinalizeBatch event for already committed batch after restart
+			if daEntry.BatchIndex > bq.lastFinalizedBatchIndex {
+				bq.lastFinalizedBatchIndex = daEntry.BatchIndex
+			}
+			ret, ok := bq.getFinalizedBatch()
+			if ok {
+				return ret, nil
+			} else {
 				continue
 			}
-			bq.deleteBatch(daEntry.BatchIndex)
-			return ret, nil
 		default:
 			return nil, fmt.Errorf("unexpected type of daEntry: %T", daEntry)
 		}
 	}
 }
 
-// deleteBatch deletes data committed in the batch, because this batch is reverted or finalized
+// getFinalizedBatch returns next finalized batch if there is available
+func (bq *BatchQueue) getFinalizedBatch() (DAEntry, bool) {
+	if len(bq.batches) == 0 {
+		return nil, false
+	}
+	var minBatchIndex uint64 = math.MaxUint64
+	for index := range bq.batches {
+		if index < minBatchIndex {
+			minBatchIndex = index
+		}
+	}
+	if minBatchIndex <= bq.lastFinalizedBatchIndex {
+		batch, _ := bq.batches[minBatchIndex]
+		bq.deleteBatch(minBatchIndex)
+		return batch, true
+	} else {
+		return nil, false
+	}
+}
+
+// deleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized
 // updates DASyncedL1BlockNumber
 func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 	batch, ok := bq.batches[batchIndex]
@@ -75,4 +101,5 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 		}
 	}
 	rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height-1)
+
 }

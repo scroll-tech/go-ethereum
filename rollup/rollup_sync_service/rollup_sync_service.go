@@ -422,9 +422,28 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 	return nil, fmt.Errorf("unexpected method name: %v", method.Name)
 }
 
-// validateBatch verifies the consistency between the L1 contract and L2 node data.
+// validateBatch verifies the consistency between L1 contract and L2 node data.
+// It performs the following checks:
+// 1. Recalculates the batch hash locally
+// 2. Compares local state root, withdraw root, and batch hash with L1 data (for the last batch only when "finalize by bundle")
+//
 // The function will terminate the node and exit if any consistency check fails.
-// It returns the number of the end block, a finalized batch meta data, and an error if any.
+//
+// Parameters:
+// - event: L1 finalize batch event data
+// - parentBatchMeta: metadata of the parent batch
+// - chunks: slice of chunk data for the current batch
+// - chainCfg: chain configuration to identify the codec version
+// - stack: node stack to terminate the node in case of inconsistency
+// - lastBatch: boolean indicating if this is the last batch in a bundle
+//
+// Returns:
+// - uint64: the end block height of the batch
+// - *rawdb.FinalizedBatchMeta: finalized batch metadata
+// - error: any error encountered during validation
+//
+// Note: This function is compatible with both "finalize by batch" and "finalize by bundle" methods.
+// In "finalize by bundle", only the last batch of each bundle is fully verified.
 func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node, lastBatch bool) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
 		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", event.BatchIndex.Uint64())
@@ -499,9 +518,9 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 			os.Exit(1)
 		}
 
-		// The rollup verifier recalculates all batch hashes locally.
-		// Each batch hash depends on the parent hash, so checking the last batch hash of each bundle when "finalize by bundle"
-		// still ensures all batch hashes are correct.
+		// Verify batch hash
+		// This check ensures the correctness of all batch hashes in the bundle
+		// due to the parent-child relationship between batch hashes
 		if localBatchHash != event.BatchHash {
 			log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
 			chunksJson, err := json.Marshal(chunks)

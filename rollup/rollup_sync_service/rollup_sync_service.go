@@ -422,10 +422,10 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 	return nil, fmt.Errorf("unexpected method name: %v", method.Name)
 }
 
-// validateBatch verifies the consistency between L1 contract and L2 node data.
+// validateBatch verifies the consistency between the L1 contract and L2 node data.
 // It performs the following checks:
 // 1. Recalculates the batch hash locally
-// 2. Compares local state root, withdraw root, and batch hash with L1 data (for the last batch only when "finalize by bundle")
+// 2. Compares local state root, local withdraw root, and locally calculated batch hash with L1 data (for the last batch only when "finalize by bundle")
 //
 // The function will terminate the node and exit if any consistency check fails.
 //
@@ -444,6 +444,7 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 //
 // Note: This function is compatible with both "finalize by batch" and "finalize by bundle" methods.
 // In "finalize by bundle", only the last batch of each bundle is fully verified.
+// This check still ensures the correctness of all batch hashes in the bundle due to the parent-child relationship between batch hashes.
 func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
 		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", batchIndex)

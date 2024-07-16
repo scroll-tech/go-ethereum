@@ -11,8 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scroll-tech/go-ethereum/ethclient"
 	"github.com/spf13/cobra"
+
+	"github.com/scroll-tech/go-ethereum/ethclient"
 
 	"github.com/scroll-tech/go-ethereum/export-headers-toolkit/types"
 )

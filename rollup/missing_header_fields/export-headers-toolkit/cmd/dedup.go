@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -41,7 +42,23 @@ The binary layout of the deduplicated file is as follows:
 
 		seenDifficulty, seenVanity, seenSealLen := runAnalysis(inputFile)
 		runDedup(inputFile, outputFile, seenDifficulty, seenVanity, seenSealLen)
+		runSHA256(outputFile)
 	},
+}
+
+func runSHA256(outputFile string) {
+	f, err := os.Open(outputFile)
+	defer f.Close()
+	if err != nil {
+		log.Fatalf("Error opening file: %v", err)
+	}
+
+	h := sha256.New()
+	if _, err = io.Copy(h, f); err != nil {
+		log.Fatalf("Error hashing file: %v", err)
+	}
+
+	fmt.Printf("Deduplicated headers written to %s with sha256 checksum: %x\n", outputFile, h.Sum(nil))
 }
 
 func init() {
@@ -93,15 +110,13 @@ func runDedup(inputFile, outputFile string, seenDifficulty map[uint64]int, seenV
 	defer reader.close()
 
 	writer := newMissingHeaderFileWriter(outputFile, seenVanity)
-	writer.close()
+	defer writer.close()
 
 	writer.missingHeaderWriter.writeVanities()
 
 	reader.read(func(header *types.Header) {
 		writer.missingHeaderWriter.write(header)
 	})
-
-	fmt.Printf("Deduplicated headers written to %s\n", outputFile)
 }
 
 type headerReader struct {

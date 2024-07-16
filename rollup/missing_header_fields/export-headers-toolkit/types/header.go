@@ -6,11 +6,20 @@ import (
 )
 
 const HeaderSizeSerialized = 2
+const VanitySize = 32
 
 type Header struct {
 	Number     uint64
 	Difficulty uint64
 	ExtraData  []byte
+}
+
+func NewHeader(number, difficulty uint64, extraData []byte) *Header {
+	return &Header{
+		Number:     number,
+		Difficulty: difficulty,
+		ExtraData:  extraData,
+	}
 }
 
 func (h *Header) String() string {
@@ -29,12 +38,16 @@ func (h *Header) Bytes() ([]byte, error) {
 	return buf, nil
 }
 
-func (h *Header) Vanity() [32]byte {
-	return [32]byte(h.ExtraData[:32])
+func (h *Header) Vanity() [VanitySize]byte {
+	return [VanitySize]byte(h.ExtraData[:VanitySize])
+}
+
+func (h *Header) Seal() []byte {
+	return h.ExtraData[VanitySize:]
 }
 
 func (h *Header) SealLen() int {
-	return len(h.ExtraData[32:])
+	return len(h.Seal())
 }
 
 // FromBytes reads the header from the byte representation excluding the initial 2 bytes for the size.

@@ -39,7 +39,8 @@ The binary layout of the deduplicated file is as follows:
 			log.Fatalf("Error reading output flag: %v", err)
 		}
 
-		runDedup(inputFile, outputFile)
+		seenDifficulty, seenVanity, seenSealLen := runAnalysis(inputFile)
+		runDedup(inputFile, outputFile, seenDifficulty, seenVanity, seenSealLen)
 	},
 }
 
@@ -50,38 +51,57 @@ func init() {
 	dedupCmd.Flags().String("output", "headers-dedup.bin", "deduplicated, binary formatted file")
 }
 
-func runDedup(inputFile, outputFile string) {
+func runAnalysis(inputFile string) (seenDifficulty map[uint64]int, seenVanity map[[32]byte]bool, seenSealLen map[int]int) {
 	reader := newHeaderReader(inputFile)
 	defer reader.close()
 
 	// track header fields we've seen
-	seenDifficulty := make(map[uint64]bool)
-	seenVanity := make(map[[32]byte]bool)
-	seenSealLen := make(map[int]bool)
+	seenDifficulty = make(map[uint64]int)
+	seenVanity = make(map[[32]byte]bool)
+	seenSealLen = make(map[int]int)
 
 	reader.read(func(header *types.Header) {
-		seenDifficulty[header.Difficulty] = true
+		seenDifficulty[header.Difficulty]++
 		seenVanity[header.Vanity()] = true
-		seenSealLen[header.SealLen()] = true
+		seenSealLen[header.SealLen()]++
 	})
 
-	// Print report
+	// Print distinct values and report
 	fmt.Println("--------------------------------------------------")
-	fmt.Printf("Unique values seen in the headers file (last seen block: %d):\n", reader.lastHeader.Number)
-	fmt.Printf("Distinct count: Difficulty:%d, Vanity:%d, SealLen:%d\n", len(seenDifficulty), len(seenVanity), len(seenSealLen))
-	fmt.Printf("--------------------------------------------------\n\n")
-
-	for diff := range seenDifficulty {
-		fmt.Printf("Difficulty: %d\n", diff)
+	for diff, count := range seenDifficulty {
+		fmt.Printf("Difficulty %d: %d\n", diff, count)
 	}
 
 	for vanity := range seenVanity {
 		fmt.Printf("Vanity: %x\n", vanity)
 	}
 
-	for sealLen := range seenSealLen {
-		fmt.Printf("SealLen: %d\n", sealLen)
+	for sealLen, count := range seenSealLen {
+		fmt.Printf("SealLen %d bytes: %d\n", sealLen, count)
 	}
+
+	fmt.Println("--------------------------------------------------")
+	fmt.Printf("Unique values seen in the headers file (last seen block: %d):\n", reader.lastHeader.Number)
+	fmt.Printf("Distinct count: Difficulty:%d, Vanity:%d, SealLen:%d\n", len(seenDifficulty), len(seenVanity), len(seenSealLen))
+	fmt.Printf("--------------------------------------------------\n\n")
+
+	return seenDifficulty, seenVanity, seenSealLen
+}
+
+func runDedup(inputFile, outputFile string, seenDifficulty map[uint64]int, seenVanity map[[32]byte]bool, seenSealLen map[int]int) {
+	reader := newHeaderReader(inputFile)
+	defer reader.close()
+
+	writer := newMissingHeaderFileWriter(outputFile, seenVanity)
+	writer.close()
+
+	writer.missingHeaderWriter.writeVanities()
+
+	reader.read(func(header *types.Header) {
+		writer.missingHeaderWriter.write(header)
+	})
+
+	fmt.Printf("Deduplicated headers written to %s\n", outputFile)
 }
 
 type headerReader struct {

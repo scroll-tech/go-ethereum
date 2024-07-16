@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	VersionMajor = 5         // Major version component of the current release
-	VersionMinor = 5         // Minor version component of the current release
-	VersionPatch = 12        // Patch version component of the current release
-	VersionMeta  = "mainnet" // Version metadata to append to the version string
+	VersionMajor = 5                    // Major version component of the current release
+	VersionMinor = 5                    // Minor version component of the current release
+	VersionPatch = 12                   // Patch version component of the current release
+	VersionMeta  = "mainnet-shadowfork" // Version metadata to append to the version string
 )
 
 // Version holds the textual version string.

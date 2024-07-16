@@ -552,7 +552,7 @@ func TestValidateBatchCodecv0(t *testing.T) {
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil, true)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1.BatchIndex.Uint64(), event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock1)
 
@@ -572,7 +572,7 @@ func TestValidateBatchCodecv0(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil, true)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2.BatchIndex.Uint64(), event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock2)
 
@@ -605,7 +605,7 @@ func TestValidateBatchCodecv1(t *testing.T) {
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil, true)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1.BatchIndex.Uint64(), event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock1)
 
@@ -625,7 +625,7 @@ func TestValidateBatchCodecv1(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil, true)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2.BatchIndex.Uint64(), event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock2)
 
@@ -658,7 +658,7 @@ func TestValidateBatchCodecv2(t *testing.T) {
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil, true)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1.BatchIndex.Uint64(), event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock1)
 
@@ -678,7 +678,7 @@ func TestValidateBatchCodecv2(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil, true)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2.BatchIndex.Uint64(), event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock2)
 
@@ -711,7 +711,7 @@ func TestValidateBatchCodecv3(t *testing.T) {
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil, true)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1.BatchIndex.Uint64(), event1, parentBatchMeta1, []*encoding.Chunk{chunk1, chunk2, chunk3}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock1)
 
@@ -731,7 +731,7 @@ func TestValidateBatchCodecv3(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil, true)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2.BatchIndex.Uint64(), event2, parentBatchMeta2, []*encoding.Chunk{chunk4}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock2)
 
@@ -758,7 +758,7 @@ func TestValidateBatchUpgrades(t *testing.T) {
 		WithdrawRoot: chunk1.Blocks[len(chunk1.Blocks)-1].WithdrawRoot,
 	}
 
-	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*encoding.Chunk{chunk1}, chainConfig, nil, true)
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1.BatchIndex.Uint64(), event1, parentBatchMeta1, []*encoding.Chunk{chunk1}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(2), endBlock1)
 
@@ -778,7 +778,7 @@ func TestValidateBatchUpgrades(t *testing.T) {
 		StateRoot:    chunk2.Blocks[len(chunk2.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk2.Blocks[len(chunk2.Blocks)-1].WithdrawRoot,
 	}
-	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*encoding.Chunk{chunk2}, chainConfig, nil, true)
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2.BatchIndex.Uint64(), event2, parentBatchMeta2, []*encoding.Chunk{chunk2}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(3), endBlock2)
 
@@ -798,7 +798,7 @@ func TestValidateBatchUpgrades(t *testing.T) {
 		StateRoot:    chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
-	endBlock3, finalizedBatchMeta3, err := validateBatch(event3, parentBatchMeta3, []*encoding.Chunk{chunk3}, chainConfig, nil, true)
+	endBlock3, finalizedBatchMeta3, err := validateBatch(event3.BatchIndex.Uint64(), event3, parentBatchMeta3, []*encoding.Chunk{chunk3}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(13), endBlock3)
 
@@ -818,7 +818,7 @@ func TestValidateBatchUpgrades(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	endBlock4, finalizedBatchMeta4, err := validateBatch(event4, parentBatchMeta4, []*encoding.Chunk{chunk4}, chainConfig, nil, true)
+	endBlock4, finalizedBatchMeta4, err := validateBatch(event4.BatchIndex.Uint64(), event4, parentBatchMeta4, []*encoding.Chunk{chunk4}, chainConfig, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(17), endBlock4)
 

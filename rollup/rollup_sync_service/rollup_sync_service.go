@@ -263,7 +263,9 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			}
 
 			if err := batchWriter.Write(); err != nil {
-				log.Crit("Failed to write finalized batch meta to database", "err", err)
+				log.Error("fatal: failed to batch write finalized batch meta to database", "startBatchIndex", startBatchIndex, "endBatchIndex", batchIndex,
+					"batchCount", batchIndex-startBatchIndex+1, "highestFinalizedBlockNumber", highestFinalizedBlockNumber, "err", err)
+				return fmt.Errorf("failed to batch write finalized batch meta to database: %w", err)
 			}
 			rawdb.WriteFinalizedL2BlockNumber(s.db, highestFinalizedBlockNumber)
 			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)

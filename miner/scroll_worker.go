@@ -19,7 +19,6 @@ package miner
 import (
 	"bytes"
 	"errors"
-	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -126,7 +125,7 @@ type worker struct {
 	noempty uint32
 
 	// External functions
-	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
+	isLocalBlock func(block *types.Header) bool // Function used to determine whether the specified block is mined by local miner.
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 	prioritizedTx          *prioritizedTransaction
@@ -135,7 +134,7 @@ type worker struct {
 	beforeTxHook func() // Method to call before processing a transaction.
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Header) bool, init bool) *worker {
 	worker := &worker{
 		config:                 config,
 		chainConfig:            chainConfig,
@@ -157,12 +156,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
-
-	// Sanitize account fetch limit.
-	if worker.config.MaxAccountsNum == 0 {
-		log.Warn("Sanitizing miner account fetch limit", "provided", worker.config.MaxAccountsNum, "updated", math.MaxInt)
-		worker.config.MaxAccountsNum = math.MaxInt
-	}
 
 	worker.wg.Add(1)
 	go worker.mainLoop()
@@ -346,23 +339,23 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	parent := w.chain.CurrentBlock()
 
-	num := parent.Number()
+	num := parent.Number
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent.GasLimit(), w.config.GasCeil),
+		GasLimit:   core.CalcGasLimit(parent.GasLimit, w.config.GasCeil),
 		Extra:      w.extra,
 		Time:       uint64(timestamp),
 	}
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
-		state, err := w.chain.StateAt(parent.Root())
+		state, err := w.chain.StateAt(parent.Root)
 		if err != nil {
 			log.Error("Failed to create mining context", "err", err)
 			return
 		}
 		parentL1BaseFee := fees.GetL1BaseFee(state)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent, parentL1BaseFee)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -394,7 +387,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		}
 	}
 
-	parentState, err := w.chain.StateAt(parent.Root())
+	parentState, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		log.Error("failed to fetch parent state", "err", err)
 		return
@@ -442,7 +435,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	tidyPendingStart := time.Now()
 	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
+	pending := w.eth.TxPool().Pending(false)
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
 	for _, account := range w.eth.TxPool().Locals() {

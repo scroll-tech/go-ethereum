@@ -8,7 +8,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -66,7 +65,7 @@ type Pipeline struct {
 	Header         types.Header
 	state          *state.StateDB
 	nextL1MsgIndex uint64
-	blockSize      common.StorageSize
+	blockSize      uint64
 	txs            types.Transactions
 	coalescedLogs  []*types.Log
 	receipts       types.Receipts
@@ -92,7 +91,6 @@ func NewPipeline(
 ) *Pipeline {
 	// make sure we are not sharing a tracer with the caller and not in debug mode
 	vmConfig.Tracer = nil
-	vmConfig.Debug = false
 
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pipeline{

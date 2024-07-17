@@ -481,7 +481,7 @@ func (p *Pipeline) traceAndApply(tx *types.Transaction) (*types.Receipt, *types.
 	if p.ccc != nil {
 		// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
 		// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
-		commitStateAfterApply := false
+		finaliseStateAfterApply := false
 		snap := p.state.Snapshot()
 
 		// 1. we have to check circuit capacity before `core.ApplyTransaction`,
@@ -492,7 +492,7 @@ func (p *Pipeline) traceAndApply(tx *types.Transaction) (*types.Receipt, *types.
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
 		trace, err = tracing.NewTracerWrapper().CreateTraceEnvAndGetBlockTrace(p.chain.Config(), p.chain, p.chain.Engine(), p.chain.Database(),
-			p.state, p.parent, types.NewBlockWithHeader(&p.Header).WithBody([]*types.Transaction{tx}, nil), commitStateAfterApply)
+			p.state, p.parent, types.NewBlockWithHeader(&p.Header).WithBody([]*types.Transaction{tx}, nil), finaliseStateAfterApply)
 		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
 		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
 		p.state.RevertToSnapshot(snap)

@@ -16,35 +16,12 @@
 
 package miner
 
-/*
 import (
-	"errors"
-	"fmt"
-	"math/big"
-	"sync"
-	"sync/atomic"
-	"time"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rollup/circuitcapacitychecker"
-	"github.com/ethereum/go-ethereum/rollup/fees"
-	"github.com/ethereum/go-ethereum/rollup/tracing"
-	"github.com/ethereum/go-ethereum/trie"
 )
+
+/*
 
 const (
 	// resultQueueSize is the size of channel listening to sealing result.
@@ -1389,6 +1366,8 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	return env, nil
 }
 
+*/
+
 func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransaction {
 	if tx.IsL1MessageTx() {
 		return &txpool.LazyTransaction{
@@ -1414,6 +1393,8 @@ func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransa
 		BlobGas:   tx.BlobGas(),
 	}
 }
+
+/*
 
 // fillTransactions retrieves the pending transactions from the txpool and fills them
 // into the given sealing block. The transaction selection and ordering strategy can

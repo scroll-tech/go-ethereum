@@ -242,7 +242,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			}
 
 			var highestFinalizedBlockNumber uint64
-			var finalizedBatchMetas []*rawdb.FinalizedBatchMeta
+			batchWriter := s.db.NewBatch()
 			for index := startBatchIndex; index <= batchIndex; index++ {
 				parentBatchMeta, chunks, err := s.getLocalInfoForBatch(index)
 				if err != nil {
@@ -254,7 +254,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 					return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 				}
 
-				finalizedBatchMetas = append(finalizedBatchMetas, finalizedBatchMeta)
+				rawdb.WriteFinalizedBatchMeta(batchWriter, index, finalizedBatchMeta)
 				highestFinalizedBlockNumber = endBlock
 
 				if index%100 == 0 {
@@ -262,8 +262,8 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				}
 			}
 
-			for index, finalizedBatchMeta := range finalizedBatchMetas {
-				rawdb.WriteFinalizedBatchMeta(s.db, startBatchIndex+uint64(index), finalizedBatchMeta)
+			if err := batchWriter.Write(); err != nil {
+				log.Crit("Failed to write finalized batch meta to database", "err", err)
 			}
 			rawdb.WriteFinalizedL2BlockNumber(s.db, highestFinalizedBlockNumber)
 			rawdb.WriteLastFinalizedBatchIndex(s.db, batchIndex)

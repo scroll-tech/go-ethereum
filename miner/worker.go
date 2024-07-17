@@ -16,6 +16,7 @@
 
 package miner
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -1780,3 +1781,5 @@ func signalToErr(signal int32) error {
 		panic(fmt.Errorf("undefined signal %d", signal))
 	}
 }
+
+*/

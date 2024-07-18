@@ -117,6 +117,7 @@ type worker struct {
 	// atomic status counters
 	running atomic.Bool  // The indicator whether the consensus engine is running or not.
 	newTxs  atomic.Int32 // New arrival transaction count since last sealing work submitting.
+	syncing atomic.Bool  // The indicator whether the node is still syncing.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -261,6 +262,10 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 
 // startNewPipeline generates several new sealing tasks based on the parent block.
 func (w *worker) startNewPipeline(timestamp int64) {
+	// Abort if node is still syncing
+	if w.syncing.Load() {
+		return
+	}
 
 	if w.currentPipeline != nil {
 		w.currentPipeline.Release()

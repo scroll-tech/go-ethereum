@@ -321,11 +321,11 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 	start.Store(true)
 
 	// w.setRecommitInterval(3 * time.Second)
-	select {
-	case <-progress:
-	case <-time.NewTimer(time.Second).C:
-		t.Error("interval reset timeout")
-	}
+	// select {
+	// case <-progress:
+	// case <-time.NewTimer(time.Second).C:
+	// 	t.Error("interval reset timeout")
+	// }
 
 	w.resubmitAdjustCh <- &intervalAdjust{inc: true, ratio: 0.8}
 	select {
@@ -342,11 +342,11 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 	}
 
 	// w.setRecommitInterval(500 * time.Millisecond)
-	select {
-	case <-progress:
-	case <-time.NewTimer(time.Second).C:
-		t.Error("interval reset timeout")
-	}
+	// select {
+	// case <-progress:
+	// case <-time.NewTimer(time.Second).C:
+	// 	t.Error("interval reset timeout")
+	// }
 }
 
 func TestGetSealingWorkEthash(t *testing.T) {

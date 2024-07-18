@@ -24,11 +24,10 @@ The binary layout of the deduplicated file is as follows:
 - 1 byte for the count of unique vanity
 - 32 bytes for each unique vanity
 - for each header:
-  - 1 byte for the index of the vanity in the unique vanity list
   - 1 byte (bitmask, lsb first): 
-	- bit 0: 0 if difficulty is 2, 1 if difficulty is 1
-    - bit 1: 0 if seal length is 65, 1 if seal length is 85
-    - rest: 0
+	- bit 0-5: index of the vanity in the sorted vanities list
+	- bit 6: 0 if difficulty is 2, 1 if difficulty is 1
+	- bit 7: 0 if seal length is 65, 1 if seal length is 85
   - 65 or 85 bytes for the seal`,
 	Run: func(cmd *cobra.Command, args []string) {
 		inputFile, err := cmd.Flags().GetString("input")
@@ -40,8 +39,8 @@ The binary layout of the deduplicated file is as follows:
 			log.Fatalf("Error reading output flag: %v", err)
 		}
 
-		seenDifficulty, seenVanity, seenSealLen := runAnalysis(inputFile)
-		runDedup(inputFile, outputFile, seenDifficulty, seenVanity, seenSealLen)
+		_, seenVanity, _ := runAnalysis(inputFile)
+		runDedup(inputFile, outputFile, seenVanity)
 		runSHA256(outputFile)
 	},
 }
@@ -105,7 +104,7 @@ func runAnalysis(inputFile string) (seenDifficulty map[uint64]int, seenVanity ma
 	return seenDifficulty, seenVanity, seenSealLen
 }
 
-func runDedup(inputFile, outputFile string, seenDifficulty map[uint64]int, seenVanity map[[32]byte]bool, seenSealLen map[int]int) {
+func runDedup(inputFile, outputFile string, seenVanity map[[32]byte]bool) {
 	reader := newHeaderReader(inputFile)
 	defer reader.close()
 

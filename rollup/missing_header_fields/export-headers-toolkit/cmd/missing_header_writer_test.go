@@ -39,8 +39,8 @@ func TestMissingHeaderWriter(t *testing.T) {
 		header := types.NewHeader(0, 2, append(vanity1[:], seal...))
 		mhw.write(header)
 
-		expectedBytes = append(expectedBytes, 0x00) // index 0
-		expectedBytes = append(expectedBytes, 0x00) // difficulty 2, seal length 65
+		// bit 0-5:0x0 index0, bit 6=0: difficulty 2, bit 7=0: seal length 65
+		expectedBytes = append(expectedBytes, 0b00000000)
 		expectedBytes = append(expectedBytes, seal...)
 		assert.Equal(t, expectedBytes, bytesBuffer.Bytes())
 	}
@@ -51,8 +51,8 @@ func TestMissingHeaderWriter(t *testing.T) {
 		header := types.NewHeader(1, 1, append(vanity2[:], seal...))
 		mhw.write(header)
 
-		expectedBytes = append(expectedBytes, 0x01) // index 1
-		expectedBytes = append(expectedBytes, 0x01) // difficulty 1, seal length 65
+		// bit 0-5:0x1 index1, bit 6=1: difficulty 1, bit 7=0: seal length 65
+		expectedBytes = append(expectedBytes, 0b01000001)
 		expectedBytes = append(expectedBytes, seal...)
 		assert.Equal(t, expectedBytes, bytesBuffer.Bytes())
 	}
@@ -63,8 +63,8 @@ func TestMissingHeaderWriter(t *testing.T) {
 		header := types.NewHeader(2, 2, append(vanity2[:], seal...))
 		mhw.write(header)
 
-		expectedBytes = append(expectedBytes, 0x01) // index 1
-		expectedBytes = append(expectedBytes, 0x02) // difficulty 2, seal length 85
+		// bit 0-5:0x1 index1, bit 6=0: difficulty 2, bit 7=1: seal length 85
+		expectedBytes = append(expectedBytes, 0b10000001)
 		expectedBytes = append(expectedBytes, seal...)
 		assert.Equal(t, expectedBytes, bytesBuffer.Bytes())
 	}
@@ -75,8 +75,8 @@ func TestMissingHeaderWriter(t *testing.T) {
 		header := types.NewHeader(3, 1, append(vanity8[:], seal...))
 		mhw.write(header)
 
-		expectedBytes = append(expectedBytes, 0x02) // index 2
-		expectedBytes = append(expectedBytes, 0x03) // difficulty 1, seal length 85
+		// bit 0-5:0x2 index2, bit 6=1: difficulty 1, bit 7=1: seal length 85
+		expectedBytes = append(expectedBytes, 0b11000010)
 		expectedBytes = append(expectedBytes, seal...)
 		assert.Equal(t, expectedBytes, bytesBuffer.Bytes())
 	}
@@ -87,8 +87,8 @@ func TestMissingHeaderWriter(t *testing.T) {
 		header := types.NewHeader(4, 2, append(vanity1[:], seal...))
 		mhw.write(header)
 
-		expectedBytes = append(expectedBytes, 0x00) // index 0
-		expectedBytes = append(expectedBytes, 0x00) // difficulty 2, seal length 65
+		// bit 0-5:0x0 index0, bit 6=0: difficulty 2, bit 7=0: seal length 65
+		expectedBytes = append(expectedBytes, 0b00000000)
 		expectedBytes = append(expectedBytes, seal...)
 		assert.Equal(t, expectedBytes, bytesBuffer.Bytes())
 	}

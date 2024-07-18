@@ -410,7 +410,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
-		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
+		txs, err := newL1MessagesByQueueIndex(w.eth.TxPool(), l1Messages)
 		if err != nil {
 			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
 			return

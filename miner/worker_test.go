@@ -184,10 +184,10 @@ func TestGenerateAndImportBlock(t *testing.T) {
 	chain, _ := core.NewBlockChain(rawdb.NewMemoryDatabase(), nil, b.genesis, nil, engine, vm.Config{}, nil, nil)
 	defer chain.Stop()
 
-	// Ignore empty commit here for less noise.
-	w.skipSealHook = func(task *task) bool {
-		return len(task.receipts) == 0
-	}
+	// // Ignore empty commit here for less noise.
+	// w.skipSealHook = func(task *task) bool {
+	// 	return len(task.receipts) == 0
+	// }
 
 	// Wait for mined blocks.
 	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
@@ -352,8 +352,6 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 	}
 }
 
-*/
-
 func TestGetSealingWorkEthash(t *testing.T) {
 	testGetSealingWork(t, ethashChainConfig, ethash.NewFaker())
 }
@@ -508,3 +506,5 @@ func testGetSealingWork(t *testing.T, chainConfig *params.ChainConfig, engine co
 		}
 	}
 }
+
+*/

@@ -219,7 +219,7 @@ func (w *worker) mainLoop() {
 					acc, _ := types.Sender(signer, tx)
 					txs[acc] = append(txs[acc], tx)
 				}
-				txset := types.NewTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
+				txset := newTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
 				if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
 					w.handlePipelineResult(result)
 				}
@@ -430,7 +430,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	if w.prioritizedTx != nil {
 		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
 		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
-		txs := types.NewTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
@@ -438,14 +438,14 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 
 	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
 		}
 	}
 	if len(remoteTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return

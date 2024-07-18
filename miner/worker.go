@@ -17,6 +17,8 @@
 package miner
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -177,6 +179,7 @@ type newWorkReq struct {
 	interrupt *atomic.Int32
 	timestamp int64
 }
+*/
 
 // newPayloadResult is the result of payload generation.
 type newPayloadResult struct {
@@ -185,6 +188,8 @@ type newPayloadResult struct {
 	fees     *big.Int               // total block fees
 	sidecars []*types.BlobTxSidecar // collected blobs of blob transactions
 }
+
+/*
 
 // getWorkReq represents a request for getting a new sealing work with provided parameters.
 type getWorkReq struct {

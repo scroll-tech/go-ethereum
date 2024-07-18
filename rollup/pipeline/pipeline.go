@@ -73,7 +73,7 @@ type Pipeline struct {
 	gasPool        *core.GasPool
 
 	// com channels
-	txnQueue         chan *types.Transaction
+	txnQueue         chan *txpool.LazyTransaction
 	applyStageRespCh <-chan error
 	ResultCh         <-chan *Result
 
@@ -115,7 +115,7 @@ func (p *Pipeline) WithBeforeTxHook(beforeTxHook func()) *Pipeline {
 
 func (p *Pipeline) Start(deadline time.Time) error {
 	p.start = time.Now()
-	p.txnQueue = make(chan *types.Transaction)
+	p.txnQueue = make(chan *txpool.LazyTransaction)
 	applyStageRespCh, applyToEncodeCh, err := p.traceAndApplyStage(p.txnQueue)
 	if err != nil {
 		log.Error("Failed starting traceAndApplyStage", "err", err)
@@ -149,14 +149,21 @@ type orderedTransactionSet interface {
 
 func (p *Pipeline) TryPushTxns(txs orderedTransactionSet, onFailingTxn func(txnIndex int, tx *types.Transaction, err error) bool) *Result {
 	for {
-		tx := txs.Peek()
-		if tx == nil {
+		ltx := txs.Peek()
+		if ltx == nil {
 			break
 		}
 
-		result, err := p.TryPushTxn(tx)
+		result, err := p.TryPushTxn(ltx)
 		if result != nil {
 			return result
+		}
+
+		// TODO: return tx via `TryPushTxn` so that we don't need to resolve it here again
+		tx := ltx.Resolve()
+		if tx == nil {
+			txs.Shift()
+			continue
 		}
 
 		switch {
@@ -179,7 +186,7 @@ func (p *Pipeline) TryPushTxns(txs orderedTransactionSet, onFailingTxn func(txnI
 	return nil
 }
 
-func (p *Pipeline) TryPushTxn(tx *types.Transaction) (*Result, error) {
+func (p *Pipeline) TryPushTxn(tx *txpool.LazyTransaction) (*Result, error) {
 	if p.txnQueue == nil {
 		return nil, ErrPipelineDone
 	}
@@ -238,7 +245,7 @@ func sendCancellable[T any, C comparable](resCh chan T, msg T, cancelCh <-chan C
 	}
 }
 
-func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan error, <-chan *BlockCandidate, error) {
+func (p *Pipeline) traceAndApplyStage(txsIn <-chan *txpool.LazyTransaction) (<-chan error, <-chan *BlockCandidate, error) {
 	p.state.StartPrefetcher("miner")
 	downstreamCh := make(chan *BlockCandidate, p.downstreamChCapacity())
 	resCh := make(chan error)
@@ -251,12 +258,12 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 			p.wg.Done()
 		}()
 
-		var tx *types.Transaction
+		var ltx *txpool.LazyTransaction
 		for {
 			idleStart := time.Now()
 			select {
-			case tx = <-txsIn:
-				if tx == nil {
+			case ltx = <-txsIn:
+				if ltx == nil {
 					return
 				}
 			case <-p.ctx.Done():
@@ -275,6 +282,23 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *types.Transaction) (<-chan e
 			// Originally we only limit l2txs count, but now strictly limit total txs number.
 			if !p.chain.Config().Scroll.IsValidTxCount(p.txs.Len() + 1) {
 				return
+			}
+
+			// TODO: what error should we use?
+			if p.gasPool.Gas() < ltx.Gas {
+				// we don't have enough space for the next transaction, skip the account and continue looking for more txns
+				sendCancellable(resCh, nil, p.ctx.Done())
+				continue
+			}
+
+			// TODO: blob gas check
+
+			tx := ltx.Resolve()
+			// TODO: what error should we use?
+			if tx == nil {
+				// can't resolve the tx, silently ignore and continue looking for more txns
+				sendCancellable(resCh, nil, p.ctx.Done())
+				continue
 			}
 
 			if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != p.nextL1MsgIndex {

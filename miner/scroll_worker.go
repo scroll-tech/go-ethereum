@@ -153,7 +153,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
 	// Subscribe NewTxsEvent for tx pool
-	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
+	worker.txsSub = eth.TxPool().SubscribeTransactions(worker.txsCh, true)
 
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)

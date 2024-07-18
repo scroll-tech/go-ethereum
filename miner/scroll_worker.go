@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -214,11 +215,20 @@ func (w *worker) mainLoop() {
 			// already included in the current mining block. These transactions will
 			// be automatically eliminated.
 			if w.currentPipeline != nil {
-				txs := make(map[common.Address]types.Transactions)
+				txs := make(map[common.Address][]*txpool.LazyTransaction)
 				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number, w.currentPipeline.Header.Time)
 				for _, tx := range ev.Txs {
 					acc, _ := types.Sender(signer, tx)
-					txs[acc] = append(txs[acc], tx)
+					txs[acc] = append(txs[acc], &txpool.LazyTransaction{
+						Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
+						Hash:      tx.Hash(),
+						Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
+						Time:      tx.Time(),
+						GasFeeCap: tx.GasFeeCap(),
+						GasTipCap: tx.GasTipCap(),
+						Gas:       tx.Gas(),
+						BlobGas:   tx.BlobGas(),
+					})
 				}
 				txset := newTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
 				if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
@@ -372,7 +382,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(false)
 	// Split the pending transactions into locals and remotes
-	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
+	localTxs, remoteTxs := make(map[common.Address][]*txpool.LazyTransaction), pending
 	for _, account := range w.eth.TxPool().Locals() {
 		if txs := remoteTxs[account]; len(txs) > 0 {
 			delete(remoteTxs, account)
@@ -428,7 +438,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 	if w.prioritizedTx != nil {
 		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
-		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
+		txList := map[common.Address][]*txpool.LazyTransaction{from: {txToLazyTx(w.eth.TxPool(), w.prioritizedTx.tx)}}
 		txs := newTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
@@ -642,7 +652,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 
 	rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), blockHash, res.Rows)
 	// Commit block and state to database.
-	_, err = w.chain.WriteBlockWithState(block, res.FinalBlock.Receipts, res.FinalBlock.CoalescedLogs, res.FinalBlock.State, true)
+	err = w.chain.WriteBlockWithState(block, res.FinalBlock.Receipts, res.FinalBlock.CoalescedLogs, res.FinalBlock.State, true)
 	if err != nil {
 		return err
 	}

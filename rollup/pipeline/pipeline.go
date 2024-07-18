@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
@@ -134,7 +135,19 @@ func (p *Pipeline) Stop() {
 	}
 }
 
-func (p *Pipeline) TryPushTxns(txs types.OrderedTransactionSet, onFailingTxn func(txnIndex int, tx *types.Transaction, err error) bool) *Result {
+// orderedTransactionSet represents a set of transactions and some ordering on top of this set.
+type orderedTransactionSet interface {
+	// Peek returns the next transaction.
+	Peek() *txpool.LazyTransaction
+
+	// Shift removes the next transaction.
+	Shift()
+
+	// Pop removes all transactions from the current account.
+	Pop()
+}
+
+func (p *Pipeline) TryPushTxns(txs orderedTransactionSet, onFailingTxn func(txnIndex int, tx *types.Transaction, err error) bool) *Result {
 	for {
 		tx := txs.Peek()
 		if tx == nil {

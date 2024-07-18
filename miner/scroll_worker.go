@@ -115,8 +115,8 @@ type worker struct {
 	snapshotState    *state.StateDB
 
 	// atomic status counters
-	running int32 // The indicator whether the consensus engine is running or not.
-	newTxs  int32 // New arrival transaction count since last sealing work submitting.
+	running atomic.Bool  // The indicator whether the consensus engine is running or not.
+	newTxs  atomic.Int32 // New arrival transaction count since last sealing work submitting.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -174,26 +174,6 @@ func (w *worker) getCCC() *circuitcapacitychecker.CircuitCapacityChecker {
 	return w.circuitCapacityChecker
 }
 
-// setEtherbase sets the etherbase used to initialize the block coinbase field.
-func (w *worker) setEtherbase(addr common.Address) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.coinbase = addr
-}
-
-func (w *worker) setGasCeil(ceil uint64) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.config.GasCeil = ceil
-}
-
-// setExtra sets the content used to initialize the block extra field.
-func (w *worker) setExtra(extra []byte) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.extra = extra
-}
-
 // disablePreseal disables pre-sealing mining feature
 func (w *worker) disablePreseal() {
 	atomic.StoreUint32(&w.noempty, 1)
@@ -202,57 +182,6 @@ func (w *worker) disablePreseal() {
 // enablePreseal enables pre-sealing mining feature
 func (w *worker) enablePreseal() {
 	atomic.StoreUint32(&w.noempty, 0)
-}
-
-// pending returns the pending state and corresponding block.
-func (w *worker) pending() (*types.Block, *state.StateDB) {
-	// return a snapshot to avoid contention on currentMu mutex
-	w.snapshotMu.RLock()
-	defer w.snapshotMu.RUnlock()
-	if w.snapshotState == nil {
-		return nil, nil
-	}
-	return w.snapshotBlock, w.snapshotState.Copy()
-}
-
-// pendingBlock returns pending block.
-func (w *worker) pendingBlock() *types.Block {
-	// return a snapshot to avoid contention on currentMu mutex
-	w.snapshotMu.RLock()
-	defer w.snapshotMu.RUnlock()
-	return w.snapshotBlock
-}
-
-// pendingBlockAndReceipts returns pending block and corresponding receipts.
-func (w *worker) pendingBlockAndReceipts() (*types.Block, types.Receipts) {
-	// return a snapshot to avoid contention on currentMu mutex
-	w.snapshotMu.RLock()
-	defer w.snapshotMu.RUnlock()
-	return w.snapshotBlock, w.snapshotReceipts
-}
-
-// start sets the running status as 1 and triggers new work submitting.
-func (w *worker) start() {
-	atomic.StoreInt32(&w.running, 1)
-	w.startCh <- struct{}{}
-}
-
-// stop sets the running status as 0.
-func (w *worker) stop() {
-	atomic.StoreInt32(&w.running, 0)
-}
-
-// isRunning returns an indicator whether worker is running or not.
-func (w *worker) isRunning() bool {
-	return atomic.LoadInt32(&w.running) == 1
-}
-
-// close terminates all background threads maintained by the worker.
-// Note the worker does not support being closed multiple times.
-func (w *worker) close() {
-	atomic.StoreInt32(&w.running, 0)
-	close(w.exitCh)
-	w.wg.Wait()
 }
 
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
@@ -295,7 +224,7 @@ func (w *worker) mainLoop() {
 					w.handlePipelineResult(result)
 				}
 			}
-			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
+			w.newTxs.Add(int32(len(ev.Txs)))
 
 		// System stopped
 		case <-w.exitCh:

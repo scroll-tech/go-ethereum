@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -284,7 +285,7 @@ func (w *worker) mainLoop() {
 			// be automatically eliminated.
 			if w.currentPipeline != nil {
 				txs := make(map[common.Address]types.Transactions)
-				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number)
+				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number, w.currentPipeline.Header.Time)
 				for _, tx := range ev.Txs {
 					acc, _ := types.Sender(signer, tx)
 					txs[acc] = append(txs[acc], tx)
@@ -355,7 +356,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 			return
 		}
 		parentL1BaseFee := fees.GetL1BaseFee(state)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent, parentL1BaseFee)
+		header.BaseFee = eip1559.CalcBaseFee(w.chainConfig, parent, parentL1BaseFee)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -492,7 +493,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 			return
 		}
 	}
-	signer := types.MakeSigner(w.chainConfig, header.Number)
+	signer := types.MakeSigner(w.chainConfig, header.Number, header.Time)
 
 	if w.prioritizedTx != nil && w.currentPipeline.Header.Number.Uint64() > w.prioritizedTx.blockNumber {
 		w.prioritizedTx = nil
@@ -561,7 +562,7 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), startingHeader.ParentHash, overflowingL1MsgTx.QueueIndex+1)
 			} else {
 				w.prioritizedTx = nil
-				w.eth.TxPool().RemoveTx(res.OverflowingTx.Hash(), true)
+				w.eth.TxPool().RemoveTx(res.OverflowingTx.Hash(), true, true)
 			}
 		} else if !res.OverflowingTx.IsL1MessageTx() {
 			// prioritize overflowing L2 message as the first txn next block
@@ -632,7 +633,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 	commitGasCounter.Inc(int64(res.FinalBlock.Header.GasUsed))
 
 	block, err := w.engine.FinalizeAndAssemble(w.chain, res.FinalBlock.Header, res.FinalBlock.State,
-		res.FinalBlock.Txs, nil, res.FinalBlock.Receipts)
+		res.FinalBlock.Txs, nil, res.FinalBlock.Receipts, nil)
 	if err != nil {
 		return err
 	}
@@ -658,7 +659,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 	}
 
 	// verify the generated block with local consensus engine to make sure everything is as expected
-	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
+	if err = w.engine.VerifyHeader(w.chain, block.Header()); err != nil {
 		return retryableCommitError{inner: err}
 	}
 
@@ -766,7 +767,7 @@ func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err e
 
 	case errors.Is(err, core.ErrInsufficientFunds):
 		log.Trace("Skipping tx with insufficient funds", "tx", tx.Hash().String())
-		w.eth.TxPool().RemoveTx(tx.Hash(), true)
+		w.eth.TxPool().RemoveTx(tx.Hash(), true, true)
 
 	case errors.Is(err, pipeline.ErrUnexpectedL1MessageIndex):
 		log.Warn(

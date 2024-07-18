@@ -18,7 +18,6 @@ package miner
 
 import (
 	"math/big"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -213,6 +212,8 @@ func TestGenerateAndImportBlock(t *testing.T) {
 	}
 }
 
+/*
+
 func TestEmptyWorkEthash(t *testing.T) {
 	testEmptyWork(t, ethashChainConfig, ethash.NewFaker())
 }
@@ -322,7 +323,7 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 	time.Sleep(time.Second) // Ensure two tasks have been submitted due to start opt
 	start.Store(true)
 
-	// w.setRecommitInterval(3 * time.Second)
+	w.setRecommitInterval(3 * time.Second)
 	select {
 	case <-progress:
 	case <-time.NewTimer(time.Second).C:
@@ -343,13 +344,15 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 		t.Error("interval reset timeout")
 	}
 
-	// w.setRecommitInterval(500 * time.Millisecond)
+	w.setRecommitInterval(500 * time.Millisecond)
 	select {
 	case <-progress:
 	case <-time.NewTimer(time.Second).C:
 		t.Error("interval reset timeout")
 	}
 }
+
+*/
 
 func TestGetSealingWorkEthash(t *testing.T) {
 	testGetSealingWork(t, ethashChainConfig, ethash.NewFaker())

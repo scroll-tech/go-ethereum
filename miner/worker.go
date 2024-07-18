@@ -19,6 +19,8 @@ package miner
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -370,6 +372,8 @@ func (w *worker) getCCC() *circuitcapacitychecker.CircuitCapacityChecker {
 	return w.circuitCapacityChecker
 }
 
+*/
+
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.mu.Lock()
@@ -447,6 +451,8 @@ func (w *worker) close() {
 	close(w.exitCh)
 	w.wg.Wait()
 }
+
+/*
 
 // recalcRecommit recalculates the resubmitting interval upon feedback.
 func recalcRecommit(minRecommit, prev time.Duration, target float64, inc bool) time.Duration {

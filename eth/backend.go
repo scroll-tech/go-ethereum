@@ -238,7 +238,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 
 	if config.EnableDASyncing {
-		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
+		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, stack.Config().DataDir, config.DA)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
 		}

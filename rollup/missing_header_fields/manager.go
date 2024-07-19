@@ -15,6 +15,7 @@ import (
 )
 
 const timeoutDownload = 10 * time.Minute
+const DefaultFileName = "missing_header_fields.bin"
 
 // Manager is responsible for managing the missing header fields file.
 // It lazily downloads the file if it doesn't exist, verifies its checksum and provides the missing header fields.

@@ -3,6 +3,7 @@ package da_syncer
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
@@ -33,7 +35,7 @@ type SyncingPipeline struct {
 	daSyncer   *DaSyncer
 }
 
-func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient sync_service.EthClient, l1DeploymentBlock uint64, config Config) (*SyncingPipeline, error) {
+func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient sync_service.EthClient, l1DeploymentBlock uint64, dataDir string, config Config) (*SyncingPipeline, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	var err error
 
@@ -62,7 +64,13 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	daQueue := NewDaQueue(syncedL1Height, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
-	daSyncer := NewDaSyncer(blockchain)
+
+	missingHeaderFieldsManager := missing_header_fields.NewManager(ctx,
+		filepath.Join(dataDir, missing_header_fields.DefaultFileName),
+		genesisConfig.Scroll.DAConfig.MissingHeaderFieldsURL,
+		genesisConfig.Scroll.DAConfig.MissingHeaderFieldsSHA256,
+	)
+	daSyncer := NewDaSyncer(blockchain, missingHeaderFieldsManager)
 
 	return &SyncingPipeline{
 		ctx:        ctx,
@@ -100,7 +108,8 @@ func (sp *SyncingPipeline) Start() {
 				if strings.HasPrefix(err.Error(), "not consecutive block") {
 					log.Warn("syncing pipeline step failed, probably because of restart", "err", err)
 				} else {
-					log.Crit("syncing pipeline step failed", "err", err)
+					log.Warn("syncing pipeline step failed", "err", err)
+					return
 				}
 			}
 			select {

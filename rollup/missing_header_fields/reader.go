@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -84,7 +85,7 @@ func (r *Reader) ReadNext() (difficulty uint64, extraData []byte, err error) {
 	bits := newBitMask(bitmask)
 
 	seal := make([]byte, bits.sealLen())
-	if _, err = r.reader.Read(seal); err != nil {
+	if _, err = io.ReadFull(r.reader, seal); err != nil {
 		return 0, nil, fmt.Errorf("failed to read seal: %v", err)
 	}
 

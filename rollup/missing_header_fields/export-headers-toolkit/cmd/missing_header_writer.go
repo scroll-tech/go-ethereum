@@ -115,6 +115,10 @@ type bitMask struct {
 	b uint8
 }
 
+func newBitMaskFromByte(b uint8) bitMask {
+	return bitMask{b}
+}
+
 func newBitMask(vanityIndex int, difficulty int, sealLen int) bitMask {
 	b := uint8(0)
 

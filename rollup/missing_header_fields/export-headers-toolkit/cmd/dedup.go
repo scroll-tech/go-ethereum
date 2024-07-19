@@ -2,14 +2,19 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/scroll-tech/go-ethereum/common"
 
 	"github.com/scroll-tech/go-ethereum/export-headers-toolkit/types"
 )
@@ -38,26 +43,24 @@ The binary layout of the deduplicated file is as follows:
 		if err != nil {
 			log.Fatalf("Error reading output flag: %v", err)
 		}
+		verifyFile, err := cmd.Flags().GetString("verify")
+		if err != nil {
+			log.Fatalf("Error reading verify flag: %v", err)
+		}
+
+		if verifyFile != "" {
+			verifyInputFile(verifyFile, inputFile)
+		}
 
 		_, seenVanity, _ := runAnalysis(inputFile)
 		runDedup(inputFile, outputFile, seenVanity)
+
+		if verifyFile != "" {
+			verifyOutputFile(verifyFile, outputFile)
+		}
+
 		runSHA256(outputFile)
 	},
-}
-
-func runSHA256(outputFile string) {
-	f, err := os.Open(outputFile)
-	defer f.Close()
-	if err != nil {
-		log.Fatalf("Error opening file: %v", err)
-	}
-
-	h := sha256.New()
-	if _, err = io.Copy(h, f); err != nil {
-		log.Fatalf("Error hashing file: %v", err)
-	}
-
-	fmt.Printf("Deduplicated headers written to %s with sha256 checksum: %x\n", outputFile, h.Sum(nil))
 }
 
 func init() {
@@ -65,6 +68,7 @@ func init() {
 
 	dedupCmd.Flags().String("input", "headers.bin", "headers file")
 	dedupCmd.Flags().String("output", "headers-dedup.bin", "deduplicated, binary formatted file")
+	dedupCmd.Flags().String("verify", "", "verify the input and output files with the given .csv file")
 }
 
 func runAnalysis(inputFile string) (seenDifficulty map[uint64]int, seenVanity map[[32]byte]bool, seenSealLen map[int]int) {
@@ -116,6 +120,21 @@ func runDedup(inputFile, outputFile string, seenVanity map[[32]byte]bool) {
 	reader.read(func(header *types.Header) {
 		writer.missingHeaderWriter.write(header)
 	})
+}
+
+func runSHA256(outputFile string) {
+	f, err := os.Open(outputFile)
+	defer f.Close()
+	if err != nil {
+		log.Fatalf("Error opening file: %v", err)
+	}
+
+	h := sha256.New()
+	if _, err = io.Copy(h, f); err != nil {
+		log.Fatalf("Error hashing file: %v", err)
+	}
+
+	fmt.Printf("Deduplicated headers written to %s with sha256 checksum: %x\n", outputFile, h.Sum(nil))
 }
 
 type headerReader struct {
@@ -174,4 +193,104 @@ func (h *headerReader) read(callback func(header *types.Header)) {
 
 func (h *headerReader) close() {
 	h.file.Close()
+}
+
+type csvHeaderReader struct {
+	file   *os.File
+	reader *bufio.Reader
+}
+
+func newCSVHeaderReader(verifyFile string) *csvHeaderReader {
+	f, err := os.Open(verifyFile)
+	if err != nil {
+		log.Fatalf("Error opening verify file: %v", err)
+	}
+
+	h := &csvHeaderReader{
+		file:   f,
+		reader: bufio.NewReader(f),
+	}
+
+	return h
+}
+
+func (h *csvHeaderReader) readNext() *types.Header {
+	line, err := h.reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		log.Fatalf("Error reading line: %v", err)
+	}
+
+	s := strings.Split(line, ",")
+	extraString := strings.Split(s[2], "\n")
+
+	num, err := strconv.ParseUint(s[0], 10, 64)
+	if err != nil {
+		log.Fatalf("Error parsing block number: %v", err)
+	}
+	difficulty, err := strconv.ParseUint(s[1], 10, 64)
+	if err != nil {
+		log.Fatalf("Error parsing difficulty: %v", err)
+	}
+	extra := common.FromHex(extraString[0])
+
+	header := types.NewHeader(num, difficulty, extra)
+	return header
+}
+
+func (h *csvHeaderReader) close() {
+	h.file.Close()
+}
+
+func verifyInputFile(verifyFile, inputFile string) {
+	csvReader := newCSVHeaderReader(verifyFile)
+	defer csvReader.close()
+
+	binaryReader := newHeaderReader(inputFile)
+	defer binaryReader.close()
+
+	binaryReader.read(func(header *types.Header) {
+		csvHeader := csvReader.readNext()
+
+		if !csvHeader.Equal(header) {
+			log.Fatalf("Header mismatch: %v != %v", csvHeader, header)
+		}
+	})
+
+	log.Printf("All headers match in %s and %s\n", verifyFile, inputFile)
+}
+
+func verifyOutputFile(verifyFile, outputFile string) {
+	csvReader := newCSVHeaderReader(verifyFile)
+	defer csvReader.close()
+
+	dedupReader, err := NewReader(outputFile)
+	if err != nil {
+		log.Fatalf("Error opening dedup file: %v", err)
+	}
+	defer dedupReader.Close()
+
+	for {
+		header := csvReader.readNext()
+		if header == nil {
+			if _, _, err = dedupReader.ReadNext(); err == nil {
+				log.Fatalf("Expected EOF, got more headers")
+			}
+			break
+		}
+
+		difficulty, extraData, err := dedupReader.Read(header.Number)
+		if err != nil {
+			log.Fatalf("Error reading header: %v", err)
+		}
+
+		if header.Difficulty != difficulty {
+			log.Fatalf("Difficulty mismatch: headerNum %d: %d != %d", header.Number, header.Difficulty, difficulty)
+		}
+		if !bytes.Equal(header.ExtraData, extraData) {
+			log.Fatalf("ExtraData mismatch: headerNum %d: %x != %x", header.Number, header.ExtraData, extraData)
+		}
+	}
 }

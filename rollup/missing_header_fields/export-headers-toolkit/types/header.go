@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/scroll-tech/go-ethereum/common"
 )
 
 const HeaderSizeSerialized = 2
@@ -23,7 +25,25 @@ func NewHeader(number, difficulty uint64, extraData []byte) *Header {
 }
 
 func (h *Header) String() string {
-	return fmt.Sprintf("%d,%d,0x%x\n", h.Number, h.Difficulty, h.ExtraData)
+	return fmt.Sprintf("%d,%d,%s\n", h.Number, h.Difficulty, common.Bytes2Hex(h.ExtraData))
+}
+
+func (h *Header) Equal(other *Header) bool {
+	if h.Number != other.Number {
+		return false
+	}
+	if h.Difficulty != other.Difficulty {
+		return false
+	}
+	if len(h.ExtraData) != len(other.ExtraData) {
+		return false
+	}
+	for i, b := range h.ExtraData {
+		if b != other.ExtraData[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Bytes returns the byte representation of the header including the initial 2 bytes for the size.

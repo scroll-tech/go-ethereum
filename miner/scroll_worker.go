@@ -19,7 +19,6 @@ package miner
 import (
 	"bytes"
 	"errors"
-	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -27,7 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -209,7 +208,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 
 	// Subscribe NewTxsEvent for tx pool
-	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
+	worker.txsSub = eth.TxPool().SubscribeTransactions(worker.txsCh, true)
 
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -220,12 +219,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	if recommit < minRecommitInterval {
 		log.Warn("Sanitizing miner recommit interval", "provided", recommit, "updated", minRecommitInterval)
 		recommit = minRecommitInterval
-	}
-
-	// Sanitize account fetch limit.
-	if worker.config.MaxAccountsNum == 0 {
-		log.Warn("Sanitizing miner account fetch limit", "provided", worker.config.MaxAccountsNum, "updated", math.MaxInt)
-		worker.config.MaxAccountsNum = math.MaxInt
 	}
 
 	worker.wg.Add(4)
@@ -359,7 +352,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	for {
 		select {
 		case <-w.startCh:
-			clearPending(w.chain.CurrentBlock().NumberU64())
+			clearPending(w.chain.CurrentBlock().Number.Uint64())
 			timestamp = time.Now().Unix()
 			commit(false)
 		case head := <-w.chainHeadCh:
@@ -401,12 +394,12 @@ func (w *worker) mainLoop() {
 			// be automatically eliminated.
 			if w.currentPipeline != nil {
 				txs := make(map[common.Address]types.Transactions)
-				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number)
+				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number, w.currentPipeline.Header.Time)
 				for _, tx := range ev.Txs {
 					acc, _ := types.Sender(signer, tx)
 					txs[acc] = append(txs[acc], tx)
 				}
-				txset := types.NewTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
+				txset := newTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
 				if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
 					w.handlePipelineResult(result)
 				}
@@ -568,7 +561,7 @@ func (w *worker) resultLoop() {
 			)
 			rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), hash, task.accRows)
 			// Commit block and state to database.
-			_, err := w.chain.WriteBlockWithState(block, receipts, logs, task.state, true)
+			err := w.chain.WriteBlockWithState(block, receipts, logs, task.state, true)
 			if err != nil {
 				resultTimer.Update(time.Since(startTime))
 				log.Error("Failed writing block to chain", "err", err)
@@ -623,23 +616,23 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	parent := w.chain.CurrentBlock()
 
-	num := parent.Number()
+	num := parent.Number
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent.GasLimit(), w.config.GasCeil),
+		GasLimit:   core.CalcGasLimit(parent.GasLimit, w.config.GasCeil),
 		Extra:      w.extra,
 		Time:       uint64(timestamp),
 	}
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
-		state, err := w.chain.StateAt(parent.Root())
+		state, err := w.chain.StateAt(parent.Root)
 		if err != nil {
 			log.Error("Failed to create mining context", "err", err)
 			return
 		}
 		parentL1BaseFee := fees.GetL1BaseFee(state)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+		header.BaseFee = eip1559.CalcBaseFee(w.chainConfig, parent, parentL1BaseFee)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -671,7 +664,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		}
 	}
 
-	parentState, err := w.chain.StateAt(parent.Root())
+	parentState, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		log.Error("failed to fetch parent state", "err", err)
 		return
@@ -687,7 +680,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	tidyPendingStart := time.Now()
 	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
+	pending := w.eth.TxPool().Pending(false)
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
 	for _, account := range w.eth.TxPool().Locals() {
@@ -707,7 +700,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 
 	w.currentPipelineStart = time.Now()
-	w.currentPipeline = pipeline.NewPipeline(w.chain, w.chain.GetVMConfig(), parentState, header, nextL1MsgIndex, w.getCCC()).WithBeforeTxHook(w.beforeTxHook)
+	w.currentPipeline = pipeline.NewPipeline(w.chain, *w.chain.GetVMConfig(), parentState, header, nextL1MsgIndex, w.getCCC()).WithBeforeTxHook(w.beforeTxHook)
 	if err := w.currentPipeline.Start(time.Unix(int64(header.Time), 0)); err != nil {
 		log.Error("failed to start pipeline", "err", err)
 		return
@@ -722,7 +715,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
-		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
+		txs, err := newL1MessagesByQueueIndex(w.eth.TxPool(), l1Messages)
 		if err != nil {
 			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
 			return
@@ -733,7 +726,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 			return
 		}
 	}
-	signer := types.MakeSigner(w.chainConfig, header.Number)
+	signer := types.MakeSigner(w.chainConfig, header.Number, header.Time)
 
 	if w.prioritizedTx != nil && w.currentPipeline.Header.Number.Uint64() > w.prioritizedTx.blockNumber {
 		w.prioritizedTx = nil
@@ -741,7 +734,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	if w.prioritizedTx != nil {
 		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
 		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
-		txs := types.NewTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
@@ -749,14 +742,14 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 
 	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
 		}
 	}
 	if len(remoteTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
@@ -782,7 +775,7 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 			if overflowingL1MsgTx := res.OverflowingTx.AsL1MessageTx(); overflowingL1MsgTx != nil {
 				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), w.currentPipeline.Header.ParentHash, overflowingL1MsgTx.QueueIndex+1)
 			} else {
-				w.eth.TxPool().RemoveTx(res.OverflowingTx.Hash(), true)
+				w.eth.TxPool().RemoveTx(res.OverflowingTx.Hash(), true, true)
 			}
 		} else if !res.OverflowingTx.IsL1MessageTx() {
 			// prioritize overflowing L2 message as the first txn next block
@@ -840,7 +833,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 	commitGasCounter.Inc(int64(res.FinalBlock.Header.GasUsed))
 
 	block, err := w.engine.FinalizeAndAssemble(w.chain, res.FinalBlock.Header, res.FinalBlock.State,
-		res.FinalBlock.Txs, nil, res.FinalBlock.Receipts)
+		res.FinalBlock.Txs, nil, res.FinalBlock.Receipts, nil)
 	if err != nil {
 		return err
 	}
@@ -905,7 +898,7 @@ func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err e
 
 	case errors.Is(err, core.ErrInsufficientFunds):
 		log.Trace("Skipping tx with insufficient funds", "tx", tx.Hash().String())
-		w.eth.TxPool().RemoveTx(tx.Hash(), true)
+		w.eth.TxPool().RemoveTx(tx.Hash(), true, true)
 
 	case errors.Is(err, pipeline.ErrUnexpectedL1MessageIndex):
 		log.Warn(

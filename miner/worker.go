@@ -1007,9 +1007,13 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	// create new snapshot for `core.ApplyTransaction`
 	snap := w.current.state.Snapshot()
 
+	// todo: apply this changes to new worker when merged with upstream
+	// make a copy of vm config and change caller type to worker
+	var vmConf vm.Config = *w.chain.GetVMConfig()
+	vmConf.CallerType = vm.CallerTypeWorker
 	var receipt *types.Receipt
 	common.WithTimer(l2CommitTxApplyTimer, func() {
-		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vmConf)
 	})
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
@@ -1169,10 +1173,13 @@ loop:
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Pop()
+
 		case errors.As(err, &errL1):
-			// Skip the current transaction failed on L1Sload precompile with L1RpcError without shifting in the next from the account
+			// Skip the current transaction failed on L1Sload precompile with L1RpcError without shifting in the next from the account, this tx will be left in txpool and retried in future block
 			log.Trace("Skipping transaction failed on L1Sload precompile with L1RpcError", "sender", from)
+			atomic.AddInt32(&w.newTxs, int32(1))
 			txs.Pop()
+
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)

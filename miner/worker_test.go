@@ -17,6 +17,8 @@
 package miner
 
 import (
+	"context"
+	"errors"
 	"math"
 	"math/big"
 	"math/rand"
@@ -1190,6 +1192,83 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 		// note: txs are not included according to their gas fee order
 		assert.Equal(tx1.Hash(), block.Transactions()[0].Hash())
 		assert.Equal(tx2.Hash(), block.Transactions()[1].Hash())
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
+		}
+	case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
+		t.Fatalf("timeout")
+	}
+}
+
+type mockL1Client struct {
+	failList []bool
+}
+
+func (c *mockL1Client) StoragesAt(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) ([]byte, error) {
+	if len(c.failList) == 0 {
+		return common.Hash{}.Bytes(), nil
+	}
+	failed := c.failList[0]
+	c.failList = c.failList[1:]
+	if failed {
+		return nil, errors.New("error")
+	} else {
+		return common.Hash{}.Bytes(), nil
+	}
+}
+
+func TestL1SloadFailedTxReexecuted(t *testing.T) {
+	assert := assert.New(t)
+
+	var (
+		chainConfig = params.AllCliqueProtocolChanges
+		db          = rawdb.NewMemoryDatabase()
+		engine      = clique.New(chainConfig.Clique, db)
+	)
+
+	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.LondonBlock = big.NewInt(0)
+	chainConfig.DescartesBlock = big.NewInt(0)
+
+	w, b := newTestWorker(t, chainConfig, engine, db, 0)
+	// GetStoragesAt will shouldn't fail 2 times on block tracing and should fail then on tx executing
+	w.chain.GetVMConfig().L1Client = &mockL1Client{failList: []bool{false, false, true, true, true}}
+	defer w.close()
+
+	// This test chain imports the mined blocks.
+	db2 := rawdb.NewMemoryDatabase()
+	b.genesis.MustCommit(db2)
+	chain, _ := core.NewBlockChain(db2, nil, b.chain.Config(), engine, vm.Config{
+		Debug:  true,
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
+	defer chain.Stop()
+	chain.GetVMConfig().L1Client = &mockL1Client{}
+
+	// Ignore empty commit here for less noise.
+	w.skipSealHook = func(task *task) bool {
+		return len(task.receipts) == 0
+	}
+
+	// Wait for mined blocks.
+	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
+	defer sub.Unsubscribe()
+
+	// Define tx that calls L1Sload
+	l1SlaodAddress := common.BytesToAddress([]byte{1, 1})
+	input := make([]byte, 52)
+	tx, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), l1SlaodAddress, big.NewInt(0), 25208, big.NewInt(10*params.InitialBaseFee), input), types.HomesteadSigner{}, testBankKey)
+
+	// Process 2 transactions with gas order: tx0 > tx1, tx1 will overflow.
+	b.txPool.AddRemote(tx)
+	// b.txPool.AddLocal(b.newRandomTx(false))
+	w.start()
+
+	select {
+	case ev := <-sub.Chan():
+		w.stop()
+		block := ev.Data.(core.NewMinedBlockEvent).Block
+		assert.Equal(1, len(block.Transactions()))
+		assert.Equal(tx.Hash(), block.Transactions()[0].Hash())
 		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
 			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 		}

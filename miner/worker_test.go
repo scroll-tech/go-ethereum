@@ -1258,7 +1258,7 @@ func TestL1SloadFailedTxReexecuted(t *testing.T) {
 	input := make([]byte, 52)
 	tx, _ := types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), l1SlaodAddress, big.NewInt(0), 25208, big.NewInt(10*params.InitialBaseFee), input), types.HomesteadSigner{}, testBankKey)
 
-	// Process 2 transactions with gas order: tx0 > tx1, tx1 will overflow.
+	// Process l1sload tx
 	b.txPool.AddLocal(tx)
 	w.start()
 

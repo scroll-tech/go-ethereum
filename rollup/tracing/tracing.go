@@ -47,7 +47,7 @@ func NewTracerWrapper() *TracerWrapper {
 
 // CreateTraceEnvAndGetBlockTrace wraps the whole block tracing logic for a block
 func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, l1Client vm.L1Client, parent *types.Block, block *types.Block, commitAfterApply bool) (*types.BlockTrace, error) {
-	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, l1Client, parent, block, commitAfterApply)
+	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, l1Client, vm.CallerTypeNonWorker, parent, block, commitAfterApply)
 	if err != nil {
 		return nil, err
 	}
@@ -60,6 +60,7 @@ type TraceEnv struct {
 	commitAfterApply bool
 	chainConfig      *params.ChainConfig
 	l1Client         vm.L1Client
+	callerType       vm.CallerType
 
 	coinbase common.Address
 
@@ -99,13 +100,14 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, l1Client vm.L1Client, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConfig, l1Client vm.L1Client, callerType vm.CallerType, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
 	return &TraceEnv{
 		logConfig:        logConfig,
 		commitAfterApply: commitAfterApply,
 		chainConfig:      chainConfig,
 		coinbase:         coinbase,
 		l1Client:         l1Client,
+		callerType:       callerType,
 		signer:           types.MakeSigner(chainConfig, block.Number()),
 		state:            statedb,
 		blockCtx:         blockCtx,
@@ -122,7 +124,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 	}
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, l1Client vm.L1Client, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, l1Client vm.L1Client, callerType vm.CallerType, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 
 	var err error
@@ -160,6 +162,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 			EnableReturnData: true,
 		},
 		l1Client,
+		callerType,
 		core.NewEVMBlockContext(block.Header(), chainContext, chainConfig, nil),
 		*startL1QueueIndex,
 		coinbase,
@@ -231,7 +234,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			// Generate the next state snapshot fast without tracing
 			msg, _ := tx.AsMessage(env.signer, block.BaseFee())
 			env.state.SetTxContext(tx.Hash(), i)
-			vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{L1Client: env.l1Client})
+			vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{L1Client: env.l1Client, CallerType: env.callerType})
 			l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
 			if err != nil {
 				failed = err
@@ -332,7 +335,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	structLogger := vm.NewStructLogger(env.logConfig)
 	tracer := NewMuxTracer(structLogger, callTracer, prestateTracer)
 	// Run the transaction with tracing enabled.
-	vmenv := vm.NewEVM(env.blockCtx, txContext, state, env.chainConfig, vm.Config{L1Client: env.l1Client, Debug: true, Tracer: tracer, NoBaseFee: true})
+	vmenv := vm.NewEVM(env.blockCtx, txContext, state, env.chainConfig, vm.Config{L1Client: env.l1Client, Debug: true, Tracer: tracer, NoBaseFee: true, CallerType: env.callerType})
 
 	// Call Prepare to clear out the statedb access list
 	state.SetTxContext(txctx.TxHash, txctx.TxIndex)

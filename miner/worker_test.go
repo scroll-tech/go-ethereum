@@ -1231,8 +1231,10 @@ func TestL1SloadFailedTxReexecuted(t *testing.T) {
 	chainConfig.DescartesBlock = big.NewInt(0)
 
 	w, b := newTestWorker(t, chainConfig, engine, db, 0)
-	// GetStoragesAt shouldn't fail 2 times on block tracing and should fail then on tx executing
-	w.chain.GetVMConfig().L1Client = &mockL1Client{failList: []bool{false, false, true, true, true}}
+	// GetStoragesAt should fail at tracing request 2 times (3 retries for each), commitTransaction will fail during tracing and will be retried in next work
+	// after that GetStoragesAt shouls pass tracing 2 times and then fail on execution tx (3 retries)
+	// after that tx will be retried again and executed without fails
+	w.chain.GetVMConfig().L1Client = &mockL1Client{failList: []bool{true, true, true, true, true, true, false, false, true, true, true}}
 	defer w.close()
 
 	// This test chain imports the mined blocks.
@@ -1271,7 +1273,7 @@ func TestL1SloadFailedTxReexecuted(t *testing.T) {
 		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
 			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 		}
-	case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
+	case <-time.After(5 * time.Second): // Worker needs 1s to include new changes.
 		t.Fatalf("timeout")
 	}
 }

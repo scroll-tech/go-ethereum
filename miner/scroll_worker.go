@@ -144,7 +144,6 @@ type worker struct {
 
 	localUncles  map[common.Hash]*types.Block // A set of side blocks generated locally as the possible uncle blocks.
 	remoteUncles map[common.Hash]*types.Block // A set of side blocks as the possible uncle blocks.
-	unconfirmed  *unconfirmedBlocks           // A set of locally mined blocks pending canonicalness confirmations.
 
 	mu       sync.RWMutex // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
@@ -159,10 +158,10 @@ type worker struct {
 	snapshotState    *state.StateDB
 
 	// atomic status counters
-	running   int32       // The indicator whether the consensus engine is running or not.
-	newTxs    int32       // New arrival transaction count since last sealing work submitting.
-	syncing   atomic.Bool // The indicator whether the node is still syncing.
-	newL1Msgs int32       // New arrival L1 message count since last sealing work submitting.
+	running   atomic.Bool  // The indicator whether the consensus engine is running or not.
+	newTxs    atomic.Int32 // New arrival transaction count since last sealing work submitting.
+	syncing   atomic.Bool  // The indicator whether the node is still syncing.
+	newL1Msgs atomic.Int32 // New arrival L1 message count since last sealing work submitting.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -172,7 +171,7 @@ type worker struct {
 	noempty uint32
 
 	// External functions
-	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
+	isLocalBlock func(block *types.Header) bool // Function used to determine whether the specified block is mined by local miner.
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 	prioritizedTx          *prioritizedTransaction
@@ -183,7 +182,7 @@ type worker struct {
 	beforeTxHook func()           // Method to call before processing a transaction.
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Header) bool, init bool) *worker {
 	worker := &worker{
 		config:                 config,
 		chainConfig:            chainConfig,
@@ -194,7 +193,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		isLocalBlock:           isLocalBlock,
 		localUncles:            make(map[common.Hash]*types.Block),
 		remoteUncles:           make(map[common.Hash]*types.Block),
-		unconfirmed:            newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 		pendingTasks:           make(map[common.Hash]*task),
 		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
@@ -251,14 +249,6 @@ func (w *worker) enablePreseal() {
 	atomic.StoreUint32(&w.noempty, 0)
 }
 
-// close terminates all background threads maintained by the worker.
-// Note the worker does not support being closed multiple times.
-func (w *worker) close() {
-	atomic.StoreInt32(&w.running, 0)
-	close(w.exitCh)
-	w.wg.Wait()
-}
-
 // newWorkLoop is a standalone goroutine to submit new mining work upon received events.
 func (w *worker) newWorkLoop(recommit time.Duration) {
 	defer w.wg.Done()
@@ -273,8 +263,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-w.exitCh:
 			return
 		}
-		atomic.StoreInt32(&w.newTxs, 0)
-		atomic.StoreInt32(&w.newL1Msgs, 0)
+		w.newTxs.Store(0)
+		w.newL1Msgs.Store(0)
 	}
 	// clearPending cleans the stale pending tasks.
 	clearPending := func(number uint64) {
@@ -342,7 +332,7 @@ func (w *worker) mainLoop() {
 					w.handlePipelineResult(result)
 				}
 			}
-			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
+			w.newTxs.Add(int32(len(ev.Txs)))
 
 		// System stopped
 		case <-w.exitCh:
@@ -511,9 +501,6 @@ func (w *worker) resultLoop() {
 			// Broadcast the block and announce chain insertion event
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
 
-			// Insert the block into the set of pending ones to resultLoop for confirmations
-			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
-
 			resultTimer.Update(time.Since(startTime))
 
 		case <-w.exitCh:
@@ -548,7 +535,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 func (w *worker) startNewPipeline(timestamp int64) {
 
 	if w.currentPipeline != nil {
-		w.currentPipeline.Kill()
+		w.currentPipeline.Release()
 		w.currentPipeline = nil
 	}
 
@@ -779,7 +766,6 @@ func (w *worker) commit(res *pipeline.Result) error {
 	select {
 	case w.taskCh <- &task{receipts: res.FinalBlock.Receipts, state: res.FinalBlock.State, block: block, createdAt: time.Now(),
 		accRows: res.Rows, nextL1MsgIndex: res.FinalBlock.NextL1MsgIndex}:
-		w.unconfirmed.Shift(block.NumberU64() - 1)
 		log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 			"txs", res.FinalBlock.Txs.Len(),
 			"gas", block.GasUsed(), "fees", totalFees(block, res.FinalBlock.Receipts),

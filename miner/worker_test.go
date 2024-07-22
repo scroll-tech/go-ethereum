@@ -1196,6 +1196,12 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 	case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
 		t.Fatalf("timeout")
 	}
+	t.Fatalf("a")
+}
+
+func TestTrigger(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal(1, 1)
 }
 
 // type mockL1Client struct {

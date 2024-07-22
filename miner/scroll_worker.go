@@ -287,7 +287,7 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	num := parent.Number
 	header := &types.Header{
 		ParentHash: parent.Hash(),
-		Number:     num.Add(num, common.Big1),
+		Number:     new(big.Int).Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent.GasLimit, w.config.GasCeil),
 		Extra:      w.extra,
 		Time:       uint64(timestamp),

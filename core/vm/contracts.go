@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
@@ -145,7 +146,7 @@ func PrecompiledContractsDescartes(cfg Config) map[common.Address]PrecompiledCon
 		common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
 		common.BytesToAddress([]byte{9}): &blake2FDisabled{},
 		// TODO final contract address to be decided
-		common.BytesToAddress([]byte{1, 1}): &l1sload{l1Client: cfg.L1Client},
+		common.BytesToAddress([]byte{1, 1}): &l1sload{l1Client: cfg.L1Client, callerType: cfg.CallerType},
 	}
 }
 
@@ -1164,7 +1165,8 @@ func (c *bls12381MapG2) Run(state StateDB, input []byte) ([]byte, error) {
 
 // L1SLoad precompiled
 type l1sload struct {
-	l1Client L1Client
+	l1Client   L1Client
+	callerType CallerType
 }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
@@ -1179,6 +1181,9 @@ func (c *l1sload) RequiredGas(input []byte) uint64 {
 }
 
 func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
+	log.Info("l1sload", "input", input)
+	const l1ClientMaxRetries = 3
+
 	if c.l1Client == nil {
 		log.Error("No L1Client in the l1sload")
 		return nil, ErrNoL1Client
@@ -1198,10 +1203,29 @@ func (c *l1sload) Run(state StateDB, input []byte) ([]byte, error) {
 		keys[i] = common.BytesToHash(input[20+32*i : 52+32*i])
 	}
 
-	res, err := c.l1Client.StoragesAt(context.Background(), address, keys, block)
-	if err != nil {
-		return nil, &ErrL1RPCError{err: err}
+	// if caller type is non-worker then we can retry request multiple times and return err, the tx will be reinserted in tx poll
+	// otherwise, we should retry requests forever
+	if c.callerType == CallerTypeNonWorker {
+		for {
+			res, err := c.l1Client.StoragesAt(context.Background(), address, keys, block)
+			if err == nil {
+				return res, nil
+			}
+			// wait before retrying
+			time.Sleep(100 * time.Millisecond)
+			log.Warn("L1 client request error", "err", err)
+		}
+	} else {
+		var innerErr error
+		for i := 0; i < l1ClientMaxRetries; i++ {
+			res, err := c.l1Client.StoragesAt(context.Background(), address, keys, block)
+			if err != nil {
+				innerErr = err
+				continue
+			} else {
+				return res, nil
+			}
+		}
+		return nil, &ErrL1RPCError{err: innerErr}
 	}
-
-	return res, nil
 }

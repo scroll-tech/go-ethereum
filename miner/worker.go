@@ -34,6 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -846,7 +847,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	// don't commit the state during tracing for circuit capacity checker, otherwise we cannot revert.
 	// and even if we don't commit the state, the `refund` value will still be correct, as explained in `CommitTransaction`
 	commitStateAfterApply := false
-	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, w.chain.GetVMConfig().L1Client, parent,
+	traceEnv, err := tracing.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.eth.ChainDb(), state, w.chain.GetVMConfig().L1Client, vm.CallerTypeWorker, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
 		commitStateAfterApply)
@@ -1006,9 +1007,13 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	// create new snapshot for `core.ApplyTransaction`
 	snap := w.current.state.Snapshot()
 
+	// todo: apply this changes to new worker when merged with upstream
+	// make a copy of vm config and change caller type to worker
+	var vmConf vm.Config = *w.chain.GetVMConfig()
+	vmConf.CallerType = vm.CallerTypeWorker
 	var receipt *types.Receipt
 	common.WithTimer(l2CommitTxApplyTimer, func() {
-		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vmConf)
 	})
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
@@ -1134,6 +1139,7 @@ loop:
 		w.current.state.SetTxContext(tx.Hash(), w.current.tcount)
 
 		logs, traces, err := w.commitTransaction(tx, coinbase)
+		var errL1 *vm.ErrL1RPCError
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
@@ -1166,6 +1172,12 @@ loop:
 		case errors.Is(err, core.ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			txs.Pop()
+
+		case errors.As(err, &errL1):
+			// Skip the current transaction failed on L1Sload precompile with L1RpcError without shifting in the next from the account, this tx will be left in txpool and retried in future block
+			log.Trace("Skipping transaction failed on L1Sload precompile with L1RpcError", "sender", from)
+			atomic.AddInt32(&w.newTxs, int32(1))
 			txs.Pop()
 
 		case errors.Is(err, nil):

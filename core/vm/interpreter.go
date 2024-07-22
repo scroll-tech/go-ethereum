@@ -44,8 +44,18 @@ type Config struct {
 
 	ExtraEips []int // Additional EIPS that are to be enabled
 
-	L1Client L1Client // L1 RPC client
+	L1Client   L1Client   // L1 RPC client
+	CallerType CallerType // caller type is used in L1Sload precompile to determine whether to retry RPC call forever in case of error
 }
+
+type CallerType int
+
+const (
+	// NonWorker
+	CallerTypeNonWorker CallerType = iota
+	// Worker
+	CallerTypeWorker
+)
 
 // ScopeContext contains the things that are per-call, such as stack and memory,
 // but not transients like pc and gas

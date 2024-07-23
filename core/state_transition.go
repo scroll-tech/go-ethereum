@@ -335,6 +335,7 @@ func (st *StateTransition) preCheck() error {
 	}
 
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
+	// Note: Logically, this should be `IsCurie`, but we keep `IsLondon` to ensure backward compatibility.
 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 		if !st.evm.Config.NoBaseFee || msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
@@ -352,7 +353,11 @@ func (st *StateTransition) preCheck() error {
 			}
 			// This will panic if baseFee is nil, but basefee presence is verified
 			// as part of header validation.
-			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
+			if st.evm.Context.BaseFee != nil && msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
+				return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
+					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
+			}
+			if st.evm.Context.BaseFee == nil && msg.GasFeeCap.Cmp(big.NewInt(0)) < 0 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
 					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
 			}
@@ -479,23 +484,25 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
 	effectiveTip := msg.GasPrice
-	if rules.IsLondon {
+
+	// only burn the base fee if the fee vault is not enabled
+	if rules.IsCurie && !st.evm.ChainConfig().Scroll.FeeVaultEnabled() {
 		effectiveTip = cmath.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 	}
 
+	// The L2 Fee is the same as the fee that is charged in the normal geth codepath.
+	fee := big.NewInt(0)
 	if st.evm.Config.NoBaseFee && msg.GasFeeCap.Sign() == 0 && msg.GasTipCap.Sign() == 0 {
 		// Skip fee payment when NoBaseFee is set and the fee fields
 		// are 0. This avoids a negative effectiveTip being applied to
 		// the coinbase when simulating calls.
 	} else {
-		// The L2 Fee is the same as the fee that is charged in the normal geth
-		// codepath. Add the L1DataFee to the L2 fee for the total fee that is sent
-		// to the sequencer.
-		fee := new(big.Int).SetUint64(st.gasUsed())
+		fee = new(big.Int).SetUint64(st.gasUsed())
 		fee.Mul(fee, effectiveTip)
-		fee.Add(fee, st.l1DataFee)
-		st.state.AddBalance(st.evm.Context.Coinbase, fee) // TODO: change to `st.evm.FeeRecipient()`
 	}
+	//Add the L1DataFee to the L2 fee for the total fee that is sent to the sequencer.
+	totalFee := fee.Add(fee, st.l1DataFee)
+	st.state.AddBalance(st.evm.FeeRecipient(), totalFee)
 
 	return &ExecutionResult{
 		L1DataFee:  st.l1DataFee,

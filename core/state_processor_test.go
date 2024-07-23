@@ -64,6 +64,9 @@ func TestStateProcessorErrors(t *testing.T) {
 			TerminalTotalDifficultyPassed: true,
 			ShanghaiTime:                  new(uint64),
 			CancunTime:                    new(uint64),
+			BernoulliBlock:                big.NewInt(0),
+			CurieBlock:                    big.NewInt(0),
+			DarwinTime:                    new(uint64),
 		}
 		signer  = types.LatestSigner(config)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -376,8 +379,9 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		Time:       parent.Time() + 10,
 		UncleHash:  types.EmptyUncleHash,
 	}
-	if config.IsLondon(header.Number) {
-		header.BaseFee = eip1559.CalcBaseFee(config, parent.Header())
+	if config.IsCurie(header.Number) {
+		parentL1BaseFee := big.NewInt(1000000000) // 1 gwei
+		header.BaseFee = eip1559.CalcBaseFee(config, parent.Header(), parentL1BaseFee)
 	}
 	if config.IsShanghai(header.Number, header.Time) {
 		header.WithdrawalsHash = &types.EmptyWithdrawalsHash

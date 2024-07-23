@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -315,7 +316,8 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 		// overwrite triedb IsUsingZktrie config to be safe
 		triedb.SetIsUsingZktrie(storedcfg.Scroll.ZktrieEnabled())
 	}
-	if header.Root != types.EmptyRootHash && !triedb.Initialized(header.Root) {
+	// if header.Root != types.EmptyRootHash && !triedb.Initialized(header.Hash()) {
+	if _, err := state.New(header.Root, state.NewDatabaseWithNodeDB(db, triedb), nil); err != nil {
 		if genesis == nil {
 			genesis = DefaultGenesisBlock()
 		}
@@ -419,6 +421,12 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.SepoliaChainConfig
 	case ghash == params.GoerliGenesisHash:
 		return params.GoerliChainConfig
+	case ghash == params.ScrollAlphaGenesisHash:
+		return params.ScrollAlphaChainConfig
+	case ghash == params.ScrollSepoliaGenesisHash:
+		return params.ScrollSepoliaChainConfig
+	case ghash == params.ScrollMainnetGenesisHash:
+		return params.ScrollMainnetChainConfig
 	default:
 		return params.AllEthashProtocolChanges
 	}
@@ -450,36 +458,36 @@ func (g *Genesis) ToBlock() *types.Block {
 	if g.Difficulty == nil && g.Mixhash == (common.Hash{}) {
 		head.Difficulty = params.GenesisDifficulty
 	}
-	if g.Config != nil && g.Config.IsLondon(common.Big0) {
+	if g.Config != nil && g.Config.IsCurie(common.Big0) {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
-			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
+			head.BaseFee = eip1559.CalcBaseFee(g.Config, nil, big.NewInt(0))
 		}
 	}
 	var withdrawals []*types.Withdrawal
-	if conf := g.Config; conf != nil {
-		num := big.NewInt(int64(g.Number))
-		if conf.IsShanghai(num, g.Timestamp) {
-			head.WithdrawalsHash = &types.EmptyWithdrawalsHash
-			withdrawals = make([]*types.Withdrawal, 0)
-		}
-		if conf.IsCancun(num, g.Timestamp) {
-			// EIP-4788: The parentBeaconBlockRoot of the genesis block is always
-			// the zero hash. This is because the genesis block does not have a parent
-			// by definition.
-			head.ParentBeaconRoot = new(common.Hash)
-			// EIP-4844 fields
-			head.ExcessBlobGas = g.ExcessBlobGas
-			head.BlobGasUsed = g.BlobGasUsed
-			if head.ExcessBlobGas == nil {
-				head.ExcessBlobGas = new(uint64)
-			}
-			if head.BlobGasUsed == nil {
-				head.BlobGasUsed = new(uint64)
-			}
-		}
-	}
+	// if conf := g.Config; conf != nil {
+	// 	num := big.NewInt(int64(g.Number))
+	// 	if conf.IsShanghai(num, g.Timestamp) {
+	// 		head.WithdrawalsHash = &types.EmptyWithdrawalsHash
+	// 		withdrawals = make([]*types.Withdrawal, 0)
+	// 	}
+	// 	if conf.IsCancun(num, g.Timestamp) {
+	// 		// EIP-4788: The parentBeaconBlockRoot of the genesis block is always
+	// 		// the zero hash. This is because the genesis block does not have a parent
+	// 		// by definition.
+	// 		head.ParentBeaconRoot = new(common.Hash)
+	// 		// EIP-4844 fields
+	// 		head.ExcessBlobGas = g.ExcessBlobGas
+	// 		head.BlobGasUsed = g.BlobGasUsed
+	// 		if head.ExcessBlobGas == nil {
+	// 			head.ExcessBlobGas = new(uint64)
+	// 		}
+	// 		if head.BlobGasUsed == nil {
+	// 			head.BlobGasUsed = new(uint64)
+	// 		}
+	// 	}
+	// }
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil)).WithWithdrawals(withdrawals)
 }
 
@@ -581,6 +589,42 @@ func DefaultHoleskyGenesisBlock() *Genesis {
 	}
 }
 
+// DefaultScrollAlphaGenesisBlock returns the Scroll Alpha network genesis block.
+func DefaultScrollAlphaGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollAlphaChainConfig,
+		Timestamp:  0x63f67207,
+		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000b7C0c58702D0781C0e2eB3aaE301E4c340073448Ec9c139eFCBBe6323DA406fffBF4Db02a60A9720589c71deC4302fE718bE62350c174922782Cc6600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   8000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollAlphaAllocData),
+	}
+}
+
+// DefaultScrollSepoliaGenesisBlock returns the Scroll Sepolia network genesis block.
+func DefaultScrollSepoliaGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollSepoliaChainConfig,
+		Timestamp:  0x64cfd015,
+		ExtraData:  hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000048C3F81f3D998b6652900e1C3183736C238Fe4290000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   8000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollSepoliaAllocData),
+	}
+}
+
+// DefaultScrollMainnetGenesisBlock returns the Scroll mainnet genesis block.
+func DefaultScrollMainnetGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollMainnetChainConfig,
+		Timestamp:  0x6524e860,
+		ExtraData:  hexutil.MustDecode("0x4c61206573746f6e7465636f206573746173206d616c6665726d6974612e0000d2ACF5d16a983DB0d909d9D761B8337Fabd6cBd10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   10000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollMainnetAllocData),
+	}
+}
+
 // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
 func DeveloperGenesisBlock(gasLimit uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
@@ -602,12 +646,46 @@ func DeveloperGenesisBlock(gasLimit uint64, faucet common.Address) *Genesis {
 			common.BytesToAddress([]byte{7}): {Balance: big.NewInt(1)}, // ECScalarMul
 			common.BytesToAddress([]byte{8}): {Balance: big.NewInt(1)}, // ECPairing
 			common.BytesToAddress([]byte{9}): {Balance: big.NewInt(1)}, // BLAKE2b
-			faucet:                           {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
+			// faucet:                           {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
+			faucet: {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 250), big.NewInt(9))}, // LSH 250 due to finite field limitation
 		},
 	}
 }
 
+// decodePrealloc does not support code and storage in prealloc config,
+// so we provide an alternative implementation here.
+func decodePreallocScroll(data string) (GenesisAlloc, error) {
+	var p []struct {
+		Addr, Balance *big.Int
+		Code          []byte
+		Storage       []struct{ Key, Value *big.Int }
+	}
+
+	if err := rlp.NewStream(strings.NewReader(data), 0).Decode(&p); err != nil {
+		return nil, err
+	}
+	ga := make(GenesisAlloc, len(p))
+
+	for _, account := range p {
+		s := make(map[common.Hash]common.Hash)
+		for _, entry := range account.Storage {
+			s[common.BigToHash(entry.Key)] = common.BigToHash(entry.Value)
+		}
+
+		ga[common.BigToAddress(account.Addr)] = GenesisAccount{
+			Balance: account.Balance,
+			Code:    account.Code,
+			Storage: s,
+		}
+	}
+
+	return ga, nil
+}
+
 func decodePrealloc(data string) GenesisAlloc {
+	if ga, err := decodePreallocScroll(data); err == nil {
+		return ga
+	}
 	var p []struct {
 		Addr    *big.Int
 		Balance *big.Int

@@ -58,7 +58,7 @@ var LightClientGPO = gasprice.Config{
 
 // Defaults contains default settings for use on the Ethereum main net.
 var Defaults = Config{
-	SyncMode:           downloader.SnapSync,
+	SyncMode:           downloader.FullSync,
 	NetworkId:          1,
 	TxLookupLimit:      2350000,
 	TransactionHistory: 2350000,
@@ -169,6 +169,9 @@ type Config struct {
 
 	// OverrideVerkle (TODO: remove after the fork)
 	OverrideVerkle *uint64 `toml:",omitempty"`
+
+	// Check circuit capacity in block validator
+	CheckCircuitCapacity bool
 
 	// Enable verification of batch consistency between L1 and L2 in rollup
 	EnableRollupVerify bool

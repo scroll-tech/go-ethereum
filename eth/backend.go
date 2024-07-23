@@ -59,6 +59,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rollup/rollup_sync_service"
 	"github.com/ethereum/go-ethereum/rollup/sync_service"
+	"github.com/ethereum/go-ethereum/rollup/tracing"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -218,6 +219,10 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if err != nil {
 		return nil, err
 	}
+	if config.CheckCircuitCapacity {
+		tracer := tracing.NewTracerWrapper()
+		eth.blockchain.Validator().SetupTracerAndCircuitCapacityChecker(tracer)
+	}
 	eth.bloomIndexer.Start(eth.blockchain)
 
 	if config.BlobPool.Datadir != "" {
@@ -243,7 +248,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	eth.syncService.Start()
 	if config.EnableRollupVerify {
 		// initialize and start rollup event sync service
-		eth.rollupSyncService, err = rollup_sync_service.NewRollupSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack.Config().L1DeploymentBlock)
+		eth.rollupSyncService, err = rollup_sync_service.NewRollupSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
 		}
@@ -349,6 +354,9 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "net",
 			Service:   s.netRPCService,
+		}, {
+			Namespace: "scroll",
+			Service:   NewScrollAPI(s),
 		},
 	}...)
 }

@@ -89,13 +89,14 @@ const (
 
 // 0x40 range - block operations.
 const (
-	BLOCKHASH   OpCode = 0x40
-	COINBASE    OpCode = 0x41
-	TIMESTAMP   OpCode = 0x42
-	NUMBER      OpCode = 0x43
-	DIFFICULTY  OpCode = 0x44
-	RANDOM      OpCode = 0x44 // Same as DIFFICULTY
-	PREVRANDAO  OpCode = 0x44 // Same as DIFFICULTY
+	BLOCKHASH  OpCode = 0x40
+	COINBASE   OpCode = 0x41
+	TIMESTAMP  OpCode = 0x42
+	NUMBER     OpCode = 0x43
+	DIFFICULTY OpCode = 0x44
+	// RANDOM & PREVRANDAO are not supported in scroll
+	// RANDOM      OpCode = 0x44 // Same as DIFFICULTY
+	// PREVRANDAO  OpCode = 0x44 // Same as DIFFICULTY
 	GASLIMIT    OpCode = 0x45
 	CHAINID     OpCode = 0x46
 	SELFBALANCE OpCode = 0x47
@@ -286,7 +287,12 @@ var opCodeToString = map[OpCode]string{
 	GASLIMIT:    "GASLIMIT",
 	CHAINID:     "CHAINID",
 	SELFBALANCE: "SELFBALANCE",
-	BASEFEE:     "BASEFEE",
+
+	// we temporarily comment this out, since ccc expects
+	// the "opcode 0x%x not defined" string in the traces,
+	// should uncomment once ccc supports the string version.
+	// BASEFEE:     "BASEFEE",
+
 	BLOBHASH:    "BLOBHASH",
 	BLOBBASEFEE: "BLOBBASEFEE",
 
@@ -303,10 +309,15 @@ var opCodeToString = map[OpCode]string{
 	MSIZE:    "MSIZE",
 	GAS:      "GAS",
 	JUMPDEST: "JUMPDEST",
-	TLOAD:    "TLOAD",
-	TSTORE:   "TSTORE",
-	MCOPY:    "MCOPY",
-	PUSH0:    "PUSH0",
+
+	// we temporarily comment these out, since ccc expects
+	// the "opcode 0x%x not defined" string in the traces,
+	// should uncomment once ccc supports the string version.
+	// TLOAD:    "TLOAD",
+	// TSTORE:   "TSTORE",
+	// MCOPY:    "MCOPY",
+
+	PUSH0: "PUSH0",
 
 	// 0x60 range - pushes.
 	PUSH1:  "PUSH1",

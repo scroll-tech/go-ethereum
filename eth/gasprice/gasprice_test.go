@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -117,6 +118,10 @@ func (b *testBackend) teardown() {
 	b.chain.Stop()
 }
 
+func (b *testBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return b.chain.StateAt(root)
+}
+
 // newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
 // after use, otherwise the blockchain instance will mem-leak via goroutines.
 func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBackend {
@@ -133,6 +138,17 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	config.LondonBlock = londonBlock
 	config.ArrowGlacierBlock = londonBlock
 	config.GrayGlacierBlock = londonBlock
+
+	config.ArchimedesBlock = londonBlock
+	config.BernoulliBlock = londonBlock
+	config.CurieBlock = londonBlock
+	config.ShanghaiTime = nil
+	if londonBlock != nil {
+		shanghaiTime := londonBlock.Uint64() * 12
+		config.ShanghaiTime = &shanghaiTime
+		config.DarwinTime = &shanghaiTime
+	}
+
 	config.TerminalTotalDifficulty = common.Big0
 	engine := ethash.NewFaker()
 

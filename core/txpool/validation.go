@@ -58,11 +58,11 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return fmt.Errorf("%w: transaction size %v, limit %v", ErrOversizedData, tx.Size(), opts.MaxSize)
 	}
 	// Ensure only transactions that have been enabled are accepted
-	if !opts.Config.IsBerlin(head.Number) && tx.Type() != types.LegacyTxType {
-		return fmt.Errorf("%w: type %d rejected, pool not yet in Berlin", core.ErrTxTypeNotSupported, tx.Type())
+	if !opts.Config.IsCurie(head.Number) && tx.Type() != types.LegacyTxType {
+		return fmt.Errorf("%w: type %d rejected, pool not yet in Curie", core.ErrTxTypeNotSupported, tx.Type())
 	}
-	if !opts.Config.IsLondon(head.Number) && tx.Type() == types.DynamicFeeTxType {
-		return fmt.Errorf("%w: type %d rejected, pool not yet in London", core.ErrTxTypeNotSupported, tx.Type())
+	if !opts.Config.IsCurie(head.Number) && tx.Type() == types.DynamicFeeTxType {
+		return fmt.Errorf("%w: type %d rejected, pool not yet in Curie", core.ErrTxTypeNotSupported, tx.Type())
 	}
 	if !opts.Config.IsCancun(head.Number, head.Time) && tx.Type() == types.BlobTxType {
 		return fmt.Errorf("%w: type %d rejected, pool not yet in Cancun", core.ErrTxTypeNotSupported, tx.Type())
@@ -197,7 +197,7 @@ type ValidationOptionsWithState struct {
 //
 // This check is public to allow different transaction pools to check the stateful
 // rules without duplicating code and running the risk of missed updates.
-func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, opts *ValidationOptionsWithState) error {
+func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, opts *ValidationOptionsWithState, chainConfig *params.ChainConfig, headNumber *big.Int) error {
 	// Ensure the transaction adheres to nonce ordering
 	from, err := signer.Sender(tx) // already validated (and cached), but cleaner to check
 	if err != nil {
@@ -227,7 +227,7 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 	// 2. Perform an additional check for L1 data fees.
 	// Always perform the check, because it's not easy to check FeeVault here
 	// Get L1 data fee in current state
-	l1DataFee, err := fees.CalculateL1DataFee(tx, opts.State)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, opts.State, chainConfig, headNumber)
 	if err != nil {
 		return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
 	}

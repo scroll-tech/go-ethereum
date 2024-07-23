@@ -80,8 +80,13 @@ type SimulatedBackend struct {
 // and uses a simulated blockchain for testing purposes.
 // A simulated backend always uses chainID 1337.
 func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.GenesisAlloc, gasLimit uint64) *SimulatedBackend {
+	// copy AllEthashProtocolChanges and enable zktrie
+	chainCfg := new(params.ChainConfig)
+	*chainCfg = *params.AllEthashProtocolChanges
+	chainCfg.Scroll.UseZktrie = true
+
 	genesis := core.Genesis{
-		Config:   params.AllEthashProtocolChanges,
+		Config:   chainCfg,
 		GasLimit: gasLimit,
 		Alloc:    alloc,
 	}
@@ -646,7 +651,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	if call.GasPrice != nil && (call.GasFeeCap != nil || call.GasTipCap != nil) {
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
-	if !b.blockchain.Config().IsLondon(header.Number) {
+	if !b.blockchain.Config().IsCurie(header.Number) {
 		// If there's no basefee, then it must be a non-1559 execution
 		if call.GasPrice == nil {
 			call.GasPrice = new(big.Int)
@@ -668,7 +673,11 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 			// Backfill the legacy gasPrice for EVM execution, unless we're all zeroes
 			call.GasPrice = new(big.Int)
 			if call.GasFeeCap.BitLen() > 0 || call.GasTipCap.BitLen() > 0 {
-				call.GasPrice = math.BigMin(new(big.Int).Add(call.GasTipCap, header.BaseFee), call.GasFeeCap)
+				if header.BaseFee != nil {
+					call.GasPrice = math.BigMin(new(big.Int).Add(call.GasTipCap, header.BaseFee), call.GasFeeCap)
+				} else {
+					call.GasPrice = math.BigMin(call.GasTipCap, call.GasFeeCap)
+				}
 			}
 		}
 	}
@@ -706,7 +715,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	vmEnv := vm.NewEVM(evmContext, txContext, stateDB, b.config, vm.Config{NoBaseFee: true})
 	gasPool := new(core.GasPool).AddGas(math.MaxUint64)
 	signer := types.MakeSigner(b.blockchain.Config(), header.Number, header.Time)
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.blockchain.Config().ChainID, signer, stateDB)
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.blockchain.Config(), signer, stateDB, header.Number)
 	if err != nil {
 		return nil, err
 	}
@@ -979,4 +988,8 @@ func nullSubscription() event.Subscription {
 		<-quit
 		return nil
 	})
+}
+
+func (fb *filterBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return fb.bc.StateAt(root)
 }

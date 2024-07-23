@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
@@ -52,10 +53,18 @@ func (*dummyStatedb) GetRefund() uint64                                       { 
 func (*dummyStatedb) GetState(_ common.Address, _ common.Hash) common.Hash    { return common.Hash{} }
 func (*dummyStatedb) SetState(_ common.Address, _ common.Hash, _ common.Hash) {}
 
+// newTestStateDB create a sample test state to test node-wise reconstruction.
+func newTestStateDB() *state.StateDB {
+	// Create an empty state
+	db := state.NewDatabase(rawdb.NewMemoryDatabase())
+	stateDb, _ := state.New(common.Hash{}, db, nil)
+	return stateDb
+}
+
 func TestStoreCapture(t *testing.T) {
 	var (
 		logger   = NewStructLogger(nil)
-		env      = vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, &dummyStatedb{}, params.TestChainConfig, vm.Config{Tracer: logger})
+		env      = vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, newTestStateDB(), params.TestChainConfig, vm.Config{Tracer: logger})
 		contract = vm.NewContract(&dummyContractRef{}, &dummyContractRef{}, new(big.Int), 100000)
 	)
 	contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x0, byte(vm.SSTORE)}
@@ -84,13 +93,13 @@ func TestStructLogMarshalingOmitEmpty(t *testing.T) {
 		want string
 	}{
 		{"empty err and no fields", &StructLog{},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"extraData":null,"opName":"STOP"}`},
 		{"with err", &StructLog{Err: errors.New("this failed")},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP","error":"this failed"}`},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"extraData":null,"opName":"STOP","error":"this failed"}`},
 		{"with mem", &StructLog{Memory: make([]byte, 2), MemorySize: 2},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memory":"0x0000","memSize":2,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memory":"0x0000","memSize":2,"stack":null,"depth":0,"refund":0,"extraData":null,"opName":"STOP"}`},
 		{"with 0-size mem", &StructLog{Memory: make([]byte, 0)},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"extraData":null,"opName":"STOP"}`},
 	}
 
 	for _, tt := range tests {

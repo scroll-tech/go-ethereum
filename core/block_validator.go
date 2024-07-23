@@ -59,7 +59,7 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 }
 
 type tracerWrapper interface {
-	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
+	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Header, *types.Block, bool) (*types.BlockTrace, error)
 }
 
 func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper) {
@@ -155,9 +155,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		// if a block's RowConsumption has been stored, which means it has been processed before,
 		// (e.g., in miner/worker.go or in insertChain),
 		// we simply skip its calculation and validation
-		// if rawdb.ReadBlockRowConsumption(v.bc.db, block.Hash()) != nil {
-		// 	return nil
-		// }
+		if rawdb.ReadBlockRowConsumption(v.bc.db, block.Hash()) != nil {
+			return nil
+		}
 		rowConsumption, err := v.validateCircuitRowConsumption(block)
 		if err != nil {
 			return err
@@ -169,7 +169,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 			"hash", block.Hash().String(),
 			"rowConsumption", rowConsumption,
 		)
-		// rawdb.WriteBlockRowConsumption(v.bc.db, block.Hash(), rowConsumption)
+		rawdb.WriteBlockRowConsumption(v.bc.db, block.Hash(), rowConsumption)
 	}
 
 	return nil
@@ -226,6 +226,9 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 		// TODO: consider verifying that skipped messages overflow
 		for index := queueIndex; index < txQueueIndex; index++ {
 			if exists := it.Next(); !exists {
+				if err := it.Error(); err != nil {
+					log.Error("Unexpected DB error in ValidateL1Messages", "err", err, "queueIndex", queueIndex)
+				}
 				// the message in this block is not available in our local db.
 				// we'll reprocess this block at a later time.
 				return consensus.ErrMissingL1MessageData
@@ -240,6 +243,9 @@ func (v *BlockValidator) ValidateL1Messages(block *types.Block) error {
 		queueIndex = txQueueIndex + 1
 
 		if exists := it.Next(); !exists {
+			if err := it.Error(); err != nil {
+				log.Error("Unexpected DB error in ValidateL1Messages", "err", err, "queueIndex", txQueueIndex)
+			}
 			// the message in this block is not available in our local db.
 			// we'll reprocess this block at a later time.
 			return consensus.ErrMissingL1MessageData
@@ -324,7 +330,7 @@ func (v *BlockValidator) createTraceEnvAndGetBlockTrace(block *types.Block) (*ty
 		return nil, err
 	}
 
-	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.bc.db, statedb, parent, block, true)
+	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.bc.db, statedb, parent.Header(), block, true)
 }
 
 func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {

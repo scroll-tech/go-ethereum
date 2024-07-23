@@ -36,8 +36,8 @@ func NewTracerWrapper() *TracerWrapper {
 }
 
 // CreateTraceEnvAndGetBlockTrace wraps the whole block tracing logic for a block
-func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*types.BlockTrace, error) {
-	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parent, block, commitAfterApply)
+func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parentHeader *types.Header, block *types.Block, finaliseStateAfterApply bool) (*types.BlockTrace, error) {
+	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parentHeader, block, finaliseStateAfterApply)
 	if err != nil {
 		return nil, err
 	}
@@ -46,9 +46,9 @@ func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.Chai
 }
 
 type TraceEnv struct {
-	logConfig        *logger.Config
-	commitAfterApply bool
-	chainConfig      *params.ChainConfig
+	logConfig               *logger.Config
+	finaliseStateAfterApply bool
+	chainConfig             *params.ChainConfig
 
 	coinbase common.Address
 
@@ -88,15 +88,15 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Config, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, commitAfterApply bool) *TraceEnv {
+func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Config, blockCtx vm.BlockContext, startL1QueueIndex uint64, coinbase common.Address, statedb *state.StateDB, rootBefore common.Hash, block *types.Block, finaliseStateAfterApply bool) *TraceEnv {
 	return &TraceEnv{
-		logConfig:        logConfig,
-		commitAfterApply: commitAfterApply,
-		chainConfig:      chainConfig,
-		coinbase:         coinbase,
-		signer:           types.MakeSigner(chainConfig, block.Number(), block.Time()),
-		state:            statedb,
-		blockCtx:         blockCtx,
+		logConfig:               logConfig,
+		finaliseStateAfterApply: finaliseStateAfterApply,
+		chainConfig:             chainConfig,
+		coinbase:                coinbase,
+		signer:                  types.MakeSigner(chainConfig, block.Number(), block.Time()),
+		state:                   statedb,
+		blockCtx:                blockCtx,
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    rootBefore,
 			RootAfter:     block.Root(),
@@ -110,7 +110,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Con
 	}
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parentHeader *types.Header, block *types.Block, finaliseStateAfterApply bool) (*TraceEnv, error) {
 	var coinbase common.Address
 
 	var err error
@@ -134,14 +134,16 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 	// block `C`.
 	// `ReadFirstQueueIndexNotInL1Block(B)` will return the correct value
 	// `10` on follower nodes.
-	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, parent.Hash())
+	startL1QueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(chaindb, parentHeader.Hash())
 	if startL1QueueIndex == nil {
-		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parent.NumberU64(), "hash", parent.Hash())
-		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parent.Hash())
+		log.Error("missing FirstQueueIndexNotInL2Block for block during trace call", "number", parentHeader.Number.Uint64(), "hash", parentHeader.Hash())
+		return nil, fmt.Errorf("missing FirstQueueIndexNotInL2Block for block during trace call: hash=%v, parentHash=%vv", block.Hash(), parentHeader.Hash())
 	}
 	env := CreateTraceEnvHelper(
 		chainConfig,
 		&logger.Config{
+			DisableStorage:   true,
+			DisableStack:     true,
 			EnableMemory:     false,
 			EnableReturnData: true,
 			Debug:            true,
@@ -150,9 +152,9 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 		*startL1QueueIndex,
 		coinbase,
 		statedb,
-		parent.Root(),
+		parentHeader.Root,
 		block,
-		commitAfterApply,
+		finaliseStateAfterApply,
 	)
 
 	key := coinbase.String()
@@ -169,6 +171,11 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 }
 
 func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+	if env == nil {
+		log.Warn("running in light mode? trace env is nil and do not support `GetBlockTrace`")
+		return nil, nil
+	}
+
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs   = block.Transactions()
@@ -213,7 +220,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 		msg, _ := core.TransactionToMessage(tx, env.signer, block.BaseFee())
 		env.state.SetTxContext(tx.Hash(), i)
 		vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{})
-		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state, env.chainConfig, block.Number())
 		if err != nil {
 			failed = err
 			break
@@ -222,7 +229,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			failed = err
 			break
 		}
-		if env.commitAfterApply {
+		if env.finaliseStateAfterApply {
 			env.state.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
 		}
 	}
@@ -323,7 +330,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	state.SetTxContext(txctx.TxHash, txctx.TxIndex)
 
 	// Computes the new state by applying the given message.
-	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, state, env.chainConfig, block.Number())
 	if err != nil {
 		return err
 	}
@@ -413,10 +420,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		zktrieTracer := state.NewProofTracer(trie)
 		env.sMu.Unlock()
 
-		for key, values := range keys {
+		for key := range keys {
 			addrStr := addr.String()
 			keyStr := key.String()
-			isDelete := bytes.Equal(values.Bytes(), common.Hash{}.Bytes())
+			value := state.GetState(addr, key)
+			isDelete := bytes.Equal(value.Bytes(), common.Hash{}.Bytes())
 
 			txm := txStorageTrace.StorageProofs[addrStr]
 			env.sMu.Lock()
@@ -507,6 +515,10 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			rcfg.L1BaseFeeSlot,
 			rcfg.OverheadSlot,
 			rcfg.ScalarSlot,
+			rcfg.L1BlobBaseFeeSlot,
+			rcfg.CommitScalarSlot,
+			rcfg.BlobScalarSlot,
+			rcfg.IsCurieSlot,
 		},
 	}
 
@@ -527,7 +539,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			if _, existed := env.StorageProofs[addr.String()][slot.String()]; !existed {
 				if trie, err := statedb.GetStorageTrieForProof(addr); err != nil {
 					log.Error("Storage proof for intrinstic address not available", "error", err, "address", addr)
-				} else if proof, _ := statedb.GetSecureTrieProof(trie, slot); err != nil {
+				} else if proof, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
 				} else {
 					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof)
@@ -570,15 +582,6 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
 			evmTrace.PoseidonCodeHash = &codeHash
 		}
-	}
-
-	// only zktrie model has the ability to get `mptwitness`.
-	if env.chainConfig.Scroll.ZktrieEnabled() {
-		// // we use MPTWitnessNothing by default and do not allow switch among MPTWitnessType atm.
-		// // MPTWitness will be removed from traces in the future.
-		// if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessNothing, blockTrace); err != nil {
-		// 	log.Error("fill mpt witness fail", "error", err)
-		// }
 	}
 
 	blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.state)

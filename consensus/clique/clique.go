@@ -299,9 +299,9 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	if header.GasLimit > params.MaxGasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
-	if chain.Config().IsShanghai(header.Number, header.Time) {
-		return errors.New("clique does not support shanghai fork")
-	}
+	// if chain.Config().IsShanghai(header.Number, header.Time) {
+	// 	return errors.New("clique does not support shanghai fork")
+	// }
 	if chain.Config().IsCancun(header.Number, header.Time) {
 		return errors.New("clique does not support cancun fork")
 	}
@@ -336,7 +336,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
-	if !chain.Config().IsLondon(header.Number) {
+	if !chain.Config().IsCurie(header.Number) {
 		// Verify BaseFee not present before EIP-1559 fork.
 		if header.BaseFee != nil {
 			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)

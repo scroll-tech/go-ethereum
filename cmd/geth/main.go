@@ -123,6 +123,7 @@ var (
 		utils.MinerExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNewPayloadTimeout,
+		utils.MinerStoreSkippedTxTracesFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV4Flag,
@@ -147,6 +148,7 @@ var (
 		utils.L1EndpointFlag,
 		utils.L1ConfirmationsFlag,
 		utils.L1DeploymentBlockFlag,
+		utils.CircuitCapacityCheckEnabledFlag,
 		utils.RollupVerifyEnabledFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
@@ -287,6 +289,12 @@ func prepare(ctx *cli.Context) {
 	case ctx.IsSet(utils.HoleskyFlag.Name):
 		log.Info("Starting Geth on Holesky testnet...")
 
+	case ctx.IsSet(utils.ScrollAlphaFlag.Name):
+		log.Info("Starting l2geth on Scroll Alpha testnet...")
+
+	case ctx.IsSet(utils.ScrollSepoliaFlag.Name):
+		log.Info("Starting l2geth on Scroll Sepolia testnet...")
+
 	case ctx.IsSet(utils.DeveloperFlag.Name):
 		log.Info("Starting Geth in ephemeral dev mode...")
 		log.Warn(`You are running Geth in --dev mode. Please note the following:
@@ -314,6 +322,8 @@ func prepare(ctx *cli.Context) {
 		if !ctx.IsSet(utils.HoleskyFlag.Name) &&
 			!ctx.IsSet(utils.SepoliaFlag.Name) &&
 			!ctx.IsSet(utils.GoerliFlag.Name) &&
+			!ctx.IsSet(utils.ScrollAlphaFlag.Name) &&
+			!ctx.IsSet(utils.ScrollSepoliaFlag.Name) &&
 			!ctx.IsSet(utils.DeveloperFlag.Name) {
 			// Nope, we're really on mainnet. Bump that cache up!
 			log.Info("Bumping default cache on mainnet", "provided", ctx.Int(utils.CacheFlag.Name), "updated", 4096)

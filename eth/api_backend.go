@@ -92,6 +92,9 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	// 	return block, nil
 	// }
 	if number == rpc.FinalizedBlockNumber {
+		if !b.eth.config.EnableRollupVerify {
+			return nil, errors.New("sync L1 finalized batch feature not enabled, cannot query L2 finalized block height")
+		}
 		finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(b.eth.ChainDb())
 		if finalizedBlockHeightPtr == nil {
 			return nil, errors.New("L2 finalized block height not found in database")
@@ -152,6 +155,9 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	// 	return b.eth.blockchain.GetBlock(header.Hash(), header.Number.Uint64()), nil
 	// }
 	if number == rpc.FinalizedBlockNumber {
+		if !b.eth.config.EnableRollupVerify {
+			return nil, errors.New("sync L1 finalized batch feature not enabled, cannot query L2 finalized block height")
+		}
 		finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(b.eth.ChainDb())
 		if finalizedBlockHeightPtr == nil {
 			return nil, errors.New("L2 finalized block height not found in database")
@@ -431,4 +437,8 @@ func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 
 func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	return b.eth.stateAtTransaction(ctx, block, txIndex, reexec)
+}
+
+func (b *EthAPIBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return b.eth.BlockChain().StateAt(root)
 }

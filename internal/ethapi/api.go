@@ -169,11 +169,20 @@ func (s *TxPoolAPI) Content() map[string]map[string]map[string]*RPCTransaction {
 	}
 	pending, queue := s.b.TxPoolContent()
 	curHeader := s.b.CurrentHeader()
+
+	// get latest L1 base fee
+	state, err := s.b.StateAt(curHeader.Root)
+	if err != nil || state == nil {
+		log.Error("State not found", "number", curHeader.Number, "hash", curHeader.Hash().Hex(), "state", state, "err", err)
+		return nil
+	}
+	l1BaseFee := fees.GetL1BaseFee(state)
+
 	// Flatten the pending transactions
 	for account, txs := range pending {
 		dump := make(map[string]*RPCTransaction)
 		for _, tx := range txs {
-			dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig())
+			dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig(), l1BaseFee)
 		}
 		content["pending"][account.Hex()] = dump
 	}
@@ -181,7 +190,7 @@ func (s *TxPoolAPI) Content() map[string]map[string]map[string]*RPCTransaction {
 	for account, txs := range queue {
 		dump := make(map[string]*RPCTransaction)
 		for _, tx := range txs {
-			dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig())
+			dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig(), l1BaseFee)
 		}
 		content["queued"][account.Hex()] = dump
 	}
@@ -194,17 +203,25 @@ func (s *TxPoolAPI) ContentFrom(addr common.Address) map[string]map[string]*RPCT
 	pending, queue := s.b.TxPoolContentFrom(addr)
 	curHeader := s.b.CurrentHeader()
 
+	// get latest L1 base fee
+	state, err := s.b.StateAt(curHeader.Root)
+	if err != nil || state == nil {
+		log.Error("State not found", "number", curHeader.Number, "hash", curHeader.Hash().Hex(), "state", state, "err", err)
+		return nil
+	}
+	l1BaseFee := fees.GetL1BaseFee(state)
+
 	// Build the pending transactions
 	dump := make(map[string]*RPCTransaction, len(pending))
 	for _, tx := range pending {
-		dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig())
+		dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig(), l1BaseFee)
 	}
 	content["pending"] = dump
 
 	// Build the queued transactions
 	dump = make(map[string]*RPCTransaction, len(queue))
 	for _, tx := range queue {
-		dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig())
+		dump[fmt.Sprintf("%d", tx.Nonce())] = NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig(), l1BaseFee)
 	}
 	content["queued"] = dump
 
@@ -1217,7 +1234,7 @@ func EstimateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, bloc
 	}()
 
 	signer := types.MakeSigner(config, header.Number, header.Time)
-	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config.ChainID, signer, evm.StateDB)
+	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config, signer, evm.StateDB, header.Number)
 }
 
 // executeEstimate is a helper that executes the transaction under a given gas limit and returns
@@ -1501,13 +1518,13 @@ type RPCTransaction struct {
 	YParity             *hexutil.Uint64   `json:"yParity,omitempty"`
 
 	// L1 message transaction fields:
-	Sender     common.Address  `json:"sender,omitempty"`
+	Sender     *common.Address `json:"sender,omitempty"`
 	QueueIndex *hexutil.Uint64 `json:"queueIndex,omitempty"`
 }
 
-// newRPCTransaction returns a transaction that will serialize to the RPC
+// NewRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, blockTime uint64, index uint64, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
+func NewRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, blockTime uint64, index uint64, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
 	signer := types.MakeSigner(config, new(big.Int).SetUint64(blockNumber), blockTime)
 	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
@@ -1580,7 +1597,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 
 	case types.L1MessageTxType:
 		msg := tx.AsL1MessageTx()
-		result.Sender = msg.Sender
+		result.Sender = &msg.Sender
 		result.QueueIndex = (*hexutil.Uint64)(&msg.QueueIndex)
 	}
 	return result
@@ -1599,18 +1616,18 @@ func effectiveGasPrice(tx *types.Transaction, baseFee *big.Int) *big.Int {
 }
 
 // NewRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
-func NewRPCPendingTransaction(tx *types.Transaction, current *types.Header, config *params.ChainConfig) *RPCTransaction {
+func NewRPCPendingTransaction(tx *types.Transaction, current *types.Header, config *params.ChainConfig, l1BaseFee *big.Int) *RPCTransaction {
 	var (
 		baseFee     *big.Int
 		blockNumber = uint64(0)
 		blockTime   = uint64(0)
 	)
 	if current != nil {
-		baseFee = eip1559.CalcBaseFee(config, current)
+		baseFee = eip1559.CalcBaseFee(config, current, l1BaseFee)
 		blockNumber = current.Number.Uint64()
 		blockTime = current.Time
 	}
-	return newRPCTransaction(tx, common.Hash{}, blockNumber, blockTime, 0, baseFee, config)
+	return NewRPCTransaction(tx, common.Hash{}, blockNumber, blockTime, 0, baseFee, config)
 }
 
 // newRPCTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
@@ -1619,7 +1636,7 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64, config *param
 	if index >= uint64(len(txs)) {
 		return nil
 	}
-	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time(), index, b.BaseFee(), config)
+	return NewRPCTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time(), index, b.BaseFee(), config)
 }
 
 // newRPCRawTransactionFromBlockIndex returns the bytes of a transaction given a block and a transaction index.
@@ -1712,7 +1729,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		config := vm.Config{Tracer: tracer, NoBaseFee: true}
 		vmenv, _ := b.GetEVM(ctx, msg, statedb, header, &config, nil)
 		signer := types.MakeSigner(b.ChainConfig(), header.Number, header.Time)
-		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig().ChainID, signer, statedb)
+		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig(), signer, statedb, header.Number)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}
@@ -1823,11 +1840,21 @@ func (s *TransactionAPI) GetTransactionByHash(ctx context.Context, hash common.H
 		if err != nil {
 			return nil, err
 		}
-		return newRPCTransaction(tx, blockHash, blockNumber, header.Time, index, header.BaseFee, s.b.ChainConfig()), nil
+		return NewRPCTransaction(tx, blockHash, blockNumber, header.Time, index, header.BaseFee, s.b.ChainConfig()), nil
 	}
 	// No finalized transaction, try to retrieve it from the pool
 	if tx := s.b.GetPoolTransaction(hash); tx != nil {
-		return NewRPCPendingTransaction(tx, s.b.CurrentHeader(), s.b.ChainConfig()), nil
+		curHeader := s.b.CurrentHeader()
+
+		// get latest L1 base fee
+		state, err := s.b.StateAt(curHeader.Root)
+		if err != nil || state == nil {
+			log.Error("State not found", "number", curHeader.Number, "hash", curHeader.Hash().Hex(), "state", state, "err", err)
+			return nil, fmt.Errorf("cannot get L1 base fee, state not found")
+		}
+		l1BaseFee := fees.GetL1BaseFee(state)
+
+		return NewRPCPendingTransaction(tx, s.b.CurrentHeader(), s.b.ChainConfig(), l1BaseFee), nil
 	}
 
 	// Transaction unknown, return as such
@@ -2101,10 +2128,19 @@ func (s *TransactionAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	}
 	curHeader := s.b.CurrentHeader()
 	transactions := make([]*RPCTransaction, 0, len(pending))
+
+	// get latest L1 base fee
+	state, err := s.b.StateAt(curHeader.Root)
+	if err != nil || state == nil {
+		log.Error("State not found", "number", curHeader.Number, "hash", curHeader.Hash().Hex(), "state", state, "err", err)
+		return nil, fmt.Errorf("cannot get L1 base fee, state not found")
+	}
+	l1BaseFee := fees.GetL1BaseFee(state)
+
 	for _, tx := range pending {
 		from, _ := types.Sender(s.signer, tx)
 		if _, exists := accounts[from]; exists {
-			transactions = append(transactions, NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig()))
+			transactions = append(transactions, NewRPCPendingTransaction(tx, curHeader, s.b.ChainConfig(), l1BaseFee))
 		}
 	}
 	return transactions, nil

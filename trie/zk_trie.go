@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/poseidon"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie/trienode"
 )
 
@@ -83,12 +82,7 @@ func (t *ZkTrie) GetAccount(address common.Address) (*types.StateAccount, error)
 
 func (t *ZkTrie) GetStorage(_ common.Address, key []byte) ([]byte, error) {
 	sanityCheckByte32Key(key)
-	enc, err := t.TryGet(key)
-	if err != nil || len(enc) == 0 {
-		return nil, err
-	}
-	_, content, _, err := rlp.Split(enc)
-	return content, err
+	return t.TryGet(key)
 }
 
 func (t *ZkTrie) UpdateAccount(address common.Address, acc *types.StateAccount) error {
@@ -127,8 +121,7 @@ func (t *ZkTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) e
 }
 
 func (t *ZkTrie) UpdateStorage(_ common.Address, key, value []byte) error {
-	v, _ := rlp.EncodeToBytes(value)
-	return t.TryUpdate(key, v)
+	return t.TryUpdate(key, value)
 }
 
 // Delete removes any existing value for key from the trie.
@@ -169,15 +162,10 @@ func (t *ZkTrie) GetKey(kHashBytes []byte) []byte {
 //
 // Committing flushes nodes from memory. Subsequent Get calls will load nodes
 // from the database.
-//
-//	func (t *ZkTrie) Commit(LeafCallback) (common.Hash, int, error) {
-//		// in current implmentation, every update of trie already writes into database
-//		// so Commmit does nothing
-//		return t.Hash(), 0, nil
-//	}
 func (t *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
-	// in current implmentation, every update of trie already writes into database
-	// so Commmit does nothing
+	if err := t.ZkTrie.Commit(); err != nil {
+		return common.Hash{}, nil, err
+	}
 	return t.Hash(), nil, nil
 }
 

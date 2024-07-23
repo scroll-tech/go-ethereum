@@ -547,7 +547,7 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 
 	// Rows being nil without an OverflowingTx means that block didn't go thru CCC,
 	// which means that we are not the sequencer. Do not attempt to commit.
-	if res.Rows == nil && res.OverflowingTx == nil {x
+	if res.Rows == nil && res.OverflowingTx == nil {
 		return nil
 	}
 

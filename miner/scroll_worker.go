@@ -610,7 +610,7 @@ func (w *worker) commit(res *pipeline.Result) error {
 	}
 
 	blockHash := block.Hash()
-
+	var logs []*types.Log
 	for i, receipt := range res.FinalBlock.Receipts {
 		// add block location fields
 		receipt.BlockHash = blockHash
@@ -620,6 +620,8 @@ func (w *worker) commit(res *pipeline.Result) error {
 		for _, log := range receipt.Logs {
 			log.BlockHash = blockHash
 		}
+
+		logs = append(logs, receipt.Logs...)
 	}
 
 	for _, log := range res.FinalBlock.CoalescedLogs {
@@ -660,8 +662,9 @@ func (w *worker) commit(res *pipeline.Result) error {
 
 	rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), blockHash, res.Rows)
 	// Commit block and state to database.
-	err = w.chain.WriteBlockWithState(block, res.FinalBlock.Receipts, res.FinalBlock.CoalescedLogs, res.FinalBlock.State, true)
+	_, err = w.chain.WriteBlockAndSetHead(block, res.FinalBlock.Receipts, logs, res.FinalBlock.State, true)
 	if err != nil {
+		log.Error("Failed writing block to chain", "err", err)
 		return err
 	}
 

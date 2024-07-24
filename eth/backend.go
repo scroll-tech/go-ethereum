@@ -595,7 +595,7 @@ func (s *Ethereum) Start() error {
 	//}
 	// Start the networking layer and the light server if requested
 	// handler is not enabled when DA syncing enabled
-	if s.config.EnableDASyncing {
+	if !s.config.EnableDASyncing {
 		s.handler.Start(maxPeers)
 	}
 	return nil

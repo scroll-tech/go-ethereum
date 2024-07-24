@@ -284,20 +284,19 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *txpool.LazyTransaction) (<-c
 				return
 			}
 
-			// TODO: what error should we use?
 			if p.gasPool.Gas() < ltx.Gas {
 				// we don't have enough space for the next transaction, skip the account and continue looking for more txns
-				sendCancellable(resCh, nil, p.ctx.Done())
+				sendCancellable(resCh, core.ErrGasLimitReached, p.ctx.Done())
 				continue
 			}
 
 			// TODO: blob gas check
 
 			tx := ltx.Resolve()
-			// TODO: what error should we use?
 			if tx == nil {
+				log.Trace("Ignoring evicted transaction", "hash", ltx.Hash)
 				// can't resolve the tx, silently ignore and continue looking for more txns
-				sendCancellable(resCh, nil, p.ctx.Done())
+				sendCancellable(resCh, errors.New("cannot resolve evicted tx"), p.ctx.Done())
 				continue
 			}
 

@@ -18,16 +18,27 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 )
 
 var (
-	callDataBlobSourceFetchBlockRange uint64 = 500
+	callDataBlobSourceFetchBlockRange  uint64 = 500
+	commitBatchEventName                      = "CommitBatch"
+	revertBatchEventName                      = "RevertBatch"
+	finalizeBatchEventName                    = "FinalizeBatch"
+	commitBatchMethodName                     = "commitBatch"
+	commitBatchWithBlobProofMethodName        = "commitBatchWithBlobProof"
+
+	// the length og method ID at the beginning of transaction data
+	methodIDLength = 4
 )
 
 type CalldataBlobSource struct {
 	ctx                           context.Context
-	l1Client                      *L1Client
-	blobClient                    BlobClient
+	l1Client                      *rollup_sync_service.L1Client
+	blobClient                    blob_client.BlobClient
 	l1height                      uint64
 	scrollChainABI                *abi.ABI
 	l1CommitBatchEventSignature   common.Hash
@@ -36,8 +47,8 @@ type CalldataBlobSource struct {
 	db                            ethdb.Database
 }
 
-func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *L1Client, blobClient BlobClient, db ethdb.Database) (DataSource, error) {
-	scrollChainABI, err := scrollChainMetaData.GetAbi()
+func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *rollup_sync_service.L1Client, blobClient blob_client.BlobClient, db ethdb.Database) (DataSource, error) {
+	scrollChainABI, err := rollup_sync_service.ScrollChainMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
@@ -47,26 +58,26 @@ func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *L1Cli
 		blobClient:                    blobClient,
 		l1height:                      l1height,
 		scrollChainABI:                scrollChainABI,
-		l1CommitBatchEventSignature:   scrollChainABI.Events["CommitBatch"].ID,
-		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
-		l1FinalizeBatchEventSignature: scrollChainABI.Events["FinalizeBatch"].ID,
+		l1CommitBatchEventSignature:   scrollChainABI.Events[commitBatchEventName].ID,
+		l1RevertBatchEventSignature:   scrollChainABI.Events[revertBatchEventName].ID,
+		l1FinalizeBatchEventSignature: scrollChainABI.Events[finalizeBatchEventName].ID,
 		db:                            db,
 	}, nil
 }
 
 func (ds *CalldataBlobSource) NextData() (DA, error) {
 	to := ds.l1height + callDataBlobSourceFetchBlockRange
-	l1Finalized, err := ds.l1Client.getFinalizedBlockNumber(ds.ctx)
+	l1Finalized, err := ds.l1Client.GetLatestFinalizedBlockNumber()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get l1height, error: %v", err)
 	}
-	if to > l1Finalized.Uint64() {
-		to = l1Finalized.Uint64()
+	if to > l1Finalized {
+		to = l1Finalized
 	}
 	if ds.l1height > to {
-		return nil, sourceExhaustedErr
+		return nil, errSourceExhausted
 	}
-	logs, err := ds.l1Client.fetchRollupEventsInRange(ds.ctx, ds.l1height, to)
+	logs, err := ds.l1Client.FetchRollupEventsInRange(ds.l1height, to)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get events, l1height: %d, error: %v", ds.l1height, err)
 	}
@@ -86,8 +97,8 @@ func (ds *CalldataBlobSource) processLogsToDA(logs []types.Log) (DA, error) {
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case ds.l1CommitBatchEventSignature:
-			event := &L1CommitBatchEvent{}
-			if err := UnpackLog(ds.scrollChainABI, event, "CommitBatch", vLog); err != nil {
+			event := &rollup_sync_service.L1CommitBatchEvent{}
+			if err := rollup_sync_service.UnpackLog(ds.scrollChainABI, event, "CommitBatch", vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
 			batchIndex := event.BatchIndex.Uint64()
@@ -100,8 +111,8 @@ func (ds *CalldataBlobSource) processLogsToDA(logs []types.Log) (DA, error) {
 			da = append(da, daEntry)
 
 		case ds.l1RevertBatchEventSignature:
-			event := &L1RevertBatchEvent{}
-			if err := UnpackLog(ds.scrollChainABI, event, "RevertBatch", vLog); err != nil {
+			event := &rollup_sync_service.L1RevertBatchEvent{}
+			if err := rollup_sync_service.UnpackLog(ds.scrollChainABI, event, "RevertBatch", vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
 			batchIndex := event.BatchIndex.Uint64()
@@ -109,8 +120,8 @@ func (ds *CalldataBlobSource) processLogsToDA(logs []types.Log) (DA, error) {
 			da = append(da, NewRevertBatchDA(batchIndex))
 
 		case ds.l1FinalizeBatchEventSignature:
-			event := &L1FinalizeBatchEvent{}
-			if err := UnpackLog(ds.scrollChainABI, event, "FinalizeBatch", vLog); err != nil {
+			event := &rollup_sync_service.L1FinalizeBatchEvent{}
+			if err := rollup_sync_service.UnpackLog(ds.scrollChainABI, event, "FinalizeBatch", vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
 			batchIndex := event.BatchIndex.Uint64()
@@ -132,6 +143,26 @@ type commitBatchArgs struct {
 	SkippedL1MessageBitmap []byte
 }
 
+func newCommitBatchArgs(method *abi.Method, values []interface{}) (*commitBatchArgs, error) {
+	var args commitBatchArgs
+	err := method.Inputs.Copy(&args, values)
+	return &args, err
+}
+
+func newCommitBatchArgsFromCommitBatchWithProof(method *abi.Method, values []interface{}) (*commitBatchArgs, error) {
+	var args commitBatchWithBlobProofArgs
+	err := method.Inputs.Copy(&args, values)
+	if err != nil {
+		return nil, err
+	}
+	return &commitBatchArgs{
+		Version:                args.Version,
+		ParentBatchHeader:      args.ParentBatchHeader,
+		Chunks:                 args.Chunks,
+		SkippedL1MessageBitmap: args.SkippedL1MessageBitmap,
+	}, nil
+}
+
 type commitBatchWithBlobProofArgs struct {
 	Version                uint8
 	ParentBatchHeader      []byte
@@ -142,14 +173,13 @@ type commitBatchWithBlobProofArgs struct {
 
 func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Log) (DAEntry, error) {
 	if batchIndex == 0 {
-		return NewCommitBatchDaV0(0, batchIndex, 0, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}, 0), nil
+		return NewCommitBatchDAV0(0, batchIndex, 0, []byte{}, []*codecv0.DAChunkRawTx{}, []*types.L1MessageTx{}, 0), nil
 	}
 
-	txData, err := ds.l1Client.fetchTxData(ds.ctx, vLog)
+	txData, err := ds.l1Client.FetchTxData(vLog)
 	if err != nil {
 		return nil, err
 	}
-	const methodIDLength = 4
 	if len(txData) < methodIDLength {
 		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)
 	}
@@ -163,37 +193,29 @@ func (ds *CalldataBlobSource) getCommitBatchDa(batchIndex uint64, vLog *types.Lo
 		return nil, fmt.Errorf("failed to unpack transaction data using ABI, tx data: %v, err: %w", txData, err)
 	}
 
-	if method.Name == "commitBatch" {
-		var args commitBatchArgs
-		err = method.Inputs.Copy(&args, values)
+	if method.Name == commitBatchMethodName {
+		args, err := newCommitBatchArgs(method, values)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 		}
 		switch args.Version {
 		case 0:
-			return ds.decodeDAV0(batchIndex, vLog, &args)
+			return ds.decodeDAV0(batchIndex, vLog, args)
 		case 1:
-			return ds.decodeDAV1(batchIndex, vLog, &args)
+			return ds.decodeDAV1(batchIndex, vLog, args)
 		case 2:
-			return ds.decodeDAV2(batchIndex, vLog, &args)
+			return ds.decodeDAV2(batchIndex, vLog, args)
 		default:
 			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 		}
-	} else {
-		var args commitBatchWithBlobProofArgs
-		err = method.Inputs.Copy(&args, values)
-		var usedArgs commitBatchArgs = commitBatchArgs{
-			Version:                args.Version,
-			ParentBatchHeader:      args.ParentBatchHeader,
-			Chunks:                 args.Chunks,
-			SkippedL1MessageBitmap: args.SkippedL1MessageBitmap,
-		}
+	} else if method.Name == commitBatchWithBlobProofMethodName {
+		args, err := newCommitBatchArgsFromCommitBatchWithProof(method, values)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 		}
-		return ds.decodeDAV2(batchIndex, vLog, &usedArgs)
+		return ds.decodeDAV2(batchIndex, vLog, args)
 	}
-
+	return nil, fmt.Errorf("unknown method name: %s", method.Name)
 }
 
 func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, args *commitBatchArgs) (DAEntry, error) {
@@ -229,7 +251,7 @@ func (ds *CalldataBlobSource) decodeDAV0(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV0(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	da := NewCommitBatchDAV0(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }
 
@@ -241,7 +263,7 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
 
-	versionedHash, err := ds.l1Client.fetchTxBlobHash(ds.ctx, vLog)
+	versionedHash, err := ds.l1Client.FetchTxBlobHash(vLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
 	}
@@ -287,7 +309,7 @@ func (ds *CalldataBlobSource) decodeDAV1(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV1(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	da := NewCommitBatchDAV1(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }
 
@@ -299,7 +321,7 @@ func (ds *CalldataBlobSource) decodeDAV2(batchIndex uint64, vLog *types.Log, arg
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
 
-	versionedHash, err := ds.l1Client.fetchTxBlobHash(ds.ctx, vLog)
+	versionedHash, err := ds.l1Client.FetchTxBlobHash(vLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
 	}
@@ -345,10 +367,11 @@ func (ds *CalldataBlobSource) decodeDAV2(batchIndex uint64, vLog *types.Log, arg
 		l1Txs = append(l1Txs, l1Tx)
 		currentIndex++
 	}
-	da := NewCommitBatchDaV2(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
+	da := NewCommitBatchDAV2(args.Version, batchIndex, parentTotalL1MessagePopped, args.SkippedL1MessageBitmap, chunks, l1Txs, vLog.BlockNumber)
 	return da, nil
 }
 
 func getBatchTotalL1MessagePopped(data []byte) uint64 {
+	// total l1 message popped stored in bytes from 17 to 24, accordingly to codec spec
 	return binary.BigEndian.Uint64(data[17:25])
 }

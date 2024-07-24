@@ -1,4 +1,4 @@
-package da_syncer
+package blob_client
 
 import (
 	"context"
@@ -17,21 +17,21 @@ type BlobClient interface {
 	GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error)
 }
 
-type BLobSource int
+type BlobSource int
 
 const (
 	// BlobScan
-	BlobScan BLobSource = iota
+	BlobScan BlobSource = iota
 	// BlockNative
 	BlockNative
 )
 
-func (src BLobSource) IsValid() bool {
+func (src BlobSource) IsValid() bool {
 	return src >= BlobScan && src <= BlockNative
 }
 
 // String implements the stringer interface.
-func (src BLobSource) String() string {
+func (src BlobSource) String() string {
 	switch src {
 	case BlobScan:
 		return "blobscan"
@@ -42,7 +42,7 @@ func (src BLobSource) String() string {
 	}
 }
 
-func (src BLobSource) MarshalText() ([]byte, error) {
+func (src BlobSource) MarshalText() ([]byte, error) {
 	switch src {
 	case BlobScan:
 		return []byte("blobscan"), nil
@@ -53,7 +53,7 @@ func (src BLobSource) MarshalText() ([]byte, error) {
 	}
 }
 
-func (src *BLobSource) UnmarshalText(text []byte) error {
+func (src *BlobSource) UnmarshalText(text []byte) error {
 	switch string(text) {
 	case "blobscan":
 		*src = BlobScan

@@ -1,4 +1,4 @@
-package da_syncer
+package blob_client
 
 import (
 	"context"
@@ -6,23 +6,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 )
 
 type BlockNativeClient struct {
-	blockNativeApiEndpoint string
+	apiEndpoint string
 }
 
-func newBlockNativeClient(blockNativeApiEndpoint string) *BlockNativeClient {
+func NewBlockNativeClient(apiEndpoint string) *BlockNativeClient {
 	return &BlockNativeClient{
-		blockNativeApiEndpoint: blockNativeApiEndpoint,
+		apiEndpoint: apiEndpoint,
 	}
 }
 
 func (c *BlockNativeClient) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
-	resp, err := http.Get(c.blockNativeApiEndpoint + versionedHash.String())
+	// blocknative api docs https://docs.blocknative.com/blocknative-data-archive/blob-archive
+	path, err := url.JoinPath(c.apiEndpoint, versionedHash.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to join path, err: %w", err)
+	}
+	resp, err := http.Get(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}

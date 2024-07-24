@@ -38,18 +38,18 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 		return err
 	}
 	switch daEntry := daEntry.(type) {
-	case *CommitBatchDaV0:
-		bq.blocks, err = bq.processDaV0ToBlocks(daEntry)
+	case *CommitBatchDAV0:
+		bq.blocks, err = bq.processDAV0ToBlocks(daEntry)
 		if err != nil {
 			return err
 		}
-	case *CommitBatchDaV1:
-		bq.blocks, err = bq.processDaV1ToBlocks(daEntry)
+	case *CommitBatchDAV1:
+		bq.blocks, err = bq.processDAV1ToBlocks(daEntry)
 		if err != nil {
 			return err
 		}
-	case *CommitBatchDaV2:
-		bq.blocks, err = bq.processDaV2ToBlocks(daEntry)
+	case *CommitBatchDAV2:
+		bq.blocks, err = bq.processDAV2ToBlocks(daEntry)
 		if err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 	return nil
 }
 
-func (bq *BlockQueue) processDaV0ToBlocks(daEntry *CommitBatchDaV0) ([]*types.Block, error) {
+func (bq *BlockQueue) processDAV0ToBlocks(daEntry *CommitBatchDAV0) ([]*types.Block, error) {
 	var blocks []*types.Block
 	l1TxPointer := 0
 	var curL1TxIndex uint64 = daEntry.ParentTotalL1MessagePopped
@@ -91,7 +91,7 @@ func (bq *BlockQueue) processDaV0ToBlocks(daEntry *CommitBatchDaV0) ([]*types.Bl
 	return blocks, nil
 }
 
-func (bq *BlockQueue) processDaV1ToBlocks(daEntry *CommitBatchDaV1) ([]*types.Block, error) {
+func (bq *BlockQueue) processDAV1ToBlocks(daEntry *CommitBatchDAV1) ([]*types.Block, error) {
 	var blocks []*types.Block
 	l1TxPointer := 0
 	var curL1TxIndex uint64 = daEntry.ParentTotalL1MessagePopped
@@ -123,7 +123,7 @@ func (bq *BlockQueue) processDaV1ToBlocks(daEntry *CommitBatchDaV1) ([]*types.Bl
 	return blocks, nil
 }
 
-func (bq *BlockQueue) processDaV2ToBlocks(daEntry *CommitBatchDaV2) ([]*types.Block, error) {
+func (bq *BlockQueue) processDAV2ToBlocks(daEntry *CommitBatchDAV2) ([]*types.Block, error) {
 	var blocks []*types.Block
 	l1TxPointer := 0
 	var curL1TxIndex uint64 = daEntry.ParentTotalL1MessagePopped

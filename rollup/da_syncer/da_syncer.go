@@ -11,17 +11,17 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
-type DaSyncer struct {
+type DASyncer struct {
 	blockchain *core.BlockChain
 }
 
-func NewDaSyncer(blockchain *core.BlockChain) *DaSyncer {
-	return &DaSyncer{
+func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
+	return &DASyncer{
 		blockchain: blockchain,
 	}
 }
 
-func (s *DaSyncer) SyncOneBlock(block *types.Block) error {
+func (s *DASyncer) SyncOneBlock(block *types.Block) error {
 	prevHash := s.blockchain.CurrentBlock().Hash()
 	if big.NewInt(0).Add(s.blockchain.CurrentBlock().Number(), common.Big1).Cmp(block.Number()) != 0 {
 		return fmt.Errorf("not consecutive block, number: %d", block.Number())

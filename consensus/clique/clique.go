@@ -145,7 +145,6 @@ type SignerFn func(signer accounts.Account, mimeType string, message []byte) ([]
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
-	// return common.BigToAddress(big.NewInt(0).SetUint64(12345)), nil
 	// If the signature's already cached, return that
 	hash := header.Hash()
 	if address, known := sigcache.Get(hash); known {
@@ -352,9 +351,6 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	} else if err := misc.VerifyEip1559Header(chain.Config(), parent, header); err != nil {
 		// Verify the header's EIP-1559 attributes.
 		return err
-	}
-	if c.config.DaSyncingEnabled {
-		return nil
 	}
 	// Retrieve the snapshot needed to verify this header and cache it
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)

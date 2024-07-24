@@ -337,7 +337,7 @@ var (
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
 			},
 			DAConfig: &DAConfig{
-				BlobScanApiEndpoint: "https://api.sepolia.blobscan.com/blobs/",
+				BlobScanAPIEndpoint: "https://api.sepolia.blobscan.com/blobs/",
 			},
 		},
 	}
@@ -379,8 +379,8 @@ var (
 				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
 			},
 			DAConfig: &DAConfig{
-				BlobScanApiEndpoint:    "https://api.blobscan.com/blobs/",
-				BlockNativeApiEndpoint: "https://api.ethernow.xyz/v1/blob/",
+				BlobScanAPIEndpoint:    "https://api.blobscan.com/blobs/",
+				BlockNativeAPIEndpoint: "https://api.ethernow.xyz/v1/blob/",
 			},
 		},
 	}
@@ -673,8 +673,8 @@ type L1Config struct {
 
 // DAConfig contains the parameters to sync from DA
 type DAConfig struct {
-	BlobScanApiEndpoint    string `json:"blobScanApiEndpoint,omitempty"`
-	BlockNativeApiEndpoint string `json:"blockNativeApiEndpoint,omitempty"`
+	BlobScanAPIEndpoint    string `json:"blobScanApiEndpoint,omitempty"`
+	BlockNativeAPIEndpoint string `json:"blockNativeApiEndpoint,omitempty"`
 }
 
 func (c *L1Config) String() string {

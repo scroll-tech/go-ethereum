@@ -32,8 +32,7 @@ type DAEntry interface {
 
 type DA []DAEntry
 
-type CommitBatchDaV0 struct {
-	DaType                     DAType
+type CommitBatchDAV0 struct {
 	Version                    uint8
 	BatchIndex                 uint64
 	ParentTotalL1MessagePopped uint64
@@ -44,9 +43,8 @@ type CommitBatchDaV0 struct {
 	L1BlockNumber uint64
 }
 
-func NewCommitBatchDaV0(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv0.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
-	return &CommitBatchDaV0{
-		DaType:                     CommitBatchV0,
+func NewCommitBatchDAV0(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv0.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
+	return &CommitBatchDAV0{
 		Version:                    version,
 		BatchIndex:                 batchIndex,
 		ParentTotalL1MessagePopped: parentTotalL1MessagePopped,
@@ -57,16 +55,15 @@ func NewCommitBatchDaV0(version uint8, batchIndex uint64, parentTotalL1MessagePo
 	}
 }
 
-func (f *CommitBatchDaV0) DAType() DAType {
-	return f.DaType
+func (f *CommitBatchDAV0) DAType() DAType {
+	return CommitBatchV0
 }
 
-func (f *CommitBatchDaV0) GetL1BlockNumber() uint64 {
+func (f *CommitBatchDAV0) GetL1BlockNumber() uint64 {
 	return f.L1BlockNumber
 }
 
-type CommitBatchDaV1 struct {
-	DaType                     DAType
+type CommitBatchDAV1 struct {
 	Version                    uint8
 	BatchIndex                 uint64
 	ParentTotalL1MessagePopped uint64
@@ -77,9 +74,8 @@ type CommitBatchDaV1 struct {
 	L1BlockNumber uint64
 }
 
-func NewCommitBatchDaV1(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv1.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
-	return &CommitBatchDaV1{
-		DaType:                     CommitBatchV1,
+func NewCommitBatchDAV1(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv1.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
+	return &CommitBatchDAV1{
 		Version:                    version,
 		BatchIndex:                 batchIndex,
 		ParentTotalL1MessagePopped: parentTotalL1MessagePopped,
@@ -90,16 +86,15 @@ func NewCommitBatchDaV1(version uint8, batchIndex uint64, parentTotalL1MessagePo
 	}
 }
 
-func (f *CommitBatchDaV1) DAType() DAType {
-	return f.DaType
+func (f *CommitBatchDAV1) DAType() DAType {
+	return CommitBatchV1
 }
 
-func (f *CommitBatchDaV1) GetL1BlockNumber() uint64 {
+func (f *CommitBatchDAV1) GetL1BlockNumber() uint64 {
 	return f.L1BlockNumber
 }
 
-type CommitBatchDaV2 struct {
-	DaType                     DAType
+type CommitBatchDAV2 struct {
 	Version                    uint8
 	BatchIndex                 uint64
 	ParentTotalL1MessagePopped uint64
@@ -110,9 +105,8 @@ type CommitBatchDaV2 struct {
 	L1BlockNumber uint64
 }
 
-func NewCommitBatchDaV2(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv2.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
-	return &CommitBatchDaV2{
-		DaType:                     CommitBatchV2,
+func NewCommitBatchDAV2(version uint8, batchIndex uint64, parentTotalL1MessagePopped uint64, skippedL1MessageBitmap []byte, chunks []*codecv2.DAChunkRawTx, l1Txs []*types.L1MessageTx, l1BlockNumber uint64) DAEntry {
+	return &CommitBatchDAV2{
 		Version:                    version,
 		BatchIndex:                 batchIndex,
 		ParentTotalL1MessagePopped: parentTotalL1MessagePopped,
@@ -123,16 +117,15 @@ func NewCommitBatchDaV2(version uint8, batchIndex uint64, parentTotalL1MessagePo
 	}
 }
 
-func (f *CommitBatchDaV2) DAType() DAType {
-	return f.DaType
+func (f *CommitBatchDAV2) DAType() DAType {
+	return CommitBatchV2
 }
 
-func (f *CommitBatchDaV2) GetL1BlockNumber() uint64 {
+func (f *CommitBatchDAV2) GetL1BlockNumber() uint64 {
 	return f.L1BlockNumber
 }
 
 type RevertBatchDA struct {
-	DaType     DAType
 	BatchIndex uint64
 
 	L1BlockNumber uint64
@@ -140,13 +133,12 @@ type RevertBatchDA struct {
 
 func NewRevertBatchDA(batchIndex uint64) DAEntry {
 	return &RevertBatchDA{
-		DaType:     RevertBatch,
 		BatchIndex: batchIndex,
 	}
 }
 
 func (f *RevertBatchDA) DAType() DAType {
-	return f.DaType
+	return RevertBatch
 }
 
 func (f *RevertBatchDA) GetL1BlockNumber() uint64 {
@@ -154,7 +146,6 @@ func (f *RevertBatchDA) GetL1BlockNumber() uint64 {
 }
 
 type FinalizeBatchDA struct {
-	DaType     DAType
 	BatchIndex uint64
 
 	L1BlockNumber uint64
@@ -162,13 +153,12 @@ type FinalizeBatchDA struct {
 
 func NewFinalizeBatchDA(batchIndex uint64) DAEntry {
 	return &FinalizeBatchDA{
-		DaType:     FinalizeBatch,
 		BatchIndex: batchIndex,
 	}
 }
 
 func (f *FinalizeBatchDA) DAType() DAType {
-	return f.DaType
+	return FinalizeBatch
 }
 
 func (f *FinalizeBatchDA) GetL1BlockNumber() uint64 {
@@ -176,7 +166,6 @@ func (f *FinalizeBatchDA) GetL1BlockNumber() uint64 {
 }
 
 type FinalizeBatchDAV3 struct {
-	DaType     DAType
 	BatchIndex uint64
 
 	L1BlockNumber uint64
@@ -184,13 +173,12 @@ type FinalizeBatchDAV3 struct {
 
 func NewFinalizeBatchDAV3(batchIndex uint64) DAEntry {
 	return &FinalizeBatchDAV3{
-		DaType:     FinalizeBatchV3,
 		BatchIndex: batchIndex,
 	}
 }
 
 func (f *FinalizeBatchDAV3) DAType() DAType {
-	return f.DaType
+	return FinalizeBatchV3
 }
 
 func (f *FinalizeBatchDAV3) GetL1BlockNumber() uint64 {

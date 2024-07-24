@@ -55,7 +55,14 @@ pub mod checker {
         deserializer.disable_recursion_limit();
         let trace = BlockTrace::deserialize(&mut deserializer);
         match trace {
-            Err(_) => return null_mut(),
+            Err(e) => {
+                log::warn!(
+                    "failed to parse trace in parse_json_to_rust_trace, error: {:?}, trace_json_cstr: {:?}",
+                    e,
+                    trace_json_cstr,
+                );
+                return null_mut();
+            }
             Ok(t) => return Box::into_raw(Box::new(t))
         }
     }

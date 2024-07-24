@@ -49,7 +49,7 @@ pub mod checker {
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn parse_json_to_rust_trace(trace_json_ptr: *const c_char) -> *mut BlockTrace {
-        let trace_json_cstr = CStr::from_ptr(trace_json_ptr);
+        let trace_json_cstr = unsafe { CStr::from_ptr(trace_json_ptr) };
         let trace_json_bytes = trace_json_cstr.to_bytes();
         let mut deserializer = Deserializer::from_slice(trace_json_bytes);
         deserializer.disable_recursion_limit();
@@ -238,10 +238,10 @@ pub mod checker {
                 ))?
                 .get_tx_num() as u64)
         })
-        .map_or_else(
-            |e| bail!("circuit capacity checker (id: {id}) error in get_tx_num: {e:?}"),
-            |result| result,
-        )
+            .map_or_else(
+                |e| bail!("circuit capacity checker (id: {id}) error in get_tx_num: {e:?}"),
+                |result| result,
+            )
     }
 
     /// # Safety
@@ -272,10 +272,10 @@ pub mod checker {
                 .set_light_mode(light_mode);
             Ok(())
         })
-        .map_or_else(
-            |e| bail!("circuit capacity checker (id: {id}) error in set_light_mode: {e:?}"),
-            |result| result,
-        )
+            .map_or_else(
+                |e| bail!("circuit capacity checker (id: {id}) error in set_light_mode: {e:?}"),
+                |result| result,
+            )
     }
 }
 

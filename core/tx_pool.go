@@ -496,6 +496,40 @@ func (pool *TxPool) stats() (int, int) {
 	return pending, queued
 }
 
+// StatsWithMinBaseFee retrieves the current pool stats, namely the number of pending and the
+// number of queued (non-executable) transactions greater equal minBaseFee.
+func (pool *TxPool) StatsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+
+	return pool.statsWithMinBaseFee(minBaseFee)
+}
+
+// statsWithMinBaseFee retrieves the current pool stats, namely the number of pending and the
+// number of queued (non-executable) transactions greater equal minBaseFee.
+func (pool *TxPool) statsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
+	pending := 0
+	for _, list := range pool.pending {
+		for _, tx := range list.txs.flatten() {
+			if _, err := tx.EffectiveGasTip(minBaseFee); err != nil {
+				break // basefee too low, discard rest of txs with higher nonces from the account
+			}
+			pending++
+		}
+	}
+
+	queued := 0
+	for _, list := range pool.queue {
+		for _, tx := range list.txs.flatten() {
+			if _, err := tx.EffectiveGasTip(minBaseFee); err != nil {
+				break // basefee too low, discard rest of txs with higher nonces from the account
+			}
+			queued++
+		}
+	}
+	return pending, queued
+}
+
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and sorted by nonce.
 func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
@@ -648,7 +682,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrInvalidSender
 	}
 	// Drop non-local transactions under our own minimal accepted gas price or tip.
-	if !local && tx.GasTipCapIntCmp(pool.gasPrice) < 0 {
+	if !local && tx.GasFeeCapIntCmp(pool.gasPrice) < 0 {
 		return ErrUnderpriced
 	}
 	// Ensure the transaction adheres to nonce ordering

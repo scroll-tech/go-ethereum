@@ -181,7 +181,10 @@ func (l *StructLogger) CaptureStart(env *vm.EVM, from common.Address, to common.
 			Nonce:   env.StateDB.GetNonce(to),
 			Balance: (*hexutil.Big)(value),
 		}
+	} else {
+		traceCodeWithAddress(l, to)
 	}
+
 	l.statesAffected[from] = struct{}{}
 	l.statesAffected[to] = struct{}{}
 }
@@ -254,23 +257,18 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 		copy(rdata, rData)
 	}
 	// create a new snapshot of the EVM.
-	structLog := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err, nil}
+	structLog := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err}
 
 	execFuncList, ok := OpcodeExecs[op]
 	if ok {
 		// execute trace func list.
 		for _, exec := range execFuncList {
-			if e := exec(l, scope, structLog.getOrInitExtraData()); e != nil {
+			if e := exec(l, scope); e != nil {
 				log.Error("Failed to trace data", "opcode", op.String(), "err", e)
 			}
 		}
 	}
-	// for each "calling" op, pick the caller's state
-	switch op {
-	case vm.CALL, vm.CALLCODE, vm.STATICCALL, vm.DELEGATECALL, vm.CREATE, vm.CREATE2:
-		extraData := structLog.getOrInitExtraData()
-		extraData.Caller = append(extraData.Caller, getWrappedAccountForAddr(l, scope.Contract.Address()))
-	}
+
 	// in reality it is impossible for CREATE to trigger ErrContractAddressCollision
 	if op == vm.CREATE2 && err == nil {
 		_ = stack.Data()[stackLen-1] // value
@@ -287,9 +285,6 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 
 		contractHash := l.env.StateDB.GetKeccakCodeHash(address)
 		if l.env.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != codehash.EmptyKeccakCodeHash) {
-			extraData := structLog.getOrInitExtraData()
-			wrappedStatus := getWrappedAccountForAddr(l, address)
-			extraData.StateList = append(extraData.StateList, wrappedStatus)
 			l.statesAffected[address] = struct{}{}
 		}
 	}
@@ -342,16 +337,6 @@ func (l *StructLogger) CaptureEnter(typ vm.OpCode, from common.Address, to commo
 		panic("unexpected evm depth in capture enter")
 	}
 	l.statesAffected[to] = struct{}{}
-	theLog := l.logs[lastLogPos]
-	theLog.getOrInitExtraData()
-	// handling additional updating for CALL/STATICCALL/CALLCODE/CREATE/CREATE2 only
-	// append extraData part for the log, capture the account status (the nonce / balance has been updated in capture enter)
-	wrappedStatus := getWrappedAccountForAddr(l, to)
-	theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
-	// finally we update the caller's status (it is possible that nonce and balance being updated)
-	if len(theLog.ExtraData.Caller) == 1 {
-		theLog.ExtraData.Caller = append(theLog.ExtraData.Caller, getWrappedAccountForAddr(l, from))
-	}
 }
 
 // CaptureExit phase, a CREATE has its target address's code being set and queryable
@@ -361,33 +346,7 @@ func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
 		panic("unexpected capture exit occur")
 	}
 
-	theLogPos := l.callStackLogInd[stackH-1]
 	l.callStackLogInd = l.callStackLogInd[:stackH-1]
-	theLog := l.logs[theLogPos]
-	// update "forecast" data
-	if err != nil {
-		theLog.ExtraData.CallFailed = true
-	}
-
-	// handling updating for CREATE only
-	switch theLog.Op {
-	case vm.CREATE, vm.CREATE2:
-		// append extraData part for the log whose op is CREATE(2), capture the account status (the codehash would be updated in capture exit)
-		dataLen := len(theLog.ExtraData.StateList)
-		if dataLen == 0 {
-			panic("unexpected data capture for target op")
-		}
-
-		lastAccData := theLog.ExtraData.StateList[dataLen-1]
-		wrappedStatus := getWrappedAccountForAddr(l, lastAccData.Address)
-		theLog.ExtraData.StateList = append(theLog.ExtraData.StateList, wrappedStatus)
-		code := getCodeForAddr(l, lastAccData.Address)
-		theLog.ExtraData.CodeList = append(theLog.ExtraData.CodeList, hexutil.Encode(code))
-	default:
-		//do nothing for other op code
-		return
-	}
-
 }
 
 func (l *StructLogger) GetResult() (json.RawMessage, error) {
@@ -450,6 +409,11 @@ func (l *StructLogger) Error() error { return l.err }
 
 // Output returns the VM return value captured by the trace.
 func (l *StructLogger) Output() []byte { return l.output }
+
+// TracedBytecodes is used to collect all "touched" bytecodes
+func (l *StructLogger) TracedBytecodes() map[common.Hash]CodeInfo {
+	return l.bytecodes
+}
 
 // UpdatedAccounts is used to collect all "touched" accounts
 func (l *StructLogger) UpdatedAccounts() map[common.Address]struct{} {
@@ -599,7 +563,6 @@ func FormatLogs(logs []StructLog) []types.StructLogRes {
 			Depth:         trace.Depth,
 			Error:         trace.ErrorString(),
 			RefundCounter: trace.RefundCounter,
-			ExtraData:     trace.ExtraData,
 		}
 		if trace.Stack != nil {
 			stack := make([]string, len(trace.Stack))

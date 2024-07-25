@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/holiman/uint256"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/common/math"
@@ -34,7 +35,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/holiman/uint256"
 )
 
 // Storage represents a contract's storage.
@@ -78,8 +78,6 @@ type StructLog struct {
 	Depth         int                         `json:"depth"`
 	RefundCounter uint64                      `json:"refund"`
 	Err           error                       `json:"-"`
-	// scroll-related
-	ExtraData *types.ExtraData `json:"extraData"`
 }
 
 func (s *StructLog) clean() {
@@ -87,15 +85,7 @@ func (s *StructLog) clean() {
 	s.Stack = s.Stack[:0]
 	s.ReturnData = s.ReturnData[:0]
 	s.Storage = nil
-	s.ExtraData = nil
 	s.Err = nil
-}
-
-func (s *StructLog) getOrInitExtraData() *types.ExtraData {
-	if s.ExtraData == nil {
-		s.ExtraData = &types.ExtraData{}
-	}
-	return s.ExtraData
 }
 
 // overrides for gencodec
@@ -121,6 +111,13 @@ func (s *StructLog) ErrorString() string {
 	return ""
 }
 
+type CodeInfo struct {
+	CodeSize         uint64
+	KeccakCodeHash   common.Hash
+	PoseidonCodeHash common.Hash
+	Code             []byte
+}
+
 // StructLogger is an EVM state logger and implements EVMLogger.
 //
 // StructLogger can capture state based on the given Log configuration and also keeps
@@ -140,6 +137,8 @@ type StructLogger struct {
 	interrupt atomic.Bool // Atomic flag to signal execution interruption
 	reason    error       // Textual reason for the interruption
 
+	// scroll-related
+	bytecodes       map[common.Hash]CodeInfo
 	statesAffected  map[common.Address]struct{}
 	createdAccount  *types.AccountWrapper
 	callStackLogInd []int
@@ -149,6 +148,7 @@ type StructLogger struct {
 func NewStructLogger(cfg *Config) *StructLogger {
 	logger := &StructLogger{
 		storage:        make(map[common.Address]Storage),
+		bytecodes:      make(map[common.Hash]CodeInfo),
 		statesAffected: make(map[common.Address]struct{}),
 	}
 	if cfg != nil {
@@ -163,6 +163,7 @@ func (l *StructLogger) Reset() {
 	l.output = make([]byte, 0)
 	l.logs = l.logs[:0]
 	l.err = nil
+	l.bytecodes = make(map[common.Hash]CodeInfo)
 	l.statesAffected = make(map[common.Address]struct{})
 	l.createdAccount = nil
 	l.callStackLogInd = nil

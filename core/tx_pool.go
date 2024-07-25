@@ -1682,6 +1682,7 @@ func (pool *TxPool) demoteUnexecutables() {
 }
 
 // PauseReorgs stops any new reorg jobs to be started but doesn't interrupt any existing ones that are in flight
+// Keep in mind this function might block, although it is not expected to block for any significant amount of time
 func (pool *TxPool) PauseReorgs() {
 	select {
 	case pool.reorgPauseCh <- true:
@@ -1689,7 +1690,8 @@ func (pool *TxPool) PauseReorgs() {
 	}
 }
 
-// ResumeReorgs allows new reorg jobs to be started
+// ResumeReorgs allows new reorg jobs to be started.
+// Keep in mind this function might block, although it is not expected to block for any significant amount of time
 func (pool *TxPool) ResumeReorgs() {
 	select {
 	case pool.reorgPauseCh <- false:

@@ -226,7 +226,9 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	// simply let them run simultaneously. If messages are missing in DA syncing, it will be handled by the syncing pipeline
 	// by waiting and retrying.
 	if config.EnableDASyncing {
-		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, stack.Config().DataDir,config.DA)
+		// TODO: set proper default for data dir and enable setting via flag
+		config.DA.AdditionalDataDir = stack.Config().DataDir
+		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
 		}

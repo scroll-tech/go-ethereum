@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/big"
 
 	"github.com/scroll-tech/da-codec/encoding"
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
@@ -11,9 +12,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 type CommitBatchDAV0 struct {
+	missingHeaderFieldsManager *missing_header_fields.Manager
+
 	version                    uint8
 	batchIndex                 uint64
 	parentTotalL1MessagePopped uint64
@@ -24,7 +28,9 @@ type CommitBatchDAV0 struct {
 	l1BlockNumber uint64
 }
 
-func NewCommitBatchDAV0(db ethdb.Database,
+func NewCommitBatchDAV0(
+	missingHeaderFieldsManager *missing_header_fields.Manager,
+	db ethdb.Database,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
@@ -37,10 +43,12 @@ func NewCommitBatchDAV0(db ethdb.Database,
 		return nil, fmt.Errorf("failed to unpack chunks: %d, err: %w", batchIndex, err)
 	}
 
-	return NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, l1BlockNumber)
+	return NewCommitBatchDAV0WithChunks(missingHeaderFieldsManager, db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, l1BlockNumber)
 }
 
-func NewCommitBatchDAV0WithChunks(db ethdb.Database,
+func NewCommitBatchDAV0WithChunks(
+	missingHeaderFieldsManager *missing_header_fields.Manager,
+	db ethdb.Database,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
@@ -55,6 +63,7 @@ func NewCommitBatchDAV0WithChunks(db ethdb.Database,
 	}
 
 	return &CommitBatchDAV0{
+		missingHeaderFieldsManager: missingHeaderFieldsManager,
 		version:                    version,
 		batchIndex:                 batchIndex,
 		parentTotalL1MessagePopped: parentTotalL1MessagePopped,
@@ -103,14 +112,24 @@ func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
 			// insert l2 txs
 			txs = append(txs, chunk.Transactions[blockId]...)
 
+			difficulty, extraData, err := c.missingHeaderFieldsManager.GetMissingHeaderFields(daBlock.BlockNumber)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get missing header fields, block number: %d, error: %v", daBlock.BlockNumber, err)
+			}
+
+			var baseFee *big.Int
+			if daBlock.BaseFee.Uint64() != 0 {
+				baseFee = daBlock.BaseFee
+			}
+
 			block := NewPartialBlock(
 				&PartialHeader{
-					Number:   daBlock.BlockNumber,
-					Time:     daBlock.Timestamp,
-					BaseFee:  daBlock.BaseFee,
-					GasLimit: daBlock.GasLimit,
-					//TODO: Difficulty: new(big.Int).SetUint64(10),
-					//TODO: ExtraData:  []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Number:     daBlock.BlockNumber,
+					Time:       daBlock.Timestamp,
+					BaseFee:    baseFee,
+					GasLimit:   daBlock.GasLimit,
+					Difficulty: difficulty,
+					ExtraData:  extraData,
 				},
 				txs)
 			blocks = append(blocks, block)

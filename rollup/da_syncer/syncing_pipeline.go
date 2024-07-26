@@ -4,28 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
+	"io"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common/backoff"
 	"github.com/scroll-tech/go-ethereum/core"
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	FetcherMode      FetcherMode            // mode of fetcher
-	SnapshotFilePath string                 // path to snapshot file
-	BlobSource       blob_client.BlobSource // blob source
+	FetcherMode       FetcherMode            // mode of fetcher
+	SnapshotFilePath  string                 // path to snapshot file
+	BlobSource        blob_client.BlobSource // blob source
+	AdditionalDataDir string                 // additional data directory
 }
 
 type SyncingPipeline struct {
@@ -40,14 +39,16 @@ type SyncingPipeline struct {
 	daSyncer   *DASyncer
 }
 
-func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient sync_service.EthClient, l1DeploymentBlock uint64, dataDir string, config Config) (*SyncingPipeline, error) {
+func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient sync_service.EthClient, l1DeploymentBlock uint64, config Config) (*SyncingPipeline, error) {
 	scrollChainABI, err := rollup_sync_service.ScrollChainMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	l1Client, err := rollup_sync_service.NewL1Client(ctx, ethClient, genesisConfig.Scroll.L1Config.L1ChainId, genesisConfig.Scroll.L1Config.ScrollChainAddress, scrollChainABI)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -58,10 +59,11 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	case blob_client.BlockNative:
 		blobClient = blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint)
 	default:
+		cancel()
 		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)
 	}
 
-	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
+	dataSourceFactory := NewDataSourceFactory(ctx, genesisConfig, config, l1Client, blobClient, db)
 	syncedL1Height := l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)
 	if from != nil {
@@ -71,15 +73,8 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	daQueue := NewDAQueue(syncedL1Height, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
+	daSyncer := NewDASyncer(blockchain)
 
-	missingHeaderFieldsManager := missing_header_fields.NewManager(ctx,
-		filepath.Join(dataDir, missing_header_fields.DefaultFileName),
-		genesisConfig.Scroll.DAConfig.MissingHeaderFieldsURL,
-		genesisConfig.Scroll.DAConfig.MissingHeaderFieldsSHA256,
-	)
-	daSyncer := NewDASyncer(blockchain, missingHeaderFieldsManager)
-
-	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{
 		ctx:        ctx,
 		cancel:     cancel,

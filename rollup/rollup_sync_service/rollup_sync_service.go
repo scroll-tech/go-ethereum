@@ -302,7 +302,7 @@ func (s *RollupSyncService) getLocalChunksForBatch(batchIndex uint64) ([]*encodi
 			return nil, s.ctx.Err()
 		}
 
-		localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
+		localSyncedBlockHeight := s.bc.CurrentBlock().Number.Uint64()
 		if localSyncedBlockHeight >= endBlockNumber {
 			break // ready to proceed, exit retry loop
 		}
@@ -312,7 +312,7 @@ func (s *RollupSyncService) getLocalChunksForBatch(batchIndex uint64) ([]*encodi
 		time.Sleep(defaultGetBlockInRangeRetryDelay)
 	}
 
-	localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
+	localSyncedBlockHeight := s.bc.CurrentBlock().Number.Uint64()
 	if localSyncedBlockHeight < endBlockNumber {
 		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, local synced block height: %v", endBlockNumber, localSyncedBlockHeight)
 	}
@@ -488,7 +488,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMe
 			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", batchIndex, err)
 		}
 		localBatchHash = daBatch.Hash()
-	} else if !chainCfg.IsDarwin(startBlock.Header.Time) { // codecv2: batches after Curie and before Darwin
+	} else if !chainCfg.IsDarwin(startBlock.Header.Number, startBlock.Header.Time) { // codecv2: batches after Curie and before Darwin
 		daBatch, err := codecv2.NewDABatch(batch)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to create codecv2 DA batch, batch index: %v, err: %w", batchIndex, err)

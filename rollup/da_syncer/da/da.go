@@ -41,7 +41,7 @@ type PartialHeader struct {
 	Time       uint64
 	BaseFee    *big.Int
 	GasLimit   uint64
-	Difficulty *big.Int
+	Difficulty uint64
 	ExtraData  []byte
 }
 
@@ -51,7 +51,7 @@ func (h *PartialHeader) ToHeader() *types.Header {
 		Time:       h.Time,
 		BaseFee:    h.BaseFee,
 		GasLimit:   h.GasLimit,
-		Difficulty: h.Difficulty,
+		Difficulty: new(big.Int).SetUint64(h.Difficulty),
 		Extra:      h.ExtraData,
 	}
 }

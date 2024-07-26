@@ -692,7 +692,7 @@ func TestValidateBatchCodecv2(t *testing.T) {
 }
 
 func TestValidateBatchCodecv3(t *testing.T) {
-	chainConfig := &params.ChainConfig{BernoulliBlock: big.NewInt(0), CurieBlock: big.NewInt(0), DarwinTime: new(uint64)}
+	chainConfig := &params.ChainConfig{LondonBlock: big.NewInt(0), BernoulliBlock: big.NewInt(0), CurieBlock: big.NewInt(0), DarwinTime: new(uint64)}
 
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}
@@ -745,7 +745,7 @@ func TestValidateBatchCodecv3(t *testing.T) {
 }
 
 func TestValidateBatchUpgrades(t *testing.T) {
-	chainConfig := &params.ChainConfig{BernoulliBlock: big.NewInt(3), CurieBlock: big.NewInt(14), DarwinTime: func() *uint64 { t := uint64(1684762320); return &t }()}
+	chainConfig := &params.ChainConfig{LondonBlock: big.NewInt(0), BernoulliBlock: big.NewInt(3), CurieBlock: big.NewInt(14), DarwinTime: func() *uint64 { t := uint64(1684762320); return &t }()}
 
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}
@@ -832,7 +832,7 @@ func TestValidateBatchUpgrades(t *testing.T) {
 }
 
 func TestValidateBatchInFinalizeByBundle(t *testing.T) {
-	chainConfig := &params.ChainConfig{BernoulliBlock: big.NewInt(0), CurieBlock: big.NewInt(0), DarwinTime: func() *uint64 { t := uint64(0); return &t }()}
+	chainConfig := &params.ChainConfig{LondonBlock: big.NewInt(0), BernoulliBlock: big.NewInt(0), CurieBlock: big.NewInt(0), DarwinTime: func() *uint64 { t := uint64(0); return &t }()}
 
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	block2 := readBlockFromJSON(t, "./testdata/blockTrace_03.json")

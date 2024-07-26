@@ -1835,6 +1835,8 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 		return NonStatTy, err
 	}
 
+	header.ParentHash = parentBlock.Hash()
+
 	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
 	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
 	if err != nil {
@@ -1842,11 +1844,9 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	}
 
 	header.GasUsed = gasUsed
-	header.ParentHash = parentBlock.Hash()
 	header.Root = statedb.GetRootHash()
 	// Since we're using Clique consensus, we don't have uncles
 	header.UncleHash = types.EmptyUncleHash
-	// TODO: extraData and difficulty should be set
 
 	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
 

@@ -1,6 +1,8 @@
 package da
 
 import (
+	"math/big"
+
 	"github.com/scroll-tech/go-ethereum/core/types"
 )
 
@@ -29,7 +31,39 @@ type Entry interface {
 
 type EntryWithBlocks interface {
 	Entry
-	Blocks() ([]*types.Block, error)
+	Blocks() ([]*PartialBlock, error)
 }
 
 type Entries []Entry
+
+type PartialHeader struct {
+	Number     uint64
+	Time       uint64
+	BaseFee    *big.Int
+	GasLimit   uint64
+	Difficulty *big.Int
+	ExtraData  []byte
+}
+
+func (h *PartialHeader) ToHeader() *types.Header {
+	return &types.Header{
+		Number:     big.NewInt(0).SetUint64(h.Number),
+		Time:       h.Time,
+		BaseFee:    h.BaseFee,
+		GasLimit:   h.GasLimit,
+		Difficulty: h.Difficulty,
+		Extra:      h.ExtraData,
+	}
+}
+
+type PartialBlock struct {
+	PartialHeader *PartialHeader
+	Transactions  types.Transactions
+}
+
+func NewPartialBlock(partialHeader *PartialHeader, txs types.Transactions) *PartialBlock {
+	return &PartialBlock{
+		PartialHeader: partialHeader,
+		Transactions:  txs,
+	}
+}

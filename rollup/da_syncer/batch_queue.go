@@ -12,15 +12,15 @@ import (
 type BatchQueue struct {
 	// batches is map from batchIndex to batch blocks
 	batches                 map[uint64]DAEntry
-	daQueue                 *DaQueue
+	DAQueue                 *DAQueue
 	db                      ethdb.Database
 	lastFinalizedBatchIndex uint64
 }
 
-func NewBatchQueue(daQueue *DaQueue, db ethdb.Database) *BatchQueue {
+func NewBatchQueue(DAQueue *DAQueue, db ethdb.Database) *BatchQueue {
 	return &BatchQueue{
 		batches:                 make(map[uint64]DAEntry),
-		daQueue:                 daQueue,
+		DAQueue:                 DAQueue,
 		db:                      db,
 		lastFinalizedBatchIndex: 0,
 	}
@@ -32,16 +32,16 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (DAEntry, error) {
 		return batch, nil
 	}
 	for {
-		daEntry, err := bq.daQueue.NextDA(ctx)
+		daEntry, err := bq.DAQueue.NextDA(ctx)
 		if err != nil {
 			return nil, err
 		}
 		switch daEntry := daEntry.(type) {
-		case *CommitBatchDaV0:
+		case *CommitBatchDAV0:
 			bq.batches[daEntry.BatchIndex] = daEntry
-		case *CommitBatchDaV1:
+		case *CommitBatchDAV1:
 			bq.batches[daEntry.BatchIndex] = daEntry
-		case *CommitBatchDaV2:
+		case *CommitBatchDAV2:
 			bq.batches[daEntry.BatchIndex] = daEntry
 		case *RevertBatchDA:
 			bq.deleteBatch(daEntry.BatchIndex)
@@ -73,9 +73,14 @@ func (bq *BatchQueue) getFinalizedBatch() (DAEntry, bool) {
 		}
 	}
 	if minBatchIndex <= bq.lastFinalizedBatchIndex {
-		batch, _ := bq.batches[minBatchIndex]
+		batch, ok := bq.batches[minBatchIndex]
+
+		// this won't happen because wew just found minBatchIndex among map keys, but need to leave this check to pass CI
+		if !ok {
+			return nil, false
+		}
 		bq.deleteBatch(minBatchIndex)
-		return batch, true
+		return batch, ok
 	} else {
 		return nil, false
 	}
@@ -94,12 +99,13 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 		rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height)
 		return
 	}
+	// we store here min height of currently loaded batches to be able to start syncing from the same place in case of restart
 	var minBatchL1Height uint64 = math.MaxUint64
 	for _, val := range bq.batches {
 		if val.GetL1BlockNumber() < minBatchL1Height {
 			minBatchL1Height = val.GetL1BlockNumber()
 		}
 	}
-	rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height-1)
+	rawdb.WriteDASyncedL1BlockNumber(bq.db, minBatchL1Height-1)
 
 }

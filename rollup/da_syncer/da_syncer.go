@@ -12,19 +12,19 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
-type DaSyncer struct {
+type DASyncer struct {
 	blockchain          *core.BlockChain
 	missingHeaderFields *missing_header_fields.Manager
 }
 
-func NewDaSyncer(blockchain *core.BlockChain, missingHeaderFields *missing_header_fields.Manager) *DaSyncer {
-	return &DaSyncer{
+func NewDASyncer(blockchain *core.BlockChain, missingHeaderFields *missing_header_fields.Manager) *DASyncer {
+	return &DASyncer{
 		blockchain:          blockchain,
 		missingHeaderFields: missingHeaderFields,
 	}
 }
 
-func (s *DaSyncer) SyncOneBlock(block *types.Block) error {
+func (s *DASyncer) SyncOneBlock(block *types.Block) error {
 	prevHash := s.blockchain.CurrentBlock().Hash()
 	if big.NewInt(0).Add(s.blockchain.CurrentBlock().Number(), common.Big1).Cmp(block.Number()) != 0 {
 		return fmt.Errorf("not consecutive block, number: %d", block.Number())

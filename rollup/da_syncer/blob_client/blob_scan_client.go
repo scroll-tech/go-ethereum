@@ -1,4 +1,4 @@
-package da_syncer
+package blob_client
 
 import (
 	"context"
@@ -6,25 +6,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 )
 
 type BlobScanClient struct {
-	client              *http.Client
-	blobScanApiEndpoint string
+	client      *http.Client
+	apiEndpoint string
 }
 
-func newBlobScanClient(blobScanApiEndpoint string) *BlobScanClient {
+func NewBlobScanClient(apiEndpoint string) *BlobScanClient {
 	return &BlobScanClient{
-		client:              http.DefaultClient,
-		blobScanApiEndpoint: blobScanApiEndpoint,
+		client:      http.DefaultClient,
+		apiEndpoint: apiEndpoint,
 	}
 }
 
 func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.blobScanApiEndpoint+versionedHash.String(), nil)
+	// blobscan api docs https://api.blobscan.com/#/blobs/blob-getByBlobId
+	path, err := url.JoinPath(c.apiEndpoint, versionedHash.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to join path, err: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create request, err: %w", err)
 	}

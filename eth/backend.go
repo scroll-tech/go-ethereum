@@ -339,7 +339,7 @@ func (s *Ethereum) APIs() []rpc.API {
 
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, s.engine.APIs(s.BlockChain())...)
-	if s.handler != nil {
+	if !s.config.EnableDASyncing {
 		apis = append(apis, rpc.API{
 			Namespace: "eth",
 			Version:   "1.0",
@@ -566,7 +566,8 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 // Protocols returns all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
-	if s.handler == nil {
+	// if DA syncing enabled then we don't create handler
+	if s.config.EnableDASyncing {
 		return nil
 	}
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)
@@ -593,7 +594,8 @@ func (s *Ethereum) Start() error {
 	//	maxPeers -= s.config.LightPeers
 	//}
 	// Start the networking layer and the light server if requested
-	if s.handler != nil {
+	// handler is not enabled when DA syncing enabled
+	if !s.config.EnableDASyncing {
 		s.handler.Start(maxPeers)
 	}
 	return nil
@@ -605,7 +607,8 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	if s.handler != nil {
+	// handler is not enabled if DA syncing enabled
+	if !s.config.EnableDASyncing {
 		s.handler.Stop()
 	}
 

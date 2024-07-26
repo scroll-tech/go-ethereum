@@ -7,10 +7,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 )
 
 var (
-	sourceExhaustedErr = errors.New("data source has been exhausted")
+	errSourceExhausted = errors.New("data source has been exhausted")
 )
 
 type DataSource interface {
@@ -21,12 +23,12 @@ type DataSource interface {
 type DataSourceFactory struct {
 	config        Config
 	genesisConfig *params.ChainConfig
-	l1Client      *L1Client
-	blobClient    BlobClient
+	l1Client      *rollup_sync_service.L1Client
+	blobClient    blob_client.BlobClient
 	db            ethdb.Database
 }
 
-func NewDataSourceFactory(blockchain *core.BlockChain, genesisConfig *params.ChainConfig, config Config, l1Client *L1Client, blobClient BlobClient, db ethdb.Database) *DataSourceFactory {
+func NewDataSourceFactory(blockchain *core.BlockChain, genesisConfig *params.ChainConfig, config Config, l1Client *rollup_sync_service.L1Client, blobClient blob_client.BlobClient, db ethdb.Database) *DataSourceFactory {
 	return &DataSourceFactory{
 		config:        config,
 		genesisConfig: genesisConfig,

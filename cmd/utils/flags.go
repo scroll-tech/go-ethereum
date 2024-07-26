@@ -74,6 +74,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -865,13 +866,13 @@ var (
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
 	}
-	defaultDa  = ethconfig.Defaults.DA.FetcherMode
+	defaultDA  = ethconfig.Defaults.DA.FetcherMode
 	DAModeFlag = TextMarshalerFlag{
 		Name:  "da.mode",
 		Usage: `Da sync sync mode ("l1rpc" or "snapshot")`,
-		Value: &defaultDa,
+		Value: &defaultDA,
 	}
-	defaultBlobSource = ethconfig.Defaults.DA.BLobSource
+	defaultBlobSource = ethconfig.Defaults.DA.BlobSource
 	DABlobSourceFlag  = TextMarshalerFlag{
 		Name:  "da.blob.source",
 		Usage: `Blob data source, currently supported "blobscan" or "blocknative"`,
@@ -1598,7 +1599,7 @@ func setEnableRollupVerify(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
-func setDa(ctx *cli.Context, cfg *ethconfig.Config) {
+func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(DASyncEnabledFlag.Name) {
 		cfg.EnableDASyncing = ctx.GlobalBool(DASyncEnabledFlag.Name)
 		if ctx.GlobalIsSet(DAModeFlag.Name) {
@@ -1608,7 +1609,7 @@ func setDa(ctx *cli.Context, cfg *ethconfig.Config) {
 			cfg.DA.SnapshotFilePath = ctx.GlobalString(DASnapshotFileFlag.Name)
 		}
 		if ctx.GlobalIsSet(DABlobSourceFlag.Name) {
-			cfg.DA.BLobSource = *GlobalTextMarshaler(ctx, DABlobSourceFlag.Name).(*da_syncer.BLobSource)
+			cfg.DA.BlobSource = *GlobalTextMarshaler(ctx, DABlobSourceFlag.Name).(*blob_client.BlobSource)
 		}
 	}
 }
@@ -1688,7 +1689,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
 	setEnableRollupVerify(ctx, cfg)
-	setDa(ctx, cfg)
+	setDA(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
 
 	// Cap the cache allowance and tune the garbage collector

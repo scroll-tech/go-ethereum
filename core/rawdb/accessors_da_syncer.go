@@ -12,7 +12,7 @@ func WriteDASyncedL1BlockNumber(db ethdb.KeyValueWriter, L1BlockNumber uint64) {
 	value := big.NewInt(0).SetUint64(L1BlockNumber).Bytes()
 
 	if err := db.Put(daSyncedL1BlockNumberKey, value); err != nil {
-		log.Crit("Failed to update da synced L1 block number", "err", err)
+		log.Crit("Failed to update DA synced L1 block number", "err", err)
 	}
 }
 
@@ -23,7 +23,7 @@ func ReadDASyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 		return nil
 	}
 	if err != nil {
-		log.Crit("Failed to read da synced L1 block number from database", "err", err)
+		log.Crit("Failed to read DA synced L1 block number from database", "err", err)
 	}
 	if len(data) == 0 {
 		return nil
@@ -31,7 +31,7 @@ func ReadDASyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 
 	number := new(big.Int).SetBytes(data)
 	if !number.IsUint64() {
-		log.Crit("Unexpected da synced L1 block number in database", "number", number)
+		log.Crit("Unexpected DA synced L1 block number in database", "number", number)
 	}
 
 	value := number.Uint64()

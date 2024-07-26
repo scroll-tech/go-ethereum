@@ -11,7 +11,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common/backoff"
 	"github.com/scroll-tech/go-ethereum/core"
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
@@ -22,9 +21,10 @@ import (
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	FetcherMode      FetcherMode            // mode of fetcher
-	SnapshotFilePath string                 // path to snapshot file
-	BlobSource       blob_client.BlobSource // blob source
+	FetcherMode       FetcherMode            // mode of fetcher
+	SnapshotFilePath  string                 // path to snapshot file
+	BlobSource        blob_client.BlobSource // blob source
+	AdditionalDataDir string                 // additional data directory
 }
 
 type SyncingPipeline struct {
@@ -45,8 +45,10 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	l1Client, err := rollup_sync_service.NewL1Client(ctx, ethClient, genesisConfig.Scroll.L1Config.L1ChainId, genesisConfig.Scroll.L1Config.ScrollChainAddress, scrollChainABI)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -57,10 +59,11 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	case blob_client.BlockNative:
 		blobClient = blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint)
 	default:
+		cancel()
 		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)
 	}
 
-	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
+	dataSourceFactory := NewDataSourceFactory(ctx, genesisConfig, config, l1Client, blobClient, db)
 	syncedL1Height := l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)
 	if from != nil {
@@ -72,7 +75,6 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	blockQueue := NewBlockQueue(batchQueue)
 	daSyncer := NewDASyncer(blockchain)
 
-	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{
 		ctx:        ctx,
 		cancel:     cancel,

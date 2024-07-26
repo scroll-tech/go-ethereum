@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
@@ -337,7 +338,9 @@ var (
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
 			},
 			DAConfig: &DAConfig{
-				BlobScanAPIEndpoint: "https://api.sepolia.blobscan.com/blobs/",
+				BlobScanAPIEndpoint:       "https://api.sepolia.blobscan.com/blobs/",
+				MissingHeaderFieldsURL:    "", // TODO: Add missing header fields URL and correct checksum
+				MissingHeaderFieldsSHA256: missing_header_fields.SHA256ChecksumFromHex("0xdcdae1c92c59c307edae24216eb06c4566f512739aec39dca1abd53c597102c7"),
 			},
 		},
 	}
@@ -379,8 +382,10 @@ var (
 				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
 			},
 			DAConfig: &DAConfig{
-				BlobScanAPIEndpoint:    "https://api.blobscan.com/blobs/",
-				BlockNativeAPIEndpoint: "https://api.ethernow.xyz/v1/blob/",
+				BlobScanAPIEndpoint:       "https://api.blobscan.com/blobs/",
+				BlockNativeAPIEndpoint:    "https://api.ethernow.xyz/v1/blob/",
+				MissingHeaderFieldsURL:    "", // TODO: Add missing header fields URL and correct checksum
+				MissingHeaderFieldsSHA256: missing_header_fields.SHA256ChecksumFromHex("0xdcdae1c92c59c307edae24216eb06c4566f512739aec39dca1abd53c597102c7"),
 			},
 		},
 	}
@@ -675,6 +680,10 @@ type L1Config struct {
 type DAConfig struct {
 	BlobScanAPIEndpoint    string `json:"blobScanApiEndpoint,omitempty"`
 	BlockNativeAPIEndpoint string `json:"blockNativeApiEndpoint,omitempty"`
+	// MissingHeaderFieldsURL is the URL to fetch the historical missing header fields to a file.
+	MissingHeaderFieldsURL string `json:"missingHeaderFieldsURL,omitempty"`
+	// MissingHeaderFieldsSHA256 is the SHA256 hash of the file containing the historical missing header fields.
+	MissingHeaderFieldsSHA256 missing_header_fields.SHA256Checksum `json:"missingHeaderFieldsSHA256,omitempty"`
 }
 
 func (c *L1Config) String() string {

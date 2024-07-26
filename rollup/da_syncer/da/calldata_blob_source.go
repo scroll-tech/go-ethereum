@@ -11,6 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 )
 
@@ -40,13 +41,15 @@ type CalldataBlobSource struct {
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 	db                            ethdb.Database
+	missingHeaderFieldsManager    *missing_header_fields.Manager
 }
 
-func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *rollup_sync_service.L1Client, blobClient blob_client.BlobClient, db ethdb.Database) (*CalldataBlobSource, error) {
+func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *rollup_sync_service.L1Client, blobClient blob_client.BlobClient, db ethdb.Database, missingHeaderFieldsManager *missing_header_fields.Manager) (*CalldataBlobSource, error) {
 	scrollChainABI, err := rollup_sync_service.ScrollChainMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
+
 	return &CalldataBlobSource{
 		ctx:                           ctx,
 		l1Client:                      l1Client,
@@ -57,6 +60,7 @@ func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *rollu
 		l1RevertBatchEventSignature:   scrollChainABI.Events[revertBatchEventName].ID,
 		l1FinalizeBatchEventSignature: scrollChainABI.Events[finalizeBatchEventName].ID,
 		db:                            db,
+		missingHeaderFieldsManager:    missingHeaderFieldsManager,
 	}, nil
 }
 
@@ -200,11 +204,11 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, vLog *types.Lo
 		}
 		switch args.Version {
 		case 0:
-			return NewCommitBatchDAV0(ds.db, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, vLog.BlockNumber)
+			return NewCommitBatchDAV0(ds.missingHeaderFieldsManager, ds.db, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, vLog.BlockNumber)
 		case 1:
-			return NewCommitBatchDAV1(ds.ctx, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+			return NewCommitBatchDAV1(ds.ctx, ds.missingHeaderFieldsManager, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
 		case 2:
-			return NewCommitBatchDAV2(ds.ctx, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+			return NewCommitBatchDAV2(ds.ctx, ds.missingHeaderFieldsManager, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
 		default:
 			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 		}
@@ -213,7 +217,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, vLog *types.Lo
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 		}
-		return NewCommitBatchDAV2(ds.ctx, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+		return NewCommitBatchDAV2(ds.ctx, ds.missingHeaderFieldsManager, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
 	}
 
 	return nil, fmt.Errorf("unknown method name: %s", method.Name)

@@ -8,6 +8,7 @@ import (
 	"github.com/scroll-tech/da-codec/encoding/codecv1"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -20,7 +21,9 @@ type CommitBatchDAV1 struct {
 	*CommitBatchDAV0
 }
 
-func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
+func NewCommitBatchDAV1(ctx context.Context,
+	missingHeaderFieldsManager *missing_header_fields.Manager,
+	db ethdb.Database,
 	l1Client *rollup_sync_service.L1Client,
 	blobClient blob_client.BlobClient,
 	vLog *types.Log,
@@ -61,7 +64,7 @@ func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, vLog.BlockNumber)
+	v0, err := NewCommitBatchDAV0WithChunks(missingHeaderFieldsManager, db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, vLog.BlockNumber)
 	if err != nil {
 		return nil, err
 	}

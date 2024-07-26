@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	callDataBlobSourceFetchBlockRange  uint64 = 100
+	callDataBlobSourceFetchBlockRange  uint64 = 500
 	commitBatchEventName                      = "CommitBatch"
 	revertBatchEventName                      = "RevertBatch"
 	finalizeBatchEventName                    = "FinalizeBatch"

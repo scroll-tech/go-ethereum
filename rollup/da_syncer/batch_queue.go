@@ -103,6 +103,6 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 			minBatchL1Height = val.L1BlockNumber()
 		}
 	}
-	rawdb.WriteDASyncedL1BlockNumber(bq.db, minBatchL1Height-1)
 
+	rawdb.WriteDASyncedL1BlockNumber(bq.db, minBatchL1Height-1)
 }

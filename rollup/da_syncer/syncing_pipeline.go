@@ -77,6 +77,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		ctx:        ctx,
 		cancel:     cancel,
 		expBackoff: backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
+		wg:         sync.WaitGroup{},
 		db:         db,
 		blockchain: blockchain,
 		blockQueue: blockQueue,

@@ -8,7 +8,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 type DASyncer struct {
@@ -22,32 +21,22 @@ func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
 }
 
 func (s *DASyncer) SyncOneBlock(block *types.Block) error {
-	prevHash := s.blockchain.CurrentBlock().Hash()
-	if big.NewInt(0).Add(s.blockchain.CurrentBlock().Number(), common.Big1).Cmp(block.Number()) != 0 {
+	parentBlock := s.blockchain.CurrentBlock()
+	if big.NewInt(0).Add(parentBlock.Number(), common.Big1).Cmp(block.Number()) != 0 {
 		return fmt.Errorf("not consecutive block, number: %d", block.Number())
 	}
+
 	header := block.Header()
-	txs := block.Transactions()
-
-	// fill header with all necessary fields
-	var err error
-	header.ReceiptHash, header.Bloom, header.Root, header.GasUsed, err = s.blockchain.PreprocessBlock(block)
-	if err != nil {
-		return fmt.Errorf("block preprocessing failed, block number: %d, error: %v", block.Number(), err)
-	}
-	header.UncleHash = common.HexToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
 	header.Difficulty = common.Big1
-	header.BaseFee = nil
-	header.TxHash = types.DeriveSha(txs, trie.NewStackTrie(nil))
-	header.ParentHash = prevHash
+	header.BaseFee = nil // TODO: after Curie we need to fill this correctly
+	header.ParentHash = parentBlock.Hash()
 
-	fullBlock := types.NewBlockWithHeader(header).WithBody(txs, make([]*types.Header, 0))
-
-	if _, err := s.blockchain.InsertChainWithoutSealVerification(fullBlock); err != nil {
-		return fmt.Errorf("cannot insert block, number: %d, error: %v", block.Number(), err)
+	if _, err := s.blockchain.BuildAndWriteBlock(parentBlock, header, block.Transactions()); err != nil {
+		return fmt.Errorf("failed building and writing block, number: %d, error: %v", block.Number(), err)
 	}
+
 	if s.blockchain.CurrentBlock().Header().Number.Uint64()%100 == 0 {
-		log.Info("inserted block", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash())
+		log.Info("inserted block", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash(), "root", s.blockchain.CurrentBlock().Header().Root)
 	}
 	return nil
 }

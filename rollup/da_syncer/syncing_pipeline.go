@@ -2,11 +2,14 @@ package da_syncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/scroll-tech/go-ethereum/common/backoff"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
@@ -25,12 +28,12 @@ type Config struct {
 	BlobSource       blob_client.BlobSource // blob source
 }
 
-// defaultSyncInterval is the frequency at which we query for new rollup event.
-const defaultSyncInterval = 1 * time.Millisecond
-
 type SyncingPipeline struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	expBackoff *backoff.Exponential
+
 	db         ethdb.Database
 	blockchain *core.BlockChain
 	blockQueue *BlockQueue
@@ -38,19 +41,16 @@ type SyncingPipeline struct {
 }
 
 func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient sync_service.EthClient, l1DeploymentBlock uint64, dataDir string, config Config) (*SyncingPipeline, error) {
-	ctx, cancel := context.WithCancel(ctx)
-
 	scrollChainABI, err := rollup_sync_service.ScrollChainMetaData.GetAbi()
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
 
 	l1Client, err := rollup_sync_service.NewL1Client(ctx, ethClient, genesisConfig.Scroll.L1Config.L1ChainId, genesisConfig.Scroll.L1Config.ScrollChainAddress, scrollChainABI)
 	if err != nil {
-		cancel()
 		return nil, err
 	}
+
 	var blobClient blob_client.BlobClient
 	switch config.BlobSource {
 	case blob_client.BlobScan:
@@ -58,7 +58,6 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	case blob_client.BlockNative:
 		blobClient = blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint)
 	default:
-		cancel()
 		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)
 	}
 
@@ -68,8 +67,9 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	if from != nil {
 		syncedL1Height = *from
 	}
-	DAQueue := NewDAQueue(syncedL1Height, dataSourceFactory)
-	batchQueue := NewBatchQueue(DAQueue, db)
+
+	daQueue := NewDAQueue(syncedL1Height, dataSourceFactory)
+	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
 
 	missingHeaderFieldsManager := missing_header_fields.NewManager(ctx,
@@ -79,9 +79,11 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	)
 	daSyncer := NewDASyncer(blockchain, missingHeaderFieldsManager)
 
+	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{
 		ctx:        ctx,
 		cancel:     cancel,
+		expBackoff: backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
 		db:         db,
 		blockchain: blockchain,
 		blockQueue: blockQueue,
@@ -89,48 +91,92 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}, nil
 }
 
-func (sp *SyncingPipeline) Step() error {
-	block, err := sp.blockQueue.NextBlock(sp.ctx)
+func (s *SyncingPipeline) Step() error {
+	block, err := s.blockQueue.NextBlock(s.ctx)
 	if err != nil {
 		return err
 	}
-	err = sp.daSyncer.SyncOneBlock(block)
+	err = s.daSyncer.SyncOneBlock(block)
 	return err
 }
 
-func (sp *SyncingPipeline) Start() {
+func (s *SyncingPipeline) Start() {
 	log.Info("Starting SyncingPipeline")
 
+	s.wg.Add(1)
 	go func() {
-		syncTicker := time.NewTicker(defaultSyncInterval)
-		defer syncTicker.Stop()
-
-		for {
-			err := sp.Step()
-			if err != nil {
-				if strings.HasPrefix(err.Error(), "not consecutive block") {
-					log.Warn("syncing pipeline step failed, probably because of restart", "err", err)
-				} else {
-					log.Warn("syncing pipeline step failed", "err", err)
-					return
-				}
-			}
-			select {
-			case <-sp.ctx.Done():
-				return
-			case <-syncTicker.C:
-				select {
-				case <-sp.ctx.Done():
-					return
-				default:
-				}
-				continue
-			}
-		}
+		s.mainLoop()
+		s.wg.Done()
 	}()
 }
 
-func (sp *SyncingPipeline) Stop() {
-	log.Info("Stopping DaSyncer")
-	sp.cancel()
+func (s *SyncingPipeline) mainLoop() {
+	stepCh := make(chan struct{}, 1)
+	var delayedStepCh <-chan time.Time
+
+	// reqStep is a helper function to request a step to be executed.
+	// If delay is true, it will request a delayed step with exponential backoff, otherwise it will request an immediate step.
+	reqStep := func(delay bool) {
+		if delay {
+			if delayedStepCh == nil {
+				delayDur := s.expBackoff.NextDuration()
+				delayedStepCh = time.After(delayDur)
+				log.Debug("requesting delayed step", "delay", delayDur, "attempt", s.expBackoff.Attempt())
+			} else {
+				log.Debug("ignoring step request because of ongoing delayed step", "attempt", s.expBackoff.Attempt())
+			}
+		} else {
+			select {
+			case stepCh <- struct{}{}:
+			default:
+			}
+		}
+	}
+
+	// start pipeline
+	reqStep(false)
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-delayedStepCh:
+			delayedStepCh = nil
+			reqStep(false)
+		case <-stepCh:
+			err := s.Step()
+			if err == nil {
+				reqStep(false)
+				s.expBackoff.Reset()
+				continue
+			}
+
+			if errors.Is(err, io.EOF) {
+				reqStep(true)
+				continue
+			}
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+
+			if strings.HasPrefix(err.Error(), "not consecutive block") {
+				log.Warn("syncing pipeline step failed, probably because of restart", "err", err)
+			} else {
+				log.Crit("syncing pipeline step failed", "err", err)
+			}
+		}
+	}
+}
+
+func (s *SyncingPipeline) Stop() {
+	log.Info("Stopping DaSyncer...")
+	s.cancel()
+	s.wg.Wait()
+	log.Info("Stopped DaSyncer... Done")
 }

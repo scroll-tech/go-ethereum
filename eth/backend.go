@@ -221,6 +221,18 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
+	// Initialize and start DA syncing pipeline before SyncService as SyncService is blocking until all L1 messages are loaded.
+	// We need SyncService to load the L1 messages for DA syncing, but since both sync from last known L1 state, we can
+	// simply let them run simultaneously. If messages are missing in DA syncing, it will be handled by the syncing pipeline
+	// by waiting and retrying.
+	if config.EnableDASyncing {
+		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, stack.Config().DataDir,config.DA)
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
+		}
+		eth.syncingPipeline.Start()
+	}
+
 	// initialize and start L1 message sync service
 	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
 	if err != nil {
@@ -235,14 +247,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 			return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
 		}
 		eth.rollupSyncService.Start()
-	}
-
-	if config.EnableDASyncing {
-		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, stack.Config().DataDir, config.DA)
-		if err != nil {
-			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
-		}
-		eth.syncingPipeline.Start()
 	}
 
 	// Permit the downloader to use the trie cache allowance during fast sync

@@ -1824,6 +1824,51 @@ func (bc *BlockChain) PreprocessBlock(block *types.Block) (common.Hash, types.Bl
 	return receiptSha, bloom, stateRoot, usedGas, nil
 }
 
+func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types.Header, txs types.Transactions) (WriteStatus, error) {
+	if !bc.chainmu.TryLock() {
+		return NonStatTy, errInsertionInterrupted
+	}
+	defer bc.chainmu.Unlock()
+
+	statedb, err := state.New(parentBlock.Root(), bc.stateCache, bc.snaps)
+	if err != nil {
+		return NonStatTy, err
+	}
+
+	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
+	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
+	if err != nil {
+		return NonStatTy, err
+	}
+
+	header.GasUsed = gasUsed
+	header.ParentHash = parentBlock.Hash()
+	header.Root = statedb.GetRootHash()
+	// Since we're using Clique consensus, we don't have uncles
+	header.UncleHash = types.EmptyUncleHash
+	// TODO: extraData and difficulty should be set
+
+	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+
+	blockHash := fullBlock.Hash()
+	// manually replace the block hash in the receipts
+	for i, receipt := range receipts {
+		// add block location fields
+		receipt.BlockHash = blockHash
+		receipt.BlockNumber = tempBlock.Number()
+		receipt.TransactionIndex = uint(i)
+
+		for _, l := range receipt.Logs {
+			l.BlockHash = blockHash
+		}
+	}
+	for _, l := range logs {
+		l.BlockHash = blockHash
+	}
+
+	return bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)
+}
+
 // insertSideChain is called when an import batch hits upon a pruned ancestor
 // error, which happens when a sidechain with a sufficiently old fork-block is
 // found.

@@ -42,6 +42,7 @@ RUN apt-get -qq update \
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 COPY --from=zkp-builder /app/target/release/libzkp.so /usr/local/lib/
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+ENV CGO_LDFLAGS="-ldl"
 
 EXPOSE 8545 8546 30303 30303/udp
 ENTRYPOINT ["geth"]

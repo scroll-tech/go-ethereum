@@ -3,6 +3,8 @@ package da
 import (
 	"context"
 
+	"github.com/scroll-tech/da-codec/encoding/codecv2"
+
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
@@ -25,7 +27,7 @@ func NewCommitBatchDAV2(ctx context.Context, db ethdb.Database,
 	skippedL1MessageBitmap []byte,
 ) (*CommitBatchDAV2, error) {
 
-	v1, err := NewCommitBatchDAV1(ctx, db, l1Client, blobClient, vLog, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap)
+	v1, err := NewCommitBatchDAV1(ctx, db, l1Client, blobClient, vLog, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv2.DecodeTxsFromBlob)
 	if err != nil {
 		return nil, err
 	}

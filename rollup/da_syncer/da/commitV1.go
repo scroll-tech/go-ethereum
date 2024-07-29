@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/scroll-tech/da-codec/encoding/codecv0"
 	"github.com/scroll-tech/da-codec/encoding/codecv1"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
@@ -29,6 +30,7 @@ func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 	parentBatchHeader []byte,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
+	decodeTxsFromBlobFunc func(*kzg4844.Blob, []*codecv0.DAChunkRawTx) error,
 ) (*CommitBatchDAV1, error) {
 	decodedChunks, err := codecv1.DecodeDAChunksRawTx(chunks)
 	if err != nil {
@@ -56,7 +58,10 @@ func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 	}
 
 	// decode txs from blob
-	err = codecv1.DecodeTxsFromBlob(blob, decodedChunks)
+	if decodeTxsFromBlobFunc == nil {
+		decodeTxsFromBlobFunc = codecv1.DecodeTxsFromBlob
+	}
+	err = decodeTxsFromBlobFunc(blob, decodedChunks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}

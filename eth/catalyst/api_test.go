@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattn/go-colorable"
+
 	"github.com/scroll-tech/go-ethereum/beacon/engine"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
@@ -48,7 +50,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rpc"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"github.com/mattn/go-colorable"
 )
 
 var (
@@ -102,6 +103,8 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block) {
 }
 
 func TestEth2AssembleBlock(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, blocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, blocks)
 	defer n.Close()
@@ -141,6 +144,8 @@ func assembleWithTransactions(api *ConsensusAPI, parentHash common.Hash, params 
 }
 
 func TestEth2AssembleBlockWithAnotherBlocksTxs(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, blocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, blocks[:9])
 	defer n.Close()
@@ -179,6 +184,8 @@ func TestSetHeadBeforeTotalDifficulty(t *testing.T) {
 }
 
 func TestEth2PrepareAndGetPayload(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, blocks := generateMergeChain(10, false)
 	// We need to properly set the terminal total difficulty
 	genesis.Config.TerminalTotalDifficulty.Sub(genesis.Config.TerminalTotalDifficulty, blocks[9].Difficulty())
@@ -291,6 +298,8 @@ func TestInvalidPayloadTimestamp(t *testing.T) {
 }
 
 func TestEth2NewBlock(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	defer n.Close()
@@ -468,6 +477,8 @@ func startEthService(t *testing.T, genesis *core.Genesis, blocks []*types.Block)
 }
 
 func TestFullAPI(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	defer n.Close()
@@ -587,6 +598,8 @@ We expect
 	                └── P1''
 */
 func TestNewPayloadOnInvalidChain(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	defer n.Close()
@@ -683,6 +696,8 @@ func assembleBlock(api *ConsensusAPI, parentHash common.Hash, params *engine.Pay
 }
 
 func TestEmptyBlocks(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	defer n.Close()
@@ -798,6 +813,8 @@ func decodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
 }
 
 func TestTrickRemoteBlockCache(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	// Setup two nodes
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	nodeA, ethserviceA := startEthService(t, genesis, preMergeBlocks)
@@ -862,6 +879,8 @@ func TestTrickRemoteBlockCache(t *testing.T) {
 }
 
 func TestInvalidBloom(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	ethservice.Merger().ReachTTD()
@@ -886,6 +905,8 @@ func TestInvalidBloom(t *testing.T) {
 }
 
 func TestNewPayloadOnInvalidTerminalBlock(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(100, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	defer n.Close()
@@ -953,6 +974,8 @@ func TestNewPayloadOnInvalidTerminalBlock(t *testing.T) {
 // newPayLoad and forkchoiceUpdate. This is to test that the api behaves
 // well even of the caller is not being 'serial'.
 func TestSimultaneousNewBlock(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, preMergeBlocks := generateMergeChain(10, false)
 	n, ethservice := startEthService(t, genesis, preMergeBlocks)
 	defer n.Close()
@@ -1040,6 +1063,8 @@ func TestSimultaneousNewBlock(t *testing.T) {
 // TestWithdrawals creates and verifies two post-Shanghai blocks. The first
 // includes zero withdrawals and the second includes two.
 func TestWithdrawals(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, blocks := generateMergeChain(10, true)
 	// Set shanghai time to last block + 5 seconds (first post-merge block)
 	time := blocks[len(blocks)-1].Time() + 5
@@ -1156,6 +1181,8 @@ func TestWithdrawals(t *testing.T) {
 }
 
 func TestNilWithdrawals(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	genesis, blocks := generateMergeChain(10, true)
 	// Set shanghai time to last block + 4 seconds (first post-merge block)
 	time := blocks[len(blocks)-1].Time() + 4
@@ -1323,6 +1350,8 @@ func allBodies(blocks []*types.Block) []*types.Body {
 }
 
 func TestGetBlockBodiesByHash(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	node, eth, blocks := setupBodies(t)
 	api := NewConsensusAPI(eth)
 	defer node.Close()
@@ -1379,6 +1408,8 @@ func TestGetBlockBodiesByHash(t *testing.T) {
 }
 
 func TestGetBlockBodiesByRange(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	node, eth, blocks := setupBodies(t)
 	api := NewConsensusAPI(eth)
 	defer node.Close()
@@ -1460,6 +1491,8 @@ func TestGetBlockBodiesByRange(t *testing.T) {
 }
 
 func TestGetBlockBodiesByRangeInvalidParams(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	node, eth, _ := setupBodies(t)
 	api := NewConsensusAPI(eth)
 	defer node.Close()
@@ -1562,6 +1595,8 @@ func TestBlockToPayloadWithBlobs(t *testing.T) {
 
 // This checks that beaconRoot is applied to the state from the engine API.
 func TestParentBeaconBlockRoot(t *testing.T) {
+	t.Skip("we are not using catalyst API currently")
+
 	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(colorable.NewColorableStderr(), log.TerminalFormat(true))))
 
 	genesis, blocks := generateMergeChain(10, true)

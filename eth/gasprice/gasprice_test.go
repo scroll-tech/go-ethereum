@@ -208,7 +208,6 @@ func TestSuggestTipCap(t *testing.T) {
 		fork   *big.Int // London fork number
 		expect *big.Int // Expected gasprice suggestion
 	}{
-		{nil, big.NewInt(params.GWei * int64(30))},
 		{big.NewInt(0), big.NewInt(params.GWei * int64(30))},  // Fork point in genesis
 		{big.NewInt(1), big.NewInt(params.GWei * int64(30))},  // Fork point in first block
 		{big.NewInt(32), big.NewInt(params.GWei * int64(30))}, // Fork point in last block

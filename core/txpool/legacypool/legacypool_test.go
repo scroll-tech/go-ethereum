@@ -2633,8 +2633,8 @@ func BenchmarkMultiAccountBatchInsert(b *testing.B) {
 
 func TestPoolPending(t *testing.T) {
 	// Generate a batch of transactions to enqueue into the pool
-	pool, _ := setupTxPool()
-	defer pool.Stop()
+	pool, _ := setupPool()
+	defer pool.Close()
 	numTxns := 100
 	batches := make(types.Transactions, numTxns)
 	for i := 0; i < numTxns; i++ {
@@ -2646,7 +2646,7 @@ func TestPoolPending(t *testing.T) {
 	}
 	// Benchmark importing the transactions into the queue
 	for _, tx := range batches {
-		pool.AddRemotesSync([]*types.Transaction{tx})
+		pool.addRemotesSync([]*types.Transaction{tx})
 	}
 
 	assert.Len(t, pool.Pending(false), numTxns)

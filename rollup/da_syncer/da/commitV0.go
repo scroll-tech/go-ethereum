@@ -105,12 +105,12 @@ func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
 
 			block := NewPartialBlock(
 				&PartialHeader{
-					Number:   daBlock.BlockNumber,
-					Time:     daBlock.Timestamp,
-					BaseFee:  daBlock.BaseFee,
-					GasLimit: daBlock.GasLimit,
-					//TODO: Difficulty: new(big.Int).SetUint64(10),
-					//TODO: ExtraData:  []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Number:     daBlock.BlockNumber,
+					Time:       daBlock.Timestamp,
+					BaseFee:    daBlock.BaseFee,
+					GasLimit:   daBlock.GasLimit,
+					Difficulty: 10,                             // TODO: replace with real difficulty
+					ExtraData:  []byte{1, 2, 3, 4, 5, 6, 7, 8}, // TODO: replace with real extra data
 				},
 				txs)
 			blocks = append(blocks, block)

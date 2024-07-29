@@ -84,6 +84,15 @@ func (c *CommitBatchDAV0) BatchIndex() uint64 {
 	return c.batchIndex
 }
 
+func (c *CommitBatchDAV0) CompareTo(other Entry) int {
+	if c.BatchIndex() < other.BatchIndex() {
+		return -1
+	} else if c.BatchIndex() > other.BatchIndex() {
+		return 1
+	}
+	return 0
+}
+
 func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
 	var blocks []*PartialBlock
 	l1TxPointer := 0

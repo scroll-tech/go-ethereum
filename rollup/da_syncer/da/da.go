@@ -27,6 +27,7 @@ type Entry interface {
 	Type() Type
 	BatchIndex() uint64
 	L1BlockNumber() uint64
+	CompareTo(Entry) int
 }
 
 type EntryWithBlocks interface {

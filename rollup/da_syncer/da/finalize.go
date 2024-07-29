@@ -30,6 +30,15 @@ type FinalizeBatchDAV3 struct {
 	L1BlockNumber uint64
 }
 
+func (f *FinalizeBatch) CompareTo(other Entry) int {
+	if f.BatchIndex() < other.BatchIndex() {
+		return -1
+	} else if f.BatchIndex() > other.BatchIndex() {
+		return 1
+	}
+	return 0
+}
+
 func NewFinalizeBatchDAV3(batchIndex uint64) *FinalizeBatchDAV3 {
 	return &FinalizeBatchDAV3{
 		BatchIndex: batchIndex,

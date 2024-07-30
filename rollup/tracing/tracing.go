@@ -409,13 +409,15 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		if existed {
 			continue
 		}
-		proof, err := state.GetProof(addr)
+		proof, err := state.GetFullProof(addr)
 		if err != nil {
 			log.Error("Proof not available", "address", addrStr, "error", err)
 			// but we still mark the proofs map with nil array
 		}
-		wrappedProof := types.WrapProof(proof)
+		wrappedProof := types.WrapProof(proof.GetData())
 		env.pMu.Lock()
+		// TODO:
+		env.fillFlattenStorageProof(txStorageTrace, proof)
 		env.Proofs[addrStr] = wrappedProof
 		txStorageTrace.Proofs[addrStr] = wrappedProof
 		env.pMu.Unlock()
@@ -480,6 +482,8 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			}
 			wrappedProof := types.WrapProof(proof.GetData())
 			env.sMu.Lock()
+			// TODO:
+			env.fillFlattenStorageProof(txStorageTrace, proof)
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
 			if zktrieTracer.Available() {
@@ -517,9 +521,13 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	return nil
 }
 
-func (env *TraceEnv) fillFlattenStorageProof(proof proofList) {
+func (env *TraceEnv) fillFlattenStorageProof(trace *types.StorageTrace, proof proofList) {
 	for _, i := range proof {
-		env.FlattenProofs[&hexutil.Bytes{}]
+		keyStr := hexutil.Encode(i.Key)
+		env.FlattenProofs[keyStr] = i.Value
+		if trace != nil {
+			trace.FlattenProofs[keyStr] = i.Value
+		}
 	}
 }
 
@@ -551,10 +559,12 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 
 	for addr, storages := range intrinsicStorageProofs {
 		if _, existed := env.Proofs[addr.String()]; !existed {
-			if proof, err := statedb.GetProof(addr); err != nil {
+			if proof, err := statedb.GetFullProof(addr); err != nil {
 				log.Error("Proof for intrinstic address not available", "error", err, "address", addr)
 			} else {
-				env.Proofs[addr.String()] = types.WrapProof(proof)
+				// TODO:
+				env.fillFlattenStorageProof(nil, proof)
+				env.Proofs[addr.String()] = types.WrapProof(proof.GetData())
 			}
 		}
 
@@ -569,6 +579,8 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 				} else if proof, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
 				} else {
+					// TODO:
+					env.fillFlattenStorageProof(nil, proof)
 					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof.GetData())
 				}
 			}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
-	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
 type BlockQueue struct {

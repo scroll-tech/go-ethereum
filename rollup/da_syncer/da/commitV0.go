@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math/big"
 
 	"github.com/scroll-tech/da-codec/encoding"
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
@@ -100,15 +99,7 @@ func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
 	curL1TxIndex := c.parentTotalL1MessagePopped
 	for _, chunk := range c.chunks {
 		for blockId, daBlock := range chunk.Blocks {
-			// create header
-			header := types.Header{
-				Number:   big.NewInt(0).SetUint64(daBlock.BlockNumber),
-				Time:     daBlock.Timestamp,
-				BaseFee:  daBlock.BaseFee,
-				GasLimit: daBlock.GasLimit,
-			}
 			// create txs
-			// var txs types.Transactions
 			txs := make(types.Transactions, 0, daBlock.NumTransactions)
 			// insert l1 msgs
 			for l1TxPointer < len(c.l1Txs) && c.l1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages) {
@@ -117,6 +108,7 @@ func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
 				l1TxPointer++
 			}
 			curL1TxIndex += uint64(daBlock.NumL1Messages)
+
 			// insert l2 txs
 			txs = append(txs, chunk.Transactions[blockId]...)
 

@@ -8,6 +8,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
+var (
+	ErrBlockTooLow  = fmt.Errorf("block number is too low")
+	ErrBlockTooHigh = fmt.Errorf("block number is too high")
+)
+
 type DASyncer struct {
 	blockchain *core.BlockChain
 }
@@ -20,6 +25,13 @@ func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
 
 func (s *DASyncer) SyncOneBlock(block *da.PartialBlock) error {
 	parentBlock := s.blockchain.CurrentBlock()
+	if block.PartialHeader.Number <= parentBlock.NumberU64() {
+		log.Debug("block number is too low", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
+		return ErrBlockTooLow
+	} else if block.PartialHeader.Number > parentBlock.NumberU64()+1 {
+		log.Debug("block number is too high", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
+		return ErrBlockTooHigh
+	}
 	if parentBlock.NumberU64()+1 != block.PartialHeader.Number {
 		return fmt.Errorf("not consecutive block, number: %d, chain height: %d", block.PartialHeader.Number, parentBlock.NumberU64())
 	}

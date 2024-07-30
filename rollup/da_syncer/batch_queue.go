@@ -11,18 +11,16 @@ import (
 )
 
 type BatchQueue struct {
-	DAQueue                 *DAQueue
-	db                      ethdb.Database
-	lastFinalizedBatchIndex uint64
-	batches                 *common.Heap[da.Entry]
+	DAQueue *DAQueue
+	db      ethdb.Database
+	batches *common.Heap[da.Entry]
 }
 
 func NewBatchQueue(DAQueue *DAQueue, db ethdb.Database) *BatchQueue {
 	return &BatchQueue{
-		DAQueue:                 DAQueue,
-		db:                      db,
-		lastFinalizedBatchIndex: 0,
-		batches:                 common.NewHeap[da.Entry](),
+		DAQueue: DAQueue,
+		db:      db,
+		batches: common.NewHeap[da.Entry](),
 	}
 }
 
@@ -43,10 +41,7 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.Entry, error) {
 		case da.RevertBatchType:
 			bq.deleteBatch(daEntry.BatchIndex())
 		case da.FinalizeBatchType:
-			if daEntry.BatchIndex() > bq.lastFinalizedBatchIndex {
-				bq.lastFinalizedBatchIndex = daEntry.BatchIndex()
-			}
-
+			// TODO: eventually we should match finalized batch with the one that was committed via batch header
 			if batch := bq.getFinalizedBatch(); batch != nil {
 				return batch, nil
 			}
@@ -81,12 +76,12 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
 		batch = bq.batches.Peek()
 	}
 
-	if bq.batches.Len() == 0 {
-		curBatchL1Height := batch.L1BlockNumber()
-		rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height)
-		return
-	}
-
 	// we store here min height of currently loaded batches to be able to start syncing from the same place in case of restart
-	rawdb.WriteDASyncedL1BlockNumber(bq.db, bq.batches.Peek().L1BlockNumber()-1)
+	// TODO: we should store this information when the batch is done being processed to avoid inconsistencies
+	rawdb.WriteDASyncedL1BlockNumber(bq.db, batch.L1BlockNumber()-1)
+}
+
+func (bq *BatchQueue) Reset(height uint64) {
+	bq.batches = common.NewHeap[da.Entry]()
+	bq.DAQueue.Reset(height)
 }

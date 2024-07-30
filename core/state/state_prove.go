@@ -74,9 +74,9 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 
 // GetSecureTrieProof handle any interface with Prove (should be a Trie in most case) and
 // deliver the proof in bytes
-func (s *StateDB) GetSecureTrieProof(trieProve TrieProve, key common.Hash) ([][]byte, error) {
+func (s *StateDB) GetSecureTrieProof(trieProve TrieProve, key common.Hash) (FullProofList, error) {
 
-	var proof proofList
+	var proof FullProofList
 	var err error
 	if s.IsZktrie() {
 		key_s, _ := zkt.ToSecureKeyBytes(key.Bytes())

@@ -40,6 +40,9 @@ var (
 // TracerWrapper implements ScrollTracerWrapper interface
 type TracerWrapper struct{}
 
+// alias for proof list
+type proofList = state.FullProofList
+
 // NewTracerWrapper TracerWrapper creates a new TracerWrapper
 func NewTracerWrapper() *TracerWrapper {
 	return &TracerWrapper{}
@@ -464,7 +467,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			}
 			env.sMu.Unlock()
 
-			var proof [][]byte
+			var proof proofList
 			var err error
 			if zktrieTracer.Available() {
 				proof, err = state.GetSecureTrieProof(zktrieTracer, key)
@@ -475,7 +478,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 				// but we still mark the proofs map with nil array
 			}
-			wrappedProof := types.WrapProof(proof)
+			wrappedProof := types.WrapProof(proof.GetData())
 			env.sMu.Lock()
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
@@ -512,6 +515,12 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	env.TxStorageTraces[index] = txStorageTrace
 
 	return nil
+}
+
+func (env *TraceEnv) fillFlattenStorageProof(proof proofList) {
+	for _, i := range proof {
+		env.FlattenProofs[&hexutil.Bytes{}]
+	}
 }
 
 // fillBlockTrace content after all the txs are finished running.
@@ -560,7 +569,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 				} else if proof, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
 				} else {
-					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof)
+					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof.GetData())
 				}
 			}
 		}

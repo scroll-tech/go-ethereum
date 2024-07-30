@@ -54,6 +54,33 @@ func (n *proofList) Delete(key []byte) error {
 	panic("not supported")
 }
 
+type fullProof struct {
+	Key   []byte
+	Value []byte
+}
+
+type FullProofList []fullProof
+
+func (n *FullProofList) Put(key []byte, value []byte) error {
+	*n = append(*n, fullProof{
+		Key:   key,
+		Value: value,
+	})
+	return nil
+}
+
+func (n *FullProofList) Delete(key []byte) error {
+	panic("not supported")
+}
+
+func (n FullProofList) GetData() (out [][]byte) {
+	out = make([][]byte, 0, len(n))
+	for _, i := range n {
+		out = append(out, i.Value)
+	}
+	return
+}
+
 // StateDB structs within the ethereum protocol are used to store anything
 // within the merkle trie. StateDBs take care of caching and storing
 // nested states. It's the general query interface to retrieve:
@@ -343,6 +370,20 @@ func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
 	return proof, err
 }
 
+// GetFullProof returns the Merkle proof for a given account, with both node data and key
+func (s *StateDB) GetFullProof(addr common.Address) (FullProofList, error) {
+	var hash common.Hash
+	if s.IsZktrie() {
+		addr_s, _ := zkt.ToSecureKeyBytes(addr.Bytes())
+		hash = common.BytesToHash(addr_s.Bytes())
+	} else {
+		hash = crypto.Keccak256Hash(addr.Bytes())
+	}
+	var proof FullProofList
+	err := s.trie.Prove(hash[:], 0, &proof)
+	return proof, err
+}
+
 func (s *StateDB) GetLiveStateAccount(addr common.Address) *types.StateAccount {
 	obj, ok := s.stateObjects[addr]
 	if !ok {
@@ -361,7 +402,11 @@ func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, 
 	if trie == nil {
 		return nil, errors.New("storage trie for requested address does not exist")
 	}
-	return s.GetSecureTrieProof(trie, key)
+	proof, err := s.GetSecureTrieProof(trie, key)
+	if err != nil {
+		return nil, err
+	}
+	return proof.GetData(), nil
 }
 
 // GetCommittedState retrieves a value from the given account's committed storage trie.

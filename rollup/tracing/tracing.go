@@ -253,21 +253,32 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	pend.Wait()
 
 	// after all tx has been traced, collect "deletion proof" for zktrie
+	deleteionProofs := make(map[string]hexutil.Bytes)
+
 	for _, tracer := range env.ZkTrieTracer {
 		delProofs, err := tracer.GetDeletionProofs()
 		if err != nil {
 			log.Error("deletion proof failure", "error", err)
 		} else {
-			for _, proof := range delProofs {
+			for key, proof := range delProofs {
+				deleteionProofs[hexutil.Encode(key.Bytes())] = proof
 				env.DeletionProofs = append(env.DeletionProofs, proof)
 			}
 		}
+	}
+
+	//TODO: merge deletion proof
+	for k, v := range deleteionProofs {
+		env.FlattenProofs[k] = v
 	}
 
 	// build dummy per-tx deletion proof
 	for _, txStorageTrace := range env.TxStorageTraces {
 		if txStorageTrace != nil {
 			txStorageTrace.DeletionProofs = env.DeletionProofs
+			for k, v := range deleteionProofs {
+				txStorageTrace.FlattenProofs[k] = v
+			}
 		}
 	}
 

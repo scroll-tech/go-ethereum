@@ -51,13 +51,28 @@ func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 	return t
 }
 
+// GetDeletionProofNodes extract the value part from deletion proofs
+func (t *ProofTracer) GetDeletionProofNodes() ([][]byte, error) {
+
+	retMap, err := t.GetDeletionProofs()
+	if err != nil {
+		return nil, err
+	}
+
+	var ret [][]byte
+	for _, bt := range retMap {
+		ret = append(ret, bt)
+	}
+	return ret, nil
+}
+
 // GetDeletionProofs generate current deletionTracer and collect deletion proofs
 // which is possible to be used from all rawPaths, which enabling witness generator
 // to predict the final state root after executing any deletion
 // along any of the rawpath, no matter of the deletion occurs in any position of the mpt ops
 // Note the collected sibling node has no key along with it since witness generator would
 // always decode the node for its purpose
-func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
+func (t *ProofTracer) GetDeletionProofs() (map[zkt.Hash][]byte, error) {
 
 	retMap := map[zkt.Hash][]byte{}
 
@@ -93,12 +108,7 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 		}
 	}
 
-	var ret [][]byte
-	for _, bt := range retMap {
-		ret = append(ret, bt)
-	}
-
-	return ret, nil
+	return retMap, nil
 
 }
 

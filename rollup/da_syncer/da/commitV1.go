@@ -30,6 +30,19 @@ func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 	parentBatchHeader []byte,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
+) (*CommitBatchDAV1, error) {
+	return NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Client, blobClient, vLog, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv1.DecodeTxsFromBlob)
+}
+
+func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database,
+	l1Client *rollup_sync_service.L1Client,
+	blobClient blob_client.BlobClient,
+	vLog *types.Log,
+	version uint8,
+	batchIndex uint64,
+	parentBatchHeader []byte,
+	chunks [][]byte,
+	skippedL1MessageBitmap []byte,
 	decodeTxsFromBlobFunc func(*kzg4844.Blob, []*codecv0.DAChunkRawTx) error,
 ) (*CommitBatchDAV1, error) {
 	decodedChunks, err := codecv1.DecodeDAChunksRawTx(chunks)
@@ -58,9 +71,6 @@ func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 	}
 
 	// decode txs from blob
-	if decodeTxsFromBlobFunc == nil {
-		decodeTxsFromBlobFunc = codecv1.DecodeTxsFromBlob
-	}
 	err = decodeTxsFromBlobFunc(blob, decodedChunks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)

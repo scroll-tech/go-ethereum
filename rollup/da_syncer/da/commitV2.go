@@ -27,7 +27,7 @@ func NewCommitBatchDAV2(ctx context.Context, db ethdb.Database,
 	skippedL1MessageBitmap []byte,
 ) (*CommitBatchDAV2, error) {
 
-	v1, err := NewCommitBatchDAV1(ctx, db, l1Client, blobClient, vLog, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv2.DecodeTxsFromBlob)
+	v1, err := NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Client, blobClient, vLog, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv2.DecodeTxsFromBlob)
 	if err != nil {
 		return nil, err
 	}

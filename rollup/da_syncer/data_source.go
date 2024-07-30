@@ -8,15 +8,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 )
 
-var (
-	errSourceExhausted = errors.New("data source has been exhausted")
-)
-
 type DataSource interface {
-	NextData() (DA, error)
+	NextData() (da.Entries, error)
 	L1Height() uint64
 }
 
@@ -40,7 +37,7 @@ func NewDataSourceFactory(blockchain *core.BlockChain, genesisConfig *params.Cha
 
 func (ds *DataSourceFactory) OpenDataSource(ctx context.Context, l1height uint64) (DataSource, error) {
 	if ds.config.FetcherMode == L1RPC {
-		return NewCalldataBlobSource(ctx, l1height, ds.l1Client, ds.blobClient, ds.db)
+		return da.NewCalldataBlobSource(ctx, l1height, ds.l1Client, ds.blobClient, ds.db)
 	} else {
 		return nil, errors.New("snapshot_data_source: not implemented")
 	}

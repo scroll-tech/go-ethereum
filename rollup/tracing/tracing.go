@@ -482,10 +482,14 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 				// but we still mark the proofs map with nil array
 			}
-			wrappedProof := types.WrapProof(proof.GetData())
-			env.sMu.Lock()
+
+			env.pMu.Lock()
 			// TODO:
 			env.fillFlattenStorageProof(txStorageTrace, proof)
+			env.pMu.Unlock()
+
+			wrappedProof := types.WrapProof(proof.GetData())
+			env.sMu.Lock()
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
 			if zktrieTracer.Available() {

@@ -116,6 +116,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 			RootAfter:     block.Root(),
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+			FlattenProofs: make(map[string]hexutil.Bytes),
 		},
 		Codes:             make(map[common.Hash]vm.CodeInfo),
 		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
@@ -376,6 +377,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	txStorageTrace := &types.StorageTrace{
 		Proofs:        make(map[string][]hexutil.Bytes),
 		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+		FlattenProofs: make(map[string]hexutil.Bytes),
 	}
 	// still we have no state root for per tx, only set the head and tail
 	if index == 0 {

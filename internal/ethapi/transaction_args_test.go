@@ -138,14 +138,14 @@ func TestSetFeeDefaults(t *testing.T) {
 			false,
 			&TransactionArgs{MaxFeePerGas: maxFee},
 			nil,
-			errors.New("maxFeePerGas and maxPriorityFeePerGas are not valid before London is active"),
+			errors.New("maxFeePerGas and maxPriorityFeePerGas are not valid before Curie is active"),
 		},
 		{
 			"dynamic fee tx pre-London, priorityFee set",
 			false,
 			&TransactionArgs{MaxPriorityFeePerGas: fortytwo},
 			nil,
-			errors.New("maxFeePerGas and maxPriorityFeePerGas are not valid before London is active"),
+			errors.New("maxFeePerGas and maxPriorityFeePerGas are not valid before Curie is active"),
 		},
 		{
 			"dynamic fee tx, maxFee < priorityFee",
@@ -229,6 +229,17 @@ func newBackendMock() *backendMock {
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(1000),
 	}
+	config.ArchimedesBlock = config.LondonBlock
+	config.BernoulliBlock = config.LondonBlock
+	config.CurieBlock = config.LondonBlock
+	config.ShanghaiTime = nil
+
+	if config.LondonBlock != nil {
+		shanghaiTime := config.LondonBlock.Uint64() * 12
+		config.ShanghaiTime = &shanghaiTime
+		config.DarwinTime = &shanghaiTime
+	}
+
 	return &backendMock{
 		current: &types.Header{
 			Difficulty: big.NewInt(10000000000),

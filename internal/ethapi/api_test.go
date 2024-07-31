@@ -29,6 +29,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
+
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -48,9 +52,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/internal/blocktest"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rpc"
-	"github.com/holiman/uint256"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 )
 
 func testTransactionMarshal(t *testing.T, tests []txData, config *params.ChainConfig) {
@@ -1038,8 +1039,7 @@ func TestRPCMarshalBlock(t *testing.T) {
 						"v": "0x0",
 						"r": "0x0",
 						"s": "0x0",
-						"yParity": "0x0",
-						"sender": "0x0000000000000000000000000000000000000000"
+						"yParity": "0x0"
 					},
 					{
 						"blockHash": "0x9b73c83b25d0faf7eab854e3684c7e394336d6e135625aafa5c183f27baa8fee",
@@ -1057,8 +1057,7 @@ func TestRPCMarshalBlock(t *testing.T) {
 						"chainId": "0x7fffffffffffffee",
 						"v": "0x0",
 						"r": "0x0",
-						"s": "0x0",
-						"sender": "0x0000000000000000000000000000000000000000"
+						"s": "0x0"
 					},
 					{
 						"blockHash": "0x9b73c83b25d0faf7eab854e3684c7e394336d6e135625aafa5c183f27baa8fee",
@@ -1078,8 +1077,7 @@ func TestRPCMarshalBlock(t *testing.T) {
 						"v": "0x0",
 						"r": "0x0",
 						"s": "0x0",
-						"yParity": "0x0",
-						"sender": "0x0000000000000000000000000000000000000000"
+						"yParity": "0x0"
 					},
 					{
 						"blockHash": "0x9b73c83b25d0faf7eab854e3684c7e394336d6e135625aafa5c183f27baa8fee",
@@ -1097,8 +1095,7 @@ func TestRPCMarshalBlock(t *testing.T) {
 						"chainId": "0x7fffffffffffffee",
 						"v": "0x0",
 						"r": "0x0",
-						"s": "0x0",
-						"sender": "0x0000000000000000000000000000000000000000"
+						"s": "0x0"
 					}
 				],
 				"transactionsRoot": "0x661a9febcfa8f1890af549b874faf9fa274aede26ef489d9db0b25daa569450e",

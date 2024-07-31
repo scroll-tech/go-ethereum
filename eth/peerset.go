@@ -232,7 +232,7 @@ func (ps *peerSet) snapLen() int {
 
 // peerWithHighestTD retrieves the known peer with the currently highest total
 // difficulty.
-func (ps *peerSet) peerWithHighestTD(allowList []string) *eth.Peer {
+func (ps *peerSet) peerWithHighestTD(whileList []string) *eth.Peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -241,7 +241,7 @@ func (ps *peerSet) peerWithHighestTD(allowList []string) *eth.Peer {
 		bestTd   *big.Int
 	)
 	for _, p := range ps.peers {
-		if allowList != nil && !slices.Contains(allowList, p.ID()) {
+		if whileList != nil && !slices.Contains(whileList, p.ID()) {
 			continue
 		}
 		if _, td := p.Head(); bestPeer == nil || td.Cmp(bestTd) > 0 {

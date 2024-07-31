@@ -157,17 +157,17 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 		return nil
 	}
 
-	var syncAllowList []string
+	var syncWhiteList []string
 	chainConfig := cs.handler.chain.Config()
 	currentHeight := cs.handler.chain.CurrentHeader().Number.Uint64()
 	if chainConfig.Clique != nil {
 		shadowForkHeight := chainConfig.Clique.ShadowForkHeight
 		if shadowForkHeight != 0 && currentHeight >= shadowForkHeight {
-			syncAllowList = cs.handler.shadowForkPeerIDs
+			syncWhiteList = cs.handler.shadowForkPeerIDs
 		}
 	}
 	// We have enough peers, check TD
-	peer := cs.handler.peers.peerWithHighestTD(syncAllowList)
+	peer := cs.handler.peers.peerWithHighestTD(syncWhiteList)
 	if peer == nil {
 		return nil
 	}

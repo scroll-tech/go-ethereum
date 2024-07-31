@@ -861,8 +861,8 @@ var (
 
 	// Shadowfork peers
 	ShadowforkPeersFlag = cli.StringSliceFlag{
-		Name:  "net.shadowforkpeer",
-		Usage: "peer id of a shadow fork peer",
+		Name:  "net.shadowforkpeers",
+		Usage: "peer ids of shadow fork peers",
 	}
 )
 

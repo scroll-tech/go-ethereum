@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/params"
 )
 
 // copyConfig does a _shallow_ copy of a given config. Safe to set new values, but
@@ -111,12 +111,12 @@ func TestCalcBaseFee(t *testing.T) {
 		parentL1BaseFee   int64
 		expectedL2BaseFee int64
 	}{
-		{0, 150000000},
-		{1000000000, 164000000},
-		{2000000000, 178000000},
-		{100000000000, 1550000000},
-		{111111111111, 1705555555},
-		{1000000000000, 10000000000}, // cap at max L2 base fee
+		{0, 48700000},
+		{1000000000, 53300000},
+		{2000000000, 57900000},
+		{100000000000, 508700000},
+		{111111111111, 559811111},
+		{2164000000000, 10000000000}, // cap at max L2 base fee
 	}
 	for i, test := range tests {
 		if have, want := CalcBaseFee(config(), nil, big.NewInt(test.parentL1BaseFee)), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {

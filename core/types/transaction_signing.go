@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/params"
 )
 
 var ErrInvalidChainId = errors.New("invalid chain id for signer")
@@ -43,7 +43,7 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint
 	case config.IsCurie(blockNumber):
 		signer = NewLondonSignerWithEIP4844(config.ChainID)
 	case config.IsCancun(blockNumber, blockTime):
-		signer = NewCancunSigner(config.ChainID)
+		signer = NewLondonSignerWithEIP4844(config.ChainID) // keep using LondonSignerWithEIP4844
 	case config.IsLondon(blockNumber):
 		signer = NewLondonSignerWithEIP4844(config.ChainID)
 	case config.IsBerlin(blockNumber):
@@ -67,8 +67,11 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint
 // have the current block number available, use MakeSigner instead.
 func LatestSigner(config *params.ChainConfig) Signer {
 	if config.ChainID != nil {
+		if config.CurieBlock != nil {
+			return NewLondonSignerWithEIP4844(config.ChainID)
+		}
 		if config.CancunTime != nil {
-			return NewCancunSigner(config.ChainID)
+			return NewLondonSignerWithEIP4844(config.ChainID)
 		}
 		if config.LondonBlock != nil {
 			return NewLondonSignerWithEIP4844(config.ChainID)
@@ -94,7 +97,7 @@ func LatestSignerForChainID(chainID *big.Int) Signer {
 	if chainID == nil {
 		return HomesteadSigner{}
 	}
-	return NewCancunSigner(chainID)
+	return NewLondonSignerWithEIP4844(chainID)
 }
 
 // SignTx signs the transaction using the given signer and private key.

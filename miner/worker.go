@@ -17,32 +17,15 @@
 package miner
 
 import (
-	"errors"
-	"fmt"
 	"math/big"
-	"sync"
-	"sync/atomic"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/txpool"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rollup/circuitcapacitychecker"
-	"github.com/ethereum/go-ethereum/rollup/fees"
-	"github.com/ethereum/go-ethereum/rollup/tracing"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/state"
+	"github.com/scroll-tech/go-ethereum/core/txpool"
+	"github.com/scroll-tech/go-ethereum/core/types"
 )
+
+/*
 
 const (
 	// resultQueueSize is the size of channel listening to sealing result.
@@ -198,6 +181,7 @@ type newWorkReq struct {
 	interrupt *atomic.Int32
 	timestamp int64
 }
+*/
 
 // newPayloadResult is the result of payload generation.
 type newPayloadResult struct {
@@ -206,6 +190,8 @@ type newPayloadResult struct {
 	fees     *big.Int               // total block fees
 	sidecars []*types.BlobTxSidecar // collected blobs of blob transactions
 }
+
+/*
 
 // getWorkReq represents a request for getting a new sealing work with provided parameters.
 type getWorkReq struct {
@@ -367,6 +353,12 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	}
 	worker.newpayloadTimeout = newpayloadTimeout
 
+	// Sanitize account fetch limit.
+	if worker.config.MaxAccountsNum == 0 {
+		log.Warn("Sanitizing miner account fetch limit", "provided", worker.config.MaxAccountsNum, "updated", math.MaxInt)
+		worker.config.MaxAccountsNum = math.MaxInt
+	}
+
 	worker.wg.Add(4)
 	go worker.mainLoop()
 	go worker.newWorkLoop(recommit)
@@ -385,6 +377,8 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 func (w *worker) getCCC() *circuitcapacitychecker.CircuitCapacityChecker {
 	return w.circuitCapacityChecker
 }
+
+*/
 
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
@@ -411,14 +405,6 @@ func (w *worker) setExtra(extra []byte) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.extra = extra
-}
-
-// setRecommitInterval updates the interval for miner sealing work recommitting.
-func (w *worker) setRecommitInterval(interval time.Duration) {
-	select {
-	case w.resubmitIntervalCh <- interval:
-	case <-w.exitCh:
-	}
 }
 
 // pending returns the pending state and corresponding block. The returned
@@ -471,6 +457,8 @@ func (w *worker) close() {
 	close(w.exitCh)
 	w.wg.Wait()
 }
+
+/*
 
 // recalcRecommit recalculates the resubmitting interval upon feedback.
 func recalcRecommit(minRecommit, prev time.Duration, target float64, inc bool) time.Duration {
@@ -966,12 +954,12 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
-		withTimer(l2CommitTxTraceTimer, func() {
+		common.WithTimer(l2CommitTxTraceTimer, func() {
 			traces, err = env.traceEnv.GetBlockTrace(
 				types.NewBlockWithHeader(env.header).WithBody([]*types.Transaction{tx}, nil),
 			)
 		})
-		withTimer(l2CommitTxTraceStateRevertTimer, func() {
+		common.WithTimer(l2CommitTxTraceStateRevertTimer, func() {
 			// `env.traceEnv.State` & `env.state` share a same pointer to the state, so only need to revert `env.state`
 			// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
 			env.state.RevertToSnapshot(snap)
@@ -979,7 +967,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		withTimer(l2CommitTxCCCTimer, func() {
+		common.WithTimer(l2CommitTxCCCTimer, func() {
 			accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
 		})
 		if err != nil {
@@ -997,7 +985,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 		snap = env.state.Snapshot() // create new snapshot for `core.ApplyTransaction`
 		gp   = env.gasPool.Gas()
 	)
-	withTimer(l2CommitTxApplyTimer, func() {
+	common.WithTimer(l2CommitTxApplyTimer, func() {
 		receipt, err = core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	})
 	if err != nil {
@@ -1024,7 +1012,7 @@ func (w *worker) commitTransactions(env *environment, txs orderedTransactionSet,
 		l2CommitTxsTimer.Update(time.Since(t0))
 	}(time.Now())
 
-	var circuitCapacityReached bool
+	var circuitCapacityOrBlockTimeReached bool
 
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
@@ -1044,13 +1032,13 @@ loop:
 		// Check interruption signal and abort building if it's fired.
 		if interrupt != nil {
 			if signal := interrupt.Load(); signal != commitInterruptNone {
-				return circuitCapacityReached, signalToErr(signal)
+				return circuitCapacityOrBlockTimeReached, signalToErr(signal)
 			}
 		}
 		// seal block early if we're over time
 		// note: current.header.Time = max(parent.Time + cliquePeriod, now())
 		if env.tcount > 0 && w.chainConfig.Clique != nil && uint64(time.Now().Unix()) > env.header.Time {
-			circuitCapacityReached = true // skip subsequent invocations of commitTransactions
+			circuitCapacityOrBlockTimeReached = true // skip subsequent invocations of commitTransactions
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done.
@@ -1175,7 +1163,7 @@ loop:
 				}
 				w.newTxs.Add(int32(1))
 
-				circuitCapacityReached = true
+				circuitCapacityOrBlockTimeReached = true
 				break loop
 			} else {
 				// 2. Circuit capacity limit reached in a block, and it's the first tx: skip the tx
@@ -1201,7 +1189,7 @@ loop:
 				// Reset ccc so that we can process other transactions for this block
 				w.circuitCapacityChecker.Reset()
 				log.Trace("Worker reset ccc", "id", w.circuitCapacityChecker.ID)
-				circuitCapacityReached = false
+				circuitCapacityOrBlockTimeReached = false
 
 				// Store skipped transaction in local db
 				if w.config.StoreSkippedTxTraces {
@@ -1229,7 +1217,7 @@ loop:
 			// Normally we would do `txs.Shift()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
-			circuitCapacityReached = true
+			circuitCapacityOrBlockTimeReached = true
 			w.checkCurrentTxNumWithCCC(env.tcount)
 			break loop
 
@@ -1249,7 +1237,7 @@ loop:
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
 			w.eth.TxPool().RemoveTx(tx.Hash(), true, true)
-			circuitCapacityReached = true
+			circuitCapacityOrBlockTimeReached = true
 			w.checkCurrentTxNumWithCCC(env.tcount)
 			break loop
 
@@ -1291,7 +1279,7 @@ loop:
 		}
 		w.pendingLogsFeed.Send(cpy)
 	}
-	return circuitCapacityReached, nil
+	return circuitCapacityOrBlockTimeReached, nil
 }
 
 // generateParams wraps various of settings for generating sealing task.
@@ -1384,6 +1372,9 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 		log.Error("Failed to create sealing context", "err", err)
 		return nil, err
 	}
+	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
+		misc.ApplyCurieHardFork(env.state)
+	}
 	if header.ParentBeaconRoot != nil {
 		context := core.NewEVMBlockContext(header, w.chain, w.chainConfig, nil)
 		vmenv := vm.NewEVM(context, vm.TxContext{}, env.state, w.chainConfig, vm.Config{})
@@ -1391,6 +1382,8 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	}
 	return env, nil
 }
+
+*/
 
 func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransaction {
 	if tx.IsL1MessageTx() {
@@ -1418,6 +1411,8 @@ func txToLazyTx(txPool *txpool.TxPool, tx *types.Transaction) *txpool.LazyTransa
 	}
 }
 
+/*
+
 // fillTransactions retrieves the pending transactions from the txpool and fills them
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
@@ -1425,13 +1420,13 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	// fetch l1Txs
 	var l1Messages []types.L1MessageTx
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
-		withTimer(l2CommitNewWorkL1CollectTimer, func() {
+		common.WithTimer(l2CommitNewWorkL1CollectTimer, func() {
 			l1Messages = w.collectPendingL1Messages(env.nextL1MsgIndex)
 		})
 	}
 
 	tidyPendingStart := time.Now()
-	pending := w.eth.TxPool().Pending(true)
+	pending := w.eth.TxPool().PendingWithMax(true, w.config.MaxAccountsNum)
 
 	// Split the pending transactions into locals and remotes.
 	localTxs, remoteTxs := make(map[common.Address][]*txpool.LazyTransaction), pending
@@ -1444,7 +1439,7 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	l2CommitNewWorkTidyPendingTxTimer.UpdateSince(tidyPendingStart)
 
 	// Fill the block with all available pending transactions.
-	var circuitCapacityReached bool
+	var circuitCapacityOrBlockTimeReached bool
 	var err error
 	commitL1MsgStart := time.Now()
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
@@ -1454,7 +1449,7 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
 			return err
 		}
-		circuitCapacityReached, err = w.commitTransactions(env, txs, interrupt)
+		circuitCapacityOrBlockTimeReached, err = w.commitTransactions(env, txs, interrupt)
 		if err != nil {
 			l2CommitNewWorkCommitL1MsgTimer.UpdateSince(commitL1MsgStart)
 			return err
@@ -1465,7 +1460,7 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
 		w.prioritizedTx = nil
 	}
-	if !circuitCapacityReached && w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
+	if !circuitCapacityOrBlockTimeReached && w.prioritizedTx != nil && w.current.header.Number.Uint64() == w.prioritizedTx.blockNumber {
 		tx := w.prioritizedTx.tx
 		from, _ := types.Sender(w.current.signer, tx) // error already checked before
 		// we don't know where this came from, yolo resolve from everywhere (w.eth.TxPool())
@@ -1475,7 +1470,7 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 		// but here there's only 1 tx, and hence no need for sorting, we could just simply use `newTransactionsByPriceAndNonce`
 		// (but we fill the LazyTransaction's tx first, in case it's a l1tx and cannot be resolved from the mempool).
 		txs := newTransactionsByPriceAndNonce(w.current.signer, txList, env.header.BaseFee)
-		circuitCapacityReached, err = w.commitTransactions(env, txs, interrupt)
+		circuitCapacityOrBlockTimeReached, err = w.commitTransactions(env, txs, interrupt)
 		if err != nil {
 			l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
 			return err
@@ -1483,16 +1478,16 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	}
 	l2CommitNewWorkPrioritizedTxCommitTimer.UpdateSince(prioritizedTxStart)
 	remoteLocalStart := time.Now()
-	if !circuitCapacityReached && len(localTxs) > 0 {
+	if !circuitCapacityOrBlockTimeReached && len(localTxs) > 0 {
 		localTxPriceAndNonceStart := time.Now()
 		txs := newTransactionsByPriceAndNonce(env.signer, localTxs, env.header.BaseFee)
 		l2CommitNewWorkLocalPriceAndNonceTimer.UpdateSince(localTxPriceAndNonceStart)
-		if circuitCapacityReached, err = w.commitTransactions(env, txs, interrupt); err != nil {
+		if circuitCapacityOrBlockTimeReached, err = w.commitTransactions(env, txs, interrupt); err != nil {
 			l2CommitNewWorkRemoteLocalCommitTimer.UpdateSince(remoteLocalStart)
 			return err
 		}
 	}
-	if !circuitCapacityReached && len(remoteTxs) > 0 {
+	if !circuitCapacityOrBlockTimeReached && len(remoteTxs) > 0 {
 		remoteTxPriceAndNonceStart := time.Now()
 		txs := newTransactionsByPriceAndNonce(env.signer, remoteTxs, env.header.BaseFee)
 		l2CommitNewWorkRemotePriceAndNonceTimer.UpdateSince(remoteTxPriceAndNonceStart)
@@ -1571,35 +1566,45 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 	if err != nil {
 		return
 	}
-	// Fill pending transactions from the txpool into the block.
-	err = w.fillTransactions(interrupt, work)
-	switch {
-	case err == nil:
-		// The entire block is filled, decrease resubmit interval in case
-		// of current interval is larger than the user-specified one.
-		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 
-	case errors.Is(err, errBlockInterruptedByRecommit):
-		// Notify resubmit loop to increase resubmitting interval if the
-		// interruption is due to frequent commits.
-		gaslimit := work.header.GasLimit
-		ratio := float64(gaslimit-work.gasPool.Gas()) / float64(gaslimit)
-		if ratio < 0.1 {
-			ratio = 0.1
-		}
-		w.resubmitAdjustCh <- &intervalAdjust{
-			ratio: ratio,
-			inc:   true,
-		}
-
-	case errors.Is(err, errBlockInterruptedByNewHead):
-		// If the block building is interrupted by newhead event, discard it
-		// totally. Committing the interrupted block introduces unnecessary
-		// delay, and possibly causes miner to mine on the previous head,
-		// which could result in higher uncle rate.
-		work.discard()
-		return
+	noTxs := false
+	// zkEVM requirement: Curie transition block has 0 transactions
+	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(work.header.Number) == 0 {
+		noTxs = true
 	}
+
+	if !noTxs {
+		// Fill pending transactions from the txpool into the block.
+		err = w.fillTransactions(interrupt, work)
+		switch {
+		case err == nil:
+			// The entire block is filled, decrease resubmit interval in case
+			// of current interval is larger than the user-specified one.
+			w.resubmitAdjustCh <- &intervalAdjust{inc: false}
+
+		case errors.Is(err, errBlockInterruptedByRecommit):
+			// Notify resubmit loop to increase resubmitting interval if the
+			// interruption is due to frequent commits.
+			gaslimit := work.header.GasLimit
+			ratio := float64(gaslimit-work.gasPool.Gas()) / float64(gaslimit)
+			if ratio < 0.1 {
+				ratio = 0.1
+			}
+			w.resubmitAdjustCh <- &intervalAdjust{
+				ratio: ratio,
+				inc:   true,
+			}
+
+		case errors.Is(err, errBlockInterruptedByNewHead):
+			// If the block building is interrupted by newhead event, discard it
+			// totally. Committing the interrupted block introduces unnecessary
+			// delay, and possibly causes miner to mine on the previous head,
+			// which could result in higher uncle rate.
+			work.discard()
+			return
+		}
+	}
+
 	// Submit the generated block for consensus sealing.
 	w.commit(work.copy(), w.fullTaskHook, true, start)
 
@@ -1620,7 +1625,7 @@ func (w *worker) calcAndSetAccRowsForEnv(env *environment) error {
 	)
 	var traces *types.BlockTrace
 	var err error
-	withTimer(l2CommitTraceTimer, func() {
+	common.WithTimer(l2CommitTraceTimer, func() {
 		traces, err = env.traceEnv.GetBlockTrace(types.NewBlockWithHeader(env.header))
 	})
 	if err != nil {
@@ -1636,7 +1641,7 @@ func (w *worker) calcAndSetAccRowsForEnv(env *environment) error {
 	traces.ExecutionResults = traces.ExecutionResults[:0]
 	traces.TxStorageTraces = traces.TxStorageTraces[:0]
 	var accRows *types.RowConsumption
-	withTimer(l2CommitCCCTimer, func() {
+	common.WithTimer(l2CommitCCCTimer, func() {
 		accRows, err = w.circuitCapacityChecker.ApplyBlock(traces)
 	})
 	if err != nil {
@@ -1775,10 +1780,4 @@ func signalToErr(signal int32) error {
 	}
 }
 
-func withTimer(timer metrics.Timer, f func()) {
-	if metrics.Enabled {
-		timer.Time(f)
-	} else {
-		f()
-	}
-}
+*/

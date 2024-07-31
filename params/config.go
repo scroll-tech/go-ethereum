@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -643,6 +643,8 @@ func (c *EthashConfig) String() string {
 type CliqueConfig struct {
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
 	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
+
+	RelaxedPeriod bool `json:"relaxed_period"` // Relaxes the period to be just an upper bound
 }
 
 // String implements the stringer interface, returning the consensus engine details.
@@ -749,7 +751,7 @@ func (c *ChainConfig) Description() string {
 		banner += fmt.Sprintf(" - Verkle:                      @%-10v\n", *c.VerkleTime)
 	}
 	if c.DarwinTime != nil {
-		banner += fmt.Sprintf(" - Dawrin:                      @%-10v\n", *c.DarwinTime)
+		banner += fmt.Sprintf(" - Darwin:                      @%-10v\n", *c.DarwinTime)
 	}
 	banner += "\n"
 
@@ -1059,7 +1061,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 		return newBlockCompatError("Curie fork block", c.CurieBlock, newcfg.CurieBlock)
 	}
 	if isForkTimestampIncompatible(c.DarwinTime, newcfg.DarwinTime, headTimestamp) {
-		return newTimestampCompatError("Darwin fork block", c.DarwinTime, newcfg.DarwinTime)
+		return newTimestampCompatError("Darwin fork timestamp", c.DarwinTime, newcfg.DarwinTime)
 	}
 	return nil
 }

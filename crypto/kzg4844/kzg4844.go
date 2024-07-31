@@ -20,6 +20,7 @@ package kzg4844
 import (
 	"embed"
 	"errors"
+	"hash"
 	"sync/atomic"
 )
 
@@ -65,7 +66,7 @@ func UseCKZG(use bool) error {
 }
 
 // BlobToCommitment creates a small commitment out of a data blob.
-func BlobToCommitment(blob Blob) (Commitment, error) {
+func BlobToCommitment(blob *Blob) (Commitment, error) {
 	if useCKZG.Load() {
 		return ckzgBlobToCommitment(blob)
 	}
@@ -74,7 +75,7 @@ func BlobToCommitment(blob Blob) (Commitment, error) {
 
 // ComputeProof computes the KZG proof at the given point for the polynomial
 // represented by the blob.
-func ComputeProof(blob Blob, point Point) (Proof, Claim, error) {
+func ComputeProof(blob *Blob, point Point) (Proof, Claim, error) {
 	if useCKZG.Load() {
 		return ckzgComputeProof(blob, point)
 	}
@@ -94,7 +95,7 @@ func VerifyProof(commitment Commitment, point Point, claim Claim, proof Proof) e
 // the commitment.
 //
 // This method does not verify that the commitment is correct with respect to blob.
-func ComputeBlobProof(blob Blob, commitment Commitment) (Proof, error) {
+func ComputeBlobProof(blob *Blob, commitment Commitment) (Proof, error) {
 	if useCKZG.Load() {
 		return ckzgComputeBlobProof(blob, commitment)
 	}
@@ -102,9 +103,27 @@ func ComputeBlobProof(blob Blob, commitment Commitment) (Proof, error) {
 }
 
 // VerifyBlobProof verifies that the blob data corresponds to the provided commitment.
-func VerifyBlobProof(blob Blob, commitment Commitment, proof Proof) error {
+func VerifyBlobProof(blob *Blob, commitment Commitment, proof Proof) error {
 	if useCKZG.Load() {
 		return ckzgVerifyBlobProof(blob, commitment, proof)
 	}
 	return gokzgVerifyBlobProof(blob, commitment, proof)
+}
+
+// CalcBlobHashV1 calculates the 'versioned blob hash' of a commitment.
+// The given hasher must be a sha256 hash instance, otherwise the result will be invalid!
+func CalcBlobHashV1(hasher hash.Hash, commit *Commitment) (vh [32]byte) {
+	if hasher.Size() != 32 {
+		panic("wrong hash size")
+	}
+	hasher.Reset()
+	hasher.Write(commit[:])
+	hasher.Sum(vh[:0])
+	vh[0] = 0x01 // version
+	return vh
+}
+
+// IsValidVersionedHash checks that h is a structurally-valid versioned blob hash.
+func IsValidVersionedHash(h []byte) bool {
+	return len(h) == 32 && h[0] == 0x01
 }

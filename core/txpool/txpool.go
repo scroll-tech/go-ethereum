@@ -22,12 +22,12 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -312,6 +312,16 @@ func (p *TxPool) Pending(enforceTips bool) map[common.Address][]*LazyTransaction
 	txs := make(map[common.Address][]*LazyTransaction)
 	for _, subpool := range p.subpools {
 		for addr, set := range subpool.Pending(enforceTips) {
+			txs[addr] = set
+		}
+	}
+	return txs
+}
+
+func (p *TxPool) PendingWithMax(enforceTips bool, maxAccountsNum int) map[common.Address][]*LazyTransaction {
+	txs := make(map[common.Address][]*LazyTransaction)
+	for _, subpool := range p.subpools {
+		for addr, set := range subpool.PendingWithMax(enforceTips, maxAccountsNum) {
 			txs[addr] = set
 		}
 	}

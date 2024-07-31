@@ -29,21 +29,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/txpool"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rollup/fees"
 	"github.com/holiman/billy"
 	"github.com/holiman/uint256"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/consensus/misc/eip1559"
+	"github.com/scroll-tech/go-ethereum/consensus/misc/eip4844"
+	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/state"
+	"github.com/scroll-tech/go-ethereum/core/txpool"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
+	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
 )
 
 const (
@@ -1080,7 +1080,7 @@ func (p *BlobPool) validateTx(tx *types.Transaction) error {
 			return nil
 		},
 	}
-	if err := txpool.ValidateTransactionWithState(tx, p.signer, stateOpts); err != nil {
+	if err := txpool.ValidateTransactionWithState(tx, p.signer, stateOpts, p.chain.Config(), p.head.Number); err != nil {
 		return err
 	}
 	// If the transaction replaces an existing one, ensure that price bumps are
@@ -1381,6 +1381,16 @@ func (p *BlobPool) drop() {
 // Pending retrieves all currently processable transactions, grouped by origin
 // account and sorted by nonce.
 func (p *BlobPool) Pending(enforceTips bool) map[common.Address][]*txpool.LazyTransaction {
+	return p.pendingWithMax(enforceTips, math.MaxInt)
+}
+
+// PendingWithMax works similar to Pending but allows setting an upper limit on how many
+// accounts to return
+func (p *BlobPool) PendingWithMax(enforceTips bool, maxAccountsNum int) map[common.Address][]*txpool.LazyTransaction {
+	return p.pendingWithMax(enforceTips, maxAccountsNum)
+}
+
+func (p *BlobPool) pendingWithMax(enforceTips bool, maxAccountsNum int) map[common.Address][]*txpool.LazyTransaction {
 	// Track the amount of time waiting to retrieve the list of pending blob txs
 	// from the pool and the amount of time actually spent on assembling the data.
 	// The latter will be pretty much moot, but we've kept it to have symmetric
@@ -1410,6 +1420,9 @@ func (p *BlobPool) Pending(enforceTips bool) map[common.Address][]*txpool.LazyTr
 		}
 		if len(lazies) > 0 {
 			pending[addr] = lazies
+		}
+		if len(pending) >= maxAccountsNum {
+			break
 		}
 	}
 	return pending

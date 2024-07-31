@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/scroll-tech/go-ethereum"
+	"github.com/scroll-tech/go-ethereum/accounts/abi"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rpc"
 
-	"github.com/ethereum/go-ethereum/rollup/sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
 // L1Client is a wrapper around EthClient that adds
@@ -56,7 +56,7 @@ func newL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId
 }
 
 // fetcRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
-func (c *L1Client) fetchRollupEventsInRange(ctx context.Context, from, to uint64) ([]types.Log, error) {
+func (c *L1Client) fetchRollupEventsInRange(from, to uint64) ([]types.Log, error) {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 
 	query := ethereum.FilterQuery{
@@ -80,8 +80,8 @@ func (c *L1Client) fetchRollupEventsInRange(ctx context.Context, from, to uint64
 }
 
 // getLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.
-func (c *L1Client) getLatestFinalizedBlockNumber(ctx context.Context) (uint64, error) {
-	header, err := c.client.HeaderByNumber(ctx, big.NewInt(int64(rpc.FinalizedBlockNumber)))
+func (c *L1Client) getLatestFinalizedBlockNumber() (uint64, error) {
+	header, err := c.client.HeaderByNumber(c.ctx, big.NewInt(int64(rpc.FinalizedBlockNumber)))
 	if err != nil {
 		return 0, err
 	}

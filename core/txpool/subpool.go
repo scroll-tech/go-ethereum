@@ -20,10 +20,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/event"
 )
 
 // LazyTransaction contains a small subset of the transaction properties that is
@@ -109,6 +109,8 @@ type SubPool interface {
 	// Pending retrieves all currently processable transactions, grouped by origin
 	// account and sorted by nonce.
 	Pending(enforceTips bool) map[common.Address][]*LazyTransaction
+
+	PendingWithMax(enforceTips bool, maxAccountsNum int) map[common.Address][]*LazyTransaction
 
 	// SubscribeTransactions subscribes to new transaction events. The subscriber
 	// can decide whether to receive notifications only for newly seen transactions

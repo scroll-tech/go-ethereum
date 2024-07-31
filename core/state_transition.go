@@ -21,13 +21,20 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	cmath "github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/common"
+	cmath "github.com/scroll-tech/go-ethereum/common/math"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
+	"github.com/scroll-tech/go-ethereum/params"
+)
+
+var (
+	stateTransitionEvmCallExecutionTimer = metrics.NewRegisteredTimer("state/transition/call_execution", nil)
+	stateTransitionApplyMessageTimer     = metrics.NewRegisteredTimer("state/transition/apply_message", nil)
 )
 
 // ExecutionResult includes all output after executing given evm
@@ -196,6 +203,10 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg *Message, gp *GasPool, l1DataFee *big.Int) (*ExecutionResult, error) {
+	defer func(t time.Time) {
+		stateTransitionApplyMessageTimer.Update(time.Since(t))
+	}(time.Now())
+
 	return NewStateTransition(evm, msg, gp, l1DataFee).TransitionDb()
 }
 
@@ -463,7 +474,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From, st.state.GetNonce(sender.Address())+1)
+		evmCallStart := time.Now()
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, msg.Value)
+		stateTransitionEvmCallExecutionTimer.Update(time.Since(evmCallStart))
 	}
 
 	// no refunds for l1 messages
@@ -490,19 +503,19 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		effectiveTip = cmath.BigMin(msg.GasTipCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 	}
 
+	// The L2 Fee is the same as the fee that is charged in the normal geth codepath.
+	fee := big.NewInt(0)
 	if st.evm.Config.NoBaseFee && msg.GasFeeCap.Sign() == 0 && msg.GasTipCap.Sign() == 0 {
 		// Skip fee payment when NoBaseFee is set and the fee fields
 		// are 0. This avoids a negative effectiveTip being applied to
 		// the coinbase when simulating calls.
 	} else {
-		// The L2 Fee is the same as the fee that is charged in the normal geth
-		// codepath. Add the L1DataFee to the L2 fee for the total fee that is sent
-		// to the sequencer.
-		fee := new(big.Int).SetUint64(st.gasUsed())
+		fee = new(big.Int).SetUint64(st.gasUsed())
 		fee.Mul(fee, effectiveTip)
-		fee.Add(fee, st.l1DataFee)
-		st.state.AddBalance(st.evm.Context.Coinbase, fee) // TODO: change to `st.evm.FeeRecipient()`
 	}
+	//Add the L1DataFee to the L2 fee for the total fee that is sent to the sequencer.
+	totalFee := fee.Add(fee, st.l1DataFee)
+	st.state.AddBalance(st.evm.FeeRecipient(), totalFee)
 
 	return &ExecutionResult{
 		L1DataFee:  st.l1DataFee,

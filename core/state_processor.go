@@ -20,16 +20,27 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
+	"github.com/scroll-tech/go-ethereum/core/state"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/metrics"
+	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
+)
+
+var (
+	processorBlockTransactionGauge = metrics.NewRegisteredGauge("processor/block/transactions", nil)
+	processBlockTimer              = metrics.NewRegisteredTimer("processor/block/process", nil)
+	finalizeBlockTimer             = metrics.NewRegisteredTimer("processor/block/finalize", nil)
+	applyTransactionTimer          = metrics.NewRegisteredTimer("processor/tx/apply", nil)
+	applyMessageTimer              = metrics.NewRegisteredTimer("processor/tx/msg/apply", nil)
+	updateStatedbTimer             = metrics.NewRegisteredTimer("processor/tx/statedb/update", nil)
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -59,6 +70,10 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
+	defer func(t0 time.Time) {
+		processBlockTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	var (
 		receipts    types.Receipts
 		usedGas     = new(uint64)
@@ -72,6 +87,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(statedb)
 	}
+	// Apply Curie hard fork
+	if p.config.CurieBlock != nil && p.config.CurieBlock.Cmp(block.Number()) == 0 {
+		misc.ApplyCurieHardFork(statedb)
+	}
 	var (
 		context = NewEVMBlockContext(header, p.bc, p.config, nil)
 		vmenv   = vm.NewEVM(context, vm.TxContext{}, statedb, p.config, cfg)
@@ -80,6 +99,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
 		ProcessBeaconBlockRoot(*beaconRoot, vmenv, statedb)
 	}
+	processorBlockTransactionGauge.Update(int64(block.Transactions().Len()))
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
@@ -100,34 +120,44 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		return nil, nil, 0, errors.New("withdrawals before shanghai")
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
+	finalizeBlockStartTime := time.Now()
 	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), withdrawals)
+	finalizeBlockTimer.Update(time.Since(finalizeBlockStartTime))
 
 	return receipts, allLogs, *usedGas, nil
 }
 
 func applyTransaction(msg *Message, config *params.ChainConfig, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
+	defer func(t0 time.Time) {
+		applyTransactionTimer.Update(time.Since(t0))
+	}(time.Now())
+
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
 
-	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, config, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply the transaction to the current state (included in the env).
+	applyMessageStartTime := time.Now()
 	result, err := ApplyMessage(evm, msg, gp, l1DataFee)
+	applyMessageTimer.Update(time.Since(applyMessageStartTime))
 	if err != nil {
 		return nil, err
 	}
 
 	// Update the state with pending changes.
 	var root []byte
+	updateStatedbStartTime := time.Now()
 	if config.IsByzantium(blockNumber) {
 		statedb.Finalise(true)
 	} else {
 		root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
 	}
+	updateStatedbTimer.Update(time.Since(updateStatedbStartTime))
 	*usedGas += result.UsedGas
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used

@@ -6,25 +6,36 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth/tracers"
-	"github.com/ethereum/go-ethereum/eth/tracers/logger"
-	"github.com/ethereum/go-ethereum/eth/tracers/native"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rollup/fees"
-	"github.com/ethereum/go-ethereum/rollup/rcfg"
-	"github.com/ethereum/go-ethereum/rollup/withdrawtrie"
-	// "github.com/ethereum/go-ethereum/trie/zkproof"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
+	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/core/state"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/crypto/codehash"
+	"github.com/scroll-tech/go-ethereum/eth/tracers"
+	"github.com/scroll-tech/go-ethereum/eth/tracers/logger"
+	"github.com/scroll-tech/go-ethereum/eth/tracers/native"
+	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
+	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
+)
+
+var (
+	getTxResultTimer             = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result", nil)
+	getTxResultApplyMessageTimer = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result/apply_message", nil)
+	getTxResultZkTrieBuildTimer  = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result/zk_trie_build", nil)
+	getTxResultTracerResultTimer = metrics.NewRegisteredTimer("rollup/tracing/get_tx_result/tracer_result", nil)
+	feedTxToTracerTimer          = metrics.NewRegisteredTimer("rollup/tracing/feed_tx_to_tracer", nil)
+	fillBlockTraceTimer          = metrics.NewRegisteredTimer("rollup/tracing/fill_block_trace", nil)
 )
 
 // TracerWrapper implements ScrollTracerWrapper interface
@@ -52,22 +63,22 @@ type TraceEnv struct {
 
 	coinbase common.Address
 
-	// rMu lock is used to protect txs executed in parallel.
 	signer   types.Signer
 	state    *state.StateDB
 	blockCtx vm.BlockContext
 
-	// pMu lock is used to protect Proofs' read and write mutual exclusion,
-	// since txs are executed in parallel, so this lock is required.
-	pMu sync.Mutex
-	// sMu is required because of txs are executed in parallel,
-	// this lock is used to protect StorageTrace's read and write mutual exclusion.
-	sMu sync.Mutex
+	// The following Mutexes are used to protect against parallel read/write,
+	// since txs are executed in parallel.
+	pMu sync.Mutex // for `TraceEnv.StorageTrace.Proofs`
+	sMu sync.Mutex // for `TraceEnv.state``
+	cMu sync.Mutex // for `TraceEnv.Codes`
+
+	ExecutionResults []*types.ExecutionResult
 	*types.StorageTrace
 	TxStorageTraces []*types.StorageTrace
+	Codes           map[common.Hash]logger.CodeInfo
 	// zktrie tracer is used for zktrie storage to build additional deletion proof
-	ZkTrieTracer     map[string]state.ZktrieProofTracer
-	ExecutionResults []*types.ExecutionResult
+	ZkTrieTracer map[string]state.ZktrieProofTracer
 
 	// StartL1QueueIndex is the next L1 message queue index that this block can process.
 	// Example: If the parent block included QueueIndex=9, then StartL1QueueIndex will
@@ -97,15 +108,16 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Con
 		signer:                  types.MakeSigner(chainConfig, block.Number(), block.Time()),
 		state:                   statedb,
 		blockCtx:                blockCtx,
+		ExecutionResults:        make([]*types.ExecutionResult, block.Transactions().Len()),
 		StorageTrace: &types.StorageTrace{
 			RootBefore:    rootBefore,
 			RootAfter:     block.Root(),
 			Proofs:        make(map[string][]hexutil.Bytes),
 			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		},
-		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
-		ExecutionResults:  make([]*types.ExecutionResult, block.Transactions().Len()),
 		TxStorageTraces:   make([]*types.StorageTrace, block.Transactions().Len()),
+		Codes:             make(map[common.Hash]logger.CodeInfo),
+		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
 		StartL1QueueIndex: startL1QueueIndex,
 	}
 }
@@ -190,7 +202,11 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	for th := 0; th < threads; th++ {
 		pend.Add(1)
 		go func() {
-			defer pend.Done()
+			defer func(t time.Time) {
+				pend.Done()
+				getTxResultTimer.Update(time.Since(t))
+			}(time.Now())
+
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
 				if err := env.getTxResult(task.statedb, task.index, block); err != nil {
@@ -212,27 +228,29 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 
 	// Feed the transactions into the tracers and return
 	var failed error
-	for i, tx := range txs {
-		// Send the trace task over for execution
-		jobs <- &txTraceTask{statedb: env.state.Copy(), index: i}
+	common.WithTimer(feedTxToTracerTimer, func() {
+		for i, tx := range txs {
+			// Send the trace task over for execution
+			jobs <- &txTraceTask{statedb: env.state.Copy(), index: i}
 
-		// Generate the next state snapshot fast without tracing
-		msg, _ := core.TransactionToMessage(tx, env.signer, block.BaseFee())
-		env.state.SetTxContext(tx.Hash(), i)
-		vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{})
-		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
-		if err != nil {
-			failed = err
-			break
+			// Generate the next state snapshot fast without tracing
+			msg, _ := core.TransactionToMessage(tx, env.signer, block.BaseFee())
+			env.state.SetTxContext(tx.Hash(), i)
+			vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{})
+			l1DataFee, err := fees.CalculateL1DataFee(tx, env.state, env.chainConfig, block.Number())
+			if err != nil {
+				failed = err
+				break
+			}
+			if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.GasLimit), l1DataFee); err != nil {
+				failed = err
+				break
+			}
+			if env.finaliseStateAfterApply {
+				env.state.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
+			}
 		}
-		if _, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.GasLimit), l1DataFee); err != nil {
-			failed = err
-			break
-		}
-		if env.finaliseStateAfterApply {
-			env.state.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
-		}
-	}
+	})
 	close(jobs)
 	pend.Wait()
 
@@ -300,6 +318,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		}
 	}
 
+	applyMessageStart := time.Now()
 	structLogger := logger.NewStructLogger(env.logConfig)
 	tracerContext := tracers.Context{
 		BlockHash: block.Hash(),
@@ -314,15 +333,9 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	if err != nil {
 		return fmt.Errorf("failed to create callTracer: %w", err)
 	}
-	prestateTracerConfig := native.PrestateTracerConfig{DiffMode: false}
-	prestateTracer, err := native.NewPrestateTracerWithConfig(&tracerContext, prestateTracerConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create prestateTracer: %w", err)
-	}
 	tracer := &native.MuxTracer{}
 	tracer.Append("structLogger", structLogger)
 	tracer.Append("callTracer", callTracer)
-	tracer.Append("prestateTracer", prestateTracer)
 
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, core.NewEVMTxContext(msg), state, env.chainConfig, vm.Config{Tracer: tracer, NoBaseFee: true})
@@ -330,14 +343,16 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	state.SetTxContext(txctx.TxHash, txctx.TxIndex)
 
 	// Computes the new state by applying the given message.
-	l1DataFee, err := fees.CalculateL1DataFee(tx, state)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, state, env.chainConfig, block.Number())
 	if err != nil {
 		return err
 	}
 	result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.GasLimit), l1DataFee)
 	if err != nil {
+		getTxResultApplyMessageTimer.UpdateSince(applyMessageStart)
 		return err
 	}
+	getTxResultApplyMessageTimer.UpdateSince(applyMessageStart)
 	// If the result contains a revert reason, return it.
 	returnVal := result.Return()
 	if len(result.Revert()) > 0 {
@@ -376,6 +391,15 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		txStorageTrace.RootAfter = block.Root()
 	}
 
+	// merge bytecodes
+	env.cMu.Lock()
+	for codeHash, codeInfo := range structLogger.TracedBytecodes() {
+		if codeHash != (common.Hash{}) {
+			env.Codes[codeHash] = codeInfo
+		}
+	}
+	env.cMu.Unlock()
+
 	// merge required proof data
 	proofAccounts := structLogger.UpdatedAccounts()
 	proofAccounts[vmenv.FeeRecipient()] = struct{}{}
@@ -403,6 +427,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		env.pMu.Unlock()
 	}
 
+	zkTrieBuildStart := time.Now()
 	proofStorages := structLogger.UpdatedStorages()
 	for addr, keys := range proofStorages {
 		if _, existed := txStorageTrace.StorageProofs[addr.String()]; !existed {
@@ -420,10 +445,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		zktrieTracer := state.NewProofTracer(trie)
 		env.sMu.Unlock()
 
-		for key, values := range keys {
+		for key := range keys {
 			addrStr := addr.String()
 			keyStr := key.String()
-			isDelete := bytes.Equal(values.Bytes(), common.Hash{}.Bytes())
+			value := state.GetState(addr, key)
+			isDelete := bytes.Equal(value.Bytes(), common.Hash{}.Bytes())
 
 			txm := txStorageTrace.StorageProofs[addrStr]
 			env.sMu.Lock()
@@ -471,15 +497,14 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			env.sMu.Unlock()
 		}
 	}
+	getTxResultZkTrieBuildTimer.UpdateSince(zkTrieBuildStart)
 
+	tracerResultTimer := time.Now()
 	callTrace, err := callTracer.GetResult()
 	if err != nil {
 		return fmt.Errorf("failed to get callTracer result: %w", err)
 	}
-	prestateTrace, err := prestateTracer.GetResult()
-	if err != nil {
-		return fmt.Errorf("failed to get prestateTracer result: %w", err)
-	}
+	getTxResultTracerResultTimer.UpdateSince(tracerResultTimer)
 
 	env.ExecutionResults[index] = &types.ExecutionResult{
 		From:           sender,
@@ -492,7 +517,6 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		ReturnValue:    fmt.Sprintf("%x", returnVal),
 		StructLogs:     logger.FormatLogs(structLogger.StructLogs()),
 		CallTrace:      callTrace,
-		PrestateTrace:  prestateTrace,
 	}
 	env.TxStorageTraces[index] = txStorageTrace
 
@@ -501,6 +525,10 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 
 // fillBlockTrace content after all the txs are finished running.
 func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+	defer func(t time.Time) {
+		fillBlockTraceTimer.Update(time.Since(t))
+	}(time.Now())
+
 	statedb := env.state
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())
@@ -514,6 +542,10 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			rcfg.L1BaseFeeSlot,
 			rcfg.OverheadSlot,
 			rcfg.ScalarSlot,
+			rcfg.L1BlobBaseFeeSlot,
+			rcfg.CommitScalarSlot,
+			rcfg.BlobScalarSlot,
+			rcfg.IsCurieSlot,
 		},
 	}
 
@@ -534,7 +566,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			if _, existed := env.StorageProofs[addr.String()][slot.String()]; !existed {
 				if trie, err := statedb.GetStorageTrieForProof(addr); err != nil {
 					log.Error("Storage proof for intrinstic address not available", "error", err, "address", addr)
-				} else if proof, _ := statedb.GetSecureTrieProof(trie, slot); err != nil {
+				} else if proof, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
 				} else {
 					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof)
@@ -559,33 +591,27 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			CodeSize:         statedb.GetCodeSize(env.coinbase),
 		},
 		Header:            block.Header(),
-		StorageTrace:      env.StorageTrace,
 		ExecutionResults:  env.ExecutionResults,
+		StorageTrace:      env.StorageTrace,
 		TxStorageTraces:   env.TxStorageTraces,
+		Bytecodes:         make([]*types.BytecodeTrace, 0, len(env.Codes)),
 		Transactions:      txs,
 		StartL1QueueIndex: env.StartL1QueueIndex,
 	}
 
-	for i, tx := range block.Transactions() {
-		evmTrace := env.ExecutionResults[i]
-		// Contract is created.
-		if tx.To() == nil {
-			evmTrace.ByteCode = hexutil.Encode(tx.Data())
-		} else { // contract call be included at this case, specially fallback call's data is empty.
-			evmTrace.ByteCode = hexutil.Encode(statedb.GetCode(*tx.To()))
-			// Get tx.to address's code hash.
-			codeHash := statedb.GetPoseidonCodeHash(*tx.To())
-			evmTrace.PoseidonCodeHash = &codeHash
-		}
-	}
-
-	// only zktrie model has the ability to get `mptwitness`.
-	if env.chainConfig.Scroll.ZktrieEnabled() {
-		// // we use MPTWitnessNothing by default and do not allow switch among MPTWitnessType atm.
-		// // MPTWitness will be removed from traces in the future.
-		// if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessNothing, blockTrace); err != nil {
-		// 	log.Error("fill mpt witness fail", "error", err)
-		// }
+	blockTrace.Bytecodes = append(blockTrace.Bytecodes, &types.BytecodeTrace{
+		CodeSize:         0,
+		KeccakCodeHash:   codehash.EmptyKeccakCodeHash,
+		PoseidonCodeHash: codehash.EmptyPoseidonCodeHash,
+		Code:             hexutil.Bytes{},
+	})
+	for _, codeInfo := range env.Codes {
+		blockTrace.Bytecodes = append(blockTrace.Bytecodes, &types.BytecodeTrace{
+			CodeSize:         codeInfo.CodeSize,
+			KeccakCodeHash:   codeInfo.KeccakCodeHash,
+			PoseidonCodeHash: codeInfo.PoseidonCodeHash,
+			Code:             codeInfo.Code,
+		})
 	}
 
 	blockTrace.WithdrawTrieRoot = withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, env.state)

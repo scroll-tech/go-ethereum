@@ -6,13 +6,14 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/event"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
+	"github.com/scroll-tech/go-ethereum/node"
+	"github.com/scroll-tech/go-ethereum/params"
 )
 
 const (
@@ -33,6 +34,10 @@ const (
 	// a long section of L1 blocks with no messages and we stop or crash, we will not need to re-scan
 	// this secion.
 	DbWriteThresholdBlocks = 1000
+)
+
+var (
+	l1MessageTotalCounter = metrics.NewRegisteredCounter("rollup/l1/message", nil)
 )
 
 // SyncService collects all L1 messages and stores them in a local database.
@@ -172,6 +177,7 @@ func (s *SyncService) fetchMessages() {
 		numBlocksPendingDbWrite = 0
 
 		if numMessagesPendingDbWrite > 0 {
+			l1MessageTotalCounter.Inc(int64(numMessagesPendingDbWrite))
 			s.msgCountFeed.Send(core.NewL1MsgsEvent{Count: numMessagesPendingDbWrite})
 			numMessagesPendingDbWrite = 0
 		}

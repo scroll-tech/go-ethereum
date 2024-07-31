@@ -3,7 +3,7 @@ package rawdb
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common"
 )
 
 func TestWriteRollupEventSyncedL1BlockNumber(t *testing.T) {
@@ -54,6 +54,32 @@ func TestFinalizedL2BlockNumber(t *testing.T) {
 
 		if *got != num {
 			t.Fatal("Block number mismatch", "expected", num, "got", got)
+		}
+	}
+}
+
+func TestLastFinalizedBatchIndex(t *testing.T) {
+	batchIndxes := []uint64{
+		1,
+		1 << 2,
+		1 << 8,
+		1 << 16,
+		1 << 32,
+	}
+
+	db := NewMemoryDatabase()
+
+	// read non-existing value
+	if got := ReadLastFinalizedBatchIndex(db); got != nil {
+		t.Fatal("Expected nil for non-existing value", "got", *got)
+	}
+
+	for _, num := range batchIndxes {
+		WriteLastFinalizedBatchIndex(db, num)
+		got := ReadLastFinalizedBatchIndex(db)
+
+		if *got != num {
+			t.Fatal("Batch index mismatch", "expected", num, "got", got)
 		}
 	}
 }

@@ -157,9 +157,9 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		percentile:         percent,
 		maxHeaderHistory:   maxHeaderHistory,
 		maxBlockHistory:    maxBlockHistory,
+		historyCache:       cache,
 		congestedThreshold: congestedThreshold,
 		defaultBasePrice:   defaultBasePrice,
-		historyCache:       cache,
 	}
 }
 

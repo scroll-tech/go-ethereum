@@ -40,8 +40,8 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock) error {
 		return fmt.Errorf("failed building and writing block, number: %d, error: %v", block.PartialHeader.Number, err)
 	}
 
-	if s.blockchain.CurrentBlock().Header().Number.Uint64()%100 == 0 {
-		log.Info("inserted block", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash(), "root", s.blockchain.CurrentBlock().Header().Root)
+	if s.blockchain.CurrentBlock().Header().Number.Uint64()%1000 == 0 {
+		log.Info("L1 sync progress", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash(), "root", s.blockchain.CurrentBlock().Header().Root)
 	}
 
 	return nil

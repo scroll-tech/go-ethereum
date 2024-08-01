@@ -25,7 +25,7 @@ import (
 )
 
 // Protocol-enforced maximum L2 base fee.
-// We would only go above this if L1 base fee hits 2164 Gwei.
+// We would only go above this if L1 base fee hits 2931 Gwei.
 const MaximumL2BaseFee = 10000000000
 
 // VerifyEip1559Header verifies some header attributes which were changed in EIP-1559,

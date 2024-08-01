@@ -233,11 +233,12 @@ func newBackendMock() *backendMock {
 	config.BernoulliBlock = config.LondonBlock
 	config.CurieBlock = config.LondonBlock
 	config.ShanghaiTime = nil
-
+	config.DarwinTime = nil
 	if config.LondonBlock != nil {
 		shanghaiTime := config.LondonBlock.Uint64() * 12
 		config.ShanghaiTime = &shanghaiTime
-		config.DarwinTime = &shanghaiTime
+		darwinTime := config.LondonBlock.Uint64() * 12
+		config.DarwinTime = &darwinTime
 	}
 
 	return &backendMock{

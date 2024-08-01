@@ -123,9 +123,13 @@ func (b *testBackend) StateAt(root common.Hash) (*state.StateDB, error) {
 	return b.chain.StateAt(root)
 }
 
+func (b *testBackend) Stats() (int, int) {
+	return b.pendingTxCount, 0
+}
+
 // newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
 // after use, otherwise the blockchain instance will mem-leak via goroutines.
-func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBackend {
+func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool, pendingTxCount int) *testBackend {
 	var (
 		key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr   = crypto.PubkeyToAddress(key.PublicKey)
@@ -190,7 +194,7 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	chain.InsertChain(blocks)
 	chain.SetFinalized(chain.GetBlockByNumber(25).Header())
 	chain.SetSafe(chain.GetBlockByNumber(25).Header())
-	return &testBackend{chain: chain, pending: pending}
+	return &testBackend{chain: chain, pending: pending, pendingTxCount: pendingTxCount}
 }
 
 func (b *testBackend) CurrentHeader() *types.Header {

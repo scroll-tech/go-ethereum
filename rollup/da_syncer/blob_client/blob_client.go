@@ -20,19 +20,23 @@ type BlobClient interface {
 type BlobSource int
 
 const (
+	// AnyBlobSource
+	AnyBlobSource BlobSource = iota
 	// BlobScan
-	BlobScan BlobSource = iota
+	BlobScan
 	// BlockNative
 	BlockNative
 )
 
 func (src BlobSource) IsValid() bool {
-	return src >= BlobScan && src <= BlockNative
+	return src >= AnyBlobSource && src <= BlockNative
 }
 
 // String implements the stringer interface.
 func (src BlobSource) String() string {
 	switch src {
+	case AnyBlobSource:
+		return "any"
 	case BlobScan:
 		return "blobscan"
 	case BlockNative:
@@ -44,6 +48,8 @@ func (src BlobSource) String() string {
 
 func (src BlobSource) MarshalText() ([]byte, error) {
 	switch src {
+	case AnyBlobSource:
+		return []byte("any"), nil
 	case BlobScan:
 		return []byte("blobscan"), nil
 	case BlockNative:
@@ -55,12 +61,14 @@ func (src BlobSource) MarshalText() ([]byte, error) {
 
 func (src *BlobSource) UnmarshalText(text []byte) error {
 	switch string(text) {
+	case "any":
+		*src = AnyBlobSource
 	case "blobscan":
 		*src = BlobScan
 	case "blocknative":
 		*src = BlockNative
 	default:
-		return fmt.Errorf(`unknown blob source %q, want "blobscan" or "blocknative"`, text)
+		return fmt.Errorf(`unknown blob source %q, want "any", "blobscan" or "blocknative"`, text)
 	}
 	return nil
 }

@@ -50,17 +50,28 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		return nil, err
 	}
 
-	var blobClient blob_client.BlobClient
+	blobClientList := blob_client.NewBlobClientList()
 	switch config.BlobSource {
+	case blob_client.AnyBlobSource:
+		if genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint))
+		}
+		if genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint))
+		}
 	case blob_client.BlobScan:
-		blobClient = blob_client.NewBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint)
+		if genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint))
+		}
 	case blob_client.BlockNative:
-		blobClient = blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint)
+		if genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint))
+		}
 	default:
 		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)
 	}
 
-	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
+	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClientList, db)
 	syncedL1Height := l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)
 	if from != nil {

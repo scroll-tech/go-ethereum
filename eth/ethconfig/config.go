@@ -97,7 +97,7 @@ var Defaults = Config{
 	MaxBlockRange: -1, // Default unconfigured value: no block range limit for backward compatibility
 	DA: da_syncer.Config{
 		FetcherMode: da_syncer.L1RPC,
-		BlobSource:  blob_client.BlobScan,
+		BlobSource:  blob_client.AnyBlobSource,
 	},
 }
 

@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -34,7 +35,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
 

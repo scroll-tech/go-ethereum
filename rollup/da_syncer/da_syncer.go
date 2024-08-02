@@ -25,15 +25,13 @@ func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
 
 func (s *DASyncer) SyncOneBlock(block *da.PartialBlock) error {
 	parentBlock := s.blockchain.CurrentBlock()
+	// we expect blocks to be consecutive. block.PartialHeader.Number == parentBlock.Number+1.
 	if block.PartialHeader.Number <= parentBlock.NumberU64() {
 		log.Debug("block number is too low", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
 		return ErrBlockTooLow
 	} else if block.PartialHeader.Number > parentBlock.NumberU64()+1 {
 		log.Debug("block number is too high", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
 		return ErrBlockTooHigh
-	}
-	if parentBlock.NumberU64()+1 != block.PartialHeader.Number {
-		return fmt.Errorf("not consecutive block, number: %d, chain height: %d", block.PartialHeader.Number, parentBlock.NumberU64())
 	}
 
 	if _, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions); err != nil {

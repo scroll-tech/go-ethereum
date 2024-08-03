@@ -26,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
+	zktrie "github.com/scroll-tech/zktrie/types"
 )
 
 var (
@@ -540,7 +541,10 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 
 func (env *TraceEnv) fillFlattenStorageProof(trace *types.StorageTrace, proof proofList) {
 	for _, i := range proof {
-		keyStr := hexutil.Encode(i.Key)
+		// the "raw key" is in fact a zktrie.Hash (bytes stored with little-endian)
+		// we need to convert it into big-endian
+		hashContainer := zktrie.NewHashFromBytes(i.Key)
+		keyStr := hexutil.Encode(hashContainer[:])
 		env.FlattenProofs[keyStr] = i.Value
 		if trace != nil {
 			trace.FlattenProofs[keyStr] = i.Value

@@ -63,9 +63,12 @@ func (bq *BatchQueue) getFinalizedBatch() da.Entry {
 	}
 
 	batch := bq.batches.Peek()
-	bq.deleteBatch(batch.BatchIndex())
-
-	return batch
+	if batch.BatchIndex() <= bq.lastFinalizedBatchIndex {
+		bq.deleteBatch(batch.BatchIndex())
+		return batch
+	} else {
+		return nil
+	}
 }
 
 // deleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized

@@ -221,6 +221,9 @@ type Config struct {
 	// Max block range for eth_getLogs api method
 	MaxBlockRange int64
 
+	// List of peer ids that take part in the shadow-fork
+	ShadowForkPeerIDs []string
+
 	// Enable syncing node from DA
 	EnableDASyncing bool
 

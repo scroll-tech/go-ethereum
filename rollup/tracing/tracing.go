@@ -175,12 +175,14 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 
 	key := coinbase.String()
 	if _, exist := env.Proofs[key]; !exist {
-		proof, err := env.state.GetProof(coinbase)
+		proof, err := env.state.GetFullProof(coinbase)
 		if err != nil {
 			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
 			// but we still mark the proofs map with nil array
 		}
-		env.Proofs[key] = types.WrapProof(proof)
+		// TODO:
+		env.fillFlattenStorageProof(nil, proof)
+		env.Proofs[key] = types.WrapProof(proof.GetData())
 	}
 
 	return env, nil

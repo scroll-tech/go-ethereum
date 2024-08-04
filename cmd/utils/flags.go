@@ -1325,6 +1325,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
 	setL1(ctx, cfg)
+	if ctx.GlobalIsSet(DASyncEnabledFlag.Name) {
+		cfg.DaSyncingEnabled = ctx.GlobalBool(DASyncEnabledFlag.Name)
+	}
 
 	if ctx.GlobalIsSet(ExternalSignerFlag.Name) {
 		cfg.ExternalSigner = ctx.GlobalString(ExternalSignerFlag.Name)

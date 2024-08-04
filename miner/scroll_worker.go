@@ -152,7 +152,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	}
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 	if daSyncingEnabled {
-		log.Info("worker will not start, because DA syncing is enabled")
+		log.Info("Worker will not start, because DA syncing is enabled")
 		return worker
 	}
 

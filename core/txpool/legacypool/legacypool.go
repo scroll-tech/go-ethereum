@@ -748,7 +748,7 @@ func (pool *LegacyPool) add(tx *types.Transaction, local bool) (replaced bool, e
 		// If the new transaction is underpriced, don't accept it
 		// if !isLocal && pool.priced.Underpriced(tx) {
 		if !isLocal && tx.GasFeeCapIntCmp(pool.gasTip.Load()) < 0 {
-			log.Trace("Discarding underpriced transaction", "hash", hash, "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
+			log.Trace("Discarding underpriced transaction", "hash", hash, "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap(), "txPoolGasTip", pool.gasTip.Load())
 			underpricedTxMeter.Mark(1)
 			return false, txpool.ErrUnderpriced
 		}

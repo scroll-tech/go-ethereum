@@ -213,9 +213,6 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
 func (c *Clique) Author(header *types.Header) (common.Address, error) {
-	if c.config.DaSyncingEnabled {
-		return common.BigToAddress(big.NewInt(0).SetUint64(12345)), nil
-	}
 	return ecrecover(header, c.signatures)
 }
 
@@ -271,22 +268,20 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	if checkpoint && !bytes.Equal(header.Nonce[:], nonceDropVote) {
 		return errInvalidCheckpointVote
 	}
-	if !c.config.DaSyncingEnabled {
-		// Check that the extra-data contains both the vanity and signature
-		if len(header.Extra) < extraVanity {
-			return errMissingVanity
-		}
-		if len(header.Extra) < extraVanity+extraSeal {
-			return errMissingSignature
-		}
-		// Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
-		signersBytes := len(header.Extra) - extraVanity - extraSeal
-		if !checkpoint && signersBytes != 0 {
-			return errExtraSigners
-		}
-		if checkpoint && signersBytes%common.AddressLength != 0 {
-			return errInvalidCheckpointSigners
-		}
+	// Check that the extra-data contains both the vanity and signature
+	if len(header.Extra) < extraVanity {
+		return errMissingVanity
+	}
+	if len(header.Extra) < extraVanity+extraSeal {
+		return errMissingSignature
+	}
+	// Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
+	signersBytes := len(header.Extra) - extraVanity - extraSeal
+	if !checkpoint && signersBytes != 0 {
+		return errExtraSigners
+	}
+	if checkpoint && signersBytes%common.AddressLength != 0 {
+		return errInvalidCheckpointSigners
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -354,11 +349,6 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		// Verify the header's EIP-1559 attributes.
 		return err
 	}
-
-	if c.config.DaSyncingEnabled {
-		return nil
-	}
-
 	// Retrieve the snapshot needed to verify this header and cache it
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {

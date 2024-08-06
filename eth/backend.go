@@ -143,9 +143,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
-	if chainConfig.Clique != nil && config.EnableDASyncing {
-		chainConfig.Clique.DaSyncingEnabled = true
-	}
+
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {

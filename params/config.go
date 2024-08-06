@@ -739,7 +739,6 @@ type CliqueConfig struct {
 	RelaxedPeriod    bool           `json:"relaxed_period"`     // Relaxes the period to be just an upper bound
 	ShadowForkHeight uint64         `json:"shadow_fork_height"` // Allows shadow forking consensus layer at given height
 	ShadowForkSigner common.Address `json:"shadow_fork_signer"` // Sets the address to be the authorized signer after the shadow fork
-	DaSyncingEnabled bool           `json:"da_syncing_enabled"` // Is daSyncingEnabled
 }
 
 // String implements the stringer interface, returning the consensus engine details.

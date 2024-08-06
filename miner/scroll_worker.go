@@ -152,7 +152,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	}
 	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
 	if daSyncingEnabled {
-		log.Info("worker will not start, because DA syncing is enabled")
+		log.Info("Worker will not start, because DA syncing is enabled")
 		return worker
 	}
 
@@ -457,6 +457,9 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 	collectL2Timer.UpdateSince(tidyPendingStart)
 
+	// Allow txpool to be reorged as we build current block
+	w.eth.TxPool().ResumeReorgs()
+
 	var nextL1MsgIndex uint64
 	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.chain.Database(), parent.Hash()); dbIndex != nil {
 		nextL1MsgIndex = *dbIndex
@@ -722,6 +725,10 @@ func (w *worker) commit(res *pipeline.Result) error {
 		"hash", blockHash.String(),
 		"accRows", res.Rows,
 	)
+
+	// A new block event will trigger a reorg in the txpool, pause reorgs to defer this until we fetch txns for next block.
+	// We may end up trying to process txns that we already included in the previous block, but they will all fail the nonce check
+	w.eth.TxPool().PauseReorgs()
 
 	rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), blockHash, res.Rows)
 	// Commit block and state to database.

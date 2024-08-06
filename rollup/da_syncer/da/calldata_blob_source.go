@@ -40,6 +40,8 @@ type CalldataBlobSource struct {
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 	db                            ethdb.Database
+
+	l1Finalized uint64
 }
 
 func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *rollup_sync_service.L1Client, blobClient blob_client.BlobClient, db ethdb.Database) (*CalldataBlobSource, error) {
@@ -61,17 +63,25 @@ func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Client *rollu
 }
 
 func (ds *CalldataBlobSource) NextData() (Entries, error) {
+	var err error
 	to := ds.l1height + callDataBlobSourceFetchBlockRange
-	l1Finalized, err := ds.l1Client.GetLatestFinalizedBlockNumber()
-	if err != nil {
-		return nil, fmt.Errorf("cannot get l1height, error: %v", err)
+
+	// If there's not enough finalized blocks to request up to, we need to query finalized block number.
+	// Otherwise, we know that there's more finalized blocks than we want to request up to
+	// -> no need to query finalized block number
+	if to > ds.l1Finalized {
+		ds.l1Finalized, err = ds.l1Client.GetLatestFinalizedBlockNumber()
+		if err != nil {
+			return nil, fmt.Errorf("failed to query GetLatestFinalizedBlockNumber, error: %v", err)
+		}
+		// make sure we don't request more than finalized blocks
+		to = min(to, ds.l1Finalized)
 	}
-	if to > l1Finalized {
-		to = l1Finalized
-	}
+
 	if ds.l1height > to {
 		return nil, ErrSourceExhausted
 	}
+
 	logs, err := ds.l1Client.FetchRollupEventsInRange(ds.l1height, to)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get events, l1height: %d, error: %v", ds.l1height, err)

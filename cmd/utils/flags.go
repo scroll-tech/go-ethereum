@@ -882,6 +882,16 @@ var (
 		Name:  "da.snapshot.file",
 		Usage: "Snapshot file to sync from da",
 	}
+	DABlobScanAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blobscan.endpoint",
+		Usage: "BlobScan blob api endpoint",
+		Value: ethconfig.Defaults.DA.BlobScanAPIEndpoint,
+	}
+	DABlockNativeAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blocknative.ednpoint",
+		Usage: "BlockNative blob api endpoint",
+		Value: ethconfig.Defaults.DA.BlockNativeAPIEndpoint,
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating

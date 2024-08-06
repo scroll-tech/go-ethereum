@@ -3,15 +3,11 @@ package blob_client
 import (
 	"context"
 	"fmt"
-	"time"
+	"io"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/log"
-)
-
-var (
-	listOverSleepDuration = 100
 )
 
 type BlobClientList struct {
@@ -32,15 +28,16 @@ func (c *BlobClientList) GetBlobByVersionedHash(ctx context.Context, versionedHa
 	}
 	var blob *kzg4844.Blob
 	var err error
+	startPos := c.curPos
 	for blob, err = c.list[c.curPos].GetBlobByVersionedHash(ctx, versionedHash); ; {
 		if err != nil {
 			return blob, nil
 		} else {
 			log.Warn("BlobClientList: failed to get blob by versioned hash from BlobClient", "err", err, "blob client pos in BlobClientList", c.curPos)
 			c.curPos = (c.curPos + 1) % len(c.list)
-			// if we iterated over entire list, wait before starting again
-			if c.curPos == 0 {
-				time.Sleep(time.Duration(listOverSleepDuration) * time.Millisecond)
+			// if we iterated over entire list, return EOF error that will be handled in syncing_pipeline
+			if c.curPos == startPos {
+				return nil, io.EOF
 			}
 		}
 	}

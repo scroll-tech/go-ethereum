@@ -22,9 +22,11 @@ import (
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	FetcherMode      FetcherMode            // mode of fetcher
-	SnapshotFilePath string                 // path to snapshot file
-	BlobSource       blob_client.BlobSource // blob source
+	FetcherMode            FetcherMode            // mode of fetcher
+	SnapshotFilePath       string                 // path to snapshot file
+	BlobSource             blob_client.BlobSource // blob source
+	BlobScanAPIEndpoint    string                 // BlobScan blob api endpoint
+	BlockNativeAPIEndpoint string                 // BlockNative blob api endpoint
 }
 
 type SyncingPipeline struct {
@@ -53,19 +55,19 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	blobClientList := blob_client.NewBlobClientList()
 	switch config.BlobSource {
 	case blob_client.AnyBlobSource:
-		if genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint))
+		if config.BlobScanAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
 		}
-		if genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint))
+		if config.BlockNativeAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
 		}
 	case blob_client.BlobScan:
-		if genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint))
+		if config.BlobScanAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
 		}
 	case blob_client.BlockNative:
-		if genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint))
+		if config.BlockNativeAPIEndpoint != "" {
+			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
 		}
 	default:
 		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)

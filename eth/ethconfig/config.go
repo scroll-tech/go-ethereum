@@ -96,8 +96,10 @@ var Defaults = Config{
 	RPCTxFeeCap:   1,  // 1 ether
 	MaxBlockRange: -1, // Default unconfigured value: no block range limit for backward compatibility
 	DA: da_syncer.Config{
-		FetcherMode: da_syncer.L1RPC,
-		BlobSource:  blob_client.AnyBlobSource,
+		FetcherMode:            da_syncer.L1RPC,
+		BlobSource:             blob_client.AnyBlobSource,
+		BlobScanAPIEndpoint:    "https://api.blobscan.com/blobs/",
+		BlockNativeAPIEndpoint: "https://api.ethernow.xyz/v1/blob/",
 	},
 }
 

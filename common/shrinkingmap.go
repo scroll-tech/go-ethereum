@@ -51,6 +51,11 @@ func (s *ShrinkingMap[K, V]) Size() (size int) {
 	return len(s.m)
 }
 
+func (s *ShrinkingMap[K, V]) Clear() {
+	s.m = make(map[K]V)
+	s.deletedKeys = 0
+}
+
 func (s *ShrinkingMap[K, V]) shouldShrink() bool {
 	return s.shrinkAfterDeletionsCount > 0 && s.deletedKeys >= s.shrinkAfterDeletionsCount
 }

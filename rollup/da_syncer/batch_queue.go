@@ -95,6 +95,7 @@ func (bq *BatchQueue) deleteBatch(batch da.Entry) {
 }
 
 func (bq *BatchQueue) Reset(height uint64) {
-	bq.batches = common.NewHeap[da.Entry]()
+	bq.batches.Clear()
+	bq.batchesMap.Clear()
 	bq.DAQueue.Reset(height)
 }

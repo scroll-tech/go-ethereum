@@ -11,16 +11,20 @@ import (
 )
 
 type BatchQueue struct {
-	DAQueue *DAQueue
-	db      ethdb.Database
-	batches *common.Heap[da.Entry]
+	DAQueue                 *DAQueue
+	db                      ethdb.Database
+	lastFinalizedBatchIndex uint64
+	batches                 *common.Heap[da.Entry]
+	batchesMap              *common.ShrinkingMap[uint64, *common.HeapElement[da.Entry]]
 }
 
 func NewBatchQueue(DAQueue *DAQueue, db ethdb.Database) *BatchQueue {
 	return &BatchQueue{
-		DAQueue: DAQueue,
-		db:      db,
-		batches: common.NewHeap[da.Entry](),
+		DAQueue:                 DAQueue,
+		db:                      db,
+		lastFinalizedBatchIndex: 0,
+		batches:                 common.NewHeap[da.Entry](),
+		batchesMap:              common.NewShrinkingMap[uint64, *common.HeapElement[da.Entry]](1000),
 	}
 }
 
@@ -37,11 +41,14 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.Entry, error) {
 		}
 		switch daEntry.Type() {
 		case da.CommitBatchV0Type, da.CommitBatchV1Type, da.CommitBatchV2Type:
-			bq.batches.Push(daEntry)
+			bq.addBatch(daEntry)
 		case da.RevertBatchType:
-			bq.deleteBatch(daEntry.BatchIndex())
+			bq.deleteBatch(daEntry)
 		case da.FinalizeBatchType:
-			// TODO: eventually we should match finalized batch with the one that was committed via batch header
+			if daEntry.BatchIndex() > bq.lastFinalizedBatchIndex {
+				bq.lastFinalizedBatchIndex = daEntry.BatchIndex()
+			}
+
 			if batch := bq.getFinalizedBatch(); batch != nil {
 				return batch, nil
 			}
@@ -57,24 +64,30 @@ func (bq *BatchQueue) getFinalizedBatch() da.Entry {
 		return nil
 	}
 
-	batch := bq.batches.Peek()
-	bq.deleteBatch(batch.BatchIndex())
+	batch := bq.batches.Peek().Value()
+	if batch.BatchIndex() <= bq.lastFinalizedBatchIndex {
+		bq.deleteBatch(batch)
+		return batch
+	} else {
+		return nil
+	}
+}
 
-	return batch
+func (bq *BatchQueue) addBatch(batch da.Entry) {
+	heapElement := bq.batches.Push(batch)
+	bq.batchesMap.Set(batch.BatchIndex(), heapElement)
 }
 
 // deleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized
 // updates DASyncedL1BlockNumber
-func (bq *BatchQueue) deleteBatch(batchIndex uint64) {
-	var batch da.Entry
-	for batch = bq.batches.Peek(); batch.BatchIndex() <= batchIndex; {
-		bq.batches.Pop()
-
-		if bq.batches.Len() == 0 {
-			break
-		}
-		batch = bq.batches.Peek()
+func (bq *BatchQueue) deleteBatch(batch da.Entry) {
+	batchHeapElement, exists := bq.batchesMap.Get(batch.BatchIndex())
+	if !exists {
+		return
 	}
+
+	bq.batchesMap.Delete(batch.BatchIndex())
+	bq.batches.Remove(batchHeapElement)
 
 	// we store here min height of currently loaded batches to be able to start syncing from the same place in case of restart
 	// TODO: we should store this information when the batch is done being processed to avoid inconsistencies

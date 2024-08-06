@@ -18,22 +18,27 @@ func (h *Heap[T]) Len() int {
 	return len(h.heap)
 }
 
-func (h *Heap[T]) Push(element T) {
+func (h *Heap[T]) Push(element T) *HeapElement[T] {
 	heapElement := NewHeapElement(element)
 	heap.Push(&h.heap, heapElement)
+
+	return heapElement
 }
 
-func (h *Heap[T]) Pop() T {
-	return heap.Pop(&h.heap).(*HeapElement[T]).Value()
+func (h *Heap[T]) Pop() *HeapElement[T] {
+	return heap.Pop(&h.heap).(*HeapElement[T])
 }
 
-func (h *Heap[T]) Peek() T {
+func (h *Heap[T]) Peek() *HeapElement[T] {
 	if h.Len() == 0 {
-		var empty T
-		return empty
+		return nil
 	}
 
-	return h.heap[0].Value()
+	return h.heap[0]
+}
+
+func (h *Heap[T]) Remove(element *HeapElement[T]) {
+	heap.Remove(&h.heap, element.index)
 }
 
 type innerHeap[T Comparable[T]] []*HeapElement[T]

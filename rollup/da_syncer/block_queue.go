@@ -50,3 +50,8 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 
 	return nil
 }
+
+func (bq *BlockQueue) Reset(height uint64) {
+	bq.blocks = make([]*da.PartialBlock, 0)
+	bq.batchQueue.Reset(height)
+}

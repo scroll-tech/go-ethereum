@@ -41,6 +41,10 @@ func (h *Heap[T]) Remove(element *HeapElement[T]) {
 	heap.Remove(&h.heap, element.index)
 }
 
+func (h *Heap[T]) Clear() {
+	h.heap = make(innerHeap[T], 0)
+}
+
 type innerHeap[T Comparable[T]] []*HeapElement[T]
 
 func (h innerHeap[T]) Len() int {

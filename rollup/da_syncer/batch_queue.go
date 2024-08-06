@@ -89,12 +89,13 @@ func (bq *BatchQueue) deleteBatch(batch da.Entry) {
 	bq.batchesMap.Delete(batch.BatchIndex())
 	bq.batches.Remove(batchHeapElement)
 
-	if bq.batches.Len() == 0 {
-		curBatchL1Height := batch.L1BlockNumber()
-		rawdb.WriteDASyncedL1BlockNumber(bq.db, curBatchL1Height)
-		return
-	}
-
 	// we store here min height of currently loaded batches to be able to start syncing from the same place in case of restart
-	rawdb.WriteDASyncedL1BlockNumber(bq.db, bq.batches.Peek().Value().L1BlockNumber()-1)
+	// TODO: we should store this information when the batch is done being processed to avoid inconsistencies
+	rawdb.WriteDASyncedL1BlockNumber(bq.db, batch.L1BlockNumber()-1)
+}
+
+func (bq *BatchQueue) Reset(height uint64) {
+	bq.batches.Clear()
+	bq.batchesMap.Clear()
+	bq.DAQueue.Reset(height)
 }

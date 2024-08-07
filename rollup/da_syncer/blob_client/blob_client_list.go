@@ -26,21 +26,24 @@ func (c *BlobClientList) GetBlobByVersionedHash(ctx context.Context, versionedHa
 	if len(c.list) == 0 {
 		return nil, fmt.Errorf("BlobClientList.GetBlobByVersionedHash: list of BlobClients is empty")
 	}
-	var blob *kzg4844.Blob
-	var err error
-	startPos := c.curPos
-	for blob, err = c.list[c.curPos].GetBlobByVersionedHash(ctx, versionedHash); ; {
+
+	for i := 0; i < len(c.list); i++ {
+		blob, err := c.list[c.nextPos()].GetBlobByVersionedHash(ctx, versionedHash)
 		if err != nil {
 			return blob, nil
-		} else {
-			log.Warn("BlobClientList: failed to get blob by versioned hash from BlobClient", "err", err, "blob client pos in BlobClientList", c.curPos)
-			c.curPos = (c.curPos + 1) % len(c.list)
-			// if we iterated over entire list, return EOF error that will be handled in syncing_pipeline
-			if c.curPos == startPos {
-				return nil, io.EOF
-			}
 		}
+
+		// there was an error, try the next blob client in following iteration
+		log.Warn("BlobClientList: failed to get blob by versioned hash from BlobClient", "err", err, "blob client pos in BlobClientList", c.curPos)
 	}
+
+	// if we iterated over entire list, return EOF error that will be handled in syncing_pipeline with a backoff and retry
+	return nil, io.EOF
+}
+
+func (c *BlobClientList) nextPos() int {
+	c.curPos = (c.curPos + 1) % len(c.list)
+	return c.curPos
 }
 
 func (c *BlobClientList) AddBlobClient(blobClient BlobClient) {

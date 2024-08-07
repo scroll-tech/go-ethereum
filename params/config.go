@@ -39,6 +39,8 @@ var (
 	ScrollMainnetGenesisHash = common.HexToHash("0xbbc05efd412b7cd47a2ed0e5ddfcf87af251e414ea4c801d78b6784513180a80")
 )
 
+func newUint64(val uint64) *uint64 { return &val }
+
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
 // the chain it belongs to.
 var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
@@ -281,7 +283,7 @@ var (
 		ShanghaiBlock:       nil,
 		BernoulliBlock:      nil,
 		CurieBlock:          nil,
-		DescartesBlock:      nil,
+		DarwinTime:          nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -320,7 +322,7 @@ var (
 		ShanghaiBlock:       big.NewInt(0),
 		BernoulliBlock:      big.NewInt(3747132),
 		CurieBlock:          big.NewInt(4740239),
-		DescartesBlock:      nil,
+		DarwinTime:          newUint64(1723622400),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -358,8 +360,8 @@ var (
 		ArchimedesBlock:     big.NewInt(0),
 		ShanghaiBlock:       big.NewInt(0),
 		BernoulliBlock:      big.NewInt(5220340),
-		CurieBlock:          big.NewInt(6924036),
-		DescartesBlock:      nil,
+		CurieBlock:          big.NewInt(7096836),
+		DarwinTime:          newUint64(1724227200),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -404,7 +406,7 @@ var (
 		ShanghaiBlock:           big.NewInt(0),
 		BernoulliBlock:          big.NewInt(0),
 		CurieBlock:              big.NewInt(0),
-		DescartesBlock:          big.NewInt(0),
+		DarwinTime:              new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -447,7 +449,7 @@ var (
 		ShanghaiBlock:           big.NewInt(0),
 		BernoulliBlock:          big.NewInt(0),
 		CurieBlock:              big.NewInt(0),
-		DescartesBlock:          big.NewInt(0),
+		DarwinTime:              new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  nil,
 		Clique:                  &CliqueConfig{Period: 0, Epoch: 30000},
@@ -485,7 +487,7 @@ var (
 		ShanghaiBlock:           big.NewInt(0),
 		BernoulliBlock:          big.NewInt(0),
 		CurieBlock:              big.NewInt(0),
-		DescartesBlock:          big.NewInt(0),
+		DarwinTime:              new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -501,7 +503,7 @@ var (
 				ScrollChainAddress:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
 			},
 		}}
-	TestRules = TestChainConfig.Rules(new(big.Int))
+	TestRules = TestChainConfig.Rules(new(big.Int), 0)
 
 	TestNoL1DataFeeChainConfig = &ChainConfig{
 		ChainID:                 big.NewInt(1),
@@ -524,7 +526,7 @@ var (
 		ShanghaiBlock:           big.NewInt(0),
 		BernoulliBlock:          big.NewInt(0),
 		CurieBlock:              big.NewInt(0),
-		DescartesBlock:          big.NewInt(0),
+		DarwinTime:              new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -622,7 +624,7 @@ type ChainConfig struct {
 	ShanghaiBlock       *big.Int `json:"shanghaiBlock,omitempty"`       // Shanghai switch block (nil = no fork, 0 = already on shanghai)
 	BernoulliBlock      *big.Int `json:"bernoulliBlock,omitempty"`      // Bernoulli switch block (nil = no fork, 0 = already on bernoulli)
 	CurieBlock          *big.Int `json:"curieBlock,omitempty"`          // Curie switch block (nil = no fork, 0 = already on curie)
-	DescartesBlock      *big.Int `json:"descartesBlock,omitempty"`      // Descartes switch block (nil = no fork, 0 = already on descartes)
+	DarwinTime          *uint64  `json:"darwinTime,omitempty"`          // Darwin switch time (nil = no fork, 0 = already on darwin)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -718,9 +720,11 @@ func (c *EthashConfig) String() string {
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
 type CliqueConfig struct {
-	Period        uint64 `json:"period"`         // Number of seconds between blocks to enforce
-	Epoch         uint64 `json:"epoch"`          // Epoch length to reset votes and checkpoint
-	RelaxedPeriod bool   `json:"relaxed_period"` // Relaxes the period to be just an upper bound
+	Period           uint64         `json:"period"`             // Number of seconds between blocks to enforce
+	Epoch            uint64         `json:"epoch"`              // Epoch length to reset votes and checkpoint
+	RelaxedPeriod    bool           `json:"relaxed_period"`     // Relaxes the period to be just an upper bound
+	ShadowForkHeight uint64         `json:"shadow_fork_height"` // Allows shadow forking consensus layer at given height
+	ShadowForkSigner common.Address `json:"shadow_fork_signer"` // Sets the address to be the authorized signer after the shadow fork
 }
 
 // String implements the stringer interface, returning the consensus engine details.
@@ -739,7 +743,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Descartes: %v, Engine: %v, Scroll config: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -759,7 +763,7 @@ func (c *ChainConfig) String() string {
 		c.ShanghaiBlock,
 		c.BernoulliBlock,
 		c.CurieBlock,
-		c.DescartesBlock,
+		c.DarwinTime,
 		engine,
 		c.Scroll,
 	)
@@ -852,9 +856,9 @@ func (c *ChainConfig) IsCurie(num *big.Int) bool {
 	return isForked(c.CurieBlock, num)
 }
 
-// IsDescartes returns whether num is either equal to the Descartes fork block or greater.
-func (c *ChainConfig) IsDescartes(num *big.Int) bool {
-	return isForked(c.DescartesBlock, num)
+// IsDarwin returns whether num is either equal to the Darwin fork block or greater.
+func (c *ChainConfig) IsDarwin(now uint64) bool {
+	return isForkedTime(now, c.DarwinTime)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
@@ -910,7 +914,6 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "shanghaiBlock", block: c.ShanghaiBlock, optional: true},
 		{name: "bernoulliBlock", block: c.BernoulliBlock, optional: true},
 		{name: "curieBlock", block: c.CurieBlock, optional: true},
-		{name: "descartesBlock", block: c.DescartesBlock, optional: true},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -995,9 +998,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.CurieBlock, newcfg.CurieBlock, head) {
 		return newCompatError("Curie fork block", c.CurieBlock, newcfg.CurieBlock)
 	}
-	if isForkIncompatible(c.DescartesBlock, newcfg.DescartesBlock, head) {
-		return newCompatError("Descartes fork block", c.DescartesBlock, newcfg.DescartesBlock)
-	}
 	return nil
 }
 
@@ -1013,6 +1013,13 @@ func isForked(s, head *big.Int) bool {
 		return false
 	}
 	return s.Cmp(head) <= 0
+}
+
+func isForkedTime(now uint64, forkTime *uint64) bool {
+	if forkTime == nil {
+		return false
+	}
+	return now >= *forkTime
 }
 
 func configNumEqual(x, y *big.Int) bool {
@@ -1066,11 +1073,11 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon, IsArchimedes, IsShanghai            bool
-	IsBernoulli, IsCurie, IsDescartes                       bool
+	IsBernoulli, IsCurie, IsDarwin                          bool
 }
 
 // Rules ensures c's ChainID is not nil.
-func (c *ChainConfig) Rules(num *big.Int) Rules {
+func (c *ChainConfig) Rules(num *big.Int, time uint64) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
@@ -1091,6 +1098,6 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsShanghai:       c.IsShanghai(num),
 		IsBernoulli:      c.IsBernoulli(num),
 		IsCurie:          c.IsCurie(num),
-		IsDescartes:      c.IsDescartes(num),
+		IsDarwin:         c.IsDarwin(time),
 	}
 }

@@ -373,12 +373,12 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		header.Coinbase = w.coinbase
 	}
 
-	common.WithTimer(prepareTimer, func() {
-		if err := w.engine.Prepare(w.chain, header); err != nil {
-			log.Error("Failed to prepare header for mining", "err", err)
-			return
-		}
-	})
+	prepareStart := time.Now()
+	if err := w.engine.Prepare(w.chain, header); err != nil {
+		log.Error("Failed to prepare header for mining", "err", err)
+		return
+	}
+	prepareTimer.UpdateSince(prepareStart)
 
 	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
 	if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
@@ -404,6 +404,11 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
 		misc.ApplyCurieHardFork(parentState)
 
+		var nextL1MsgIndex uint64
+		if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
+			nextL1MsgIndex = *dbVal
+		}
+
 		// zkEVM requirement: Curie transition block contains 0 transactions, bypass pipeline.
 		err = w.commit(&pipeline.Result{
 			// Note: Signer nodes will not store CCC results for empty blocks in their database.
@@ -411,11 +416,12 @@ func (w *worker) startNewPipeline(timestamp int64) {
 			// nodes will still store CCC results.
 			Rows: &types.RowConsumption{},
 			FinalBlock: &pipeline.BlockCandidate{
-				Header:        header,
-				State:         parentState,
-				Txs:           types.Transactions{},
-				Receipts:      types.Receipts{},
-				CoalescedLogs: []*types.Log{},
+				Header:         header,
+				State:          parentState,
+				Txs:            types.Transactions{},
+				Receipts:       types.Receipts{},
+				CoalescedLogs:  []*types.Log{},
+				NextL1MsgIndex: nextL1MsgIndex,
 			},
 		})
 
@@ -446,6 +452,9 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		}
 	}
 	collectL2Timer.UpdateSince(tidyPendingStart)
+
+	// Allow txpool to be reorged as we build current block
+	w.eth.TxPool().ResumeReorgs()
 
 	var nextL1MsgIndex uint64
 	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.chain.Database(), parent.Hash()); dbIndex != nil {
@@ -535,12 +544,13 @@ func (w *worker) handlePipelineResult(res *pipeline.Result) error {
 	w.currentPipeline.Release()
 	w.currentPipeline = nil
 
+	if res.FinalBlock != nil {
+		w.updateSnapshot(res.FinalBlock)
+	}
+
 	// Rows being nil without an OverflowingTx means that block didn't go thru CCC,
 	// which means that we are not the sequencer. Do not attempt to commit.
 	if res.Rows == nil && res.OverflowingTx == nil {
-		if res.FinalBlock != nil {
-			w.updateSnapshot(res.FinalBlock)
-		}
 		return nil
 	}
 
@@ -711,6 +721,10 @@ func (w *worker) commit(res *pipeline.Result) error {
 		"hash", blockHash.String(),
 		"accRows", res.Rows,
 	)
+
+	// A new block event will trigger a reorg in the txpool, pause reorgs to defer this until we fetch txns for next block.
+	// We may end up trying to process txns that we already included in the previous block, but they will all fail the nonce check
+	w.eth.TxPool().PauseReorgs()
 
 	rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), blockHash, res.Rows)
 	// Commit block and state to database.

@@ -58,7 +58,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			ShanghaiBlock:       big.NewInt(0),
 			BernoulliBlock:      big.NewInt(0),
 			CurieBlock:          big.NewInt(0),
-			DescartesBlock:      big.NewInt(0),
+			DarwinTime:          new(uint64),
 			Ethash:              new(params.EthashConfig),
 		}
 		signer  = types.LatestSigner(config)
@@ -360,13 +360,13 @@ func TestStateProcessorErrors(t *testing.T) {
 				txs: []*types.Transaction{
 					mkDynamicCreationTx(0, 500000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), tooBigInitCode[:]),
 				},
-				want: "could not apply tx 0 [0xa3d2dadf08846f3328b84b0a38240ace42f79c99ea4b9c097c8dcb345f61a84e]: max initcode size exceeded: code size 49153 limit 49152",
+				want: "could not apply tx 0 [0x8f780c3573ac61e2d7796f7b447afd0ad753623ed95bc99ef94eb083d9e0d039]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{
 					mkDynamicCreationTx(0, 54299, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), smallInitCode[:]),
 				},
-				want: "could not apply tx 0 [0x0880861c73bc504c01041b6d506737a119ca7c68c1fe666dc1682636b807c9db]: intrinsic gas too low: have 54299, want 54300",
+				want: "could not apply tx 0 [0xbf812bb88c3f53402b6cf5488ac89360595e524b65582b648d1f4ef197690e89]: intrinsic gas too low: have 54299, want 54300",
 			},
 		} {
 			block := GenerateBadBlock(genesis, ethash.NewFaker(), tt.txs, gspec.Config)

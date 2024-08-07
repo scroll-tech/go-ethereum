@@ -2,13 +2,15 @@ package da_syncer
 
 import (
 	"fmt"
-	"math/big"
 
-	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
+)
+
+var (
+	ErrBlockTooLow  = fmt.Errorf("block number is too low")
+	ErrBlockTooHigh = fmt.Errorf("block number is too high")
 )
 
 type DASyncer struct {
@@ -21,33 +23,25 @@ func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
 	}
 }
 
-func (s *DASyncer) SyncOneBlock(block *types.Block) error {
-	prevHash := s.blockchain.CurrentBlock().Hash()
-	if big.NewInt(0).Add(s.blockchain.CurrentBlock().Number(), common.Big1).Cmp(block.Number()) != 0 {
-		return fmt.Errorf("not consecutive block, number: %d", block.Number())
+// SyncOneBlock receives a PartialBlock, makes sure it's the next block in the chain, executes it and inserts it to the blockchain.
+func (s *DASyncer) SyncOneBlock(block *da.PartialBlock) error {
+	parentBlock := s.blockchain.CurrentBlock()
+	// we expect blocks to be consecutive. block.PartialHeader.Number == parentBlock.Number+1.
+	if block.PartialHeader.Number <= parentBlock.NumberU64() {
+		log.Debug("block number is too low", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
+		return ErrBlockTooLow
+	} else if block.PartialHeader.Number > parentBlock.NumberU64()+1 {
+		log.Debug("block number is too high", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
+		return ErrBlockTooHigh
 	}
-	header := block.Header()
-	txs := block.Transactions()
 
-	// fill header with all necessary fields
-	var err error
-	header.ReceiptHash, header.Bloom, header.Root, header.GasUsed, err = s.blockchain.PreprocessBlock(block)
-	if err != nil {
-		return fmt.Errorf("block preprocessing failed, block number: %d, error: %v", block.Number(), err)
+	if _, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions); err != nil {
+		return fmt.Errorf("failed building and writing block, number: %d, error: %v", block.PartialHeader.Number, err)
 	}
-	header.UncleHash = common.HexToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
-	header.Difficulty = common.Big1
-	header.BaseFee = nil
-	header.TxHash = types.DeriveSha(txs, trie.NewStackTrie(nil))
-	header.ParentHash = prevHash
 
-	fullBlock := types.NewBlockWithHeader(header).WithBody(txs, make([]*types.Header, 0))
+	if s.blockchain.CurrentBlock().Header().Number.Uint64()%1000 == 0 {
+		log.Info("L1 sync progress", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash(), "root", s.blockchain.CurrentBlock().Header().Root)
+	}
 
-	if _, err := s.blockchain.InsertChainWithoutSealVerification(fullBlock); err != nil {
-		return fmt.Errorf("cannot insert block, number: %d, error: %v", block.Number(), err)
-	}
-	if s.blockchain.CurrentBlock().Header().Number.Uint64()%100 == 0 {
-		log.Info("inserted block", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash())
-	}
 	return nil
 }

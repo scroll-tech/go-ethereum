@@ -24,22 +24,11 @@ func (f *FinalizeBatch) BatchIndex() uint64 {
 	return f.batchIndex
 }
 
-type FinalizeBatchDAV3 struct {
-	BatchIndex uint64
-
-	L1BlockNumber uint64
-}
-
-func NewFinalizeBatchDAV3(batchIndex uint64) *FinalizeBatchDAV3 {
-	return &FinalizeBatchDAV3{
-		BatchIndex: batchIndex,
+func (f *FinalizeBatch) CompareTo(other Entry) int {
+	if f.BatchIndex() < other.BatchIndex() {
+		return -1
+	} else if f.BatchIndex() > other.BatchIndex() {
+		return 1
 	}
-}
-
-func (f *FinalizeBatchDAV3) DAType() Type {
-	return FinalizeBatchV3Type
-}
-
-func (f *FinalizeBatchDAV3) GetL1BlockNumber() uint64 {
-	return f.L1BlockNumber
+	return 0
 }

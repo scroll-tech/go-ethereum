@@ -1803,25 +1803,50 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	return it.index, err
 }
 
-// PreprocessBlock processes block on top of the chain to calculate receipts, bloom and state root
-func (bc *BlockChain) PreprocessBlock(block *types.Block) (common.Hash, types.Bloom, common.Hash, uint64, error) {
-	// Retrieve the parent block and it's state to execute on top
-	parent := bc.CurrentBlock().Header()
-	if parent == nil {
-		parent = bc.GetHeader(block.ParentHash(), block.NumberU64()-1)
+func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types.Header, txs types.Transactions) (WriteStatus, error) {
+	if !bc.chainmu.TryLock() {
+		return NonStatTy, errInsertionInterrupted
 	}
-	statedb, err := state.New(parent.Root, bc.stateCache, bc.snaps)
+	defer bc.chainmu.Unlock()
+
+	statedb, err := state.New(parentBlock.Root(), bc.stateCache, bc.snaps)
 	if err != nil {
-		return common.Hash{}, types.Bloom{}, common.Hash{}, 0, err
+		return NonStatTy, err
 	}
-	receipts, _, usedGas, err := bc.processor.Process(block, statedb, bc.vmConfig)
+
+	header.ParentHash = parentBlock.Hash()
+
+	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
+	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
 	if err != nil {
-		return common.Hash{}, types.Bloom{}, common.Hash{}, 0, err
+		return NonStatTy, err
 	}
-	receiptSha := types.DeriveSha(receipts, trie.NewStackTrie(nil))
-	bloom := types.CreateBloom(receipts)
-	stateRoot := statedb.GetRootHash()
-	return receiptSha, bloom, stateRoot, usedGas, nil
+
+	// TODO: once we have the extra and difficulty we need to verify the signature of the block with Clique
+	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
+
+	header.GasUsed = gasUsed
+	header.Root = statedb.GetRootHash()
+
+	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+
+	blockHash := fullBlock.Hash()
+	// manually replace the block hash in the receipts
+	for i, receipt := range receipts {
+		// add block location fields
+		receipt.BlockHash = blockHash
+		receipt.BlockNumber = tempBlock.Number()
+		receipt.TransactionIndex = uint(i)
+
+		for _, l := range receipt.Logs {
+			l.BlockHash = blockHash
+		}
+	}
+	for _, l := range logs {
+		l.BlockHash = blockHash
+	}
+
+	return bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)
 }
 
 // insertSideChain is called when an import batch hits upon a pruned ancestor

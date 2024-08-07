@@ -4,23 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
+// BlockQueue is a pipeline stage that reads batches from BatchQueue, extracts all da.PartialBlock from it and
+// provides them to the next stage one-by-one.
 type BlockQueue struct {
 	batchQueue *BatchQueue
-	blocks     []*types.Block
+	blocks     []*da.PartialBlock
 }
 
 func NewBlockQueue(batchQueue *BatchQueue) *BlockQueue {
 	return &BlockQueue{
 		batchQueue: batchQueue,
-		blocks:     []*types.Block{},
+		blocks:     make([]*da.PartialBlock, 0),
 	}
 }
 
-func (bq *BlockQueue) NextBlock(ctx context.Context) (*types.Block, error) {
+func (bq *BlockQueue) NextBlock(ctx context.Context) (*da.PartialBlock, error) {
 	for len(bq.blocks) == 0 {
 		err := bq.getBlocksFromBatch(ctx)
 		if err != nil {
@@ -50,4 +51,9 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (bq *BlockQueue) Reset(height uint64) {
+	bq.blocks = make([]*da.PartialBlock, 0)
+	bq.batchQueue.Reset(height)
 }

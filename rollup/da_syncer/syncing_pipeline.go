@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -29,11 +28,15 @@ type Config struct {
 	BlockNativeAPIEndpoint string                 // BlockNative blob api endpoint
 }
 
+// SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
+// L2 blocks and chain.
 type SyncingPipeline struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 	expBackoff *backoff.Exponential
+
+	l1DeploymentBlock uint64
 
 	db         ethdb.Database
 	blockchain *core.BlockChain
@@ -87,14 +90,15 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 
 	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{
-		ctx:        ctx,
-		cancel:     cancel,
-		expBackoff: backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
-		wg:         sync.WaitGroup{},
-		db:         db,
-		blockchain: blockchain,
-		blockQueue: blockQueue,
-		daSyncer:   daSyncer,
+		ctx:               ctx,
+		cancel:            cancel,
+		expBackoff:        backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
+		wg:                sync.WaitGroup{},
+		l1DeploymentBlock: l1DeploymentBlock,
+		db:                db,
+		blockchain:        blockchain,
+		blockQueue:        blockQueue,
+		daSyncer:          daSyncer,
 	}, nil
 }
 
@@ -120,6 +124,7 @@ func (s *SyncingPipeline) Start() {
 func (s *SyncingPipeline) mainLoop() {
 	stepCh := make(chan struct{}, 1)
 	var delayedStepCh <-chan time.Time
+	var resetCounter int
 
 	// reqStep is a helper function to request a step to be executed.
 	// If delay is true, it will request a delayed step with exponential backoff, otherwise it will request an immediate step.
@@ -159,24 +164,39 @@ func (s *SyncingPipeline) mainLoop() {
 		case <-stepCh:
 			err := s.Step()
 			if err == nil {
+				// step succeeded, reset exponential backoff and continue
 				reqStep(false)
 				s.expBackoff.Reset()
+				resetCounter = 0
 				continue
 			}
 
 			if errors.Is(err, io.EOF) {
+				// pipeline is empty, request a delayed step
 				reqStep(true)
 				continue
 			}
+			if errors.Is(err, ErrBlockTooLow) {
+				// block number returned by the block queue is too low,
+				// we skip the blocks until we reach the correct block number again.
+				reqStep(false)
+				continue
+			} else if errors.Is(err, ErrBlockTooHigh) {
+				// block number returned by the block queue is too high,
+				// reset the pipeline and move backwards from the last L1 block we read
+				s.reset(resetCounter)
+				resetCounter++
+				reqStep(false)
+				continue
+			}
+
 			if errors.Is(err, context.Canceled) {
+				log.Info("syncing pipeline stopped due to cancelled context", "err", err)
 				return
 			}
 
-			if strings.HasPrefix(err.Error(), "not consecutive block") {
-				log.Warn("syncing pipeline step failed, probably because of restart", "err", err)
-			} else {
-				log.Crit("syncing pipeline step failed", "err", err)
-			}
+			log.Warn("syncing pipeline step failed due to unrecoverable error, stopping pipeline worker", "err", err)
+			return
 		}
 	}
 }
@@ -186,4 +206,16 @@ func (s *SyncingPipeline) Stop() {
 	s.cancel()
 	s.wg.Wait()
 	log.Info("Stopped DaSyncer... Done")
+}
+
+func (s *SyncingPipeline) reset(resetCounter int) {
+	amount := 100 * uint64(resetCounter)
+	syncedL1Height := s.l1DeploymentBlock - 1
+	from := rawdb.ReadDASyncedL1BlockNumber(s.db)
+	if from != nil && *from+amount > syncedL1Height {
+		syncedL1Height = *from - amount
+		rawdb.WriteDASyncedL1BlockNumber(s.db, syncedL1Height)
+	}
+	log.Info("resetting syncing pipeline", "syncedL1Height", syncedL1Height)
+	s.blockQueue.Reset(syncedL1Height)
 }

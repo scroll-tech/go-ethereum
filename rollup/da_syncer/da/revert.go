@@ -22,3 +22,12 @@ func (r *RevertBatch) L1BlockNumber() uint64 {
 func (r *RevertBatch) BatchIndex() uint64 {
 	return r.batchIndex
 }
+
+func (r *RevertBatch) CompareTo(other Entry) int {
+	if r.BatchIndex() < other.BatchIndex() {
+		return -1
+	} else if r.BatchIndex() > other.BatchIndex() {
+		return 1
+	}
+	return 0
+}

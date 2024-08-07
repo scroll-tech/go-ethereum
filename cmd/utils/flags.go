@@ -861,6 +861,12 @@ var (
 		Usage: "Limit max fetched block range for `eth_getLogs` method",
 	}
 
+	// Shadowfork peers
+	ShadowforkPeersFlag = cli.StringSliceFlag{
+		Name:  "net.shadowforkpeers",
+		Usage: "peer ids of shadow fork peers",
+	}
+
 	// Da syncing settings
 	DASyncEnabledFlag = cli.BoolFlag{
 		Name:  "da.sync",
@@ -1335,6 +1341,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
 	setL1(ctx, cfg)
+	if ctx.GlobalIsSet(DASyncEnabledFlag.Name) {
+		cfg.DaSyncingEnabled = ctx.GlobalBool(DASyncEnabledFlag.Name)
+	}
 
 	if ctx.GlobalIsSet(ExternalSignerFlag.Name) {
 		cfg.ExternalSigner = ctx.GlobalString(ExternalSignerFlag.Name)
@@ -1701,6 +1710,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setEnableRollupVerify(ctx, cfg)
 	setDA(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
+	if ctx.GlobalIsSet(ShadowforkPeersFlag.Name) {
+		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)
+		log.Info("Shadow fork peers", "ids", cfg.ShadowForkPeerIDs)
+	}
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()

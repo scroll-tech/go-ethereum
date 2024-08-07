@@ -143,9 +143,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
-	if chainConfig.Clique != nil && config.EnableDASyncing {
-		chainConfig.Clique.DaSyncingEnabled = true
-	}
+
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
@@ -257,15 +255,16 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	if !config.EnableDASyncing {
 		if eth.handler, err = newHandler(&handlerConfig{
-			Database:   chainDb,
-			Chain:      eth.blockchain,
-			TxPool:     eth.txPool,
-			Network:    config.NetworkId,
-			Sync:       config.SyncMode,
-			BloomCache: uint64(cacheLimit),
-			EventMux:   eth.eventMux,
-			Checkpoint: checkpoint,
-			Whitelist:  config.Whitelist,
+			Database:          chainDb,
+			Chain:             eth.blockchain,
+			TxPool:            eth.txPool,
+			Network:           config.NetworkId,
+			Sync:              config.SyncMode,
+			BloomCache:        uint64(cacheLimit),
+			EventMux:          eth.eventMux,
+			Checkpoint:        checkpoint,
+			Whitelist:         config.Whitelist,
+			ShadowForkPeerIDs: config.ShadowForkPeerIDs,
 		}); err != nil {
 			return nil, err
 		}

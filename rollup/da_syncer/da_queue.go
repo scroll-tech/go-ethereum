@@ -2,10 +2,12 @@ package da_syncer
 
 import (
 	"context"
+	"errors"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
+// DAQueue is a pipeline stage that reads DA entries from a DataSource and provides them to the next stage.
 type DAQueue struct {
 	l1height          uint64
 	dataSourceFactory *DataSourceFactory
@@ -42,15 +44,24 @@ func (dq *DAQueue) getNextData(ctx context.Context) error {
 			return err
 		}
 	}
+
 	dq.da, err = dq.dataSource.NextData()
+	if err == nil {
+		return nil
+	}
+
 	// previous dataSource has been exhausted, create new
-	if err == da.ErrSourceExhausted {
+	if errors.Is(err, da.ErrSourceExhausted) {
 		dq.l1height = dq.dataSource.L1Height()
 		dq.dataSource = nil
 		return dq.getNextData(ctx)
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return err
+}
+
+func (dq *DAQueue) Reset(height uint64) {
+	dq.l1height = height
+	dq.dataSource = nil
+	dq.da = make(da.Entries, 0)
 }

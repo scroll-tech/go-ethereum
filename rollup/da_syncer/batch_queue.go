@@ -10,6 +10,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
+// BatchQueue is a pipeline stage that reads all batch events from DAQueue and provides only finalized batches to the next stage.
 type BatchQueue struct {
 	DAQueue                 *DAQueue
 	db                      ethdb.Database

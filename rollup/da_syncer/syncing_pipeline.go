@@ -26,6 +26,8 @@ type Config struct {
 	BlobSource       blob_client.BlobSource // blob source
 }
 
+// SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
+// L2 blocks and chain.
 type SyncingPipeline struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -149,6 +151,7 @@ func (s *SyncingPipeline) mainLoop() {
 		case <-stepCh:
 			err := s.Step()
 			if err == nil {
+				// step succeeded, reset exponential backoff and continue
 				reqStep(false)
 				s.expBackoff.Reset()
 				resetCounter = 0
@@ -156,6 +159,7 @@ func (s *SyncingPipeline) mainLoop() {
 			}
 
 			if errors.Is(err, io.EOF) {
+				// pipeline is empty, request a delayed step
 				reqStep(true)
 				continue
 			}

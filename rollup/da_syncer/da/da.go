@@ -19,10 +19,9 @@ const (
 	RevertBatchType
 	// FinalizeBatchType contains data of event of FinalizeBatchType
 	FinalizeBatchType
-	// FinalizeBatchV3Type contains data of event of FinalizeBatchType v3
-	FinalizeBatchV3Type
 )
 
+// Entry represents a single DA event (commit, revert, finalize).
 type Entry interface {
 	Type() Type
 	BatchIndex() uint64
@@ -37,6 +36,7 @@ type EntryWithBlocks interface {
 
 type Entries []Entry
 
+// PartialHeader represents a partial header (from DA) of a block.
 type PartialHeader struct {
 	Number     uint64
 	Time       uint64
@@ -57,6 +57,7 @@ func (h *PartialHeader) ToHeader() *types.Header {
 	}
 }
 
+// PartialBlock represents a partial block (from DA).
 type PartialBlock struct {
 	PartialHeader *PartialHeader
 	Transactions  types.Transactions

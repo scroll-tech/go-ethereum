@@ -23,6 +23,7 @@ func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
 	}
 }
 
+// SyncOneBlock receives a PartialBlock, makes sure it's the next block in the chain, executes it and inserts it to the blockchain.
 func (s *DASyncer) SyncOneBlock(block *da.PartialBlock) error {
 	parentBlock := s.blockchain.CurrentBlock()
 	// we expect blocks to be consecutive. block.PartialHeader.Number == parentBlock.Number+1.

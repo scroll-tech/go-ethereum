@@ -155,7 +155,8 @@ func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skipped
 		}
 		l1Tx := rawdb.ReadL1Message(db, currentIndex)
 		if l1Tx == nil {
-			// TODO: returning io.EOF is not the best way to handle this
+			// message not yet available
+			// we return io.EOF as this will be handled in the syncing pipeline with a backoff and retry
 			return nil, io.EOF
 		}
 		txs = append(txs, l1Tx)

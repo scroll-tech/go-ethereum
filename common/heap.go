@@ -4,6 +4,7 @@ import (
 	"container/heap"
 )
 
+// Heap is a generic min-heap (or max-heap, depending on Comparable behavior) implementation.
 type Heap[T Comparable[T]] struct {
 	heap innerHeap[T]
 }
@@ -76,10 +77,18 @@ func (h *innerHeap[T]) Pop() interface{} {
 	return element
 }
 
+// Comparable is an interface for types that can be compared.
 type Comparable[T any] interface {
+	// CompareTo compares x with other.
+	// To create a min heap, return:
+	//	-1 if x <  other
+	//	 0 if x == other
+	//	+1 if x >  other
+	// To create a max heap, return the opposite.
 	CompareTo(other T) int
 }
 
+// HeapElement is a wrapper around the value stored in the heap.
 type HeapElement[T Comparable[T]] struct {
 	value T
 	index int

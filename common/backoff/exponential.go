@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Exponential is a backoff strategy that increases the delay between retries exponentially.
 type Exponential struct {
 	attempt int
 

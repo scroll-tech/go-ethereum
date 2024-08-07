@@ -7,6 +7,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
+// BlockQueue is a pipeline stage that reads batches from BatchQueue, extracts all da.PartialBlock from it and
+// provides them to the next stage one-by-one.
 type BlockQueue struct {
 	batchQueue *BatchQueue
 	blocks     []*da.PartialBlock

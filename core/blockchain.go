@@ -1822,10 +1822,11 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 		return NonStatTy, err
 	}
 
+	// TODO: once we have the extra and difficulty we need to verify the signature of the block with Clique
+	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
+
 	header.GasUsed = gasUsed
 	header.Root = statedb.GetRootHash()
-	// Since we're using Clique consensus, we don't have uncles
-	header.UncleHash = types.EmptyUncleHash
 
 	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
 

@@ -7,6 +7,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
+// DAQueue is a pipeline stage that reads DA entries from a DataSource and provides them to the next stage.
 type DAQueue struct {
 	l1height          uint64
 	dataSourceFactory *DataSourceFactory

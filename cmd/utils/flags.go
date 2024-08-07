@@ -74,7 +74,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
-	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -867,7 +866,7 @@ var (
 		Usage: "peer ids of shadow fork peers",
 	}
 
-	// Da syncing settings
+	// DA syncing settings
 	DASyncEnabledFlag = cli.BoolFlag{
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
@@ -875,18 +874,21 @@ var (
 	defaultDA  = ethconfig.Defaults.DA.FetcherMode
 	DAModeFlag = TextMarshalerFlag{
 		Name:  "da.mode",
-		Usage: `Da sync sync mode ("l1rpc" or "snapshot")`,
+		Usage: `DA sync mode ("l1rpc" or "snapshot")`,
 		Value: &defaultDA,
-	}
-	defaultBlobSource = ethconfig.Defaults.DA.BlobSource
-	DABlobSourceFlag  = TextMarshalerFlag{
-		Name:  "da.blob.source",
-		Usage: `Blob data source, currently supported "blobscan" or "blocknative"`,
-		Value: &defaultBlobSource,
 	}
 	DASnapshotFileFlag = cli.StringFlag{
 		Name:  "da.snapshot.file",
 		Usage: "Snapshot file to sync from da",
+	}
+	DABlobScanAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.blobscan",
+		Usage: "BlobScan blob api endpoint",
+		Value: ethconfig.Defaults.DA.BlobScanAPIEndpoint,
+	}
+	DABlockNativeAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.blocknative",
+		Usage: "BlockNative blob api endpoint",
 	}
 )
 
@@ -1617,8 +1619,11 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 		if ctx.GlobalIsSet(DASnapshotFileFlag.Name) {
 			cfg.DA.SnapshotFilePath = ctx.GlobalString(DASnapshotFileFlag.Name)
 		}
-		if ctx.GlobalIsSet(DABlobSourceFlag.Name) {
-			cfg.DA.BlobSource = *GlobalTextMarshaler(ctx, DABlobSourceFlag.Name).(*blob_client.BlobSource)
+		if ctx.GlobalIsSet(DABlobScanAPIEndpointFlag.Name) {
+			cfg.DA.BlobScanAPIEndpoint = ctx.GlobalString(DABlobScanAPIEndpointFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABlockNativeAPIEndpointFlag.Name) {
+			cfg.DA.BlockNativeAPIEndpoint = ctx.GlobalString(DABlockNativeAPIEndpointFlag.Name)
 		}
 	}
 }

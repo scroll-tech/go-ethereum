@@ -173,7 +173,8 @@ var (
 		utils.DASyncEnabledFlag,
 		utils.DAModeFlag,
 		utils.DASnapshotFileFlag,
-		utils.DABlobSourceFlag,
+		utils.DABlockNativeAPIEndpointFlag,
+		utils.DABlobScanAPIEndpointFlag,
 	}
 
 	rpcFlags = []cli.Flag{

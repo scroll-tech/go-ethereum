@@ -21,9 +21,10 @@ import (
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	FetcherMode      FetcherMode            // mode of fetcher
-	SnapshotFilePath string                 // path to snapshot file
-	BlobSource       blob_client.BlobSource // blob source
+	FetcherMode            FetcherMode // mode of fetcher
+	SnapshotFilePath       string      // path to snapshot file
+	BlobScanAPIEndpoint    string      // BlobScan blob api endpoint
+	BlockNativeAPIEndpoint string      // BlockNative blob api endpoint
 }
 
 // SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
@@ -53,17 +54,18 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		return nil, err
 	}
 
-	var blobClient blob_client.BlobClient
-	switch config.BlobSource {
-	case blob_client.BlobScan:
-		blobClient = blob_client.NewBlobScanClient(genesisConfig.Scroll.DAConfig.BlobScanAPIEndpoint)
-	case blob_client.BlockNative:
-		blobClient = blob_client.NewBlockNativeClient(genesisConfig.Scroll.DAConfig.BlockNativeAPIEndpoint)
-	default:
-		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)
+	blobClientList := blob_client.NewBlobClientList()
+	if config.BlobScanAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
+	}
+	if config.BlockNativeAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
+	}
+	if blobClientList.Size() == 0 {
+		log.Crit("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag.")
 	}
 
-	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClient, db)
+	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClientList, db)
 	syncedL1Height := l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)
 	if from != nil {
@@ -99,7 +101,7 @@ func (s *SyncingPipeline) Step() error {
 }
 
 func (s *SyncingPipeline) Start() {
-	log.Info("Starting SyncingPipeline")
+	log.Info("sync from DA: starting pipeline")
 
 	s.wg.Add(1)
 	go func() {
@@ -189,10 +191,10 @@ func (s *SyncingPipeline) mainLoop() {
 }
 
 func (s *SyncingPipeline) Stop() {
-	log.Info("Stopping DaSyncer...")
+	log.Info("sync from DA: stopping pipeline...")
 	s.cancel()
 	s.wg.Wait()
-	log.Info("Stopped DaSyncer... Done")
+	log.Info("sync from DA: stopping pipeline... done")
 }
 
 func (s *SyncingPipeline) reset(resetCounter int) {

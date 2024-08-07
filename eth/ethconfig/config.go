@@ -38,7 +38,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
-	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 )
 
 // FullNodeGPO contains default gasprice oracle settings for full node.
@@ -97,7 +96,6 @@ var Defaults = Config{
 	MaxBlockRange: -1, // Default unconfigured value: no block range limit for backward compatibility
 	DA: da_syncer.Config{
 		FetcherMode: da_syncer.L1RPC,
-		BlobSource:  blob_client.BlobScan,
 	},
 }
 

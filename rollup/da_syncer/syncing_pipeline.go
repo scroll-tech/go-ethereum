@@ -21,11 +21,10 @@ import (
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	FetcherMode            FetcherMode            // mode of fetcher
-	SnapshotFilePath       string                 // path to snapshot file
-	BlobSource             blob_client.BlobSource // blob source
-	BlobScanAPIEndpoint    string                 // BlobScan blob api endpoint
-	BlockNativeAPIEndpoint string                 // BlockNative blob api endpoint
+	FetcherMode            FetcherMode // mode of fetcher
+	SnapshotFilePath       string      // path to snapshot file
+	BlobScanAPIEndpoint    string      // BlobScan blob api endpoint
+	BlockNativeAPIEndpoint string      // BlockNative blob api endpoint
 }
 
 // SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
@@ -56,24 +55,14 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}
 
 	blobClientList := blob_client.NewBlobClientList()
-	switch config.BlobSource {
-	case blob_client.AnyBlobSource:
-		if config.BlobScanAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
-		}
-		if config.BlockNativeAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
-		}
-	case blob_client.BlobScan:
-		if config.BlobScanAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
-		}
-	case blob_client.BlockNative:
-		if config.BlockNativeAPIEndpoint != "" {
-			blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
-		}
-	default:
-		return nil, fmt.Errorf("unknown blob scan client: %d", config.BlobSource)
+	if config.BlobScanAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
+	}
+	if config.BlockNativeAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
+	}
+	if blobClientList.Size() == 0 {
+		log.Crit("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag.")
 	}
 
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClientList, db)
@@ -112,7 +101,7 @@ func (s *SyncingPipeline) Step() error {
 }
 
 func (s *SyncingPipeline) Start() {
-	log.Info("Starting SyncingPipeline")
+	log.Info("sync from DA: starting pipeline")
 
 	s.wg.Add(1)
 	go func() {
@@ -202,10 +191,10 @@ func (s *SyncingPipeline) mainLoop() {
 }
 
 func (s *SyncingPipeline) Stop() {
-	log.Info("Stopping DaSyncer...")
+	log.Info("sync from DA: stopping pipeline...")
 	s.cancel()
 	s.wg.Wait()
-	log.Info("Stopped DaSyncer... Done")
+	log.Info("sync from DA: stopping pipeline... done")
 }
 
 func (s *SyncingPipeline) reset(resetCounter int) {

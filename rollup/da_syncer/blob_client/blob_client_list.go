@@ -57,3 +57,6 @@ func (c *BlobClientList) RemoveBlobClient(blobClient BlobClient) {
 		}
 	}
 }
+func (c *BlobClientList) Size() int {
+	return len(c.list)
+}

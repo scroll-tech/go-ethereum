@@ -46,7 +46,7 @@ type StorageTrace struct {
 	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
 
 	// The "flatten" db nodes
-	FlattenProofs map[string]hexutil.Bytes `json:"flattenProofs,omitempty"`
+	FlattenProofs map[common.Hash]hexutil.Bytes `json:"flattenProofs,omitempty"`
 
 	// Node entries for deletion, no need to distinguish what it is from, just read them
 	// into the partial db

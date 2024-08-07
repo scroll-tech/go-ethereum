@@ -371,7 +371,8 @@ func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
 }
 
 // GetFullProof returns the Merkle proof for a given account, with both node data and key
-func (s *StateDB) GetFullProof(addr common.Address) (FullProofList, error) {
+// also the key for address is provided
+func (s *StateDB) GetFullProof(addr common.Address) (FullProofList, common.Hash, error) {
 	var hash common.Hash
 	if s.IsZktrie() {
 		addr_s, _ := zkt.ToSecureKeyBytes(addr.Bytes())
@@ -381,7 +382,7 @@ func (s *StateDB) GetFullProof(addr common.Address) (FullProofList, error) {
 	}
 	var proof FullProofList
 	err := s.trie.Prove(hash[:], 0, &proof)
-	return proof, err
+	return proof, hash, err
 }
 
 func (s *StateDB) GetLiveStateAccount(addr common.Address) *types.StateAccount {
@@ -402,7 +403,7 @@ func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, 
 	if trie == nil {
 		return nil, errors.New("storage trie for requested address does not exist")
 	}
-	proof, err := s.GetSecureTrieProof(trie, key)
+	proof, _, err := s.GetSecureTrieProof(trie, key)
 	if err != nil {
 		return nil, err
 	}

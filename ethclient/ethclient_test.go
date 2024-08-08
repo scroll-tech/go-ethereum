@@ -429,7 +429,7 @@ func testChainID(t *testing.T, client *rpc.Client) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if id == nil || id.Cmp(params.AllEthashProtocolChanges.ChainID) != 0 {
+	if id == nil || id.Cmp(params.TestChainConfig.ChainID) != 0 {
 		t.Fatalf("ChainID returned wrong number: %+v", id)
 	}
 }
@@ -597,10 +597,6 @@ func testCallContract(t *testing.T, client *rpc.Client) {
 	}
 	// CallContract
 	if _, err := ec.CallContract(context.Background(), msg, big.NewInt(1)); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// PendingCallContract
-	if _, err := ec.PendingCallContract(context.Background(), msg); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

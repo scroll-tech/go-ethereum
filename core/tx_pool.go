@@ -1296,7 +1296,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			for _, transaction := range addBlock.Transactions() {
 				txHashes = append(txHashes, transaction.Hash())
 			}
-			pool.calculateTxsLifecycle(txHashes, addBlock.Time())
+			pool.calculateTxsLifecycle(txHashes, uint64(time.Now().Unix()))
 		}
 
 		pool.demoteUnexecutables()

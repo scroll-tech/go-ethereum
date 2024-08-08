@@ -57,9 +57,8 @@ pub mod checker {
         match trace {
             Err(e) => {
                 log::warn!(
-                    "failed to parse trace in parse_json_to_rust_trace, error: {:?}, trace_json_cstr: {:?}",
+                    "failed to parse trace in parse_json_to_rust_trace, error: {:?}",
                     e,
-                    trace_json_cstr,
                 );
                 return null_mut();
             }

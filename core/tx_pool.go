@@ -268,6 +268,7 @@ type TxPool struct {
 	queueTxEventCh  chan *types.Transaction
 	reorgDoneCh     chan chan struct{}
 	reorgShutdownCh chan struct{}  // requests shutdown of scheduleReorgLoop
+	reorgPauseCh    chan bool      // requests to pause scheduleReorgLoop
 	wg              sync.WaitGroup // tracks loop, scheduleReorgLoop
 	initDoneCh      chan struct{}  // is closed once the pool is initialized (for tests)
 
@@ -300,6 +301,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		queueTxEventCh:  make(chan *types.Transaction),
 		reorgDoneCh:     make(chan chan struct{}),
 		reorgShutdownCh: make(chan struct{}),
+		reorgPauseCh:    make(chan bool),
 		initDoneCh:      make(chan struct{}),
 		gasPrice:        new(big.Int).SetUint64(config.PriceLimit),
 	}
@@ -496,6 +498,40 @@ func (pool *TxPool) stats() (int, int) {
 	return pending, queued
 }
 
+// StatsWithMinBaseFee retrieves the current pool stats, namely the number of pending and the
+// number of queued (non-executable) transactions greater equal minBaseFee.
+func (pool *TxPool) StatsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+
+	return pool.statsWithMinBaseFee(minBaseFee)
+}
+
+// statsWithMinBaseFee retrieves the current pool stats, namely the number of pending and the
+// number of queued (non-executable) transactions greater equal minBaseFee.
+func (pool *TxPool) statsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
+	pending := 0
+	for _, list := range pool.pending {
+		for _, tx := range list.txs.flatten() {
+			if _, err := tx.EffectiveGasTip(minBaseFee); err != nil {
+				break // basefee too low, discard rest of txs with higher nonces from the account
+			}
+			pending++
+		}
+	}
+
+	queued := 0
+	for _, list := range pool.queue {
+		for _, tx := range list.txs.flatten() {
+			if _, err := tx.EffectiveGasTip(minBaseFee); err != nil {
+				break // basefee too low, discard rest of txs with higher nonces from the account
+			}
+			queued++
+		}
+	}
+	return pending, queued
+}
+
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and sorted by nonce.
 func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
@@ -648,7 +684,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrInvalidSender
 	}
 	// Drop non-local transactions under our own minimal accepted gas price or tip.
-	if !local && tx.GasTipCapIntCmp(pool.gasPrice) < 0 {
+	if !local && tx.GasFeeCapIntCmp(pool.gasPrice) < 0 {
 		return ErrUnderpriced
 	}
 	// Ensure the transaction adheres to nonce ordering
@@ -1126,13 +1162,14 @@ func (pool *TxPool) scheduleReorgLoop() {
 		curDone       chan struct{} // non-nil while runReorg is active
 		nextDone      = make(chan struct{})
 		launchNextRun bool
+		reorgsPaused  bool
 		reset         *txpoolResetRequest
 		dirtyAccounts *accountSet
 		queuedEvents  = make(map[common.Address]*txSortedMap)
 	)
 	for {
 		// Launch next background reorg if needed
-		if curDone == nil && launchNextRun {
+		if curDone == nil && launchNextRun && !reorgsPaused {
 			// Run the background reorg and announcements
 			go pool.runReorg(nextDone, reset, dirtyAccounts, queuedEvents)
 
@@ -1184,6 +1221,7 @@ func (pool *TxPool) scheduleReorgLoop() {
 			}
 			close(nextDone)
 			return
+		case reorgsPaused = <-pool.reorgPauseCh:
 		}
 	}
 }
@@ -1640,6 +1678,24 @@ func (pool *TxPool) demoteUnexecutables() {
 		if list.Empty() {
 			delete(pool.pending, addr)
 		}
+	}
+}
+
+// PauseReorgs stops any new reorg jobs to be started but doesn't interrupt any existing ones that are in flight
+// Keep in mind this function might block, although it is not expected to block for any significant amount of time
+func (pool *TxPool) PauseReorgs() {
+	select {
+	case pool.reorgPauseCh <- true:
+	case <-pool.reorgShutdownCh:
+	}
+}
+
+// ResumeReorgs allows new reorg jobs to be started.
+// Keep in mind this function might block, although it is not expected to block for any significant amount of time
+func (pool *TxPool) ResumeReorgs() {
+	select {
+	case pool.reorgPauseCh <- false:
+	case <-pool.reorgShutdownCh:
 	}
 }
 

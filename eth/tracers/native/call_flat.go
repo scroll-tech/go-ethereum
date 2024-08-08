@@ -151,12 +151,12 @@ func (t *flatCallTracer) GetResult() (json.RawMessage, error) {
 
 func flatFromNested(input *callFrame, traceAddress []int, convertErrs bool, ctx *tracers.Context) (output []flatCallFrame, err error) {
 	var frame *flatCallFrame
-	switch input.Type {
-	case vm.CREATE.String(), vm.CREATE2.String():
+	switch vm.StringToOp(input.Type) {
+	case vm.CREATE, vm.CREATE2:
 		frame = newFlatCreate(input)
-	case vm.SELFDESTRUCT.String():
+	case vm.SELFDESTRUCT:
 		frame = newFlatSuicide(input)
-	case vm.CALL.String(), vm.STATICCALL.String(), vm.CALLCODE.String(), vm.DELEGATECALL.String():
+	case vm.CALL, vm.STATICCALL, vm.CALLCODE, vm.DELEGATECALL:
 		frame = newFlatCall(input)
 	default:
 		return nil, fmt.Errorf("unrecognized call frame type: %s", input.Type)

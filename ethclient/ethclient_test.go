@@ -599,6 +599,12 @@ func testCallContract(t *testing.T, client *rpc.Client) {
 	if _, err := ec.CallContract(context.Background(), msg, big.NewInt(1)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	// PendingCallContract
+	// Commented out since the worker is started in a separate goroutine this test leads to a race condition
+	// where sometimes a pending block is not yet available.
+	//if _, err := ec.PendingCallContract(context.Background(), msg); err != nil {
+	//	t.Fatalf("unexpected error: %v", err)
+	//}
 }
 
 func testAtFunctions(t *testing.T, client *rpc.Client) {

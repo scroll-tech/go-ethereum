@@ -153,7 +153,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
 		exitCh:                 make(chan struct{}),
 		startCh:                make(chan struct{}, 1),
-		circuitCapacityChecker: ccc.NewCircuitCapacityChecker(true),
+		circuitCapacityChecker: ccc.NewChecker(true),
 	}
 	log.Info("created new worker", "Checker ID", worker.circuitCapacityChecker.ID)
 

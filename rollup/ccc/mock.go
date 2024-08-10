@@ -20,8 +20,8 @@ type Checker struct {
 	skipError error
 }
 
-// NewCircuitCapacityChecker creates a new Checker
-func NewCircuitCapacityChecker(lightMode bool) *Checker {
+// NewChecker creates a new Checker
+func NewChecker(lightMode bool) *Checker {
 	ccc := &Checker{ID: rand.Uint64()}
 	ccc.SetLightMode(lightMode)
 	return ccc

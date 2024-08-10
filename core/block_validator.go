@@ -75,7 +75,7 @@ type tracerWrapper interface {
 func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper) {
 	v.checkCircuitCapacity = true
 	v.tracer = tracer
-	v.circuitCapacityChecker = ccc.NewCircuitCapacityChecker(true)
+	v.circuitCapacityChecker = ccc.NewChecker(true)
 	log.Info("new Checker in BlockValidator", "ID", v.circuitCapacityChecker.ID)
 }
 

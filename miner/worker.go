@@ -314,7 +314,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
 
 		l1MsgsCh:               make(chan core.NewL1MsgsEvent, txChanSize),
-		circuitCapacityChecker: ccc.NewCircuitCapacityChecker(true),
+		circuitCapacityChecker: ccc.NewChecker(true),
 	}
 	log.Info("created new worker", "Checker ID", worker.circuitCapacityChecker.ID)
 

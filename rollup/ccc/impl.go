@@ -39,8 +39,8 @@ type Checker struct {
 	jsonBuffer bytes.Buffer
 }
 
-// NewCircuitCapacityChecker creates a new Checker
-func NewCircuitCapacityChecker(lightMode bool) *Checker {
+// NewChecker creates a new Checker
+func NewChecker(lightMode bool) *Checker {
 	creationMu.Lock()
 	defer creationMu.Unlock()
 

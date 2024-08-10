@@ -52,10 +52,10 @@ type BlockValidator struct {
 	engine consensus.Engine    // Consensus engine used for validating
 
 	// circuit capacity checker related fields
-	checkCircuitCapacity   bool                        // whether enable circuit capacity check
-	cMu                    sync.Mutex                  // mutex for circuit capacity checker
-	tracer                 tracerWrapper               // scroll tracer wrapper
-	circuitCapacityChecker *ccc.CircuitCapacityChecker // circuit capacity checker instance
+	checkCircuitCapacity   bool          // whether enable circuit capacity check
+	cMu                    sync.Mutex    // mutex for circuit capacity checker
+	tracer                 tracerWrapper // scroll tracer wrapper
+	circuitCapacityChecker *ccc.Checker  // circuit capacity checker instance
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
@@ -76,7 +76,7 @@ func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapp
 	v.checkCircuitCapacity = true
 	v.tracer = tracer
 	v.circuitCapacityChecker = ccc.NewCircuitCapacityChecker(true)
-	log.Info("new CircuitCapacityChecker in BlockValidator", "ID", v.circuitCapacityChecker.ID)
+	log.Info("new Checker in BlockValidator", "ID", v.circuitCapacityChecker.ID)
 }
 
 // ValidateBody validates the given block's uncles and verifies the block

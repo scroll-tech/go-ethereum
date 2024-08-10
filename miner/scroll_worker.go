@@ -131,7 +131,7 @@ type worker struct {
 	// External functions
 	isLocalBlock func(block *types.Header) bool // Function used to determine whether the specified block is mined by local miner.
 
-	circuitCapacityChecker *ccc.CircuitCapacityChecker
+	circuitCapacityChecker *ccc.Checker
 	prioritizedTx          *prioritizedTransaction
 
 	// Test hooks
@@ -155,7 +155,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		startCh:                make(chan struct{}, 1),
 		circuitCapacityChecker: ccc.NewCircuitCapacityChecker(true),
 	}
-	log.Info("created new worker", "CircuitCapacityChecker ID", worker.circuitCapacityChecker.ID)
+	log.Info("created new worker", "Checker ID", worker.circuitCapacityChecker.ID)
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeTransactions(worker.txsCh, true)
@@ -181,7 +181,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 // getCCC returns a pointer to this worker's CCC instance.
 // Only used in tests.
-func (w *worker) getCCC() *ccc.CircuitCapacityChecker {
+func (w *worker) getCCC() *ccc.Checker {
 	return w.circuitCapacityChecker
 }
 

@@ -62,7 +62,7 @@ type Pipeline struct {
 	cancelCtx context.CancelFunc
 
 	// accumulators
-	ccc            *ccc.CircuitCapacityChecker
+	ccc            *ccc.Checker
 	Header         types.Header
 	state          *state.StateDB
 	nextL1MsgIndex uint64
@@ -88,7 +88,7 @@ func NewPipeline(
 
 	header *types.Header,
 	nextL1MsgIndex uint64,
-	ccc *ccc.CircuitCapacityChecker,
+	ccc *ccc.Checker,
 ) *Pipeline {
 	// make sure we are not sharing a tracer with the caller and not in debug mode
 	vmConfig.Tracer = nil

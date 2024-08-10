@@ -1,6 +1,6 @@
 //go:build !circuit_capacity_checker
 
-package circuitcapacitychecker
+package ccc
 
 import (
 	"bytes"

@@ -31,7 +31,7 @@ RUN cd /go-ethereum && go mod download
 ADD . /go-ethereum
 COPY --from=zkp-builder /app/target/release/libzkp.so /usr/local/lib/
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
-RUN cd /go-ethereum && go run build/ci.go install -tags circuit_capacity_checker ./cmd/geth
+RUN cd /go-ethereum && go run build/ci.go install -tags ccc ./cmd/geth
 
 # Pull Geth into a second stage deploy container
 FROM ubuntu:20.04

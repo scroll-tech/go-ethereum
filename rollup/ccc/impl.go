@@ -1,4 +1,4 @@
-//go:build circuit_capacity_checker
+//go:build ccc
 
 package ccc
 

@@ -3,7 +3,7 @@ pub mod checker {
     use anyhow::{anyhow, bail, Error};
     use libc::c_char;
     use prover::{
-        zkevm::{Checker, RowUsage},
+        zkevm::{CircuitCapacityChecker, RowUsage},
         BlockTrace,
     };
     use serde_derive::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ pub mod checker {
         pub error: Option<String>,
     }
 
-    static mut CHECKERS: OnceCell<HashMap<u64, Checker>> = OnceCell::new();
+    static mut CHECKERS: OnceCell<HashMap<u64, CircuitCapacityChecker>> = OnceCell::new();
 
     /// # Safety
     #[no_mangle]
@@ -74,7 +74,7 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in new_circuit_capacity_checker");
         let id = checkers.len() as u64;
-        let checker = Checker::new();
+        let checker = CircuitCapacityChecker::new();
         checkers.insert(id, checker);
         id
     }

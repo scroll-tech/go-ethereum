@@ -126,7 +126,7 @@ $ geth --rinkeby console
 
 ### Full node on the Ropsten test network
 
-In addition to Görli and Rinkeby, Geth also supports the ancient Ropsten testnet. The
+In addition to Goerli and Rinkeby, Geth also supports the ancient Ropsten testnet. The
 Ropsten test network is based on the Ethash proof-of-work consensus algorithm. As such,
 it has certain extra overhead and is more susceptible to reorganization attacks due to the
 network's low difficulty/security.

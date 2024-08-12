@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -72,6 +73,7 @@ var (
 		Recommit:       time.Second,
 		GasCeil:        params.GenesisGasLimit,
 		MaxAccountsNum: math.MaxInt,
+		CCCMaxWorkers:  2,
 	}
 )
 
@@ -1025,4 +1027,118 @@ func TestPending(t *testing.T) {
 	pending := w.pendingBlock()
 	assert.NotNil(t, pending)
 	assert.NotEmpty(t, pending.Transactions())
+}
+
+func TestReorg(t *testing.T) {
+	var (
+		engine      consensus.Engine
+		chainConfig *params.ChainConfig
+		db          = rawdb.NewMemoryDatabase()
+	)
+	chainConfig = params.AllCliqueProtocolChanges
+	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000, RelaxedPeriod: true}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
+	engine = clique.New(chainConfig.Clique, db)
+
+	maxTxPerBlock := 2
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
+	chainConfig.Scroll.L1Config = &params.L1Config{
+		NumL1MessagesPerBlock: 10,
+	}
+
+	chainConfig.LondonBlock = big.NewInt(0)
+	w, b := newTestWorker(t, chainConfig, engine, db, 0)
+	defer w.close()
+
+	// This test chain imports the mined blocks.
+	b.genesis.MustCommit(db)
+	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{}, nil, nil)
+	defer chain.Stop()
+
+	// Insert local tx
+	for i := 0; i < 40; i++ {
+		b.txPool.AddLocal(b.newRandomTx(true))
+	}
+
+	const firstReorgHeight = 5
+	w.asyncChecker.ScheduleError(firstReorgHeight, 1)
+
+	// Start mining!
+	w.start()
+
+	// Wait for mined blocks.
+	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
+	defer sub.Unsubscribe()
+
+	var oldBlock *types.Block
+	var newBlock *types.Block
+
+firstReorg:
+	for {
+		select {
+		case ev := <-sub.Chan():
+			block := ev.Data.(core.NewMinedBlockEvent).Block
+			if block.NumberU64() == firstReorgHeight {
+				if oldBlock == nil {
+					oldBlock = block
+				} else {
+					newBlock = block
+					break firstReorg
+				}
+			}
+		case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
+			t.Fatalf("timeout")
+		}
+	}
+
+	require.Equal(t, oldBlock.NumberU64(), newBlock.NumberU64())
+	// should skip second txn
+	require.Equal(t, oldBlock.Transactions()[:1].Len(), newBlock.Transactions().Len())
+	for i := 0; i < newBlock.Transactions().Len(); i++ {
+		require.Equal(t, oldBlock.Transactions()[:1][i].Hash(), newBlock.Transactions()[i].Hash())
+	}
+
+	time.Sleep(time.Second * 5)
+
+	const secondReorgHeight = 15
+	w.asyncChecker.ScheduleError(secondReorgHeight, 0)
+
+	sub.Unsubscribe()
+
+	// Insert local tx
+	for i := 0; i < 20; i++ {
+		b.txPool.AddLocal(b.newRandomTx(true))
+	}
+
+	// resubscribe
+	sub = w.mux.Subscribe(core.NewMinedBlockEvent{})
+	defer sub.Unsubscribe()
+
+	oldBlock = nil
+	newBlock = nil
+
+secondReorg:
+	for {
+		select {
+		case ev := <-sub.Chan():
+			block := ev.Data.(core.NewMinedBlockEvent).Block
+			if block.NumberU64() == secondReorgHeight {
+				if oldBlock == nil {
+					oldBlock = block
+				} else {
+					newBlock = block
+					break secondReorg
+				}
+			}
+		case <-time.After(3 * time.Second): // Worker needs 1s to include new changes.
+			t.Fatalf("timeout")
+		}
+	}
+
+	require.Equal(t, oldBlock.NumberU64(), newBlock.NumberU64())
+	// should skip first txn and the next txn will fail nonce check
+	require.Equal(t, 0, newBlock.Transactions().Len())
+	for i := 0; i < newBlock.Transactions().Len(); i++ {
+		require.Equal(t, oldBlock.Transactions()[1:][i].Hash(), newBlock.Transactions()[i].Hash())
+	}
 }

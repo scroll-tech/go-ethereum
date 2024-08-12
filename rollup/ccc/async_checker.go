@@ -48,16 +48,20 @@ type AsyncChecker struct {
 	currentHead       *types.Header
 	forkCtx           context.Context
 	forkCtxCancelFunc context.CancelFunc
+
+	// tests
+	blockNumberToFail uint64
+	txnIdxToFail      uint64
 }
 
 type ErrorWithTxnIdx struct {
-	txIdx      uint
+	TxIdx      uint
 	err        error
-	shouldSkip bool
+	ShouldSkip bool
 }
 
 func (e *ErrorWithTxnIdx) Error() string {
-	return fmt.Sprintf("txn at index %d failed with %s", e.txIdx, e.err)
+	return fmt.Sprintf("txn at index %d failed with %s", e.TxIdx, e.err)
 }
 
 func (e *ErrorWithTxnIdx) Unwrap() error {
@@ -148,6 +152,15 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 		}
 	}
 
+	if c.blockNumberToFail == block.NumberU64() {
+		err = &ErrorWithTxnIdx{
+			TxIdx: uint(c.txnIdxToFail),
+			err:   err,
+		}
+		c.blockNumberToFail = 0
+		return failingCallback
+	}
+
 	statedb, err := c.bc.StateAt(parent.Root())
 	if err != nil {
 		return failingCallback
@@ -168,11 +181,11 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 		curRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
 		if err != nil {
 			err = &ErrorWithTxnIdx{
-				txIdx: uint(txIdx),
+				TxIdx: uint(txIdx),
 				err:   err,
 				// if the txn is the first in block or the additional resource utilization caused
 				// by this txn alone is enough to overflow the circuit, skip
-				shouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
+				ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
 			}
 			return failingCallback
 		}
@@ -221,4 +234,10 @@ func (c *AsyncChecker) checkTxAndApply(parent *types.Block, header *types.Header
 		return nil, err
 	}
 	return rc, nil
+}
+
+// ScheduleError forces a block to error on a given transaction index
+func (c *AsyncChecker) ScheduleError(blockNumber uint64, txnIndx uint64) {
+	c.blockNumberToFail = blockNumber
+	c.txnIdxToFail = txnIndx
 }

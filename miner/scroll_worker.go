@@ -64,6 +64,7 @@ var (
 	prepareTimer       = metrics.NewRegisteredTimer("miner/prepare", nil)
 	collectL2Timer     = metrics.NewRegisteredTimer("miner/collect_l2_txns", nil)
 	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit", nil)
+	cccStallTimer      = metrics.NewRegisteredTimer("miner/ccc_stall", nil)
 
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)
@@ -84,6 +85,8 @@ type work struct {
 	cccLogger       *ccc.Logger
 	vmConfig        vm.Config
 
+	reorgReason error
+
 	// accumulated state
 	nextL1MsgIndex uint64
 	gasPool        *core.GasPool
@@ -101,6 +104,11 @@ func (w *work) deadlineCh() <-chan time.Time {
 		return deadCh
 	}
 	return w.deadlineTimer.C
+}
+
+type reorgTrigger struct {
+	block  *types.Block
+	reason error
 }
 
 // worker is the main object which takes care of submitting new work to consensus engine
@@ -125,6 +133,7 @@ type worker struct {
 	// Channels
 	startCh chan struct{}
 	exitCh  chan struct{}
+	reorgCh chan reorgTrigger
 
 	wg      sync.WaitGroup
 	current *work
@@ -154,6 +163,8 @@ type worker struct {
 
 	prioritizedTx *prioritizedTransaction
 
+	asyncChecker *ccc.AsyncChecker
+
 	// Test hooks
 	beforeTxHook func() // Method to call before processing a transaction.
 
@@ -174,7 +185,10 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		chainHeadCh:  make(chan core.ChainHeadEvent, chainHeadChanSize),
 		exitCh:       make(chan struct{}),
 		startCh:      make(chan struct{}, 1),
+		reorgCh:      make(chan reorgTrigger, 1),
 	}
+	worker.asyncChecker = ccc.NewAsyncChecker(worker.chain, config.CCCMaxWorkers, false).WithOnFailingBlock(worker.onBlockFailingCCC)
+
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
 
@@ -281,13 +295,14 @@ func (w *worker) close() {
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
+	defer w.asyncChecker.Wait()
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 
 	var err error
 	for {
 		if _, isRetryable := err.(retryableCommitError); isRetryable {
-			if err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash); err != nil {
+			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorgReason); err != nil {
 				continue
 			}
 		} else if err != nil {
@@ -297,13 +312,17 @@ func (w *worker) mainLoop() {
 
 		select {
 		case <-w.startCh:
-			err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash())
+			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)
+		case trigger := <-w.reorgCh:
+			err = w.handleReorg(&trigger)
 		case chainHead := <-w.chainHeadCh:
-			err = w.tryCommitNewWork(time.Now(), chainHead.Block.Hash())
+			if w.isCanonical(chainHead.Block.Header()) {
+				_, err = w.tryCommitNewWork(time.Now(), chainHead.Block.Hash(), nil)
+			}
 		case <-w.current.deadlineCh():
 			w.current.deadlineReached = true
 			if len(w.current.txs) > 0 {
-				err = w.commit()
+				_, err = w.commit(false)
 			}
 		case ev := <-w.txsCh:
 			// Apply transactions to the pending state
@@ -312,16 +331,9 @@ func (w *worker) mainLoop() {
 			// already included in the current mining block. These transactions will
 			// be automatically eliminated.
 			if w.current != nil {
-				txs := make(map[common.Address]types.Transactions)
-				signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
-				for _, tx := range ev.Txs {
-					acc, _ := types.Sender(signer, tx)
-					txs[acc] = append(txs[acc], tx)
-				}
-				txset := types.NewTransactionsByPriceAndNonce(signer, txs, w.current.header.BaseFee)
-				shouldCommit, _ := w.processTxns(txset)
+				shouldCommit, _ := w.processTxnSlice(ev.Txs)
 				if shouldCommit || w.current.deadlineReached {
-					err = w.commit()
+					_, err = w.commit(false)
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
@@ -360,7 +372,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 }
 
 // newWork
-func (w *worker) newWork(now time.Time, parentHash common.Hash) error {
+func (w *worker) newWork(now time.Time, parentHash common.Hash, reorgReason error) error {
 	parent := w.chain.GetBlockByHash(parentHash)
 	header := &types.Header{
 		ParentHash: parent.Hash(),
@@ -421,35 +433,50 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash) error {
 		coalescedLogs:  []*types.Log{},
 		gasPool:        new(core.GasPool).AddGas(header.GasLimit),
 		nextL1MsgIndex: nextL1MsgIndex,
+		reorgReason:    reorgReason,
 	}
 	return nil
 }
 
 // tryCommitNewWork
-func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash) error {
-	err := w.newWork(now, parent)
+func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorgReason error) (common.Hash, error) {
+	err := w.newWork(now, parent, reorgReason)
 	if err != nil {
-		return fmt.Errorf("failed creating new work: %w", err)
+		return common.Hash{}, fmt.Errorf("failed creating new work: %w", err)
 	}
 
 	shouldCommit, err := w.handleForks()
 	if err != nil {
-		return fmt.Errorf("failed handling forks: %w", err)
+		return common.Hash{}, fmt.Errorf("failed handling forks: %w", err)
+	}
+
+	// check if we are reorging
+	reorging := w.chain.GetBlockByNumber(w.current.header.Number.Uint64()) != nil
+	if !shouldCommit && reorging {
+		shouldCommit, err = w.processReorgedTxns(w.current.reorgReason)
+	}
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed handling reorged txns: %w", err)
 	}
 
 	if !shouldCommit {
 		shouldCommit, err = w.processTxPool()
 	}
 	if err != nil {
-		return fmt.Errorf("failed processing tx pool: %w", err)
+		return common.Hash{}, fmt.Errorf("failed processing tx pool: %w", err)
 	}
 
 	if shouldCommit {
-		if err = w.commit(); err != nil {
-			return fmt.Errorf("failed committing new work: %w", err)
+		// if reorging, force committing even if we are not "running"
+		// this can happen when sequencer is instructed to shutdown while handling a reorg
+		// we should make sure reorg is not interrupted
+		if blockHash, err := w.commit(reorging); err != nil {
+			return common.Hash{}, fmt.Errorf("failed committing new work: %w", err)
+		} else {
+			return blockHash, nil
 		}
 	}
-	return nil
+	return common.Hash{}, nil
 }
 
 // handleForks
@@ -544,6 +571,38 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 
 	return false, nil
+}
+
+// processTxnSlice
+func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
+	txsMap := make(map[common.Address]types.Transactions)
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	for _, tx := range txns {
+		acc, _ := types.Sender(signer, tx)
+		txsMap[acc] = append(txsMap[acc], tx)
+	}
+	txset := types.NewTransactionsByPriceAndNonce(signer, txsMap, w.current.header.BaseFee)
+	return w.processTxns(txset)
+}
+
+// processReorgedTxns
+func (w *worker) processReorgedTxns(reason error) (bool, error) {
+	reorgedTxns := w.chain.GetBlockByNumber(w.current.header.Number.Uint64()).Transactions()
+	var errorWithTxnIdx *ccc.ErrorWithTxnIdx
+	if len(reorgedTxns) > 0 && errors.As(reason, &errorWithTxnIdx) {
+		if errorWithTxnIdx.TxIdx == 0 {
+			reorgedTxns = reorgedTxns[1:]
+		} else {
+			reorgedTxns = reorgedTxns[:errorWithTxnIdx.TxIdx]
+		}
+
+		if errorWithTxnIdx.ShouldSkip {
+			w.skipTransaction(reorgedTxns[errorWithTxnIdx.TxIdx], reason)
+		}
+	}
+
+	w.processTxnSlice(reorgedTxns)
+	return true, nil
 }
 
 // processTxns
@@ -655,21 +714,21 @@ func (e retryableCommitError) Unwrap() error {
 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
-func (w *worker) commit() error {
+func (w *worker) commit(force bool) (common.Hash, error) {
 	sealDelay := time.Duration(0)
 	defer func(t0 time.Time) {
 		l2CommitTimer.Update(time.Since(t0) - sealDelay)
 	}(time.Now())
 
 	w.updateSnapshot()
-	if !w.isRunning() {
-		return nil
+	if !w.isRunning() && !force {
+		return common.Hash{}, nil
 	}
 
 	block, err := w.engine.FinalizeAndAssemble(w.chain, w.current.header, w.current.state,
 		w.current.txs, nil, w.current.receipts)
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 
 	sealHash := w.engine.SealHash(block.Header())
@@ -679,7 +738,7 @@ func (w *worker) commit() error {
 
 	resultCh, stopCh := make(chan *types.Block), make(chan struct{})
 	if err := w.engine.Seal(w.chain, block, resultCh, stopCh); err != nil {
-		return err
+		return common.Hash{}, err
 	}
 	// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
 	// or a call that blocks between the call to Seal and the line below. Seal might introduce some delay, so we keep track of
@@ -688,12 +747,12 @@ func (w *worker) commit() error {
 	block = <-resultCh
 	sealDelay = time.Since(sealStart)
 	if block == nil {
-		return errors.New("missed seal response from consensus engine")
+		return common.Hash{}, errors.New("missed seal response from consensus engine")
 	}
 
 	// verify the generated block with local consensus engine to make sure everything is as expected
 	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
-		return retryableCommitError{inner: err}
+		return common.Hash{}, retryableCommitError{inner: err}
 	}
 
 	blockHash := block.Hash()
@@ -744,13 +803,19 @@ func (w *worker) commit() error {
 	// Commit block and state to database.
 	_, err = w.chain.WriteBlockWithState(block, w.current.receipts, w.current.coalescedLogs, w.current.state, true)
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 
 	log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealHash, "hash", blockHash)
 
 	// Broadcast the block and announce chain insertion event
 	w.mux.Post(core.NewMinedBlockEvent{Block: block})
+
+	checkStart := time.Now()
+	if err = w.asyncChecker.Check(block); err != nil {
+		log.Error("failed to launch CCC background task", "err", err)
+	}
+	cccStallTimer.UpdateSince(checkStart)
 
 	commitGasCounter.Inc(int64(block.GasUsed()))
 	if w.current.deadlineReached {
@@ -759,7 +824,7 @@ func (w *worker) commit() error {
 		commitReasonCCCCounter.Inc(1)
 	}
 	w.current = nil
-	return nil
+	return block.Hash(), nil
 }
 
 // copyReceipts makes a deep copy of the given receipts.
@@ -793,19 +858,7 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 
 		// first txn overflowed the circuit, skip
 		log.Info("Circuit capacity limit reached for a single tx", "isL1Message", tx.IsL1MessageTx(), "tx", tx.Hash().String())
-		rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, err.Error(),
-			w.current.header.Number.Uint64(), nil)
-		if tx.IsL1MessageTx() {
-			w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
-			l1SkippedCounter.Inc(1)
-		} else {
-			if w.prioritizedTx != nil && w.prioritizedTx.tx.Hash() == tx.Hash() {
-				w.prioritizedTx = nil
-			}
-
-			w.eth.TxPool().RemoveTx(tx.Hash(), true)
-			l2SkippedCounter.Inc(1)
-		}
+		w.skipTransaction(tx, err)
 	} else if tx.IsL1MessageTx() {
 		if errors.Is(err, ErrUnexpectedL1MessageIndex) {
 			log.Warn(
@@ -830,6 +883,23 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 	}
 
 	return false
+}
+
+// skipTransaction
+func (w *worker) skipTransaction(tx *types.Transaction, err error) {
+	rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, err.Error(),
+		w.current.header.Number.Uint64(), nil)
+	if tx.IsL1MessageTx() {
+		w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
+		l1SkippedCounter.Inc(1)
+	} else {
+		if w.prioritizedTx != nil && w.prioritizedTx.tx.Hash() == tx.Hash() {
+			w.prioritizedTx = nil
+		}
+
+		w.eth.TxPool().RemoveTx(tx.Hash(), true)
+		l2SkippedCounter.Inc(1)
+	}
 }
 
 // totalFees computes total consumed miner fees in ETH. Block transactions and receipts have to have the same order.
@@ -861,4 +931,52 @@ func (w *worker) scheduleCCCError(countdown int) {
 // skip forces a txn to be skipped by worker
 func (w *worker) skip(txHash common.Hash) {
 	w.skipTxHash = txHash
+}
+
+// onBlockFailingCCC is called when block produced by worker fails CCC
+func (w *worker) onBlockFailingCCC(failingBlock *types.Block, err error) {
+	log.Warn("block failed CCC", "hash", failingBlock.Hash(), "number", failingBlock.NumberU64())
+	// w.asyncChecker.Check() might block until this callback returns and if the write to reorgCh
+	// below blocks, we have a deadlock. Make sure this callback can never block.
+	go func() {
+		w.reorgCh <- reorgTrigger{
+			block:  failingBlock,
+			reason: err,
+		}
+	}()
+}
+
+// handleReorg reorgs all blocks following the trigger block
+func (w *worker) handleReorg(trigger *reorgTrigger) error {
+	parentHash := trigger.block.ParentHash()
+	reorgReason := trigger.reason
+
+	for {
+		if !w.isCanonical(trigger.block.Header()) {
+			// trigger block is no longer part of the canonical chain, we are done
+			return nil
+		}
+
+		newBlockHash, err := w.tryCommitNewWork(time.Now(), parentHash, reorgReason)
+		if err != nil {
+			return err
+		}
+
+		// we created replacement blocks for all existing blocks in canonical chain, but not quite ready to commit the new HEAD
+		if newBlockHash == (common.Hash{}) {
+			// force committing the new canonical head to trigger a reorg in blockchain
+			// otherwise we might ignore CCC errors from the new side chain since it is not canonical yet
+			newBlockHash, err = w.commit(true)
+			if err != nil {
+				return err
+			}
+		}
+
+		parentHash = newBlockHash
+		reorgReason = nil // clear reorg reason after trigger block gets reorged
+	}
+}
+
+func (w *worker) isCanonical(header *types.Header) bool {
+	return w.chain.GetBlockByNumber(header.Number.Uint64()).Hash() == header.Hash()
 }

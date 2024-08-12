@@ -53,9 +53,6 @@ const (
 	// more expensive to propagate; larger transactions also take more resources
 	// to validate whether they fit into the pool or not.
 	txMaxSize = 4 * txSlotSize // 128KB
-
-	// txLifecyclesMaxSize is the maximum size of the txs stay in tx lifecycle lru containers.
-	txLifecyclesMaxSize = 10000
 )
 
 var (

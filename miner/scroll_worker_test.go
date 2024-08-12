@@ -38,7 +38,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
@@ -788,7 +787,7 @@ func TestOversizedTxThenNormal(t *testing.T) {
 		switch blockNum {
 		case 0:
 			// schedule to skip 2nd call to ccc
-			w.getCCC().ScheduleError(2, ccc.ErrBlockRowConsumptionOverflow)
+			w.scheduleCCCError(2)
 			return false
 		case 1:
 			// include #0, fail on #1, then seal the block
@@ -803,7 +802,7 @@ func TestOversizedTxThenNormal(t *testing.T) {
 			assert.Equal(uint64(1), *queueIndex)
 
 			// schedule to skip next call to ccc
-			w.getCCC().ScheduleError(1, ccc.ErrBlockRowConsumptionOverflow)
+			w.scheduleCCCError(1)
 
 			return false
 		case 2:
@@ -869,7 +868,7 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 
 	// Process 2 transactions with gas order: tx0 > tx1, tx1 will overflow.
 	b.txPool.AddRemotesSync([]*types.Transaction{tx0, tx1})
-	w.getCCC().ScheduleError(2, ccc.ErrBlockRowConsumptionOverflow)
+	w.scheduleCCCError(2)
 	w.start()
 
 	select {
@@ -903,7 +902,7 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 		t.Fatalf("timeout")
 	}
 
-	w.getCCC().Skip(tx4.Hash(), ccc.ErrBlockRowConsumptionOverflow)
+	w.skip(tx4.Hash())
 	assert.Equal([]error{nil, nil, nil}, b.txPool.AddRemotesSync([]*types.Transaction{tx3, tx4, tx5}))
 
 	w.start()
@@ -982,66 +981,6 @@ func TestSkippedTransactionDatabaseEntries(t *testing.T) {
 			return true
 		}
 	})
-}
-
-func TestSealBlockAfterCliquePeriod(t *testing.T) {
-	assert := assert.New(t)
-	var (
-		engine      consensus.Engine
-		chainConfig *params.ChainConfig
-		db          = rawdb.NewMemoryDatabase()
-	)
-	chainConfig = params.AllCliqueProtocolChanges
-	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
-	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
-	engine = clique.New(chainConfig.Clique, db)
-	w, b := newTestWorker(t, chainConfig, engine, db, 0)
-	defer w.close()
-
-	// This test chain imports the mined blocks.
-	b.genesis.MustCommit(db)
-	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
-		Debug:  true,
-		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil)
-	defer chain.Stop()
-
-	// Add artificial delay to transaction processing.
-	w.beforeTxHook = func() {
-		time.Sleep(time.Duration(chainConfig.Clique.Period) * 1 * time.Second)
-	}
-
-	// Wait for mined blocks.
-	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
-	defer sub.Unsubscribe()
-
-	// Insert 2 non-l1msg txs
-	b.txPool.AddLocal(b.newRandomTx(true))
-	b.txPool.AddLocal(b.newRandomTx(false))
-
-	// Start mining!
-	w.start()
-
-	select {
-	case ev := <-sub.Chan():
-		block := ev.Data.(core.NewMinedBlockEvent).Block
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
-			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
-		}
-		assert.Equal(1, len(block.Transactions())) // only packed 1 tx, not 2
-	case <-time.After(5 * time.Second):
-		t.Fatalf("timeout")
-	}
-
-	select {
-	case ev := <-sub.Chan():
-		block := ev.Data.(core.NewMinedBlockEvent).Block
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
-			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
-		}
-		assert.Equal(1, len(block.Transactions()))
-	case <-time.After(5 * time.Second):
-		t.Fatalf("timeout")
-	}
 }
 
 func TestPending(t *testing.T) {

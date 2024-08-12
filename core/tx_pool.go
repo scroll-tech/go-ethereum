@@ -1290,15 +1290,6 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	// remove any transaction that has been included in the block or was invalidated
 	// because of another transaction (e.g. higher gas price).
 	if reset != nil {
-		if reset.newHead != nil {
-			var txHashes []common.Hash
-			addBlock := pool.chain.GetBlock(reset.newHead.Hash(), reset.newHead.Number.Uint64())
-			for _, transaction := range addBlock.Transactions() {
-				txHashes = append(txHashes, transaction.Hash())
-			}
-			pool.calculateTxsLifecycle(txHashes, uint64(time.Now().Unix()))
-		}
-
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsCurie(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
 			l1BaseFee := fees.GetL1BaseFee(pool.currentState)

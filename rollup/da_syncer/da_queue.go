@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 )
 
 // DAQueue is a pipeline stage that reads DA entries from a DataSource and provides them to the next stage.
@@ -54,7 +55,9 @@ func (dq *DAQueue) getNextData(ctx context.Context) error {
 	if errors.Is(err, da.ErrSourceExhausted) {
 		dq.l1height = dq.dataSource.L1Height()
 		dq.dataSource = nil
-		return dq.getNextData(ctx)
+
+		// we return EOFError to be handled in pipeline
+		return serrors.EOFError
 	}
 
 	return err

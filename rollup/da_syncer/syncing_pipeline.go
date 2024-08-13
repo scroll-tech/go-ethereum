@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
@@ -114,6 +114,7 @@ func (s *SyncingPipeline) mainLoop() {
 	stepCh := make(chan struct{}, 1)
 	var delayedStepCh <-chan time.Time
 	var resetCounter int
+	var tempErrorCounter int
 
 	// reqStep is a helper function to request a step to be executed.
 	// If delay is true, it will request a delayed step with exponential backoff, otherwise it will request an immediate step.
@@ -157,18 +158,32 @@ func (s *SyncingPipeline) mainLoop() {
 				reqStep(false)
 				s.expBackoff.Reset()
 				resetCounter = 0
+				tempErrorCounter = 0
 				continue
 			}
 
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, serrors.EOFError) {
 				// pipeline is empty, request a delayed step
+				// TODO: eventually (with state manager) this should not trigger a delayed step because external events will trigger a new step anyway
 				reqStep(true)
+				tempErrorCounter = 0
 				continue
-			}
-			if errors.Is(err, ErrBlockTooLow) {
+			} else if errors.Is(err, serrors.TemporaryError) {
+				log.Warn("syncing pipeline step failed due to temporary error, retrying", "err", err)
+				if tempErrorCounter > 100 {
+					log.Warn("syncing pipeline step failed due to 100 consecutive temporary errors, stopping pipeline worker", "last err", err)
+					return
+				}
+
+				// temporary error, request a delayed step
+				reqStep(true)
+				tempErrorCounter++
+				continue
+			} else if errors.Is(err, ErrBlockTooLow) {
 				// block number returned by the block queue is too low,
 				// we skip the blocks until we reach the correct block number again.
 				reqStep(false)
+				tempErrorCounter = 0
 				continue
 			} else if errors.Is(err, ErrBlockTooHigh) {
 				// block number returned by the block queue is too high,
@@ -176,10 +191,9 @@ func (s *SyncingPipeline) mainLoop() {
 				s.reset(resetCounter)
 				resetCounter++
 				reqStep(false)
+				tempErrorCounter = 0
 				continue
-			}
-
-			if errors.Is(err, context.Canceled) {
+			} else if errors.Is(err, context.Canceled) {
 				log.Info("syncing pipeline stopped due to cancelled context", "err", err)
 				return
 			}

@@ -2,12 +2,13 @@ package blob_client
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 )
 
 type BlobClientList struct {
@@ -37,8 +38,8 @@ func (c *BlobClientList) GetBlobByVersionedHash(ctx context.Context, versionedHa
 		log.Warn("BlobClientList: failed to get blob by versioned hash from BlobClient", "err", err, "blob client pos in BlobClientList", c.curPos)
 	}
 
-	// if we iterated over entire list, return EOF error that will be handled in syncing_pipeline with a backoff and retry
-	return nil, io.EOF
+	// if we iterated over entire list, return a temporary error that will be handled in syncing_pipeline with a backoff and retry
+	return nil, serrors.NewTemporaryError(errors.New("BlobClientList.GetBlobByVersionedHash: failed to get blob by versioned hash from all BlobClients"))
 }
 
 func (c *BlobClientList) nextPos() int {

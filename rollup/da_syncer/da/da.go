@@ -31,7 +31,7 @@ type Entry interface {
 
 type EntryWithBlocks interface {
 	Entry
-	Blocks() ([]*PartialBlock, error)
+	Blocks() []*PartialBlock
 }
 
 type Entries []Entry

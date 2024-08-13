@@ -45,10 +45,7 @@ func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
 		return fmt.Errorf("unexpected type of daEntry: %T", daEntry)
 	}
 
-	bq.blocks, err = entryWithBlocks.Blocks()
-	if err != nil {
-		return fmt.Errorf("failed to get blocks from daEntry: %w", err)
-	}
+	bq.blocks = entryWithBlocks.Blocks()
 
 	return nil
 }

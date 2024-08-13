@@ -3,7 +3,6 @@ package da
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
 
 	"github.com/scroll-tech/da-codec/encoding"
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
@@ -11,6 +10,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 )
 
 type CommitBatchDAV0 struct {
@@ -92,7 +92,7 @@ func (c *CommitBatchDAV0) CompareTo(other Entry) int {
 	return 0
 }
 
-func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
+func (c *CommitBatchDAV0) Blocks() []*PartialBlock {
 	var blocks []*PartialBlock
 	l1TxPointer := 0
 
@@ -125,7 +125,8 @@ func (c *CommitBatchDAV0) Blocks() ([]*PartialBlock, error) {
 			blocks = append(blocks, block)
 		}
 	}
-	return blocks, nil
+
+	return blocks
 }
 
 func getTotalMessagesPoppedFromChunks(decodedChunks []*codecv0.DAChunkRawTx) int {
@@ -156,8 +157,8 @@ func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skipped
 		l1Tx := rawdb.ReadL1Message(db, currentIndex)
 		if l1Tx == nil {
 			// message not yet available
-			// we return io.EOF as this will be handled in the syncing pipeline with a backoff and retry
-			return nil, io.EOF
+			// we return serrors.EOFError as this will be handled in the syncing pipeline with a backoff and retry
+			return nil, serrors.EOFError
 		}
 		txs = append(txs, l1Tx)
 		currentIndex++

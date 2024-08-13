@@ -11,6 +11,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 )
 
@@ -72,7 +73,7 @@ func (ds *CalldataBlobSource) NextData() (Entries, error) {
 	if to > ds.l1Finalized {
 		ds.l1Finalized, err = ds.l1Client.GetLatestFinalizedBlockNumber()
 		if err != nil {
-			return nil, fmt.Errorf("failed to query GetLatestFinalizedBlockNumber, error: %v", err)
+			return nil, serrors.NewTemporaryError(fmt.Errorf("failed to query GetLatestFinalizedBlockNumber, error: %v", err))
 		}
 		// make sure we don't request more than finalized blocks
 		to = min(to, ds.l1Finalized)
@@ -84,13 +85,15 @@ func (ds *CalldataBlobSource) NextData() (Entries, error) {
 
 	logs, err := ds.l1Client.FetchRollupEventsInRange(ds.l1height, to)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get events, l1height: %d, error: %v", ds.l1height, err)
+		return nil, serrors.NewTemporaryError(fmt.Errorf("cannot get events, l1height: %d, error: %v", ds.l1height, err))
 	}
 	da, err := ds.processLogsToDA(logs)
-	if err == nil {
-		ds.l1height = to + 1
+	if err != nil {
+		return nil, serrors.NewTemporaryError(fmt.Errorf("failed to process logs to DA, error: %v", err))
 	}
-	return da, err
+
+	ds.l1height = to + 1
+	return da, nil
 }
 
 func (ds *CalldataBlobSource) L1Height() uint64 {
@@ -119,7 +122,7 @@ func (ds *CalldataBlobSource) processLogsToDA(logs []types.Log) (Entries, error)
 
 		case ds.l1RevertBatchEventSignature:
 			event := &rollup_sync_service.L1RevertBatchEvent{}
-			if err := rollup_sync_service.UnpackLog(ds.scrollChainABI, event, revertBatchEventName, vLog); err != nil {
+			if err = rollup_sync_service.UnpackLog(ds.scrollChainABI, event, revertBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
 
@@ -129,7 +132,7 @@ func (ds *CalldataBlobSource) processLogsToDA(logs []types.Log) (Entries, error)
 
 		case ds.l1FinalizeBatchEventSignature:
 			event := &rollup_sync_service.L1FinalizeBatchEvent{}
-			if err := rollup_sync_service.UnpackLog(ds.scrollChainABI, event, finalizeBatchEventName, vLog); err != nil {
+			if err = rollup_sync_service.UnpackLog(ds.scrollChainABI, event, finalizeBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
 
@@ -188,7 +191,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, vLog *types.Lo
 
 	txData, err := ds.l1Client.FetchTxData(vLog)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch tx data, tx hash: %v, err: %w", vLog.TxHash.Hex(), err)
 	}
 	if len(txData) < methodIDLength {
 		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)

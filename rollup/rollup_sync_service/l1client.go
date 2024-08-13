@@ -55,7 +55,7 @@ func NewL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId
 	return &client, nil
 }
 
-// fetcRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
+// FetchRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
 func (c *L1Client) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error) {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 

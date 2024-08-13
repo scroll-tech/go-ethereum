@@ -101,6 +101,8 @@ var (
 	slotsGauge   = metrics.NewRegisteredGauge("txpool/slots", nil)
 
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
+
+	txLifecycleTimer = metrics.NewRegisteredTimer("txpool/txfifecycle", nil)
 )
 
 // BlockChain defines the minimal set of methods needed to back a tx pool with
@@ -1782,6 +1784,16 @@ func (pool *LegacyPool) ResumeReorgs() {
 	select {
 	case pool.reorgPauseCh <- false:
 	case <-pool.reorgShutdownCh:
+	}
+}
+
+// calculateTxsLifecycle calculates the lifecycle of given txs
+func (pool *LegacyPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
+	for _, tx := range txs {
+		if tx.Time().Before(t) {
+			txLifecycle := t.Sub(tx.Time())
+			txLifecycleTimer.Update(txLifecycle)
+		}
 	}
 }
 

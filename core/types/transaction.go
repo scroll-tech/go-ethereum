@@ -184,7 +184,7 @@ func (tx *Transaction) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-// Time retrieves the first seen locally
+// Time retrieves the time first seen locally
 func (tx *Transaction) Time() time.Time {
 	return tx.time
 }

@@ -56,13 +56,13 @@ func (e *ErrorWithTxnIdx) Unwrap() error {
 	return e.err
 }
 
-func NewAsyncChecker(bc Blockchain, numWorkers int) *AsyncChecker {
+func NewAsyncChecker(bc Blockchain, numWorkers int, lightMode bool) *AsyncChecker {
 	return &AsyncChecker{
 		bc: bc,
 		freeCheckers: func(count int) chan *Checker {
 			checkers := make(chan *Checker, count)
 			for i := 0; i < count; i++ {
-				checkers <- NewChecker(true)
+				checkers <- NewChecker(lightMode)
 			}
 			return checkers
 		}(numWorkers),

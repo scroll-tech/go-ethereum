@@ -32,7 +32,7 @@ func TestAsyncChecker(t *testing.T) {
 	}).MustCommit(db)
 
 	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil)
-	asyncChecker := NewAsyncChecker(chain, 1)
+	asyncChecker := NewAsyncChecker(chain, 1, false)
 	chain.Validator().WithAsyncValidator(asyncChecker.Check)
 
 	bs, _ := core.GenerateChain(params.TestChainConfig, chain.Genesis(), ethash.NewFaker(), db, 100, func(i int, block *core.BlockGen) {

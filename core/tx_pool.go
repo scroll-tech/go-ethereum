@@ -1695,7 +1695,7 @@ func (pool *TxPool) demoteUnexecutables() {
 	}
 }
 
-// calculateTxsLifecycle calculate the txs lifecycle
+// calculateTxsLifecycle calculates the lifecycle of given txs
 func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 	for _, tx := range txs {
 		if tx.Time().Before(t) {

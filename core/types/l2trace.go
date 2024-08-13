@@ -58,6 +58,24 @@ type StorageTrace struct {
 	DeletionProofs []hexutil.Bytes `json:"deletionProofs,omitempty"`
 }
 
+func (tr *StorageTrace) ApplyFilter(legacy bool) {
+	if legacy {
+		tr.FlattenProofs = nil
+		tr.AddressHashes = nil
+		tr.StoreKeyHashes = nil
+	} else {
+		for k := range tr.Proofs {
+			tr.Proofs[k] = []hexutil.Bytes{}
+		}
+		for _, st := range tr.StorageProofs {
+			for k := range st {
+				st[k] = []hexutil.Bytes{}
+			}
+		}
+		tr.DeletionProofs = []hexutil.Bytes{}
+	}
+}
+
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value

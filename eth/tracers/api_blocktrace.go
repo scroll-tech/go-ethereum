@@ -81,6 +81,7 @@ func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Trans
 
 // Make trace environment for current block, and then get the trace for the block.
 func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *TraceConfig, block *types.Block) (*types.BlockTrace, error) {
+	legacyTrace := false
 	if config == nil {
 		config = &TraceConfig{
 			LogConfig: &vm.LogConfig{
@@ -91,6 +92,10 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 			},
 		}
 	} else if config.Tracer != nil {
+		if *config.Tracer == "legacy" {
+			legacyTrace = true
+		}
+
 		config.Tracer = nil
 		log.Warn("Tracer params is unsupported")
 	}
@@ -109,5 +114,13 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	}
 
 	chaindb := api.backend.ChainDb()
-	return api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	l2Trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	if err != nil {
+		return nil, err
+	}
+	l2Trace.StorageTrace.ApplyFilter(legacyTrace)
+	for _, st := range l2Trace.TxStorageTraces {
+		st.ApplyFilter(legacyTrace)
+	}
+	return l2Trace, nil
 }

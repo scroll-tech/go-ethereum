@@ -123,10 +123,11 @@ var (
 	// that this number is pretty low, since txpool reorgs happen very frequently.
 	dropBetweenReorgHistogram = metrics.NewRegisteredHistogram("txpool/dropbetweenreorg", nil, metrics.NewExpDecaySample(1028, 0.015))
 
-	pendingGauge = metrics.NewRegisteredGauge("txpool/pending", nil)
-	queuedGauge  = metrics.NewRegisteredGauge("txpool/queued", nil)
-	localGauge   = metrics.NewRegisteredGauge("txpool/local", nil)
-	slotsGauge   = metrics.NewRegisteredGauge("txpool/slots", nil)
+	pendingGauge     = metrics.NewRegisteredGauge("txpool/pending", nil)
+	realPendingGauge = metrics.NewRegisteredGauge("txpool/real_pending", nil)
+	queuedGauge      = metrics.NewRegisteredGauge("txpool/queued", nil)
+	localGauge       = metrics.NewRegisteredGauge("txpool/local", nil)
+	slotsGauge       = metrics.NewRegisteredGauge("txpool/slots", nil)
 
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
 )
@@ -1493,9 +1494,22 @@ func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transa
 // equal number for all for accounts with many pending transactions.
 func (pool *TxPool) truncatePending() {
 	pending := uint64(0)
+
+	parent := pool.chain.CurrentBlock()
+	l1BaseFee := fees.GetL1BaseFee(pool.currentState)
+	pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, parent.Header(), l1BaseFee)
+
+	var allRealPending int64
 	for _, list := range pool.pending {
+		for _, tx := range list.txs.items {
+			if tx.GasTipCapIntCmp(pendingBaseFee) > 0 {
+				allRealPending++
+			}
+		}
 		pending += uint64(list.Len())
 	}
+	realPendingGauge.Update(allRealPending)
+
 	if pending <= pool.config.GlobalSlots {
 		return
 	}

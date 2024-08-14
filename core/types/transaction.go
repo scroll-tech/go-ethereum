@@ -666,6 +666,11 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 	}
 }
 
+// TxsNum returns the transactions number
+func (t *TransactionsByPriceAndNonce) TxsNum() int {
+	return len(t.txs)
+}
+
 // Peek returns the next transaction by price.
 func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 	if len(t.heads) == 0 {

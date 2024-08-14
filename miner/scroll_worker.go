@@ -68,6 +68,8 @@ var (
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)
 	commitGasCounter            = metrics.NewRegisteredCounter("miner/commit_gas", nil)
+
+	realPendingGauge = metrics.NewRegisteredGauge("txpool/real_pending", nil)
 )
 
 // prioritizedTransaction represents a single transaction that
@@ -517,8 +519,10 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		}
 	}
 
+	var allRealPendingTxsCount int64
 	if len(localTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
+		allRealPendingTxsCount += int64(txs.TxsNum())
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
@@ -526,11 +530,13 @@ func (w *worker) startNewPipeline(timestamp int64) {
 	}
 	if len(remoteTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
+		allRealPendingTxsCount += int64(txs.TxsNum())
 		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
 			w.handlePipelineResult(result)
 			return
 		}
 	}
+	realPendingGauge.Update(allRealPendingTxsCount)
 
 	// pipelineCCC was nil, so the block was built for RPC purposes only. Stop the pipeline immediately
 	// and update the pending block.

@@ -123,11 +123,10 @@ var (
 	// that this number is pretty low, since txpool reorgs happen very frequently.
 	dropBetweenReorgHistogram = metrics.NewRegisteredHistogram("txpool/dropbetweenreorg", nil, metrics.NewExpDecaySample(1028, 0.015))
 
-	pendingGauge     = metrics.NewRegisteredGauge("txpool/pending", nil)
-	realPendingGauge = metrics.NewRegisteredGauge("txpool/real_pending", nil)
-	queuedGauge      = metrics.NewRegisteredGauge("txpool/queued", nil)
-	localGauge       = metrics.NewRegisteredGauge("txpool/local", nil)
-	slotsGauge       = metrics.NewRegisteredGauge("txpool/slots", nil)
+	pendingGauge = metrics.NewRegisteredGauge("txpool/pending", nil)
+	queuedGauge  = metrics.NewRegisteredGauge("txpool/queued", nil)
+	localGauge   = metrics.NewRegisteredGauge("txpool/local", nil)
+	slotsGauge   = metrics.NewRegisteredGauge("txpool/slots", nil)
 
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
 

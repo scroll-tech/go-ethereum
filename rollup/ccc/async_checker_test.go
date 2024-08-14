@@ -59,6 +59,9 @@ func TestAsyncChecker(t *testing.T) {
 	skippedTxn := reorgBlocks[3].Transactions()[3]
 	checker := <-asyncChecker.freeCheckers
 	checker.Skip(skippedTxn.Hash(), ErrBlockRowConsumptionOverflow)
+	// trigger an error on some later height, we shouldn't get a notification for this
+	checker.ScheduleError(50, ErrBlockRowConsumptionOverflow)
+
 	asyncChecker.freeCheckers <- checker
 
 	var failingBlockHash common.Hash

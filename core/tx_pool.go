@@ -1494,22 +1494,9 @@ func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transa
 // equal number for all for accounts with many pending transactions.
 func (pool *TxPool) truncatePending() {
 	pending := uint64(0)
-
-	parent := pool.chain.CurrentBlock()
-	l1BaseFee := fees.GetL1BaseFee(pool.currentState)
-	pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, parent.Header(), l1BaseFee)
-
-	var allRealPending int64
 	for _, list := range pool.pending {
-		for _, tx := range list.txs.items {
-			if tx.GasTipCapIntCmp(pendingBaseFee) > 0 {
-				allRealPending++
-			}
-		}
 		pending += uint64(list.Len())
 	}
-	realPendingGauge.Update(allRealPending)
-
 	if pending <= pool.config.GlobalSlots {
 		return
 	}

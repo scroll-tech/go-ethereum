@@ -192,7 +192,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 			TrieTimeLimit:       config.TrieTimeout,
 			SnapshotLimit:       config.SnapshotCache,
 			Preimages:           config.Preimages,
-			MPTWitness:          config.MPTWitness,
 		}
 	)
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)
@@ -240,15 +239,16 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		checkpoint = params.TrustedCheckpoints[genesisHash]
 	}
 	if eth.handler, err = newHandler(&handlerConfig{
-		Database:   chainDb,
-		Chain:      eth.blockchain,
-		TxPool:     eth.txPool,
-		Network:    config.NetworkId,
-		Sync:       config.SyncMode,
-		BloomCache: uint64(cacheLimit),
-		EventMux:   eth.eventMux,
-		Checkpoint: checkpoint,
-		Whitelist:  config.Whitelist,
+		Database:          chainDb,
+		Chain:             eth.blockchain,
+		TxPool:            eth.txPool,
+		Network:           config.NetworkId,
+		Sync:              config.SyncMode,
+		BloomCache:        uint64(cacheLimit),
+		EventMux:          eth.eventMux,
+		Checkpoint:        checkpoint,
+		Whitelist:         config.Whitelist,
+		ShadowForkPeerIDs: config.ShadowForkPeerIDs,
 	}); err != nil {
 		return nil, err
 	}
@@ -264,6 +264,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.Miner.GasPrice
 	}
+	gpoParams.DefaultBasePrice = new(big.Int).SetUint64(config.TxPool.PriceLimit)
 	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
 
 	// Setup DNS discovery iterators.
@@ -558,7 +559,7 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 // Start implements node.Lifecycle, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
 func (s *Ethereum) Start() error {
-	//eth.StartENRUpdater(s.blockchain, s.p2pServer.LocalNode())
+	eth.StartENRUpdater(s.blockchain, s.p2pServer.LocalNode())
 
 	// Start the bloom bits servicing goroutines
 	s.startBloomHandlers(params.BloomBitsBlocks)

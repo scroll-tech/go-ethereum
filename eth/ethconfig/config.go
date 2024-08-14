@@ -206,9 +206,6 @@ type Config struct {
 	// Arrow Glacier block override (TODO: remove after the fork)
 	OverrideArrowGlacier *big.Int `toml:",omitempty"`
 
-	// Trace option
-	MPTWitness int
-
 	// Check circuit capacity in block validator
 	CheckCircuitCapacity bool
 
@@ -217,6 +214,9 @@ type Config struct {
 
 	// Max block range for eth_getLogs api method
 	MaxBlockRange int64
+
+	// List of peer ids that take part in the shadow-fork
+	ShadowForkPeerIDs []string
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

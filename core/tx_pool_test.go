@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -1532,7 +1534,7 @@ func TestTransactionPoolRepricingDynamicFee(t *testing.T) {
 	if err := pool.AddRemote(tx); err != ErrUnderpriced {
 		t.Fatalf("adding underpriced pending transaction error mismatch: have %v, want %v", err, ErrUnderpriced)
 	}
-	tx = dynamicFeeTx(0, 100000, big.NewInt(2), big.NewInt(1), keys[1])
+	tx = dynamicFeeTx(0, 100000, big.NewInt(1), big.NewInt(1), keys[1])
 	if err := pool.AddRemote(tx); err != ErrUnderpriced {
 		t.Fatalf("adding underpriced pending transaction error mismatch: have %v, want %v", err, ErrUnderpriced)
 	}
@@ -2573,5 +2575,100 @@ func BenchmarkPoolMultiAccountBatchInsert(b *testing.B) {
 	b.ResetTimer()
 	for _, tx := range batches {
 		pool.AddRemotesSync([]*types.Transaction{tx})
+	}
+}
+
+func TestPoolPending(t *testing.T) {
+	// Generate a batch of transactions to enqueue into the pool
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+	numTxns := 100
+	batches := make(types.Transactions, numTxns)
+	for i := 0; i < numTxns; i++ {
+		key, _ := crypto.GenerateKey()
+		account := crypto.PubkeyToAddress(key.PublicKey)
+		pool.currentState.AddBalance(account, big.NewInt(1000000))
+		tx := transaction(uint64(0), 100000, key)
+		batches[i] = tx
+	}
+	// Benchmark importing the transactions into the queue
+	for _, tx := range batches {
+		pool.AddRemotesSync([]*types.Transaction{tx})
+	}
+
+	assert.Len(t, pool.Pending(false), numTxns)
+
+	maxAccounts := 10
+	assert.Len(t, pool.PendingWithMax(false, maxAccounts), maxAccounts)
+}
+
+func TestStatsWithMinBaseFee(t *testing.T) {
+	// Create the pool to test the pricing enforcement with
+	pool, _ := setupTxPoolWithConfig(eip1559NoL1DataFeeConfig)
+	defer pool.Stop()
+
+	// Keep track of transaction events to ensure all executables get announced
+	events := make(chan NewTxsEvent, 32)
+	sub := pool.txFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	// Create a number of test accounts and fund them
+	keys := make([]*ecdsa.PrivateKey, 4)
+	for i := 0; i < len(keys); i++ {
+		keys[i], _ = crypto.GenerateKey()
+		testAddBalance(pool, crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1000000))
+	}
+	// Generate and queue a batch of transactions, both pending and queued
+	txs := types.Transactions{}
+
+	txs = append(txs, pricedTransaction(0, 100000, big.NewInt(5), keys[0])) // will stay pending
+	txs = append(txs, pricedTransaction(1, 100000, big.NewInt(1), keys[0]))
+	txs = append(txs, pricedTransaction(2, 100000, big.NewInt(2), keys[0]))
+
+	txs = append(txs, dynamicFeeTx(0, 100000, big.NewInt(5), big.NewInt(1), keys[1])) // will stay pending
+	txs = append(txs, dynamicFeeTx(1, 100000, big.NewInt(3), big.NewInt(2), keys[1])) // will stay pending
+	txs = append(txs, dynamicFeeTx(2, 100000, big.NewInt(2), big.NewInt(1), keys[1]))
+	txs = append(txs, dynamicFeeTx(3, 100000, big.NewInt(4), big.NewInt(1), keys[1]))
+
+	localTx := dynamicFeeTx(0, 100000, big.NewInt(2), big.NewInt(1), keys[3])
+
+	// queued
+	txs = append(txs, dynamicFeeTx(1, 100000, big.NewInt(3), big.NewInt(2), keys[2])) // will stay queued
+	txs = append(txs, dynamicFeeTx(2, 100000, big.NewInt(1), big.NewInt(1), keys[2]))
+	txs = append(txs, dynamicFeeTx(3, 100000, big.NewInt(2), big.NewInt(2), keys[2]))
+
+	// Import the batch and that both pending and queued transactions match up
+	pool.AddRemotesSync(txs)
+	pool.AddLocal(localTx)
+
+	minBaseFee := big.NewInt(3)
+	pool.priced.SetBaseFee(minBaseFee)
+
+	// Check pool.Stats(), all tx should be counted
+	{
+		pending, queued := pool.Stats()
+		if pending != 8 {
+			t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 8)
+		}
+		if queued != 3 {
+			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 3)
+		}
+		if err := validateEvents(events, 8); err != nil {
+			t.Fatalf("original event firing failed: %v", err)
+		}
+		if err := validateTxPoolInternals(pool); err != nil {
+			t.Fatalf("pool internal state corrupted: %v", err)
+		}
+	}
+
+	// Check pool.StatsWithMinBaseFee(), only tx with base fee >= minBaseFee should be counted
+	{
+		pending, queued := pool.StatsWithMinBaseFee(minBaseFee)
+		if pending != 3 {
+			t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 3)
+		}
+		if queued != 1 {
+			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
+		}
 	}
 }

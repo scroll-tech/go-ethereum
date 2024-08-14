@@ -500,6 +500,11 @@ var (
 		Name:  "miner.storeskippedtxtraces",
 		Usage: "Store the wrapped traces when storing a skipped tx",
 	}
+	MinerMaxAccountsNumFlag = cli.IntFlag{
+		Name:  "miner.maxaccountsnum",
+		Usage: "Maximum number of accounts that miner will fetch the pending transactions of when building a new block",
+		Value: math.MaxInt,
+	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
 		Name:  "unlock",
@@ -730,6 +735,11 @@ var (
 		Usage: "Gas price below which gpo will ignore transactions",
 		Value: ethconfig.Defaults.GPO.IgnorePrice.Int64(),
 	}
+	GpoCongestionThresholdFlag = cli.IntFlag{
+		Name:  "gpo.congestionthreshold",
+		Usage: "Number of pending transactions to consider the network congested and suggest a minimum tip cap",
+		Value: ethconfig.Defaults.GPO.CongestedThreshold,
+	}
 
 	// Metrics flags
 	MetricsEnabledFlag = cli.BoolFlag{
@@ -847,6 +857,12 @@ var (
 	MaxBlockRangeFlag = cli.Int64Flag{
 		Name:  "rpc.getlogs.maxrange",
 		Usage: "Limit max fetched block range for `eth_getLogs` method",
+	}
+
+	// Shadowfork peers
+	ShadowforkPeersFlag = cli.StringSliceFlag{
+		Name:  "net.shadowforkpeers",
+		Usage: "peer ids of shadow fork peers",
 	}
 )
 
@@ -1424,6 +1440,9 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config, light bool) {
 	if ctx.GlobalIsSet(GpoIgnoreGasPriceFlag.Name) {
 		cfg.IgnorePrice = big.NewInt(ctx.GlobalInt64(GpoIgnoreGasPriceFlag.Name))
 	}
+	if ctx.GlobalIsSet(GpoCongestionThresholdFlag.Name) {
+		cfg.CongestedThreshold = ctx.GlobalInt(GpoCongestionThresholdFlag.Name)
+	}
 }
 
 func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
@@ -1518,6 +1537,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.GlobalIsSet(MinerStoreSkippedTxTracesFlag.Name) {
 		cfg.StoreSkippedTxTraces = ctx.GlobalBool(MinerStoreSkippedTxTracesFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerMaxAccountsNumFlag.Name) {
+		cfg.MaxAccountsNum = ctx.GlobalInt(MinerMaxAccountsNumFlag.Name)
 	}
 	if ctx.GlobalIsSet(LegacyMinerGasTargetFlag.Name) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
@@ -1635,6 +1657,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setCircuitCapacityCheck(ctx, cfg)
 	setEnableRollupVerify(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
+	if ctx.GlobalIsSet(ShadowforkPeersFlag.Name) {
+		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)
+		log.Info("Shadow fork peers", "ids", cfg.ShadowForkPeerIDs)
+	}
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()
@@ -1798,9 +1824,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		}
 		log.Info("Pruning disabled")
 		cfg.NoPruning = true
-		// disable prefetch
-		log.Info("Prefetch disabled")
-		cfg.NoPrefetch = true
 	case ctx.GlobalBool(ScrollFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 534352
@@ -1817,9 +1840,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		}
 		log.Info("Pruning disabled")
 		cfg.NoPruning = true
-		// disable prefetch
-		log.Info("Prefetch disabled")
-		cfg.NoPrefetch = true
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337

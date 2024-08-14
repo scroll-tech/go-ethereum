@@ -66,8 +66,9 @@ var (
 
 	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
 
-	diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
-	diffNoTurn = big.NewInt(1) // Block difficulty for out-of-turn signatures
+	diffInTurn     = big.NewInt(2) // Block difficulty for in-turn signatures
+	diffNoTurn     = big.NewInt(1) // Block difficulty for out-of-turn signatures
+	diffShadowFork = diffNoTurn
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -181,7 +182,7 @@ type Clique struct {
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
-	lock   sync.RWMutex   // Protects the signer fields
+	lock   sync.RWMutex   // Protects the signer and proposals fields
 
 	// The fields below are for testing only
 	fakeDiff bool // Skip difficulty verifications
@@ -195,6 +196,7 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	if conf.Epoch == 0 {
 		conf.Epoch = epochLength
 	}
+
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	signatures, _ := lru.NewARC(inmemorySignatures)
@@ -291,7 +293,7 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	}
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
 	if number > 0 {
-		if header.Difficulty == nil || (header.Difficulty.Cmp(diffInTurn) != 0 && header.Difficulty.Cmp(diffNoTurn) != 0) {
+		if header.Difficulty == nil || (header.Difficulty.Cmp(diffInTurn) != 0 && header.Difficulty.Cmp(diffNoTurn) != 0 && header.Difficulty.Cmp(diffShadowFork) != 0) {
 			return errInvalidDifficulty
 		}
 	}
@@ -328,7 +330,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
-	if parent.Time+c.config.Period > header.Time {
+	if header.Time < parent.Time {
 		return errInvalidTimestamp
 	}
 	// Verify that the gasUsed is <= gasLimit
@@ -375,6 +377,14 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		snap    *Snapshot
 	)
 	for snap == nil {
+		if c.config.ShadowForkHeight > 0 && number == c.config.ShadowForkHeight {
+			c.signatures.Purge()
+			c.recents.Purge()
+			c.proposals = make(map[common.Address]bool)
+			snap = newSnapshot(c.config, c.signatures, number, hash, []common.Address{c.config.ShadowForkSigner})
+			break
+		}
+
 		// If an in-memory snapshot was found, use that
 		if s, ok := c.recents.Get(hash); ok {
 			snap = s.(*Snapshot)
@@ -485,11 +495,8 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parents []*typ
 	}
 	// Ensure that the difficulty corresponds to the turn-ness of the signer
 	if !c.fakeDiff {
-		inturn := snap.inturn(header.Number.Uint64(), signer)
-		if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
-			return errWrongDifficulty
-		}
-		if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
+		expected := c.calcDifficulty(snap, signer)
+		if header.Difficulty.Cmp(expected) != 0 {
 			return errWrongDifficulty
 		}
 	}
@@ -509,9 +516,8 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	if err != nil {
 		return err
 	}
+	c.lock.RLock()
 	if number%c.config.Epoch != 0 {
-		c.lock.RLock()
-
 		// Gather all the proposals that make sense voting on
 		addresses := make([]common.Address, 0, len(c.proposals))
 		for address, authorize := range c.proposals {
@@ -528,10 +534,14 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				copy(header.Nonce[:], nonceDropVote)
 			}
 		}
-		c.lock.RUnlock()
 	}
+
+	// Copy signer protected by mutex to avoid race condition
+	signer := c.signer
+	c.lock.RUnlock()
+
 	// Set the correct difficulty
-	header.Difficulty = calcDifficulty(snap, c.signer)
+	header.Difficulty = c.calcDifficulty(snap, signer)
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
@@ -555,7 +565,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		return consensus.ErrUnknownAncestor
 	}
 	header.Time = parent.Time + c.config.Period
-	if header.Time < uint64(time.Now().Unix()) {
+	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
+	// we don't know when it will be sealed
+	if c.config.RelaxedPeriod || header.Time < uint64(time.Now().Unix()) {
 		header.Time = uint64(time.Now().Unix())
 	}
 	return nil
@@ -643,6 +655,8 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	// Wait until sealing is terminated or delay timeout.
 	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
 	go func() {
+		defer close(results)
+
 		select {
 		case <-stop:
 			return
@@ -651,7 +665,7 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 
 		select {
 		case results <- block.WithSeal(header):
-		default:
+		case <-time.After(time.Second):
 			log.Warn("Sealing result is not read by miner", "sealhash", SealHash(header))
 		}
 	}()
@@ -668,10 +682,17 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 	if err != nil {
 		return nil
 	}
-	return calcDifficulty(snap, c.signer)
+	c.lock.RLock()
+	signer := c.signer
+	c.lock.RUnlock()
+	return c.calcDifficulty(snap, signer)
 }
 
-func calcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
+func (c *Clique) calcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
+	if c.config.ShadowForkHeight > 0 && snap.Number >= c.config.ShadowForkHeight {
+		// if we are past shadow fork point, set a low difficulty so that mainnet nodes don't try to switch to forked chain
+		return new(big.Int).Set(diffShadowFork)
+	}
 	if snap.inturn(snap.Number+1, signer) {
 		return new(big.Int).Set(diffInTurn)
 	}

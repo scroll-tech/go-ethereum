@@ -194,6 +194,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.MinerRecommitIntervalFlag,
 			utils.MinerNoVerifyFlag,
 			utils.MinerStoreSkippedTxTracesFlag,
+			utils.MinerMaxAccountsNumFlag,
 		},
 	},
 	{
@@ -203,6 +204,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.GpoPercentileFlag,
 			utils.GpoMaxGasPriceFlag,
 			utils.GpoIgnoreGasPriceFlag,
+			utils.GpoCongestionThresholdFlag,
 		},
 	},
 	{
@@ -235,6 +237,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.BloomFilterSizeFlag,
 			cli.HelpFlag,
 			utils.CatalystFlag,
+			utils.ShadowforkPeersFlag,
 		},
 	},
 }

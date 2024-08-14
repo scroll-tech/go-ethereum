@@ -1,7 +1,6 @@
 package ccc
 
 import (
-	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -65,13 +64,10 @@ func TestAsyncChecker(t *testing.T) {
 	asyncChecker.freeCheckers <- checker
 
 	var failingBlockHash common.Hash
-	var errIdx uint
+	var errWithIdx *ErrorWithTxnIdx
 	asyncChecker.WithOnFailingBlock(func(b *types.Block, err error) {
 		failingBlockHash = b.Hash()
-		var errWithIdx *ErrorWithTxnIdx
-		if errors.As(err, &errWithIdx) {
-			errIdx = errWithIdx.txIdx
-		}
+		require.ErrorAs(t, err, &errWithIdx)
 	})
 
 	if _, err := chain.InsertChain(reorgBlocks); err != nil {
@@ -80,5 +76,6 @@ func TestAsyncChecker(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 	require.Equal(t, reorgBlocks[3].Hash(), failingBlockHash)
-	require.Equal(t, uint(3), errIdx)
+	require.Equal(t, uint(3), errWithIdx.txIdx)
+	require.True(t, errWithIdx.shouldSkip)
 }

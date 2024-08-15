@@ -51,8 +51,9 @@ type AsyncChecker struct {
 }
 
 type ErrorWithTxnIdx struct {
-	txIdx uint
-	err   error
+	txIdx      uint
+	err        error
+	shouldSkip bool
 }
 
 func (e *ErrorWithTxnIdx) Error() string {
@@ -157,27 +158,32 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	gasPool := new(core.GasPool).AddGas(header.GasLimit)
 	ccc.Reset()
 
-	var rc *types.RowConsumption
+	var accRc *types.RowConsumption
 	for txIdx, tx := range block.Transactions() {
 		if !isForkStillActive(forkCtx) {
 			return noopCb
 		}
 
-		rc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
+		var curRc *types.RowConsumption
+		curRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
 		if err != nil {
 			err = &ErrorWithTxnIdx{
 				txIdx: uint(txIdx),
 				err:   err,
+				// if the txn is the first in block or the additional resource utilization caused
+				// by this txn alone is enough to overflow the circuit, skip
+				shouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
 			}
 			return failingCallback
 		}
+		accRc = curRc
 	}
 
 	return func() {
 		if isForkStillActive(forkCtx) {
 			// all good, write the row consumption
 			log.Debug("CCC passed", "blockhash", block.Hash(), "height", block.NumberU64())
-			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), rc)
+			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), accRc)
 		}
 	}
 }
@@ -206,7 +212,7 @@ func (c *AsyncChecker) checkTxAndApply(parent *types.Block, header *types.Header
 
 	rc, err := ccc.ApplyTransaction(trace)
 	if err != nil {
-		return nil, err
+		return rc, err
 	}
 
 	_, err = core.ApplyTransaction(c.bc.Config(), c.bc, nil /* coinbase will default to chainConfig.Scroll.FeeVaultAddress */, gasPool,

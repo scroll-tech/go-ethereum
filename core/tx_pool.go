@@ -522,6 +522,7 @@ func (pool *TxPool) statsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
 			pending++
 		}
 	}
+	realPendingGauge.Update(int64(pending))
 
 	queued := 0
 	for _, list := range pool.queue {

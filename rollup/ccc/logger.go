@@ -8,25 +8,40 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/crypto"
+)
+
+const (
+	sigCountMax       = 127
+	ecAddCountMax     = 50
+	ecMulCountMax     = 50
+	ecPairingCountMax = 2
+	rowUsageMax       = 1_000_000
 )
 
 var _ vm.EVMLogger = (*Logger)(nil)
 
 type Logger struct {
-	limitPerCircuit uint64
-
 	currentEnv    *vm.EVM
+	isCreate      bool
 	codesAccessed map[common.Hash]bool
 
-	evmUsage      uint64
-	stateUsage    uint64
-	bytecodeUsage uint64
+	evmUsage       uint64
+	stateUsage     uint64
+	bytecodeUsage  uint64
+	sigCount       uint64
+	ecAddCount     uint64
+	ecMulCount     uint64
+	ecPairingCount uint64
+	copyUsage      uint64
+	sha256Usage    uint64
+	expUsage       uint64
+	modExpUsage    uint64
 }
 
-func NewLogger(limitPerCircuit uint64) *Logger {
+func NewLogger() *Logger {
 	return &Logger{
-		limitPerCircuit: limitPerCircuit,
-		codesAccessed:   make(map[common.Hash]bool),
+		codesAccessed: make(map[common.Hash]bool),
 	}
 }
 
@@ -37,18 +52,89 @@ func (l *Logger) Snapshot() *Logger {
 	return &newL
 }
 
-func (l *Logger) logBytecodeAccessAt(addr common.Address) {
-	codeHash := l.currentEnv.StateDB.GetKeccakCodeHash(addr)
+// logBytecodeAccess logs access to the bytecode identified by the given code hash
+func (l *Logger) logBytecodeAccess(codeHash common.Hash, codeSize uint64) {
 	if codeHash != (common.Hash{}) && !l.codesAccessed[codeHash] {
-		l.bytecodeUsage += l.currentEnv.StateDB.GetCodeSize(addr)
+		l.bytecodeUsage += codeSize + 1
 		l.codesAccessed[codeHash] = true
 	}
 }
 
+// logBytecodeAccessAt logs access to the bytecode at the given addr
+func (l *Logger) logBytecodeAccessAt(addr common.Address) {
+	codeHash := l.currentEnv.StateDB.GetKeccakCodeHash(addr)
+	l.logBytecodeAccess(codeHash, l.currentEnv.StateDB.GetCodeSize(addr))
+}
+
+// logRawBytecode logs access to a raw byte code
+// useful for CREATE/CREATE2 flows
+func (l *Logger) logRawBytecode(code []byte) {
+	l.logBytecodeAccess(crypto.Keccak256Hash(code), uint64(len(code)))
+}
+
+// logPrecompileAccess checks if the invoked address is a precompile and increments
+// resource usage of associated subcircuit
+func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64) {
+	l.logCopy(inputLen)
+	var outputLen uint64
+	switch to {
+	case common.BytesToAddress([]byte{1}): // &ecrecover{},
+		l.sigCount++
+		outputLen = 32
+	case common.BytesToAddress([]byte{2}): // &sha256hash{},
+		l.logSha256(inputLen)
+		outputLen = 32
+	case common.BytesToAddress([]byte{3}): // &ripemd160hashDisabled{},
+	case common.BytesToAddress([]byte{4}): // &dataCopy{},
+		outputLen = inputLen
+	case common.BytesToAddress([]byte{5}): // &bigModExp{eip2565: true},
+		const rowsPerModExpCall = 39962
+		l.modExpUsage += rowsPerModExpCall
+		// todo: set output len
+	case common.BytesToAddress([]byte{6}): // &bn256AddIstanbul{},
+		l.ecAddCount++
+		outputLen = 64
+	case common.BytesToAddress([]byte{7}): // &bn256ScalarMulIstanbul{},
+		l.ecMulCount++
+		outputLen = 64
+	case common.BytesToAddress([]byte{8}): // &bn256PairingIstanbul{},
+		l.ecPairingCount++
+		outputLen = 32
+	case common.BytesToAddress([]byte{9}): // &blake2FDisabled{},
+	}
+	l.logCopy(2 * outputLen)
+}
+
+// logCall logs call to a given address, regardless of the address being a precompile or not
+func (l *Logger) logCall(to common.Address, inputLen uint64) {
+	l.logBytecodeAccessAt(to)
+	l.logPrecompileAccess(to, inputLen)
+}
+
+func (l *Logger) logCopy(len uint64) {
+	l.copyUsage += len * 2
+}
+
+func (l *Logger) logSha256(inputLen uint64) {
+	const blockRows = 2114
+	const blockSizeInBytes = 64
+	const minPaddingBytes = 9
+
+	numBlocks := (inputLen + minPaddingBytes + blockSizeInBytes - 1) / blockSizeInBytes
+	l.sha256Usage += numBlocks * blockRows
+}
+
 func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.currentEnv = env
-	if !create {
-		l.logBytecodeAccessAt(to)
+	l.isCreate = create
+	if !l.isCreate {
+		l.logCall(to, uint64(len(input)))
+	} else {
+		l.logRawBytecode(input) // init bytecode
+	}
+
+	if !env.TxContext.IsL1MessageTx {
+		l.sigCount++
 	}
 }
 
@@ -58,18 +144,34 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 
 	switch op {
 	case vm.EXTCODECOPY:
-		l.logBytecodeAccessAt(common.Address(scope.Stack.Back(0).Bytes20()))
-	case vm.DELEGATECALL, vm.CALL, vm.STATICCALL, vm.CALLCODE:
-		l.logBytecodeAccessAt(common.Address(scope.Stack.Back(1).Bytes20()))
+		l.logBytecodeAccessAt(scope.Stack.Back(0).Bytes20())
+		l.logCopy(scope.Stack.Back(3).Uint64())
+	case vm.CALLDATACOPY, vm.RETURNDATACOPY, vm.CODECOPY, vm.MCOPY, vm.CREATE, vm.CREATE2:
+		l.logCopy(scope.Stack.Back(2).Uint64())
+	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.SHA3, vm.RETURN, vm.REVERT:
+		l.logCopy(scope.Stack.Back(1).Uint64())
+	case vm.DELEGATECALL, vm.STATICCALL:
+		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Stack.Back(3).Uint64())
+	case vm.CALL, vm.CALLCODE:
+		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Stack.Back(4).Uint64())
+	case vm.EXP:
+		const rowsPerExpCall = 8
+		l.expUsage += rowsPerExpCall
 	}
 }
 
 func (l *Logger) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
-
+	switch op {
+	case vm.CREATE, vm.CREATE2:
+		l.logBytecodeAccessAt(scope.Stack.Back(0).Bytes20()) // deployed bytecode
+	}
 }
 
 func (l *Logger) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
-
+	switch typ {
+	case vm.CREATE, vm.CREATE2:
+		l.logRawBytecode(input) // init bytecode
+	}
 }
 
 func (l *Logger) CaptureExit(output []byte, gasUsed uint64, err error) {
@@ -81,13 +183,15 @@ func (l *Logger) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 }
 
 func (l *Logger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
-
+	if l.isCreate {
+		l.logRawBytecode(output) // deployed bytecode
+	}
 }
 
 // Error returns an error if executed txns triggered an overflow
 // Caller should revert some transactions and close the block
 func (l *Logger) Error() error {
-	if l.evmUsage > l.limitPerCircuit || l.stateUsage > l.limitPerCircuit || l.bytecodeUsage > l.limitPerCircuit {
+	if l.RowConsumption().IsOverflown() {
 		return ErrBlockRowConsumptionOverflow
 	}
 	return nil
@@ -105,8 +209,38 @@ func (l *Logger) RowConsumption() types.RowConsumption {
 		}, {
 			Name:      "bytecode",
 			RowNumber: l.bytecodeUsage,
+		}, {
+			Name:      "sig",
+			RowNumber: uint64(rowUsageMax * (float64(l.sigCount) / sigCountMax)),
+		}, {
+			Name: "ecc",
+			RowNumber: max(
+				// multiply with types.RowConsumptionLimit here, confidence factor is 1.0 on rust side
+				uint64(types.RowConsumptionLimit*(float64(l.ecAddCount)/ecAddCountMax)),
+				uint64(types.RowConsumptionLimit*(float64(l.ecMulCount)/ecMulCountMax)),
+				uint64(types.RowConsumptionLimit*(float64(l.ecPairingCount)/ecPairingCountMax)),
+			),
+		}, {
+			Name:      "copy",
+			RowNumber: l.copyUsage,
+		}, {
+			Name:      "sha256",
+			RowNumber: l.sha256Usage,
+		}, {
+			Name:      "exp",
+			RowNumber: l.expUsage,
+		}, {
+			Name:      "mod_exp",
+			RowNumber: l.modExpUsage,
 		},
 	}
+}
+
+// ForceError makes sure to trigger an error on the next step, should only be used in tests
+func (l *Logger) ForceError() {
+	l.evmUsage += types.RowConsumptionLimit + 1
+	l.stateUsage += types.RowConsumptionLimit + 1
+	l.bytecodeUsage += types.RowConsumptionLimit + 1
 }
 
 // evm circuit resource usage per OpCode

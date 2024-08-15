@@ -1,6 +1,7 @@
 package ccc
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -31,6 +32,7 @@ type Blockchain interface {
 	StateAt(root common.Hash) (*state.StateDB, error)
 	Config() *params.ChainConfig
 	GetVMConfig() *vm.Config
+	CurrentHeader() *types.Header
 	core.ChainContext
 }
 
@@ -41,6 +43,11 @@ type AsyncChecker struct {
 
 	workers      *stream.Stream
 	freeCheckers chan *Checker
+
+	// local state to keep track of the chain progressing and terminate tasks early if needed
+	currentHead       *types.Header
+	forkCtx           context.Context
+	forkCtxCancelFunc context.CancelFunc
 }
 
 type ErrorWithTxnIdx struct {
@@ -57,6 +64,7 @@ func (e *ErrorWithTxnIdx) Unwrap() error {
 }
 
 func NewAsyncChecker(bc Blockchain, numWorkers int, lightMode bool) *AsyncChecker {
+	forkCtx, forkCtxCancelFunc := context.WithCancel(context.Background())
 	return &AsyncChecker{
 		bc: bc,
 		freeCheckers: func(count int) chan *Checker {
@@ -66,7 +74,10 @@ func NewAsyncChecker(bc Blockchain, numWorkers int, lightMode bool) *AsyncChecke
 			}
 			return checkers
 		}(numWorkers),
-		workers: stream.New().WithMaxGoroutines(numWorkers),
+		workers:           stream.New().WithMaxGoroutines(numWorkers),
+		currentHead:       bc.CurrentHeader(),
+		forkCtx:           forkCtx,
+		forkCtxCancelFunc: forkCtxCancelFunc,
 	}
 }
 
@@ -81,14 +92,35 @@ func (c *AsyncChecker) Wait() {
 
 // Check spawns an async CCC verification task.
 func (c *AsyncChecker) Check(block *types.Block) error {
+	if block.NumberU64() > c.currentHead.Number.Uint64()+1 {
+		log.Error("non continuous chain observed in AsyncChecker", "prev", c.currentHead, "got", block.Header())
+	} else if block.ParentHash() != c.currentHead.Hash() {
+		// seems like there is a fork happening, a block from the canonical chain must have failed CCC check
+		// assume the incoming block is the new tip in the fork
+		c.forkCtx, c.forkCtxCancelFunc = context.WithCancel(context.Background())
+	}
+
+	c.currentHead = block.Header()
 	checker := <-c.freeCheckers
+	// all blocks in the same fork share the same context to allow terminating them all at once if needed
+	ctx, ctxCancelFunc := c.forkCtx, c.forkCtxCancelFunc
 	c.workers.Go(func() stream.Callback {
-		return c.checkerTask(block, checker)
+		return c.checkerTask(block, checker, ctx, ctxCancelFunc)
 	})
 	return nil
 }
 
-func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker) stream.Callback {
+func isForkStillActive(forkCtx context.Context) bool {
+	select {
+	case <-forkCtx.Done():
+		// an ancestor block of this block failed CCC check, this fork is not active anymore
+		return false
+	default:
+	}
+	return true
+}
+
+func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx context.Context, forkCtxCancelFunc context.CancelFunc) stream.Callback {
 	activeWorkersGauge.Inc(1)
 	checkStart := time.Now()
 	defer func() {
@@ -97,16 +129,21 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker) stream.Call
 		activeWorkersGauge.Dec(1)
 	}()
 
+	noopCb := func() {}
 	parent := c.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
-		return func() {} // not part of a chain
+		return noopCb // not part of a chain
 	}
 
 	var err error
 	failingCallback := func() {
 		failCounter.Inc(1)
-		if c.onFailingBlock != nil {
-			c.onFailingBlock(block, err)
+		if isForkStillActive(forkCtx) {
+			// we failed the CCC check, cancel the context to signal all tasks preceding this one to terminate early
+			forkCtxCancelFunc()
+			if c.onFailingBlock != nil {
+				c.onFailingBlock(block, err)
+			}
 		}
 	}
 
@@ -122,6 +159,10 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker) stream.Call
 
 	var rc *types.RowConsumption
 	for txIdx, tx := range block.Transactions() {
+		if !isForkStillActive(forkCtx) {
+			return noopCb
+		}
+
 		rc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
 		if err != nil {
 			err = &ErrorWithTxnIdx{
@@ -133,9 +174,11 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker) stream.Call
 	}
 
 	return func() {
-		// all good, write the row consumption
-		log.Debug("CCC passed", "blockhash", block.Hash(), "height", block.NumberU64())
-		rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), rc)
+		if isForkStillActive(forkCtx) {
+			// all good, write the row consumption
+			log.Debug("CCC passed", "blockhash", block.Hash(), "height", block.NumberU64())
+			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), rc)
+		}
 	}
 }
 

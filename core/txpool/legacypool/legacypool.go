@@ -819,6 +819,7 @@ func (pool *LegacyPool) add(tx *types.Transaction, local bool) (replaced bool, e
 		// New transaction is better, replace old one
 		if old != nil {
 			pool.all.Remove(old.Hash())
+			pool.calculateTxsLifecycle(types.Transactions{old}, time.Now())
 			pool.priced.Removed(1)
 			pendingReplaceMeter.Mark(1)
 		}
@@ -894,6 +895,7 @@ func (pool *LegacyPool) enqueueTx(hash common.Hash, tx *types.Transaction, local
 	// Discard any previous transaction and mark this
 	if old != nil {
 		pool.all.Remove(old.Hash())
+		pool.calculateTxsLifecycle(types.Transactions{old}, time.Now())
 		pool.priced.Removed(1)
 		queuedReplaceMeter.Mark(1)
 	} else {
@@ -943,6 +945,7 @@ func (pool *LegacyPool) promoteTx(addr common.Address, hash common.Hash, tx *typ
 	if !inserted {
 		// An older transaction was better, discard this
 		pool.all.Remove(hash)
+		pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		pool.priced.Removed(1)
 		pendingDiscardMeter.Mark(1)
 		return false
@@ -950,6 +953,7 @@ func (pool *LegacyPool) promoteTx(addr common.Address, hash common.Hash, tx *typ
 	// Otherwise discard any previous transaction and mark this
 	if old != nil {
 		pool.all.Remove(old.Hash())
+		pool.calculateTxsLifecycle(types.Transactions{old}, time.Now())
 		pool.priced.Removed(1)
 		pendingReplaceMeter.Mark(1)
 	} else {
@@ -1158,6 +1162,7 @@ func (pool *LegacyPool) removeTx(hash common.Hash, outofbound bool, unreserve bo
 	}
 	// Remove it from the list of known transactions
 	pool.all.Remove(hash)
+	pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 	if outofbound {
 		pool.priced.Removed(1)
 	}
@@ -1501,6 +1506,7 @@ func (pool *LegacyPool) promoteExecutables(accounts []common.Address) []*types.T
 		for _, tx := range forwards {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
+			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		}
 		log.Trace("Removed old queued transactions", "count", len(forwards))
 
@@ -1510,6 +1516,7 @@ func (pool *LegacyPool) promoteExecutables(accounts []common.Address) []*types.T
 		for _, tx := range drops {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
+			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		}
 		log.Trace("Removed unpayable queued transactions", "count", len(drops))
 		queuedNofundsMeter.Mark(int64(len(drops)))
@@ -1532,6 +1539,7 @@ func (pool *LegacyPool) promoteExecutables(accounts []common.Address) []*types.T
 			for _, tx := range caps {
 				hash := tx.Hash()
 				pool.all.Remove(hash)
+				pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
 			}
 			queuedRateLimitMeter.Mark(int64(len(caps)))
@@ -1617,6 +1625,7 @@ func (pool *LegacyPool) truncatePending() {
 						// Drop the transaction from the global pools too
 						hash := tx.Hash()
 						pool.all.Remove(hash)
+						pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 
 						// Update the account nonce to the dropped transaction
 						pool.pendingNonces.setIfLower(offenders[i], tx.Nonce())
@@ -1644,6 +1653,7 @@ func (pool *LegacyPool) truncatePending() {
 					// Drop the transaction from the global pools too
 					hash := tx.Hash()
 					pool.all.Remove(hash)
+					pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 
 					// Update the account nonce to the dropped transaction
 					pool.pendingNonces.setIfLower(addr, tx.Nonce())
@@ -1724,6 +1734,7 @@ func (pool *LegacyPool) demoteUnexecutables() {
 		for _, tx := range olds {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
+			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 			log.Trace("Removed old pending transaction", "hash", hash)
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
@@ -1733,6 +1744,7 @@ func (pool *LegacyPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			log.Trace("Removed unpayable pending transaction", "hash", hash)
 			pool.all.Remove(hash)
+			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		}
 		pendingNofundsMeter.Mark(int64(len(drops)))
 

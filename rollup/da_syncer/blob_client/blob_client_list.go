@@ -30,7 +30,7 @@ func (c *BlobClientList) GetBlobByVersionedHash(ctx context.Context, versionedHa
 
 	for i := 0; i < len(c.list); i++ {
 		blob, err := c.list[c.nextPos()].GetBlobByVersionedHash(ctx, versionedHash)
-		if err != nil {
+		if err == nil {
 			return blob, nil
 		}
 

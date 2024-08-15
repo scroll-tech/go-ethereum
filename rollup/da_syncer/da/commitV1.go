@@ -59,6 +59,9 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)
 	}
+	if blob == nil {
+		return nil, fmt.Errorf("unexpected, blob == nil and err != nil, batch index: %d, versionedHash: %s, blobClient: %T", batchIndex, versionedHash.String(), blobClient)
+	}
 
 	// compute blob versioned hash and compare with one from tx
 	c, err := kzg4844.BlobToCommitment(blob)

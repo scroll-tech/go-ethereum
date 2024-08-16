@@ -175,6 +175,7 @@ var (
 		utils.DASnapshotFileFlag,
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,
+		utils.DABeaconNodeAPIEndpointFlag,
 	}
 
 	rpcFlags = []cli.Flag{

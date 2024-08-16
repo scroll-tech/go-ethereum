@@ -884,11 +884,14 @@ var (
 	DABlobScanAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blobscan",
 		Usage: "BlobScan blob api endpoint",
-		Value: ethconfig.Defaults.DA.BlobScanAPIEndpoint,
 	}
 	DABlockNativeAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blocknative",
 		Usage: "BlockNative blob api endpoint",
+	}
+	DABeaconNodeAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.blobscan",
+		Usage: "BlobScan blob api endpoint",
 	}
 )
 
@@ -1624,6 +1627,9 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 		}
 		if ctx.GlobalIsSet(DABlockNativeAPIEndpointFlag.Name) {
 			cfg.DA.BlockNativeAPIEndpoint = ctx.GlobalString(DABlockNativeAPIEndpointFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABeaconNodeAPIEndpointFlag.Name) {
+			cfg.DA.BeaconNodeAPIEndpoint = ctx.GlobalString(DABeaconNodeAPIEndpointFlag.Name)
 		}
 	}
 }

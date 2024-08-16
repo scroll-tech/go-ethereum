@@ -25,6 +25,7 @@ type Config struct {
 	SnapshotFilePath       string      // path to snapshot file
 	BlobScanAPIEndpoint    string      // BlobScan blob api endpoint
 	BlockNativeAPIEndpoint string      // BlockNative blob api endpoint
+	BeaconNodeAPIEndpoint  string      // Beacon node api endpoint
 }
 
 // SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
@@ -55,6 +56,13 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}
 
 	blobClientList := blob_client.NewBlobClientList()
+	if config.BeaconNodeAPIEndpoint != "" {
+		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint, l1Client)
+		if err != nil {
+			log.Warn("failed to create BeaconNodeClient", "err", err)
+		}
+		blobClientList.AddBlobClient(beaconNodeClient)
+	}
 	if config.BlobScanAPIEndpoint != "" {
 		blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
 	}

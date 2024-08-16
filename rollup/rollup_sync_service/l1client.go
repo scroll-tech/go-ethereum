@@ -27,7 +27,7 @@ type L1Client struct {
 	l1FinalizeBatchEventSignature common.Hash
 }
 
-// newL1Client initializes a new L1Client instance with the provided configuration.
+// NewL1Client initializes a new L1Client instance with the provided configuration.
 // It checks for a valid scrollChainAddress and verifies the chain ID.
 func NewL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId uint64, scrollChainAddress common.Address, scrollChainABI *abi.ABI) (*L1Client, error) {
 	if scrollChainAddress == (common.Address{}) {
@@ -79,7 +79,7 @@ func (c *L1Client) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error
 	return logs, nil
 }
 
-// getLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.
+// GetLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.
 func (c *L1Client) GetLatestFinalizedBlockNumber() (uint64, error) {
 	header, err := c.client.HeaderByNumber(c.ctx, big.NewInt(int64(rpc.FinalizedBlockNumber)))
 	if err != nil {
@@ -91,7 +91,7 @@ func (c *L1Client) GetLatestFinalizedBlockNumber() (uint64, error) {
 	return header.Number.Uint64(), nil
 }
 
-// fetchTxData fetches tx data corresponding to given event log
+// FetchTxData fetches tx data corresponding to given event log
 func (c *L1Client) FetchTxData(vLog *types.Log) ([]byte, error) {
 	tx, _, err := c.client.TransactionByHash(c.ctx, vLog.TxHash)
 	if err != nil {
@@ -118,7 +118,7 @@ func (c *L1Client) FetchTxData(vLog *types.Log) ([]byte, error) {
 	return tx.Data(), nil
 }
 
-// fetchTxBlobHash fetches tx blob hash corresponding to given event log
+// FetchTxBlobHash fetches tx blob hash corresponding to given event log
 func (c *L1Client) FetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
 	tx, _, err := c.client.TransactionByHash(c.ctx, vLog.TxHash)
 	if err != nil {
@@ -146,4 +146,13 @@ func (c *L1Client) FetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
 		return common.Hash{}, fmt.Errorf("transaction does not contain any blobs, tx hash: %v", vLog.TxHash.Hex())
 	}
 	return blobHashes[0], nil
+}
+
+// GetHeaderByNumber fetches the block header by number
+func (c *L1Client) GetHeaderByNumber(blockNumber uint64) (*types.Header, error) {
+	header, err := c.client.HeaderByNumber(c.ctx, big.NewInt(0).SetUint64(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return header, nil
 }

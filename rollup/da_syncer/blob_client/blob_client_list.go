@@ -23,13 +23,13 @@ func NewBlobClientList(blobClients ...BlobClient) *BlobClientList {
 	}
 }
 
-func (c *BlobClientList) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
+func (c *BlobClientList) GetBlobByVersionedHashAndBlockNumber(ctx context.Context, versionedHash common.Hash, blockNumber uint64) (*kzg4844.Blob, error) {
 	if len(c.list) == 0 {
 		return nil, fmt.Errorf("BlobClientList.GetBlobByVersionedHash: list of BlobClients is empty")
 	}
 
 	for i := 0; i < len(c.list); i++ {
-		blob, err := c.list[c.nextPos()].GetBlobByVersionedHash(ctx, versionedHash)
+		blob, err := c.list[c.nextPos()].GetBlobByVersionedHashAndBlockNumber(ctx, versionedHash, blockNumber)
 		if err == nil {
 			return blob, nil
 		}

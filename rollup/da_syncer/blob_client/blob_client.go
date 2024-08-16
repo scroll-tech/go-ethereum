@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	okStatusCode int = 200
-	lenBlobBytes int = 131072
+	lenBlobBytes     int = 131072
+	lenKzgCommitment int = 48
 )
 
 type BlobClient interface {
-	GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error)
+	GetBlobByVersionedHashAndBlockNumber(ctx context.Context, versionedHash common.Hash, blockNumber uint64) (*kzg4844.Blob, error)
 }

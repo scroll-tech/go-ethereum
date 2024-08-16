@@ -1814,6 +1814,9 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 		return NonStatTy, err
 	}
 
+	statedb.StartPrefetcher("l1sync")
+	defer statedb.StopPrefetcher()
+
 	header.ParentHash = parentBlock.Hash()
 
 	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)

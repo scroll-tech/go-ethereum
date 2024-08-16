@@ -890,7 +890,7 @@ var (
 		Usage: "BlockNative blob api endpoint",
 	}
 	DABeaconNodeAPIEndpointFlag = cli.StringFlag{
-		Name:  "da.blob.blobscan",
+		Name:  "da.blob.beaconnode",
 		Usage: "BlobScan blob api endpoint",
 	}
 )

@@ -1,19 +1,3 @@
-// Copyright 2016 The go-ethereum Authors
-// This file is part of the go-ethereum library.
-//
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
 package params
 
 import (
@@ -28,50 +12,61 @@ const (
 	VersionMeta  = "mainnet" // Version metadata to append to the version string
 )
 
-// Version holds the textual version string.
-var Version = func() string {
+// getVersion returns the base version string without metadata.
+func getVersion() string {
 	return fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
-}()
-
-// VersionWithMeta holds the textual version string including the metadata.
-var VersionWithMeta = func() string {
-	v := Version
-	if VersionMeta != "" {
-		v += "-" + VersionMeta
-	}
-	return v
-}()
-
-// ArchiveVersion holds the textual version string used for Geth archives.
-// e.g. "1.8.11-dea1ce05" for stable releases, or
-//
-//	"1.8.13-unstable-21c059b6" for unstable releases
-func ArchiveVersion(gitCommit string) string {
-	vsn := Version
-	if VersionMeta != "stable" {
-		vsn += "-" + VersionMeta
-	}
-	if len(gitCommit) >= 8 {
-		vsn += "-" + gitCommit[:8]
-	}
-	return vsn
 }
 
-func VersionWithCommit(gitCommit, gitDate string) string {
-	vsn := VersionWithMeta
-	if len(gitCommit) >= 8 {
-		vsn += "-" + gitCommit[:8]
+// getVersionWithMeta returns the version string including metadata.
+func getVersionWithMeta() string {
+	if VersionMeta == "" {
+		return getVersion()
 	}
-	if (VersionMeta != "stable") && (gitDate != "") {
-		vsn += "-" + gitDate
-	}
-	return vsn
+	return fmt.Sprintf("%s-%s", getVersion(), VersionMeta)
 }
 
-var CommitHash = func() string {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" {
+// ArchiveVersion returns the version string used for Geth archives.
+// e.g. "1.8.11-dea1ce05" for stable releases, or "1.8.13-unstable-21c059b6" for unstable releases.
+func ArchiveVersion(gitCommit string) (string, error) {
+	if len(gitCommit) < 8 {
+		return "", fmt.Errorf("gitCommit must be at least 8 characters long")
+	}
+
+	vsn := getVersionWithMeta()
+	return fmt.Sprintf("%s-%s", vsn, gitCommit[:8]), nil
+}
+
+// VersionWithCommit returns the version string including git commit and date.
+func VersionWithCommit(gitCommit, gitDate string) (string, error) {
+	if len(gitCommit) < 8 {
+		return "", fmt.Errorf("gitCommit must be at least 8 characters long")
+	}
+
+	vsn := getVersionWithMeta()
+	vsn = fmt.Sprintf("%s-%s", vsn, gitCommit[:8])
+
+	if VersionMeta != "stable" && gitDate != "" {
+		vsn = fmt.Sprintf("%s-%s", vsn, gitDate)
+	}
+
+	return vsn, nil
+}
+
+// getCommitHash returns the current git commit hash.
+func getCommitHash() (string, error) {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", fmt.Errorf("could not read build info")
+	}
+
+	for _, setting := range info.Settings {
+		if setting.Key == "vcs.revision" {
+			return setting.Value, nil
+		}
+	}
+	return "", fmt.Errorf("vcs.revision not found in build info")
+}
+
 				return setting.Value
 			}
 		}

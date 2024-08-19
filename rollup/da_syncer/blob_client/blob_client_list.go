@@ -29,11 +29,11 @@ func (c *BlobClientList) GetBlobByVersionedHashAndBlockNumber(ctx context.Contex
 	}
 
 	for i := 0; i < len(c.list); i++ {
-		blob, err := c.list[c.nextPos()].GetBlobByVersionedHashAndBlockNumber(ctx, versionedHash, blockNumber)
+		blob, err := c.list[c.curPos].GetBlobByVersionedHashAndBlockNumber(ctx, versionedHash, blockNumber)
 		if err == nil {
 			return blob, nil
 		}
-
+		c.nextPos()
 		// there was an error, try the next blob client in following iteration
 		log.Warn("BlobClientList: failed to get blob by versioned hash from BlobClient", "err", err, "blob client pos in BlobClientList", c.curPos)
 	}
@@ -42,9 +42,8 @@ func (c *BlobClientList) GetBlobByVersionedHashAndBlockNumber(ctx context.Contex
 	return nil, serrors.NewTemporaryError(errors.New("BlobClientList.GetBlobByVersionedHash: failed to get blob by versioned hash from all BlobClients"))
 }
 
-func (c *BlobClientList) nextPos() int {
+func (c *BlobClientList) nextPos() {
 	c.curPos = (c.curPos + 1) % len(c.list)
-	return c.curPos
 }
 
 func (c *BlobClientList) AddBlobClient(blobClient BlobClient) {

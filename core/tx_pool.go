@@ -132,7 +132,8 @@ var (
 
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
 
-	txLifecycleTimer = metrics.NewRegisteredTimer("txpool/txfifecycle", nil)
+	txLifecycleTimer         = metrics.NewRegisteredTimer("txpool/txfifecycle", nil)
+	statsWithMinBaseFeeTimer = metrics.NewRegisteredTimer("txpool/stats_min_base_fee", nil)
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -526,10 +527,12 @@ func (pool *TxPool) stats() (int, int) {
 // StatsWithMinBaseFee retrieves the current pool stats, namely the number of pending and the
 // number of queued (non-executable) transactions greater equal minBaseFee.
 func (pool *TxPool) StatsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
+	statsStart := time.Now()
 	pool.mu.RLock()
-	defer pool.mu.RUnlock()
-
-	return pool.statsWithMinBaseFee(minBaseFee)
+	pendingTxs, queuedTxs := pool.statsWithMinBaseFee(minBaseFee)
+	pool.mu.RUnlock()
+	statsWithMinBaseFeeTimer.UpdateSince(statsStart)
+	return pendingTxs, queuedTxs
 }
 
 // statsWithMinBaseFee retrieves the current pool stats, namely the number of pending and the

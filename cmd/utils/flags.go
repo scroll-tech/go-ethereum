@@ -879,16 +879,19 @@ var (
 	}
 	DASnapshotFileFlag = cli.StringFlag{
 		Name:  "da.snapshot.file",
-		Usage: "Snapshot file to sync from da",
+		Usage: "Snapshot file to sync from DA",
 	}
 	DABlobScanAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blobscan",
-		Usage: "BlobScan blob api endpoint",
-		Value: ethconfig.Defaults.DA.BlobScanAPIEndpoint,
+		Usage: "BlobScan blob API endpoint",
 	}
 	DABlockNativeAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blocknative",
-		Usage: "BlockNative blob api endpoint",
+		Usage: "BlockNative blob API endpoint",
+	}
+	DABeaconNodeAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.beaconnode",
+		Usage: "Beacon node API endpoint",
 	}
 )
 
@@ -1624,6 +1627,9 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 		}
 		if ctx.GlobalIsSet(DABlockNativeAPIEndpointFlag.Name) {
 			cfg.DA.BlockNativeAPIEndpoint = ctx.GlobalString(DABlockNativeAPIEndpointFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABeaconNodeAPIEndpointFlag.Name) {
+			cfg.DA.BeaconNodeAPIEndpoint = ctx.GlobalString(DABeaconNodeAPIEndpointFlag.Name)
 		}
 	}
 }

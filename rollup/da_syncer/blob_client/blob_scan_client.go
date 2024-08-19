@@ -24,7 +24,7 @@ func NewBlobScanClient(apiEndpoint string) *BlobScanClient {
 	}
 }
 
-func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHash common.Hash) (*kzg4844.Blob, error) {
+func (c *BlobScanClient) GetBlobByVersionedHashAndBlockNumber(ctx context.Context, versionedHash common.Hash, blockNumber uint64) (*kzg4844.Blob, error) {
 	// blobscan api docs https://api.blobscan.com/#/blobs/blob-getByBlobId
 	path, err := url.JoinPath(c.apiEndpoint, versionedHash.String())
 	if err != nil {
@@ -40,8 +40,8 @@ func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHa
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != okStatusCode {
-		if resp.StatusCode == 404 {
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("no blob with versioned hash : %s", versionedHash.String())
 		}
 		var res ErrorRespBlobScan
@@ -69,44 +69,10 @@ func (c *BlobScanClient) GetBlobByVersionedHash(ctx context.Context, versionedHa
 }
 
 type BlobRespBlobScan struct {
-	Commitment            string `json:"commitment"`
-	Proof                 string `json:"proof"`
-	Size                  int    `json:"size"`
-	VersionedHash         string `json:"versionedHash"`
-	Data                  string `json:"data"`
-	DataStorageReferences []struct {
-		BlobStorage   string `json:"blobStorage"`
-		DataReference string `json:"dataReference"`
-	} `json:"dataStorageReferences"`
-	Transactions []struct {
-		Hash  string `json:"hash"`
-		Index int    `json:"index"`
-		Block struct {
-			Number                int    `json:"number"`
-			BlobGasUsed           string `json:"blobGasUsed"`
-			BlobAsCalldataGasUsed string `json:"blobAsCalldataGasUsed"`
-			BlobGasPrice          string `json:"blobGasPrice"`
-			ExcessBlobGas         string `json:"excessBlobGas"`
-			Hash                  string `json:"hash"`
-			Timestamp             string `json:"timestamp"`
-			Slot                  int    `json:"slot"`
-		} `json:"block"`
-		From                  string `json:"from"`
-		To                    string `json:"to"`
-		MaxFeePerBlobGas      string `json:"maxFeePerBlobGas"`
-		BlobAsCalldataGasUsed string `json:"blobAsCalldataGasUsed"`
-		Rollup                string `json:"rollup"`
-		BlobAsCalldataGasFee  string `json:"blobAsCalldataGasFee"`
-		BlobGasBaseFee        string `json:"blobGasBaseFee"`
-		BlobGasMaxFee         string `json:"blobGasMaxFee"`
-		BlobGasUsed           string `json:"blobGasUsed"`
-	} `json:"transactions"`
+	Data string `json:"data"`
 }
 
 type ErrorRespBlobScan struct {
 	Message string `json:"message"`
 	Code    string `json:"code"`
-	Issues  []struct {
-		Message string `json:"message"`
-	} `json:"issues"`
 }

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path"
+	"net/url"
 	"strconv"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -30,7 +30,10 @@ var (
 
 func NewBeaconNodeClient(apiEndpoint string, l1Client *rollup_sync_service.L1Client) (*BeaconNodeClient, error) {
 	// get genesis time
-	genesisPath := path.Join(apiEndpoint, beaconNodeGenesisEndpoint)
+	genesisPath, err := url.JoinPath(apiEndpoint, beaconNodeGenesisEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to join path, err: %w", err)
+	}
 	resp, err := http.Get(genesisPath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
@@ -54,7 +57,10 @@ func NewBeaconNodeClient(apiEndpoint string, l1Client *rollup_sync_service.L1Cli
 	}
 
 	// get seconds per slot from spec
-	specPath := path.Join(apiEndpoint, beaconNodeSpecEndpoint)
+	specPath, err := url.JoinPath(apiEndpoint, beaconNodeSpecEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to join path, err: %w", err)
+	}
 	resp, err = http.Get(specPath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
@@ -97,7 +103,10 @@ func (c *BeaconNodeClient) GetBlobByVersionedHashAndBlockNumber(ctx context.Cont
 	slot := (header.Time - c.genesisTime) / c.secondsPerSlot
 
 	// get blob sidecar for slot
-	blobSidecarPath := path.Join(c.apiEndpoint, beaconNodeBlobEndpoint, fmt.Sprintf("%d", slot))
+	blobSidecarPath, err := url.JoinPath(c.apiEndpoint, beaconNodeBlobEndpoint, fmt.Sprintf("%d", slot))
+	if err != nil {
+		return nil, fmt.Errorf("failed to join path, err: %w", err)
+	}
 	resp, err := http.Get(blobSidecarPath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot do request, err: %w", err)

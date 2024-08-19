@@ -3,7 +3,6 @@ package blob_client
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,11 +36,13 @@ func NewBeaconNodeClient(apiEndpoint string, l1Client *rollup_sync_service.L1Cli
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 		return nil, fmt.Errorf("beacon node request failed, status: %s, body: %s", resp.Status, bodyStr)
 	}
+
 	var genesisResp GenesisResp
 	err = json.NewDecoder(resp.Body).Decode(&genesisResp)
 	if err != nil {
@@ -59,11 +60,13 @@ func NewBeaconNodeClient(apiEndpoint string, l1Client *rollup_sync_service.L1Cli
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 		return nil, fmt.Errorf("beacon node request failed, status: %s, body: %s", resp.Status, bodyStr)
 	}
+
 	var specResp SpecResp
 	err = json.NewDecoder(resp.Body).Decode(&specResp)
 	if err != nil {
@@ -100,11 +103,13 @@ func (c *BeaconNodeClient) GetBlobByVersionedHashAndBlockNumber(ctx context.Cont
 		return nil, fmt.Errorf("cannot do request, err: %w", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 		return nil, fmt.Errorf("beacon node request failed, status: %s, body: %s", resp.Status, bodyStr)
 	}
+
 	var blobSidecarResp BlobSidecarResp
 	err = json.NewDecoder(resp.Body).Decode(&blobSidecarResp)
 	if err != nil {
@@ -114,26 +119,22 @@ func (c *BeaconNodeClient) GetBlobByVersionedHashAndBlockNumber(ctx context.Cont
 	// find blob with desired versionedHash
 	for _, blob := range blobSidecarResp.Data {
 		// calculate blob hash from commitment and check it with desired
-		commitmentBytes, err := hex.DecodeString(blob.KzgCommitment[2:])
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode data to bytes, err: %w", err)
-		}
-		if len(commitmentBytes) != lenKzgCommitment {
-			return nil, fmt.Errorf("len of kzg commitment is not correct, expected: %d, got: %d", lenKzgCommitment, len(commitmentBytes))
+		commitmentBytes := common.FromHex(blob.KzgCommitment)
+		if len(commitmentBytes) != lenKZGCommitment {
+			return nil, fmt.Errorf("len of kzg commitment is not correct, expected: %d, got: %d", lenKZGCommitment, len(commitmentBytes))
 		}
 		commitment := kzg4844.Commitment(commitmentBytes)
 		blobVersionedHash := kzg4844.CalcBlobHashV1(sha256.New(), &commitment)
+
 		if blobVersionedHash == versionedHash {
 			// found desired blob
-			blobBytes, err := hex.DecodeString(blob.Blob[2:])
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode data to bytes, err: %w", err)
-			}
+			blobBytes := common.FromHex(blob.Blob)
 			if len(blobBytes) != lenBlobBytes {
 				return nil, fmt.Errorf("len of blob data is not correct, expected: %d, got: %d", lenBlobBytes, len(blobBytes))
 			}
-			blob := kzg4844.Blob(blobBytes)
-			return &blob, nil
+
+			b := kzg4844.Blob(blobBytes)
+			return &b, nil
 		}
 	}
 

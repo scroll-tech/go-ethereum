@@ -879,19 +879,19 @@ var (
 	}
 	DASnapshotFileFlag = cli.StringFlag{
 		Name:  "da.snapshot.file",
-		Usage: "Snapshot file to sync from da",
+		Usage: "Snapshot file to sync from DA",
 	}
 	DABlobScanAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blobscan",
-		Usage: "BlobScan blob api endpoint",
+		Usage: "BlobScan blob API endpoint",
 	}
 	DABlockNativeAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blocknative",
-		Usage: "BlockNative blob api endpoint",
+		Usage: "BlockNative blob API endpoint",
 	}
 	DABeaconNodeAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.beaconnode",
-		Usage: "BlobScan blob api endpoint",
+		Usage: "Beacon node API endpoint",
 	}
 )
 

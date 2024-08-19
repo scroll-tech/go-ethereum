@@ -196,6 +196,6 @@ func ReadBatchCodecVersion(db ethdb.Reader, batchIndex uint64) *uint8 {
 		log.Crit("unexpected CodecVersion data length in database", "batch index", batchIndex, "length", len(data))
 	}
 
-	codecVersion := uint8(data[0])
+	codecVersion := data[0]
 	return &codecVersion
 }

@@ -126,6 +126,7 @@ var (
 	pendingGauge     = metrics.NewRegisteredGauge("txpool/pending", nil)
 	realPendingGauge = metrics.NewRegisteredGauge("txpool/real_pending", nil)
 	queuedGauge      = metrics.NewRegisteredGauge("txpool/queued", nil)
+	realQueuedGauge  = metrics.NewRegisteredGauge("txpool/real_queued", nil)
 	localGauge       = metrics.NewRegisteredGauge("txpool/local", nil)
 	slotsGauge       = metrics.NewRegisteredGauge("txpool/slots", nil)
 
@@ -336,8 +337,19 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
 	pool.wg.Add(1)
 	go pool.loop()
+	go pool.periodicallyCalculateRealTxActivity()
 
 	return pool
+}
+
+func (pool *TxPool) periodicallyCalculateRealTxActivity() {
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			pool.StatsWithMinBaseFee(pool.chain.CurrentBlock().BaseFee())
+		}
+	}
 }
 
 // loop is the transaction pool's main event loop, waiting for and reacting to
@@ -533,6 +545,8 @@ func (pool *TxPool) statsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
 			queued++
 		}
 	}
+	realQueuedGauge.Update(int64(queued))
+
 	return pending, queued
 }
 

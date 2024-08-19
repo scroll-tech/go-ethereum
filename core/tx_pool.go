@@ -344,11 +344,8 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 
 func (pool *TxPool) periodicallyCalculateRealTxActivity() {
 	ticker := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			pool.StatsWithMinBaseFee(pool.chain.CurrentBlock().BaseFee())
-		}
+	for range ticker.C {
+		pool.StatsWithMinBaseFee(pool.chain.CurrentBlock().BaseFee())
 	}
 }
 

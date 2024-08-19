@@ -171,3 +171,31 @@ func ReadLastFinalizedBatchIndex(db ethdb.Reader) *uint64 {
 	lastFinalizedBatchIndex := number.Uint64()
 	return &lastFinalizedBatchIndex
 }
+
+// WriteBatchCodecVersion stores the CodecVersion for a specific batch in the database.
+func WriteBatchCodecVersion(db ethdb.KeyValueWriter, batchIndex uint64, codecVersion uint8) {
+	key := batchCodecVersionKey(batchIndex)
+	value := []byte{codecVersion}
+	if err := db.Put(key, value); err != nil {
+		log.Crit("failed to store CodecVersion", "batch index", batchIndex, "codec version", codecVersion, "err", err)
+	}
+}
+
+// ReadBatchCodecVersion fetches the CodecVersion for a specific batch from the database.
+func ReadBatchCodecVersion(db ethdb.Reader, batchIndex uint64) *uint8 {
+	key := batchCodecVersionKey(batchIndex)
+	data, err := db.Get(key)
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("failed to read CodecVersion from database", "batch index", batchIndex, "err", err)
+	}
+
+	if len(data) != 1 {
+		log.Crit("unexpected CodecVersion data length in database", "batch index", batchIndex, "length", len(data))
+	}
+
+	codecVersion := uint8(data[0])
+	return &codecVersion
+}

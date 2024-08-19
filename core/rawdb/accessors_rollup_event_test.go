@@ -210,3 +210,70 @@ func TestBatchChunkRanges(t *testing.T) {
 	// delete non-existing value: ensure the delete operation handles non-existing values without errors.
 	DeleteBatchChunkRanges(db, uint64(len(chunks)+1))
 }
+
+func TestWriteReadCodecVersion(t *testing.T) {
+	db := NewMemoryDatabase()
+
+	// all possible uint8 values
+	for version := uint16(0); version <= 255; version++ {
+		batchIndex := uint64(version)
+		WriteBatchCodecVersion(db, batchIndex, uint8(version))
+		got := ReadBatchCodecVersion(db, batchIndex)
+
+		if got == nil {
+			t.Fatal("Expected non-nil value", "batch index", batchIndex)
+		}
+
+		if *got != uint8(version) {
+			t.Fatal("Codec version mismatch", "batch index", batchIndex, "expected", uint8(version), "got", *got)
+		}
+	}
+
+	// reading a non-existing value
+	if got := ReadBatchCodecVersion(db, 256); got != nil {
+		t.Fatal("Expected nil for non-existing value", "got", *got)
+	}
+}
+
+func TestOverwriteCodecVersion(t *testing.T) {
+	db := NewMemoryDatabase()
+
+	batchIndex := uint64(42)
+	initialVersion := uint8(1)
+	newVersion := uint8(2)
+
+	// write initial version
+	WriteBatchCodecVersion(db, batchIndex, initialVersion)
+	got := ReadBatchCodecVersion(db, batchIndex)
+
+	if got == nil || *got != initialVersion {
+		t.Fatal("Initial write failed", "expected", initialVersion, "got", got)
+	}
+
+	// overwrite with new version
+	WriteBatchCodecVersion(db, batchIndex, newVersion)
+	got = ReadBatchCodecVersion(db, batchIndex)
+
+	if got == nil || *got != newVersion {
+		t.Fatal("Overwrite failed", "expected", newVersion, "got", got)
+	}
+
+	// edge cases
+	edgeCases := []uint8{0, 1, 254, 255}
+	for _, version := range edgeCases {
+		WriteBatchCodecVersion(db, batchIndex, version)
+		got = ReadBatchCodecVersion(db, batchIndex)
+
+		if got == nil || *got != version {
+			t.Fatal("Edge case test failed", "expected", version, "got", got)
+		}
+	}
+
+	// read non-existing batch index
+	nonExistingIndex := uint64(999)
+	got = ReadBatchCodecVersion(db, nonExistingIndex)
+
+	if got != nil {
+		t.Fatal("Expected nil for non-existing batch index", "got", *got)
+	}
+}

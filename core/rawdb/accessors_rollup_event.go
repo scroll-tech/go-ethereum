@@ -11,9 +11,17 @@ import (
 )
 
 // ChunkBlockRange represents the range of blocks within a chunk.
+// for backward compatibility, new info is also stored in CommittedBatchMeta.
 type ChunkBlockRange struct {
 	StartBlockNumber uint64
 	EndBlockNumber   uint64
+}
+
+// CommittedBatchMeta holds metadata for committed batches.
+type CommittedBatchMeta struct {
+	Version             uint8
+	BlobVersionedHashes []common.Hash
+	ChunkBlockRanges    []*ChunkBlockRange
 }
 
 // FinalizedBatchMeta holds metadata for finalized batches.
@@ -91,13 +99,12 @@ func ReadBatchChunkRanges(db ethdb.Reader, batchIndex uint64) []*ChunkBlockRange
 
 // WriteFinalizedBatchMeta stores the metadata of a finalized batch in the database.
 func WriteFinalizedBatchMeta(db ethdb.KeyValueWriter, batchIndex uint64, finalizedBatchMeta *FinalizedBatchMeta) {
-	var err error
 	value, err := rlp.EncodeToBytes(finalizedBatchMeta)
 	if err != nil {
-		log.Crit("failed to RLP encode batch metadata", "batch index", batchIndex, "finalized batch meta", finalizedBatchMeta, "err", err)
+		log.Crit("failed to RLP encode finalized batch metadata", "batch index", batchIndex, "finalized batch meta", finalizedBatchMeta, "err", err)
 	}
 	if err := db.Put(batchMetaKey(batchIndex), value); err != nil {
-		log.Crit("failed to store batch metadata", "batch index", batchIndex, "value", value, "err", err)
+		log.Crit("failed to store finalized batch metadata", "batch index", batchIndex, "value", value, "err", err)
 	}
 }
 
@@ -172,30 +179,30 @@ func ReadLastFinalizedBatchIndex(db ethdb.Reader) *uint64 {
 	return &lastFinalizedBatchIndex
 }
 
-// WriteBatchCodecVersion stores the CodecVersion for a specific batch in the database.
-func WriteBatchCodecVersion(db ethdb.KeyValueWriter, batchIndex uint64, codecVersion uint8) {
-	key := batchCodecVersionKey(batchIndex)
-	value := []byte{codecVersion}
-	if err := db.Put(key, value); err != nil {
-		log.Crit("failed to store CodecVersion", "batch index", batchIndex, "codec version", codecVersion, "err", err)
+// WriteCommittedBatchMeta stores the CommittedBatchMeta for a specific batch in the database.
+func WriteCommittedBatchMeta(db ethdb.KeyValueWriter, batchIndex uint64, committedBatchMeta *CommittedBatchMeta) {
+	value, err := rlp.EncodeToBytes(committedBatchMeta)
+	if err != nil {
+		log.Crit("failed to RLP encode committed batch metadata", "batch index", batchIndex, "committed batch meta", committedBatchMeta, "err", err)
+	}
+	if err := db.Put(committedBatchMetaKey(batchIndex), value); err != nil {
+		log.Crit("failed to store committed batch metadata", "batch index", batchIndex, "value", value, "err", err)
 	}
 }
 
-// ReadBatchCodecVersion fetches the CodecVersion for a specific batch from the database.
-func ReadBatchCodecVersion(db ethdb.Reader, batchIndex uint64) *uint8 {
-	key := batchCodecVersionKey(batchIndex)
-	data, err := db.Get(key)
+// ReadCommittedBatchMeta fetches the CommittedBatchMeta for a specific batch from the database.
+func ReadCommittedBatchMeta(db ethdb.Reader, batchIndex uint64) *CommittedBatchMeta {
+	data, err := db.Get(committedBatchMetaKey(batchIndex))
 	if err != nil && isNotFoundErr(err) {
 		return nil
 	}
 	if err != nil {
-		log.Crit("failed to read CodecVersion from database", "batch index", batchIndex, "err", err)
+		log.Crit("failed to read committed batch metadata from database", "batch index", batchIndex, "err", err)
 	}
 
-	if len(data) != 1 {
-		log.Crit("unexpected CodecVersion data length in database", "batch index", batchIndex, "length", len(data))
+	cbm := new(CommittedBatchMeta)
+	if err := rlp.Decode(bytes.NewReader(data), cbm); err != nil {
+		log.Crit("Invalid CommittedBatchMeta RLP", "batch index", batchIndex, "data", data, "err", err)
 	}
-
-	codecVersion := data[0]
-	return &codecVersion
+	return cbm
 }

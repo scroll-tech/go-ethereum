@@ -204,11 +204,11 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			batchIndex := event.BatchIndex.Uint64()
 			log.Trace("found new CommitBatch event", "batch index", batchIndex)
 
-			codecVersion, chunkBlockRanges, err := s.getBatchCodecVersionAndChunkRanges(batchIndex, &vLog)
+			committedBatchMeta, chunkBlockRanges, err := s.getCommittedBatchMeta(batchIndex, &vLog)
 			if err != nil {
 				return fmt.Errorf("failed to get chunk ranges, batch index: %v, err: %w", batchIndex, err)
 			}
-			rawdb.WriteBatchCodecVersion(s.db, batchIndex, codecVersion)
+			rawdb.WriteCommittedBatchMeta(s.db, batchIndex, committedBatchMeta)
 			rawdb.WriteBatchChunkRanges(s.db, batchIndex, chunkBlockRanges)
 
 		case s.l1RevertBatchEventSignature:
@@ -244,29 +244,29 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				log.Warn("got nil when reading last finalized batch index. This should happen only once.")
 			}
 
-			parentBatchMeta := &rawdb.FinalizedBatchMeta{}
+			parentFinalizedBatchMeta := &rawdb.FinalizedBatchMeta{}
 			if startBatchIndex > 0 {
-				parentBatchMeta = rawdb.ReadFinalizedBatchMeta(s.db, startBatchIndex-1)
+				parentFinalizedBatchMeta = rawdb.ReadFinalizedBatchMeta(s.db, startBatchIndex-1)
 			}
 
 			var highestFinalizedBlockNumber uint64
 			batchWriter := s.db.NewBatch()
 			for index := startBatchIndex; index <= batchIndex; index++ {
-				codecVersion := rawdb.ReadBatchCodecVersion(s.db, index)
+				committedBatchMeta := rawdb.ReadCommittedBatchMeta(s.db, index)
 
 				chunks, err := s.getLocalChunksForBatch(index)
 				if err != nil {
 					return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", index, err)
 				}
 
-				endBlock, finalizedBatchMeta, err := validateBatch(index, event, parentBatchMeta, codecVersion, chunks, s.bc.Config(), s.stack)
+				endBlock, finalizedBatchMeta, err := validateBatch(index, event, parentFinalizedBatchMeta, committedBatchMeta, chunks, s.bc.Config(), s.stack)
 				if err != nil {
 					return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 				}
 
 				rawdb.WriteFinalizedBatchMeta(batchWriter, index, finalizedBatchMeta)
 				highestFinalizedBlockNumber = endBlock
-				parentBatchMeta = finalizedBatchMeta
+				parentFinalizedBatchMeta = finalizedBatchMeta
 
 				if index%100 == 0 {
 					log.Info("finalized batch progress", "batch index", index, "finalized l2 block height", endBlock)
@@ -347,9 +347,9 @@ func (s *RollupSyncService) getLocalChunksForBatch(batchIndex uint64) ([]*encodi
 	return chunks, nil
 }
 
-func (s *RollupSyncService) getBatchCodecVersionAndChunkRanges(batchIndex uint64, vLog *types.Log) (uint8, []*rawdb.ChunkBlockRange, error) {
+func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types.Log) (*rawdb.CommittedBatchMeta, []*rawdb.ChunkBlockRange, error) {
 	if batchIndex == 0 {
-		return 0, []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
+		return nil, []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
 	}
 
 	tx, _, err := s.client.client.TransactionByHash(s.ctx, vLog.TxHash)
@@ -358,11 +358,11 @@ func (s *RollupSyncService) getBatchCodecVersionAndChunkRanges(batchIndex uint64
 			"tx hash", vLog.TxHash.Hex(), "block number", vLog.BlockNumber, "block hash", vLog.BlockHash.Hex(), "err", err)
 		block, err := s.client.client.BlockByHash(s.ctx, vLog.BlockHash)
 		if err != nil {
-			return 0, nil, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
+			return nil, nil, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
 		}
 
 		if block == nil {
-			return 0, nil, fmt.Errorf("failed to get block by hash, block not found, block number: %v, block hash: %v", vLog.BlockNumber, vLog.BlockHash.Hex())
+			return nil, nil, fmt.Errorf("failed to get block by hash, block not found, block number: %v, block hash: %v", vLog.BlockNumber, vLog.BlockHash.Hex())
 		}
 
 		found := false
@@ -374,15 +374,32 @@ func (s *RollupSyncService) getBatchCodecVersionAndChunkRanges(batchIndex uint64
 			}
 		}
 		if !found {
-			return 0, nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block number: %v, block hash: %v", vLog.TxHash.Hex(), vLog.BlockNumber, vLog.BlockHash.Hex())
+			return nil, nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block number: %v, block hash: %v", vLog.TxHash.Hex(), vLog.BlockNumber, vLog.BlockHash.Hex())
 		}
 	}
 
-	return s.decodeChunkBlockRanges(tx.Data())
+	var commitBatchMeta rawdb.CommittedBatchMeta
+
+	if tx.Type() == types.BlobTxType {
+		blobVersionedHashes := tx.BlobHashes()
+		if blobVersionedHashes == nil {
+			return nil, nil, fmt.Errorf("invalid blob transaction, blob hashes is nil, tx hash: %v", tx.Hash().Hex())
+		}
+		commitBatchMeta.BlobVersionedHashes = blobVersionedHashes
+	}
+
+	version, ranges, err := s.decodeBatchVersionAndChunkBlockRanges(tx.Data())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode chunk block ranges, batch index: %v, err: %w", batchIndex, err)
+	}
+
+	commitBatchMeta.Version = version
+	commitBatchMeta.ChunkBlockRanges = ranges
+	return &commitBatchMeta, ranges, nil
 }
 
-// decodeChunkBlockRanges decodes chunks in a batch based on the commit batch transaction's calldata.
-func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) (uint8, []*rawdb.ChunkBlockRange, error) {
+// decodeBatchVersionAndChunkBlockRanges decodes chunks in a batch based on the commit batch transaction's calldata.
+func (s *RollupSyncService) decodeBatchVersionAndChunkBlockRanges(txData []byte) (uint8, []*rawdb.ChunkBlockRange, error) {
 	const methodIDLength = 4
 	if len(txData) < methodIDLength {
 		return 0, nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)
@@ -452,11 +469,11 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) (uint8, []*raw
 // Parameters:
 //   - batchIndex: batch index of the validated batch
 //   - event: L1 finalize batch event data
-//   - parentBatchMeta: metadata of the parent batch
-//   - codecVersion: codec version stored in the database.
+//   - parentFinalizedBatchMeta: metadata of the finalized parent batch
+//   - committedBatchMeta: committed batch metadata stored in the database.
 //     Can be nil for older client versions that don't store this information.
 //   - chunks: slice of chunk data for the current batch
-//   - chainCfg: chain configuration to identify the codec version when codecVersion is nil
+//   - chainCfg: chain configuration to identify the codec version when committedBatchMeta is nil
 //   - stack: node stack to terminate the node in case of inconsistency
 //
 // Returns:
@@ -467,7 +484,7 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) (uint8, []*raw
 // Note: This function is compatible with both "finalize by batch" and "finalize by bundle" methods.
 // In "finalize by bundle", only the last batch of each bundle is fully verified.
 // This check still ensures the correctness of all batch hashes in the bundle due to the parent-child relationship between batch hashes.
-func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, codecVersion *uint8, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
+func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinalizedBatchMeta *rawdb.FinalizedBatchMeta, committedBatchMeta *rawdb.CommittedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
 		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", batchIndex)
 	}
@@ -487,11 +504,15 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMe
 	// Note: All params of batch are calculated locally based on the block data.
 	batch := &encoding.Batch{
 		Index:                      batchIndex,
-		TotalL1MessagePoppedBefore: parentBatchMeta.TotalL1MessagePopped,
-		ParentBatchHash:            parentBatchMeta.BatchHash,
+		TotalL1MessagePoppedBefore: parentFinalizedBatchMeta.TotalL1MessagePopped,
+		ParentBatchHash:            parentFinalizedBatchMeta.BatchHash,
 		Chunks:                     chunks,
 	}
 
+	var codecVersion *uint8
+	if committedBatchMeta != nil {
+		codecVersion = &committedBatchMeta.Version
+	}
 	determinedCodecVersion := determineCodecVersion(startBlock.Header.Number, startBlock.Header.Time, chainCfg, codecVersion)
 
 	var localBatchHash common.Hash
@@ -520,20 +541,34 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMe
 		}
 		localBatchHash = daBatch.Hash()
 	} else if determinedCodecVersion == encoding.CodecV4 {
-		// For codecV4, we first attempt to create the DA batch with compression enabled.
-		// This aligns with the behavior of the batch-proposer.
+		// Check if committedBatchMeta exists, for backward compatibility with older client versions
+		if committedBatchMeta == nil {
+			return 0, nil, fmt.Errorf("missing committed batch metadata for codecV4, please use the latest client version, batch index: %v", batchIndex)
+		}
+
+		// Validate BlobVersionedHashes
+		if committedBatchMeta.BlobVersionedHashes == nil || len(committedBatchMeta.BlobVersionedHashes) == 1 {
+			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, blob hashes: %v", batchIndex, committedBatchMeta.BlobVersionedHashes)
+		}
+
+		// Attempt to create DA batch with compression
 		daBatch, err := codecv4.NewDABatch(batch, true)
 		if err != nil {
-			// If creating the DA batch with compression fails, we log a warning
-			// and then attempt to create it without compression.
+			// If compression fails, try without compression
 			log.Warn("failed to create codecv4 DA batch with compress enabling", "batch index", batchIndex, "err", err)
 			daBatch, err = codecv4.NewDABatch(batch, false)
 			if err != nil {
-				// If both attempts fail, we return an error.
+				return 0, nil, fmt.Errorf("failed to create codecv4 DA batch, batch index: %v, err: %w", batchIndex, err)
+			}
+		} else if daBatch.BlobVersionedHash != committedBatchMeta.BlobVersionedHashes[0] {
+			// Handle unexpected blob versioned hash, fallback to uncompressed DA batch
+			log.Warn("impossible case: unexpected blob versioned hash", "batch index", batchIndex, "expected", committedBatchMeta.BlobVersionedHashes[0], "actual", daBatch.BlobVersionedHash)
+			daBatch, err = codecv4.NewDABatch(batch, false)
+			if err != nil {
 				return 0, nil, fmt.Errorf("failed to create codecv4 DA batch, batch index: %v, err: %w", batchIndex, err)
 			}
 		}
-		// Calculate the batch hash using the successfully created DA batch.
+
 		localBatchHash = daBatch.Hash()
 	} else {
 		return 0, nil, fmt.Errorf("unsupported codec version: %v", determinedCodecVersion)
@@ -550,13 +585,13 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMe
 	// - finalize by bundle: check the last batch, because only one event (containing the info of the last batch) is emitted per bundle
 	if batchIndex == event.BatchIndex.Uint64() {
 		if localStateRoot != event.StateRoot {
-			log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+			log.Error("State root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentFinalizedBatchMeta.BatchHash.Hex(), "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 			stack.Close()
 			os.Exit(1)
 		}
 
 		if localWithdrawRoot != event.WithdrawRoot {
-			log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+			log.Error("Withdraw root mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentFinalizedBatchMeta.BatchHash.Hex(), "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 			stack.Close()
 			os.Exit(1)
 		}
@@ -565,7 +600,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMe
 		// This check ensures the correctness of all batch hashes in the bundle
 		// due to the parent-child relationship between batch hashes
 		if localBatchHash != event.BatchHash {
-			log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+			log.Error("Batch hash mismatch", "batch index", event.BatchIndex.Uint64(), "start block", startBlock.Header.Number.Uint64(), "end block", endBlock.Header.Number.Uint64(), "parent batch hash", parentFinalizedBatchMeta.BatchHash.Hex(), "parent TotalL1MessagePopped", parentFinalizedBatchMeta.TotalL1MessagePopped, "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
 			chunksJson, err := json.Marshal(chunks)
 			if err != nil {
 				log.Error("marshal chunks failed", "err", err)
@@ -576,7 +611,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentBatchMe
 		}
 	}
 
-	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
+	totalL1MessagePopped := parentFinalizedBatchMeta.TotalL1MessagePopped
 	for _, chunk := range chunks {
 		totalL1MessagePopped += chunk.NumL1Messages(totalL1MessagePopped)
 	}
@@ -696,7 +731,24 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 				StartBlockNumber: daBlocks[0].BlockNumber,
 				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
 			})
+		case encoding.CodecV4:
+			if len(chunk) != 1+numBlocks*60 {
+				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
+			}
+			daBlocks := make([]*codecv4.DABlock, numBlocks)
+			for i := 0; i < numBlocks; i++ {
+				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+				endIdx := startIdx + 60
+				daBlocks[i] = &codecv4.DABlock{}
+				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
+					return nil, err
+				}
+			}
 
+			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+				StartBlockNumber: daBlocks[0].BlockNumber,
+				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			})
 		default:
 			return nil, fmt.Errorf("unexpected batch version %v", codecVersion)
 		}

@@ -211,69 +211,117 @@ func TestBatchChunkRanges(t *testing.T) {
 	DeleteBatchChunkRanges(db, uint64(len(chunks)+1))
 }
 
-func TestWriteReadCodecVersion(t *testing.T) {
+func TestWriteReadCommittedBatchMeta(t *testing.T) {
 	db := NewMemoryDatabase()
 
-	// all possible uint8 values
-	for version := uint16(0); version <= 255; version++ {
-		batchIndex := uint64(version)
-		WriteBatchCodecVersion(db, batchIndex, uint8(version))
-		got := ReadBatchCodecVersion(db, batchIndex)
+	testCases := []struct {
+		batchIndex uint64
+		meta       *CommittedBatchMeta
+	}{
+		{
+			batchIndex: 0,
+			meta: &CommittedBatchMeta{
+				Version:             0,
+				BlobVersionedHashes: []common.Hash{},
+				ChunkBlockRanges:    []*ChunkBlockRange{},
+			},
+		},
+		{
+			batchIndex: 1,
+			meta: &CommittedBatchMeta{
+				Version:             1,
+				BlobVersionedHashes: []common.Hash{common.HexToHash("0x1234")},
+				ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 10}},
+			},
+		},
+		{
+			batchIndex: 255,
+			meta: &CommittedBatchMeta{
+				Version:             255,
+				BlobVersionedHashes: []common.Hash{common.HexToHash("0xabcd"), common.HexToHash("0xef01")},
+				ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 10}, {StartBlockNumber: 11, EndBlockNumber: 20}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		WriteCommittedBatchMeta(db, tc.batchIndex, tc.meta)
+		got := ReadCommittedBatchMeta(db, tc.batchIndex)
 
 		if got == nil {
-			t.Fatal("Expected non-nil value", "batch index", batchIndex)
+			t.Fatalf("Expected non-nil value for batch index %d", tc.batchIndex)
 		}
 
-		if *got != uint8(version) {
-			t.Fatal("Codec version mismatch", "batch index", batchIndex, "expected", uint8(version), "got", *got)
+		if !compareCommitBatchMeta(tc.meta, got) {
+			t.Fatalf("CommittedBatchMeta mismatch for batch index %d, expected %+v, got %+v", tc.batchIndex, tc.meta, got)
 		}
 	}
 
 	// reading a non-existing value
-	if got := ReadBatchCodecVersion(db, 256); got != nil {
-		t.Fatal("Expected nil for non-existing value", "got", *got)
+	if got := ReadCommittedBatchMeta(db, 256); got != nil {
+		t.Fatalf("Expected nil for non-existing value, got %+v", got)
 	}
 }
 
-func TestOverwriteCodecVersion(t *testing.T) {
+func TestOverwriteCommittedBatchMeta(t *testing.T) {
 	db := NewMemoryDatabase()
 
 	batchIndex := uint64(42)
-	initialVersion := uint8(1)
-	newVersion := uint8(2)
-
-	// write initial version
-	WriteBatchCodecVersion(db, batchIndex, initialVersion)
-	got := ReadBatchCodecVersion(db, batchIndex)
-
-	if got == nil || *got != initialVersion {
-		t.Fatal("Initial write failed", "expected", initialVersion, "got", got)
+	initialMeta := &CommittedBatchMeta{
+		Version:             1,
+		BlobVersionedHashes: []common.Hash{common.HexToHash("0x1234")},
+		ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 10}},
+	}
+	newMeta := &CommittedBatchMeta{
+		Version:             2,
+		BlobVersionedHashes: []common.Hash{common.HexToHash("0x5678"), common.HexToHash("0x9abc")},
+		ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 20}, {StartBlockNumber: 21, EndBlockNumber: 30}},
 	}
 
-	// overwrite with new version
-	WriteBatchCodecVersion(db, batchIndex, newVersion)
-	got = ReadBatchCodecVersion(db, batchIndex)
+	// write initial meta
+	WriteCommittedBatchMeta(db, batchIndex, initialMeta)
+	got := ReadCommittedBatchMeta(db, batchIndex)
 
-	if got == nil || *got != newVersion {
-		t.Fatal("Overwrite failed", "expected", newVersion, "got", got)
+	if !compareCommitBatchMeta(initialMeta, got) {
+		t.Fatalf("Initial write failed, expected %+v, got %+v", initialMeta, got)
 	}
 
-	// edge cases
-	edgeCases := []uint8{0, 1, 254, 255}
-	for _, version := range edgeCases {
-		WriteBatchCodecVersion(db, batchIndex, version)
-		got = ReadBatchCodecVersion(db, batchIndex)
+	// overwrite with new meta
+	WriteCommittedBatchMeta(db, batchIndex, newMeta)
+	got = ReadCommittedBatchMeta(db, batchIndex)
 
-		if got == nil || *got != version {
-			t.Fatal("Edge case test failed", "expected", version, "got", got)
-		}
+	if !compareCommitBatchMeta(newMeta, got) {
+		t.Fatalf("Overwrite failed, expected %+v, got %+v", newMeta, got)
 	}
 
 	// read non-existing batch index
 	nonExistingIndex := uint64(999)
-	got = ReadBatchCodecVersion(db, nonExistingIndex)
+	got = ReadCommittedBatchMeta(db, nonExistingIndex)
 
 	if got != nil {
-		t.Fatal("Expected nil for non-existing batch index", "got", *got)
+		t.Fatalf("Expected nil for non-existing batch index, got %+v", got)
 	}
+}
+
+func compareCommitBatchMeta(a, b *CommittedBatchMeta) bool {
+	if a.Version != b.Version {
+		return false
+	}
+	if len(a.BlobVersionedHashes) != len(b.BlobVersionedHashes) {
+		return false
+	}
+	for i := range a.BlobVersionedHashes {
+		if a.BlobVersionedHashes[i] != b.BlobVersionedHashes[i] {
+			return false
+		}
+	}
+	if len(a.ChunkBlockRanges) != len(b.ChunkBlockRanges) {
+		return false
+	}
+	for i := range a.ChunkBlockRanges {
+		if a.ChunkBlockRanges[i].StartBlockNumber != b.ChunkBlockRanges[i].StartBlockNumber || a.ChunkBlockRanges[i].EndBlockNumber != b.ChunkBlockRanges[i].EndBlockNumber {
+			return false
+		}
+	}
+	return true
 }

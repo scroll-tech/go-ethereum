@@ -116,7 +116,7 @@ var (
 	batchMetaPrefix                   = []byte("R-bm")
 	finalizedL2BlockNumberKey         = []byte("R-finalized")
 	lastFinalizedBatchIndexKey        = []byte("R-finalizedBatchIndex")
-	batchCodecVersionPrefix           = []byte("R-bcv")
+	committedBatchMetaPrefix          = []byte("R-cbm")
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
@@ -311,7 +311,7 @@ func batchMetaKey(batchIndex uint64) []byte {
 	return append(batchMetaPrefix, encodeBigEndian(batchIndex)...)
 }
 
-// batchCodecVersionKey = batchCodecVersionPrefix + batch index (uint64 big endian)
-func batchCodecVersionKey(batchIndex uint64) []byte {
-	return append(batchCodecVersionPrefix, encodeBigEndian(batchIndex)...)
+// committedBatchMetaKey = committedBatchMetaPrefix + batch index (uint64 big endian)
+func committedBatchMetaKey(batchIndex uint64) []byte {
+	return append(committedBatchMetaPrefix, encodeBigEndian(batchIndex)...)
 }

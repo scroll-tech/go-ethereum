@@ -73,12 +73,12 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 		t.Fatalf("Failed to decode string: %v", err)
 	}
 
-	codecVersion, ranges, err := service.decodeChunkBlockRanges(testTxData)
+	version, ranges, err := service.decodeBatchVersionAndChunkBlockRanges(testTxData)
 	if err != nil {
 		t.Fatalf("Failed to decode chunk ranges: %v", err)
 	}
 
-	assert.Equal(t, encoding.CodecV0, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV0, encoding.CodecVersion(version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 4435142, EndBlockNumber: 4435142},
@@ -132,12 +132,12 @@ func TestDecodeChunkRangesCodecv1(t *testing.T) {
 		t.Fatalf("Failed to decode string: %v", err)
 	}
 
-	codecVersion, ranges, err := service.decodeChunkBlockRanges(testTxData)
+	version, ranges, err := service.decodeBatchVersionAndChunkBlockRanges(testTxData)
 	if err != nil {
 		t.Fatalf("Failed to decode chunk ranges: %v", err)
 	}
 
-	assert.Equal(t, encoding.CodecV1, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV1, encoding.CodecVersion(version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 1690, EndBlockNumber: 1780},
@@ -185,12 +185,12 @@ func TestDecodeChunkRangesCodecv2(t *testing.T) {
 		t.Fatalf("Failed to decode string: %v", err)
 	}
 
-	codecVersion, ranges, err := service.decodeChunkBlockRanges(testTxData)
+	version, ranges, err := service.decodeBatchVersionAndChunkBlockRanges(testTxData)
 	if err != nil {
 		t.Fatalf("Failed to decode chunk ranges: %v", err)
 	}
 
-	assert.Equal(t, encoding.CodecV2, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV2, encoding.CodecVersion(version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 200, EndBlockNumber: 290},
@@ -238,12 +238,12 @@ func TestDecodeChunkRangesCodecv3(t *testing.T) {
 		t.Fatalf("Failed to decode string: %v", err)
 	}
 
-	codecVersion, ranges, err := service.decodeChunkBlockRanges(testTxData)
+	version, ranges, err := service.decodeBatchVersionAndChunkBlockRanges(testTxData)
 	if err != nil {
 		t.Fatalf("Failed to decode chunk ranges: %v", err)
 	}
 
-	assert.Equal(t, encoding.CodecV3, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV3, encoding.CodecVersion(version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 1, EndBlockNumber: 9},
@@ -313,10 +313,10 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv0(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x0"),
 	}
-	codecVersion, ranges, err := service.getBatchCodecVersionAndChunkRanges(1, vLog)
+	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
-	assert.Equal(t, encoding.CodecV0, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV0, encoding.CodecVersion(metadata.Version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 911145, EndBlockNumber: 911151},
@@ -367,10 +367,10 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv1(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x1"),
 	}
-	codecVersion, ranges, err := service.getBatchCodecVersionAndChunkRanges(1, vLog)
+	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
-	assert.Equal(t, encoding.CodecV1, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV1, encoding.CodecVersion(metadata.Version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 1, EndBlockNumber: 11},
@@ -419,10 +419,10 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv2(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x2"),
 	}
-	codecVersion, ranges, err := service.getBatchCodecVersionAndChunkRanges(1, vLog)
+	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
-	assert.Equal(t, encoding.CodecV2, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV2, encoding.CodecVersion(metadata.Version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 143, EndBlockNumber: 143},
@@ -499,10 +499,10 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv3(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x3"),
 	}
-	codecVersion, ranges, err := service.getBatchCodecVersionAndChunkRanges(1, vLog)
+	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
-	assert.Equal(t, encoding.CodecV3, encoding.CodecVersion(codecVersion))
+	assert.Equal(t, encoding.CodecV3, encoding.CodecVersion(metadata.Version))
 
 	expectedRanges := []*rawdb.ChunkBlockRange{
 		{StartBlockNumber: 41, EndBlockNumber: 41},

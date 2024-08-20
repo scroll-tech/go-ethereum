@@ -252,7 +252,7 @@ func TestWriteReadCommittedBatchMeta(t *testing.T) {
 			t.Fatalf("Expected non-nil value for batch index %d", tc.batchIndex)
 		}
 
-		if !compareCommitBatchMeta(tc.meta, got) {
+		if !compareCommittedBatchMeta(tc.meta, got) {
 			t.Fatalf("CommittedBatchMeta mismatch for batch index %d, expected %+v, got %+v", tc.batchIndex, tc.meta, got)
 		}
 	}
@@ -282,7 +282,7 @@ func TestOverwriteCommittedBatchMeta(t *testing.T) {
 	WriteCommittedBatchMeta(db, batchIndex, initialMeta)
 	got := ReadCommittedBatchMeta(db, batchIndex)
 
-	if !compareCommitBatchMeta(initialMeta, got) {
+	if !compareCommittedBatchMeta(initialMeta, got) {
 		t.Fatalf("Initial write failed, expected %+v, got %+v", initialMeta, got)
 	}
 
@@ -290,7 +290,7 @@ func TestOverwriteCommittedBatchMeta(t *testing.T) {
 	WriteCommittedBatchMeta(db, batchIndex, newMeta)
 	got = ReadCommittedBatchMeta(db, batchIndex)
 
-	if !compareCommitBatchMeta(newMeta, got) {
+	if !compareCommittedBatchMeta(newMeta, got) {
 		t.Fatalf("Overwrite failed, expected %+v, got %+v", newMeta, got)
 	}
 
@@ -303,7 +303,7 @@ func TestOverwriteCommittedBatchMeta(t *testing.T) {
 	}
 }
 
-func compareCommitBatchMeta(a, b *CommittedBatchMeta) bool {
+func compareCommittedBatchMeta(a, b *CommittedBatchMeta) bool {
 	if a.Version != b.Version {
 		return false
 	}

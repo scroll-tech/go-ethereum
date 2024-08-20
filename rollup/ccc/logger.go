@@ -21,6 +21,22 @@ const (
 
 var _ vm.EVMLogger = (*Logger)(nil)
 
+// Logger is a tracer that keeps track of resource usages of each subcircuit
+// that Scroll's halo2 based zkEVM has. Some subcircuits are not tracked
+// here for the following reasons.
+//
+// rlp: worker already keeps track of how big a block is and the block size limit
+// it uses is way below what the rlp circuit allows
+// pi: row usage purely depends on the number txns and we already have a limit
+// on how many txns that worker will pack in a block
+// poseidon: not straight forward to track in block building phase. We can do
+// worst case estimation down the line if needed.
+// mpt: not straight forward to track in block building phase. We can do
+// worst case estimation down the line if needed.
+// tx: row usage depends on the length of raw txns and the number of storage
+// slots and/or accounts accessed. With the current gas limit of 10M, it is not possible
+// to overflow the circuit.
+// keccak: coming soon
 type Logger struct {
 	currentEnv    *vm.EVM
 	isCreate      bool

@@ -74,7 +74,8 @@ func (l *Logger) logRawBytecode(code []byte) {
 
 // logPrecompileAccess checks if the invoked address is a precompile and increments
 // resource usage of associated subcircuit
-func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64) {
+func (l *Logger) logPrecompileAccess(to common.Address, input []byte) {
+	inputLen := uint64(len(input))
 	l.logCopy(inputLen)
 	var outputLen uint64
 	switch to {
@@ -90,7 +91,9 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64) {
 	case common.BytesToAddress([]byte{5}): // &bigModExp{eip2565: true},
 		const rowsPerModExpCall = 39962
 		l.modExpUsage += rowsPerModExpCall
-		// todo: set output len
+		if inputLen >= 96 {
+			outputLen = new(big.Int).SetBytes(input[64:96]).Uint64() // mSize
+		}
 	case common.BytesToAddress([]byte{6}): // &bn256AddIstanbul{},
 		l.ecAddCount++
 		outputLen = 64
@@ -106,9 +109,9 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64) {
 }
 
 // logCall logs call to a given address, regardless of the address being a precompile or not
-func (l *Logger) logCall(to common.Address, inputLen uint64) {
+func (l *Logger) logCall(to common.Address, input []byte) {
 	l.logBytecodeAccessAt(to)
-	l.logPrecompileAccess(to, inputLen)
+	l.logPrecompileAccess(to, input)
 }
 
 func (l *Logger) logCopy(len uint64) {
@@ -128,7 +131,7 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 	l.currentEnv = env
 	l.isCreate = create
 	if !l.isCreate {
-		l.logCall(to, uint64(len(input)))
+		l.logCall(to, input)
 	} else {
 		l.logRawBytecode(input) // init bytecode
 	}
@@ -151,9 +154,13 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.SHA3, vm.RETURN, vm.REVERT:
 		l.logCopy(scope.Stack.Back(1).Uint64())
 	case vm.DELEGATECALL, vm.STATICCALL:
-		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Stack.Back(3).Uint64())
+		inputOffset := int64(scope.Stack.Back(2).Uint64())
+		inputLen := int64(scope.Stack.Back(3).Uint64())
+		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Memory.GetPtr(inputOffset, inputLen))
 	case vm.CALL, vm.CALLCODE:
-		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Stack.Back(4).Uint64())
+		inputOffset := int64(scope.Stack.Back(3).Uint64())
+		inputLen := int64(scope.Stack.Back(4).Uint64())
+		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Memory.GetPtr(inputOffset, inputLen))
 	case vm.EXP:
 		const rowsPerExpCall = 8
 		l.expUsage += rowsPerExpCall

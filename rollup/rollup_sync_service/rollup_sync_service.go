@@ -398,7 +398,7 @@ func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types
 	return &commitBatchMeta, ranges, nil
 }
 
-// decodeBatchVersionAndChunkBlockRanges decodes chunks in a batch based on the commit batch transaction's calldata.
+// decodeBatchVersionAndChunkBlockRanges decodes version and chunks' block ranges in a batch based on the commit batch transaction's calldata.
 func (s *RollupSyncService) decodeBatchVersionAndChunkBlockRanges(txData []byte) (uint8, []*rawdb.ChunkBlockRange, error) {
 	const methodIDLength = 4
 	if len(txData) < methodIDLength {
@@ -561,8 +561,8 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 				return 0, nil, fmt.Errorf("failed to create codecv4 DA batch, batch index: %v, err: %w", batchIndex, err)
 			}
 		} else if daBatch.BlobVersionedHash != committedBatchMeta.BlobVersionedHashes[0] {
-			// Handle unexpected blob versioned hash, fallback to uncompressed DA batch
-			log.Warn("impossible case: unexpected blob versioned hash", "batch index", batchIndex, "expected", committedBatchMeta.BlobVersionedHashes[0], "actual", daBatch.BlobVersionedHash)
+			// Inconsistent blob versioned hash, fallback to uncompressed DA batch
+			log.Warn("impossible case: inconsistent blob versioned hash", "batch index", batchIndex, "expected", committedBatchMeta.BlobVersionedHashes[0], "actual", daBatch.BlobVersionedHash)
 			daBatch, err = codecv4.NewDABatch(batch, false)
 			if err != nil {
 				return 0, nil, fmt.Errorf("failed to create codecv4 DA batch, batch index: %v, err: %w", batchIndex, err)

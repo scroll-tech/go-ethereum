@@ -50,7 +50,7 @@ func TestRollupSyncServiceStartAndStop(t *testing.T) {
 	service.Stop()
 }
 
-func TestDecodeChunkRangesCodecv0(t *testing.T) {
+func TestDecodeBatchVersionAndChunkBlockRangesCodecv0(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestDecodeChunkRangesCodecv0(t *testing.T) {
 	}
 }
 
-func TestDecodeChunkRangesCodecv1(t *testing.T) {
+func TestDecodeBatchVersionAndChunkBlockRangesCodecv1(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
@@ -162,7 +162,7 @@ func TestDecodeChunkRangesCodecv1(t *testing.T) {
 	}
 }
 
-func TestDecodeChunkRangesCodecv2(t *testing.T) {
+func TestDecodeBatchVersionAndChunkBlockRangesCodecv2(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
@@ -215,7 +215,7 @@ func TestDecodeChunkRangesCodecv2(t *testing.T) {
 	}
 }
 
-func TestDecodeChunkRangesCodecv3(t *testing.T) {
+func TestDecodeBatchVersionAndChunkBlockRangesCodecv3(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
@@ -281,7 +281,7 @@ func TestDecodeChunkRangesCodecv3(t *testing.T) {
 	}
 }
 
-func TestGetBatchCodecVersionAndChunkRangesCodecv0(t *testing.T) {
+func TestGetCommittedBatchMetaCodecv0(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
 		Scroll: params.ScrollConfig{
 			L1Config: &params.L1Config{
@@ -335,7 +335,7 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv0(t *testing.T) {
 	}
 }
 
-func TestGetBatchCodecVersionAndChunkRangesCodecv1(t *testing.T) {
+func TestGetCommittedBatchMetaCodecv1(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
 		Scroll: params.ScrollConfig{
 			L1Config: &params.L1Config{
@@ -387,7 +387,7 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv1(t *testing.T) {
 	}
 }
 
-func TestGetBatchCodecVersionAndChunkRangesCodecv2(t *testing.T) {
+func TestGetCommittedBatchMetaCodecv2(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
 		Scroll: params.ScrollConfig{
 			L1Config: &params.L1Config{
@@ -467,7 +467,7 @@ func TestGetBatchCodecVersionAndChunkRangesCodecv2(t *testing.T) {
 	}
 }
 
-func TestGetBatchCodecVersionAndChunkRangesCodecv3(t *testing.T) {
+func TestGetCommittedBatchMetaCodecv3(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
 		Scroll: params.ScrollConfig{
 			L1Config: &params.L1Config{

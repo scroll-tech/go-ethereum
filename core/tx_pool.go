@@ -528,9 +528,9 @@ func (pool *TxPool) stats() (int, int) {
 // number of queued (non-executable) transactions greater equal minBaseFee.
 func (pool *TxPool) StatsWithMinBaseFee(minBaseFee *big.Int) (int, int) {
 	statsStart := time.Now()
-	pool.mu.RLock()
+	pool.mu.Lock()
 	pendingTxs, queuedTxs := pool.statsWithMinBaseFee(minBaseFee)
-	pool.mu.RUnlock()
+	pool.mu.Unlock()
 	statsWithMinBaseFeeTimer.UpdateSince(statsStart)
 	return pendingTxs, queuedTxs
 }

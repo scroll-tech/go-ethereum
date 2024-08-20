@@ -24,7 +24,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/cmd/devp2p/internal/ethtest"
 	"github.com/scroll-tech/go-ethereum/crypto"
-	"github.com/scroll-tech/go-ethereum/internal/utesting"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/p2p/rlpx"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -96,14 +95,9 @@ func rlpxEthTest(ctx *cli.Context) error {
 	if ctx.NArg() < 3 {
 		exit("missing path to chain.rlp as command-line argument")
 	}
-	suite, err := ethtest.NewSuite(getNodeArg(ctx), ctx.Args()[1], ctx.Args()[2])
+	suite, err := ethtest.NewSuite(getNodeArg(ctx), ctx.Args().Get(1), ctx.Args().Get(2))
 	if err != nil {
 		exit(err)
 	}
-	// check if given node supports eth66, and if so, run eth66 protocol tests as well
-	is66Failed, _ := utesting.Run(utesting.Test{Name: "Is_66", Fn: suite.Is_66})
-	if is66Failed {
-		return runTests(ctx, suite.EthTests())
-	}
-	return runTests(ctx, suite.AllEthTests())
+	return runTests(ctx, suite.EthTests())
 }

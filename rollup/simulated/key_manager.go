@@ -11,8 +11,7 @@ import (
 )
 
 type KeyManager struct {
-	chainID *big.Int
-	keys    map[string]*ecdsa.PrivateKey
+	keys map[string]*ecdsa.PrivateKey
 }
 
 func NewKeyManager() *KeyManager {
@@ -42,14 +41,10 @@ func (k *KeyManager) Address(alias string) common.Address {
 	return address
 }
 
-func (k *KeyManager) SetChainID(chainID *big.Int) {
-	k.chainID = chainID
-}
-
-func (k *KeyManager) Transactor(alias string) *bind.TransactOpts {
+func (k *KeyManager) Transactor(alias string, chainID *big.Int) *bind.TransactOpts {
 	key := k.Key(alias)
 
-	transactor, err := bind.NewKeyedTransactorWithChainID(key, k.chainID)
+	transactor, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
 		panic(err)
 	}

@@ -25,17 +25,11 @@ type L1 struct {
 	l1MessageQueue   *contracts.L1MessageQueue
 }
 
-func NewL1() (*L1, error) {
-	//log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
-
-	km := NewKeyManager()
-
+func NewL1(km *KeyManager) (*L1, error) {
 	gAlloc := core.GenesisAlloc{
-		km.Address("default"): {Balance: new(big.Int).SetUint64(1 * params.Ether)},
+		km.Address(defaultKeyAlias): {Balance: new(big.Int).SetUint64(1 * params.Ether)},
 	}
-	backend := backends.NewSimulatedBackend(gAlloc, 10000000)
-
-	km.SetChainID(backend.Blockchain().Config().ChainID)
+	backend := backends.NewSimulatedBackend(gAlloc, 1000000000)
 
 	fmt.Println("Started simulated L1 with following accounts:")
 	for address, genesisAccount := range gAlloc {
@@ -58,14 +52,14 @@ func NewL1() (*L1, error) {
 func (l1 *L1) setupContracts() error {
 	// _messageQueue can't be the empty address here, however, we need to deploy ScrollChain first to be able to specify
 	// the correct address when deploying L1MessageQueue
-	scrollChainAddress, _, scrollChain, err := contracts.DeployScrollChainMockFinalize(l1.keyManager.Transactor("default"), l1.backend, 5, common.Address{1}, l1.keyManager.Address("verifier"))
+	scrollChainAddress, _, scrollChain, err := contracts.DeployScrollChainMockFinalize(l1.defaultTransactor(), l1.backend, 5, common.Address{1}, l1.keyManager.Address("verifier"))
 	if err != nil {
 		return errors.Wrap(err, "failed to deploy ScrollChain")
 	}
 	l1.scrollChain = scrollChain
 	fmt.Println("Deployed ScrollChain:", scrollChainAddress)
 
-	l2GasPriceOracleAddress, _, l2GasPriceOracle, err := contracts.DeployL2GasPriceOracle(l1.keyManager.Transactor("default"), l1.backend)
+	l2GasPriceOracleAddress, _, l2GasPriceOracle, err := contracts.DeployL2GasPriceOracle(l1.defaultTransactor(), l1.backend)
 	if err != nil {
 		return errors.Wrap(err, "failed to deploy L2GasPriceOracle")
 	}
@@ -73,7 +67,7 @@ func (l1 *L1) setupContracts() error {
 	fmt.Println("Deployed L2GasPriceOracle:", l2GasPriceOracleAddress)
 
 	// we don't deploy enforcedTxGateway
-	l1MessageQueueAddress, _, l1MessageQueue, err := contracts.DeployL1MessageQueue(l1.keyManager.Transactor("default"), l1.backend, l1.keyManager.Address("default"), scrollChainAddress, common.Address{1})
+	l1MessageQueueAddress, _, l1MessageQueue, err := contracts.DeployL1MessageQueue(l1.defaultTransactor(), l1.backend, l1.keyManager.Address(defaultKeyAlias), scrollChainAddress, common.Address{1})
 	if err != nil {
 		return errors.Wrap(err, "failed to deploy L1MessageQueue")
 	}
@@ -81,29 +75,29 @@ func (l1 *L1) setupContracts() error {
 	fmt.Println("Deployed L1MessageQueue:", l1MessageQueueAddress)
 
 	// first 3 parameters are deprecated and not used
-	_, err = l1MessageQueue.Initialize(l1.keyManager.Transactor("default"), common.Address{}, common.Address{}, common.Address{}, l2GasPriceOracleAddress, new(big.Int).SetUint64(100000000))
+	_, err = l1MessageQueue.Initialize(l1.defaultTransactor(), common.Address{}, common.Address{}, common.Address{}, l2GasPriceOracleAddress, new(big.Int).SetUint64(100000000))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize L1MessageQueue")
 	}
 
-	_, err = l1.scrollChain.Initialize(l1.keyManager.Transactor("default"), l1MessageQueueAddress, l1.keyManager.Address("verifier"), new(big.Int).SetUint64(1000))
+	_, err = l1.scrollChain.Initialize(l1.defaultTransactor(), l1MessageQueueAddress, l1.keyManager.Address("verifier"), new(big.Int).SetUint64(1000))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize ScrollChain")
 	}
 
-	l1.backend.Commit()
+	l1.CommitBlock()
 
 	return nil
 }
 
 func (l1 *L1) SendL1ToL2Message(toAlias string, data []byte, commit bool) (*types.Transaction, error) {
-	tx, err := l1.l1MessageQueue.AppendCrossDomainMessage(l1.keyManager.Transactor("default"), l1.keyManager.Address(toAlias), big.NewInt(10000000), data)
+	tx, err := l1.l1MessageQueue.AppendCrossDomainMessage(l1.defaultTransactor(), l1.keyManager.Address(toAlias), big.NewInt(10000000), data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to append cross domain message")
 	}
 
 	if commit {
-		l1.backend.Commit()
+		l1.CommitBlock()
 	}
 
 	return tx, nil
@@ -134,53 +128,41 @@ func (l1 *L1) FilterL1MessageQueueTransactions(start uint64, end uint64) ([]*con
 	return events, nil
 }
 
-// TODO: create methods for other txs types as well
-func (l1 *L1) SendDynamicFeeTransaction(fromAlias string, toAlias string, value *big.Int, data []byte, commit bool) (*types.Transaction, error) {
-	fromAddress := l1.keyManager.Address(fromAlias)
-	var toAddress *common.Address
-	if toAlias != "" {
-		toAddressNonNil := l1.keyManager.Address(toAlias)
-		toAddress = &toAddressNonNil
-	}
+func (l1 *L1) CommitBlock() *types.Block {
+	hash := l1.backend.Commit()
 
-	nonce, err := l1.backend.PendingNonceAt(context.Background(), fromAddress)
+	var err error
+	block, err := l1.backend.BlockByHash(context.Background(), hash)
+
+	// this should never happen as we just committed the block
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get nonce for %s, %s", fromAlias, fromAddress)
+		panic(err)
 	}
 
-	gasLimit := uint64(10000000)
-	gasPrice, err := l1.backend.SuggestGasPrice(context.Background())
+	return block
+}
+
+func (l1 *L1) ScrollChain() *contracts.ScrollChainMockFinalize {
+	return l1.scrollChain
+}
+
+func (l1 *L1) L1MessageQueue() *contracts.L1MessageQueue {
+	return l1.l1MessageQueue
+}
+
+func (l1 *L1) transactor(alias string) *bind.TransactOpts {
+	return l1.keyManager.Transactor(alias, l1.backend.Blockchain().Config().ChainID)
+}
+
+func (l1 *L1) defaultTransactor() *bind.TransactOpts {
+	return l1.transactor(defaultKeyAlias)
+}
+
+func (l1 *L1) SendTransaction(tx *types.Transaction) error {
+	err := l1.backend.SendTransaction(context.Background(), tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get suggested gas price")
+		return errors.Wrap(err, "failed to send tx")
 	}
 
-	tx := types.NewTx(&types.DynamicFeeTx{
-		ChainID:   l1.backend.Blockchain().Config().ChainID,
-		Nonce:     nonce,
-		GasTipCap: gasPrice,
-		GasFeeCap: gasPrice,
-		Gas:       gasLimit,
-		To:        toAddress,
-		Value:     value,
-		Data:      nil,
-	})
-
-	signer := types.LatestSigner(l1.backend.Blockchain().Config())
-	signedTx, err := types.SignTx(tx, signer, l1.keyManager.Key(fromAlias))
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to sign tx for %s, %s", fromAlias, fromAddress)
-	}
-
-	err = l1.backend.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to send tx for %s, %s", fromAlias, fromAddress)
-	}
-
-	fmt.Println("Sent transaction", "tx", signedTx.Hash().Hex(), "from", fromAddress, "to", toAddress, "value", value, "gasPrice", gasPrice, "gasLimit", gasLimit)
-
-	if commit {
-		l1.backend.Commit()
-	}
-
-	return signedTx, nil
+	return nil
 }

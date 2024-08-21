@@ -643,8 +643,10 @@ func determineCodecVersion(startBlockNumber *big.Int, startBlockTimestamp uint64
 		return encoding.CodecV1 // codecv1: batches after Bernoulli and before Curie
 	case !chainCfg.IsDarwin(startBlockTimestamp):
 		return encoding.CodecV2 // codecv2: batches after Curie and before Darwin
-	default:
+	case !chainCfg.IsDarwinV2(startBlockTimestamp):
 		return encoding.CodecV3 // codecv3: batches after Darwin
+	default:
+		return encoding.CodecV4 // codecv4: batches after DarwinV2
 	}
 }
 

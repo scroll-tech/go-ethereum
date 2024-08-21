@@ -336,6 +336,10 @@ func (pool *LegacyPool) Init(gasTip *big.Int, head *types.Header, reserve txpool
 	}
 	pool.wg.Add(1)
 	go pool.loop()
+
+	pool.wg.Add(1)
+	go pool.periodicallyCalculateRealTxActivity()
+
 	return nil
 }
 
@@ -428,6 +432,7 @@ func (pool *LegacyPool) loop() {
 func (pool *LegacyPool) Close() error {
 	// Terminate the pool reorger and return
 	close(pool.reorgShutdownCh)
+	close(pool.realTxActivityShutdownCh)
 	pool.wg.Wait()
 
 	if pool.journal != nil {

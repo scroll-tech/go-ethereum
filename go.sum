@@ -564,6 +564,8 @@ github.com/ryanuber/columnize v2.1.0+incompatible/go.mod h1:sm1tb6uqfes/u+d4ooFo
 github.com/sclevine/agouti v3.0.0+incompatible/go.mod h1:b4WX9W9L1sfQKXeJf1mUTLZKJ48R1S7H23Ji7oFO5Bw=
 github.com/scroll-tech/da-codec v0.1.1-0.20240727174557-66c0e75af163 h1:Cz0YXihFVms8pdtNNkV2PBVacZxE24yyAFSalNf8xtg=
 github.com/scroll-tech/da-codec v0.1.1-0.20240727174557-66c0e75af163/go.mod h1:D6XEESeNVJkQJlv3eK+FyR+ufPkgVQbJzERylQi53Bs=
+github.com/scroll-tech/da-codec v0.1.1-0.20240821081911-31c421a7fbf7 h1:IAzjUNH3vZsTSN0EF45bUy1xiAtb7gxfOaOtCzdMTAU=
+github.com/scroll-tech/da-codec v0.1.1-0.20240821081911-31c421a7fbf7/go.mod h1:D6XEESeNVJkQJlv3eK+FyR+ufPkgVQbJzERylQi53Bs=
 github.com/scroll-tech/zktrie v0.8.4 h1:UagmnZ4Z3ITCk+aUq9NQZJNAwnWl4gSxsLb2Nl7IgRE=
 github.com/scroll-tech/zktrie v0.8.4/go.mod h1:XvNo7vAk8yxNyTjBDj5WIiFzYW4bx/gJ78+NK6Zn6Uk=
 github.com/sergi/go-diff v1.1.0/go.mod h1:STckp+ISIX8hZLjrqAeVduY0gWCT9IjLuqbuNXdaHfM=

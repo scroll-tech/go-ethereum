@@ -69,7 +69,7 @@ type TraceEnv struct {
 	// The following Mutexes are used to protect against parallel read/write,
 	// since txs are executed in parallel.
 	pMu sync.Mutex // for `TraceEnv.StorageTrace.Proofs`
-	sMu sync.Mutex // for `TraceEnv.state``
+	sMu sync.Mutex // for `TraceEnv.state`
 	cMu sync.Mutex // for `TraceEnv.Codes`
 
 	*types.StorageTrace
@@ -325,6 +325,8 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 
 	applyMessageStart := time.Now()
 	structLogger := vm.NewStructLogger(env.logConfig)
+	structLogger.InitLogsFromPool()
+	defer structLogger.ReleaseLogsToPool()
 	tracer := NewMuxTracer(structLogger, callTracer)
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, txContext, state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})

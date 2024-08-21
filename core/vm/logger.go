@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/holiman/uint256"
@@ -150,10 +151,11 @@ type StructLogger struct {
 	storage        map[common.Address]Storage
 	createdAccount *types.AccountWrapper
 
-	callStackLogInd []int
-	logs            []StructLog
-	output          []byte
-	err             error
+	callStackLogInd      []int
+	pooledLogSliceHeader *[]StructLog
+	logs                 []StructLog
+	output               []byte
+	err                  error
 }
 
 // NewStructLogger returns a new logger
@@ -180,6 +182,28 @@ func (l *StructLogger) Reset() {
 	l.callStackLogInd = nil
 	l.err = nil
 	l.createdAccount = nil
+}
+
+var logsPool = sync.Pool{
+	New: func() any {
+		return new([]StructLog)
+	},
+}
+
+// InitLogsFromPool initiliazes logs buffer from a pool instead of unconditionally allocating
+// a new buffer every time
+func (l *StructLogger) InitLogsFromPool() {
+	l.pooledLogSliceHeader = logsPool.Get().(*[]StructLog)
+	l.logs = *l.pooledLogSliceHeader
+}
+
+// ReleaseLogsToPool releases the logs back to the pool
+// Keep in mind after calling this any copies of the internal StructLog buffer that you may
+// have acquired by calling StructLogs() is invalid. Do not interact with it in any way.
+func (l *StructLogger) ReleaseLogsToPool() {
+	*l.pooledLogSliceHeader = l.logs[:0]
+	l.logs = nil
+	logsPool.Put(l.pooledLogSliceHeader)
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
@@ -483,6 +507,8 @@ func (t *mdLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
 func FormatLogs(logs []StructLog) []types.StructLogRes {
 	formatted := make([]types.StructLogRes, 0, len(logs))
 
+	// note: make sure you don't retain a reference to any memory that originally belongs to `logs` as they might be pooled and
+	// reused
 	for _, trace := range logs {
 		logRes := types.NewStructLogResBasic(trace.Pc, trace.Op.String(), trace.Gas, trace.GasCost, trace.Depth, trace.RefundCounter, trace.Err)
 		for _, stackValue := range trace.Stack {

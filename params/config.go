@@ -862,7 +862,7 @@ func (c *ChainConfig) IsDarwin(now uint64) bool {
 	return isForkedTime(now, c.DarwinTime)
 }
 
-// IsDarwin returns whether num is either equal to the Darwin fork block or greater.
+// IsDarwinV2 returns whether num is either equal to the DarwinV2 fork block or greater.
 func (c *ChainConfig) IsDarwinV2(now uint64) bool {
 	return isForkedTime(now, c.DarwinV2Time)
 }

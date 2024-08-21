@@ -4,17 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"reflect"
 	"time"
 
 	"github.com/scroll-tech/da-codec/encoding"
-	"github.com/scroll-tech/da-codec/encoding/codecv0"
-	"github.com/scroll-tech/da-codec/encoding/codecv1"
-	"github.com/scroll-tech/da-codec/encoding/codecv2"
-	"github.com/scroll-tech/da-codec/encoding/codecv3"
-	"github.com/scroll-tech/da-codec/encoding/codecv4"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -509,69 +503,56 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		Chunks:                     chunks,
 	}
 
-	var codecVersion *uint8
+	var codecVersion encoding.CodecVersion
 	if committedBatchMeta != nil {
-		codecVersion = &committedBatchMeta.Version
+		codecVersion = encoding.CodecVersion(committedBatchMeta.Version)
+	} else {
+		codecVersion = encoding.GetCodecVersion(chainCfg, startBlock.Header.Number, startBlock.Header.Time)
 	}
-	determinedCodecVersion := determineCodecVersion(startBlock.Header.Number, startBlock.Header.Time, chainCfg, codecVersion)
 
 	var localBatchHash common.Hash
-	if determinedCodecVersion == encoding.CodecV0 {
-		daBatch, err := codecv0.NewDABatch(batch)
-		if err != nil {
-			return 0, nil, fmt.Errorf("failed to create codecv0 DA batch, batch index: %v, err: %w", batchIndex, err)
-		}
-		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV1 {
-		daBatch, err := codecv1.NewDABatch(batch)
-		if err != nil {
-			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", batchIndex, err)
-		}
-		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV2 {
-		daBatch, err := codecv2.NewDABatch(batch)
-		if err != nil {
-			return 0, nil, fmt.Errorf("failed to create codecv2 DA batch, batch index: %v, err: %w", batchIndex, err)
-		}
-		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV3 {
-		daBatch, err := codecv3.NewDABatch(batch)
-		if err != nil {
-			return 0, nil, fmt.Errorf("failed to create codecv3 DA batch, batch index: %v, err: %w", batchIndex, err)
-		}
-		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV4 {
-		// Check if committedBatchMeta exists, for backward compatibility with older client versions
-		if committedBatchMeta == nil {
-			return 0, nil, fmt.Errorf("missing committed batch metadata for codecV4, please use the latest client version, batch index: %v", batchIndex)
-		}
 
-		// Validate BlobVersionedHashes
-		if committedBatchMeta.BlobVersionedHashes == nil || len(committedBatchMeta.BlobVersionedHashes) == 1 {
-			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, blob hashes: %v", batchIndex, committedBatchMeta.BlobVersionedHashes)
-		}
+	codec, err := encoding.GetCodec(codecVersion)
+	if err != nil {
+		return 0, nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)
+	}
 
-		// Attempt to create DA batch with compression
-		daBatch, err := codecv4.NewDABatch(batch, true)
+	if codecVersion != encoding.CodecV4 {
+		daBatch, err := codec.NewDABatch(batch)
 		if err != nil {
-			// If compression fails, try without compression
-			log.Warn("failed to create codecv4 DA batch with compress enabling", "batch index", batchIndex, "err", err)
-			daBatch, err = codecv4.NewDABatch(batch, false)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to create codecv4 DA batch, batch index: %v, err: %w", batchIndex, err)
-			}
-		} else if daBatch.BlobVersionedHash != committedBatchMeta.BlobVersionedHashes[0] {
-			// Inconsistent blob versioned hash, fallback to uncompressed DA batch
-			log.Warn("impossible case: inconsistent blob versioned hash", "batch index", batchIndex, "expected", committedBatchMeta.BlobVersionedHashes[0], "actual", daBatch.BlobVersionedHash)
-			daBatch, err = codecv4.NewDABatch(batch, false)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to create codecv4 DA batch, batch index: %v, err: %w", batchIndex, err)
-			}
+			return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, err: %w", batchIndex, codecVersion, err)
 		}
-
 		localBatchHash = daBatch.Hash()
 	} else {
-		return 0, nil, fmt.Errorf("unsupported codec version: %v", determinedCodecVersion)
+		if committedBatchMeta == nil {
+			return 0, nil, fmt.Errorf("missing committed batch metadata, please use the latest client version, batch index: %v, codec version: %v", batchIndex, codecVersion)
+		}
+
+		if committedBatchMeta.BlobVersionedHashes == nil || len(committedBatchMeta.BlobVersionedHashes) == 1 {
+			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, codec version: %v, blob hashes: %v", batchIndex, codecVersion, committedBatchMeta.BlobVersionedHashes)
+		}
+
+		// Try creating the DA batch with compression
+		codec.SetCompression(true)
+		daBatch, err := codec.NewDABatch(batch)
+
+		blobVersionHashes := committedBatchMeta.BlobVersionedHashes
+		if blobVersionHashes == nil || len(blobVersionHashes) == 1 {
+			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, codec version: %v, blob hashes: %v", batchIndex, codecVersion, blobVersionHashes)
+		}
+
+		if err != nil || blobVersionHashes[0] != committedBatchMeta.BlobVersionedHashes[0] {
+			// Log the compression failure or hash inconsistency
+			log.Warn("failed to create DA batch with compression", "batch index", batchIndex, "codec version", codecVersion, "blob hash", committedBatchMeta.BlobVersionedHashes[0].Hex(), "local blob hash", blobVersionHashes[0], "err", err)
+
+			// Retry without compression
+			codec.SetCompression(false)
+			daBatch, err = codec.NewDABatch(batch)
+			if err != nil {
+				return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, err: %w", batchIndex, codecVersion, err)
+			}
+		}
+		localBatchHash = daBatch.Hash()
 	}
 
 	localStateRoot := endBlock.Header.Root
@@ -624,32 +605,6 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 	return endBlock.Header.Number.Uint64(), finalizedBatchMeta, nil
 }
 
-// determineCodecVersion determines the codec version based on the block number and chain configuration.
-// If the codecVersion is not provided (nil), which can happen with older client versions,
-// it will be inferred from the hardfork rules.
-//
-// Note: The codecVersion (except genesis batch with version 0) is retrieved from the commit batch transaction calldata and stored in the database.
-// This function provides backward compatibility when the codecVersion is not available in the database,
-// which can occur with older client versions that don't store this information.
-func determineCodecVersion(startBlockNumber *big.Int, startBlockTimestamp uint64, chainCfg *params.ChainConfig, providedCodecVersion *uint8) encoding.CodecVersion {
-	if providedCodecVersion != nil {
-		return encoding.CodecVersion(*providedCodecVersion)
-	}
-
-	switch {
-	case startBlockNumber.Uint64() == 0 || !chainCfg.IsBernoulli(startBlockNumber):
-		return encoding.CodecV0 // codecv0: genesis batch or batches before Bernoulli
-	case !chainCfg.IsCurie(startBlockNumber):
-		return encoding.CodecV1 // codecv1: batches after Bernoulli and before Curie
-	case !chainCfg.IsDarwin(startBlockTimestamp):
-		return encoding.CodecV2 // codecv2: batches after Curie and before Darwin
-	case !chainCfg.IsDarwinV2(startBlockTimestamp):
-		return encoding.CodecV3 // codecv3: batches after Darwin
-	default:
-		return encoding.CodecV4 // codecv4: batches after DarwinV2
-	}
-}
-
 // decodeBlockRangesFromEncodedChunks decodes the provided chunks into a list of block ranges.
 func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
 	var chunkBlockRanges []*rawdb.ChunkBlockRange
@@ -659,101 +614,24 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 		}
 
 		numBlocks := int(chunk[0])
-
-		switch codecVersion {
-		case encoding.CodecV0:
-			if len(chunk) < 1+numBlocks*60 {
-				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
-			}
-			daBlocks := make([]*codecv0.DABlock, numBlocks)
-			for i := 0; i < numBlocks; i++ {
-				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-				endIdx := startIdx + 60
-				daBlocks[i] = &codecv0.DABlock{}
-				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
-					return nil, err
-				}
-			}
-
-			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-				StartBlockNumber: daBlocks[0].BlockNumber,
-				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
-			})
-		case encoding.CodecV1:
-			if len(chunk) != 1+numBlocks*60 {
-				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
-			}
-			daBlocks := make([]*codecv1.DABlock, numBlocks)
-			for i := 0; i < numBlocks; i++ {
-				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-				endIdx := startIdx + 60
-				daBlocks[i] = &codecv1.DABlock{}
-				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
-					return nil, err
-				}
-			}
-
-			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-				StartBlockNumber: daBlocks[0].BlockNumber,
-				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
-			})
-		case encoding.CodecV2:
-			if len(chunk) != 1+numBlocks*60 {
-				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
-			}
-			daBlocks := make([]*codecv2.DABlock, numBlocks)
-			for i := 0; i < numBlocks; i++ {
-				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-				endIdx := startIdx + 60
-				daBlocks[i] = &codecv2.DABlock{}
-				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
-					return nil, err
-				}
-			}
-
-			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-				StartBlockNumber: daBlocks[0].BlockNumber,
-				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
-			})
-		case encoding.CodecV3:
-			if len(chunk) != 1+numBlocks*60 {
-				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
-			}
-			daBlocks := make([]*codecv3.DABlock, numBlocks)
-			for i := 0; i < numBlocks; i++ {
-				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-				endIdx := startIdx + 60
-				daBlocks[i] = &codecv3.DABlock{}
-				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
-					return nil, err
-				}
-			}
-
-			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-				StartBlockNumber: daBlocks[0].BlockNumber,
-				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
-			})
-		case encoding.CodecV4:
-			if len(chunk) != 1+numBlocks*60 {
-				return nil, fmt.Errorf("invalid chunk byte length, expected: %v, got: %v", 1+numBlocks*60, len(chunk))
-			}
-			daBlocks := make([]*codecv4.DABlock, numBlocks)
-			for i := 0; i < numBlocks; i++ {
-				startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-				endIdx := startIdx + 60
-				daBlocks[i] = &codecv4.DABlock{}
-				if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
-					return nil, err
-				}
-			}
-
-			chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-				StartBlockNumber: daBlocks[0].BlockNumber,
-				EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
-			})
-		default:
-			return nil, fmt.Errorf("unexpected batch version %v", codecVersion)
+		if len(chunk) < 1+numBlocks*60 {
+			return nil, fmt.Errorf("invalid chunk byte length, codc version: %v, expected: %v, got: %v", codecVersion, 1+numBlocks*60, len(chunk))
 		}
+
+		daBlocks := make([]*encoding.DABlock, numBlocks)
+		for i := 0; i < numBlocks; i++ {
+			startIdx := 1 + i*60 // add 1 to skip numBlocks byte
+			endIdx := startIdx + 60
+			daBlocks[i] = &encoding.DABlock{}
+			if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
+				return nil, err
+			}
+		}
+
+		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
+			StartBlockNumber: daBlocks[0].BlockNumber,
+			EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+		})
 	}
 	return chunkBlockRanges, nil
 }

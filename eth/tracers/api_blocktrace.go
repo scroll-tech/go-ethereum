@@ -97,10 +97,10 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 		log.Warn("Tracer params is unsupported")
 	}
 
-	if config.StoragePoofFormat != nil {
-		if *config.StoragePoofFormat == "legacy" {
+	if config.LogConfig != nil && config.StorageProofFormat != nil {
+		if *config.StorageProofFormat == "legacy" {
 			legacyStorageTrace = true
-		} else if *config.StoragePoofFormat == "union" {
+		} else if *config.StorageProofFormat == "union" {
 			unionStorageTrace = true
 		}
 	}

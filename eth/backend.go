@@ -200,7 +200,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 	if config.CheckCircuitCapacity {
-		eth.asyncChecker = ccc.NewAsyncChecker(eth.blockchain, runtime.GOMAXPROCS(0), false)
+		eth.asyncChecker = ccc.NewAsyncChecker(eth.blockchain, runtime.GOMAXPROCS(0), true)
 		eth.asyncChecker.WithOnFailingBlock(func(b *types.Block, err error) {
 			log.Warn("block failed CCC check, it will be reorged by the sequencer", "hash", b.Hash(), "err", err)
 		})

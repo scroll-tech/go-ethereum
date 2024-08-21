@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	zktrie "github.com/scroll-tech/zktrie/types"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -26,7 +28,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
-	zktrie "github.com/scroll-tech/zktrie/types"
 )
 
 var (

@@ -82,7 +82,7 @@ type SimulatedBackend struct {
 func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.GenesisAlloc, gasLimit uint64) *SimulatedBackend {
 	// copy AllEthashProtocolChanges and enable zktrie
 	chainCfg := new(params.ChainConfig)
-	*chainCfg = *params.AllEthashProtocolChanges
+	*chainCfg = *params.TestChainConfig
 	chainCfg.Scroll.UseZktrie = true
 
 	genesis := core.Genesis{

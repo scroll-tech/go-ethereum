@@ -527,7 +527,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, expected blob hashes: %v, err: %w", batchIndex, codecVersion, committedBatchMeta.BlobVersionedHashes, err)
 	}
-	localBatchHash = daBatch.Hash()
+	localBatchHash := daBatch.Hash()
 
 	localStateRoot := endBlock.Header.Root
 	localWithdrawRoot := endBlock.WithdrawRoot

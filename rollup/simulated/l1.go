@@ -7,6 +7,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 
+	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind/backends"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -22,6 +23,7 @@ type L1 struct {
 
 	scrollChain        *contracts.ScrollChainMockFinalize
 	scrollChainAddress common.Address
+	scrollChainABI     *abi.ABI
 
 	l2GasPriceOracle        *contracts.L2GasPriceOracle
 	l2GasPriceOracleAddress common.Address
@@ -63,6 +65,12 @@ func (l1 *L1) setupContracts() error {
 	}
 	l1.scrollChain = scrollChain
 	l1.scrollChainAddress = scrollChainAddress
+
+	scrollChainABI, err := contracts.ScrollChainMockFinalizeMetaData.GetAbi()
+	if err != nil {
+		return errors.Wrap(err, "failed to get abi")
+	}
+	l1.scrollChainABI = scrollChainABI
 	fmt.Println("Deployed ScrollChain:", scrollChainAddress)
 
 	l2GasPriceOracleAddress, _, l2GasPriceOracle, err := contracts.DeployL2GasPriceOracle(l1.defaultTransactor(), l1.backend)
@@ -93,7 +101,20 @@ func (l1 *L1) setupContracts() error {
 		return errors.Wrap(err, "failed to initialize ScrollChain")
 	}
 
+	if err = l1.addSequencer(); err != nil {
+		return errors.Wrap(err, "failed to add sequencer")
+	}
+
 	l1.CommitBlock()
+
+	return nil
+}
+
+func (l1 *L1) addSequencer() error {
+	_, err := l1.scrollChain.AddSequencer(l1.defaultTransactor(), l1.keyManager.Address(defaultKeyAlias))
+	if err != nil {
+		return errors.Wrap(err, "failed to add sequencer")
+	}
 
 	return nil
 }
@@ -154,14 +175,17 @@ func (l1 *L1) ScrollChain() *contracts.ScrollChainMockFinalize {
 	return l1.scrollChain
 }
 
-func (l1 *L1) L1MessageQueue() *contracts.L1MessageQueue {
-	return l1.l1MessageQueue
-}
-
 func (l1 *L1) ScrollChainAddress() common.Address {
 	return l1.scrollChainAddress
 }
 
+func (l1 *L1) ScrollChainABI() *abi.ABI {
+	return l1.scrollChainABI
+}
+
+func (l1 *L1) L1MessageQueue() *contracts.L1MessageQueue {
+	return l1.l1MessageQueue
+}
 func (l1 *L1) L1MessageQueueAddress() common.Address {
 	return l1.l1MessageQueueAddress
 }

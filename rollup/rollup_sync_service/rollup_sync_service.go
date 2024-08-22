@@ -513,38 +513,39 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		Chunks:                     chunks,
 	}
 
-	var codecVersion *uint8
+	var codecVersion encoding.CodecVersion
 	if committedBatchMeta != nil {
-		codecVersion = &committedBatchMeta.Version
+		codecVersion = encoding.CodecVersion(committedBatchMeta.Version)
+	} else {
+		codecVersion = determineCodecVersion(startBlock.Header.Number, startBlock.Header.Time, chainCfg)
 	}
-	determinedCodecVersion := determineCodecVersion(startBlock.Header.Number, startBlock.Header.Time, chainCfg, codecVersion)
 
 	var localBatchHash common.Hash
-	if determinedCodecVersion == encoding.CodecV0 {
+	if codecVersion == encoding.CodecV0 {
 		daBatch, err := codecv0.NewDABatch(batch)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to create codecv0 DA batch, batch index: %v, err: %w", batchIndex, err)
 		}
 		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV1 {
+	} else if codecVersion == encoding.CodecV1 {
 		daBatch, err := codecv1.NewDABatch(batch)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to create codecv1 DA batch, batch index: %v, err: %w", batchIndex, err)
 		}
 		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV2 {
+	} else if codecVersion == encoding.CodecV2 {
 		daBatch, err := codecv2.NewDABatch(batch)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to create codecv2 DA batch, batch index: %v, err: %w", batchIndex, err)
 		}
 		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV3 {
+	} else if codecVersion == encoding.CodecV3 {
 		daBatch, err := codecv3.NewDABatch(batch)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to create codecv3 DA batch, batch index: %v, err: %w", batchIndex, err)
 		}
 		localBatchHash = daBatch.Hash()
-	} else if determinedCodecVersion == encoding.CodecV4 {
+	} else if codecVersion == encoding.CodecV4 {
 		// Check if committedBatchMeta exists, for backward compatibility with older client versions
 		if committedBatchMeta == nil {
 			return 0, nil, fmt.Errorf("missing committed batch metadata for codecV4, please use the latest client version, batch index: %v", batchIndex)
@@ -575,7 +576,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 
 		localBatchHash = daBatch.Hash()
 	} else {
-		return 0, nil, fmt.Errorf("unsupported codec version: %v", determinedCodecVersion)
+		return 0, nil, fmt.Errorf("unsupported codec version: %v", codecVersion)
 	}
 
 	localStateRoot := endBlock.Header.Root
@@ -629,17 +630,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 }
 
 // determineCodecVersion determines the codec version based on the block number and chain configuration.
-// If the codecVersion is not provided (nil), which can happen with older client versions,
-// it will be inferred from the hardfork rules.
-//
-// Note: The codecVersion (except genesis batch with version 0) is retrieved from the commit batch transaction calldata and stored in the database.
-// This function provides backward compatibility when the codecVersion is not available in the database,
-// which can occur with older client versions that don't store this information.
-func determineCodecVersion(startBlockNumber *big.Int, startBlockTimestamp uint64, chainCfg *params.ChainConfig, providedCodecVersion *uint8) encoding.CodecVersion {
-	if providedCodecVersion != nil {
-		return encoding.CodecVersion(*providedCodecVersion)
-	}
-
+func determineCodecVersion(startBlockNumber *big.Int, startBlockTimestamp uint64, chainCfg *params.ChainConfig) encoding.CodecVersion {
 	switch {
 	case startBlockNumber.Uint64() == 0 || !chainCfg.IsBernoulli(startBlockNumber):
 		return encoding.CodecV0 // codecv0: genesis batch or batches before Bernoulli

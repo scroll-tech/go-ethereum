@@ -11,7 +11,6 @@ import (
 )
 
 // ChunkBlockRange represents the range of blocks within a chunk.
-// for backward compatibility, new info is also stored in CommittedBatchMeta.
 type ChunkBlockRange struct {
 	StartBlockNumber uint64
 	EndBlockNumber   uint64
@@ -61,6 +60,7 @@ func ReadRollupEventSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 
 // WriteBatchChunkRanges writes the block ranges for each chunk within a batch to the database.
 // It serializes the chunk ranges using RLP and stores them under a key derived from the batch index.
+// for backward compatibility, new info is also stored in CommittedBatchMeta.
 func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkBlockRanges []*ChunkBlockRange) {
 	value, err := rlp.EncodeToBytes(chunkBlockRanges)
 	if err != nil {
@@ -73,6 +73,7 @@ func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkBloc
 
 // DeleteBatchChunkRanges removes the block ranges of all chunks associated with a specific batch from the database.
 // Note: Only non-finalized batches can be reverted.
+// for backward compatibility, new info is also stored in CommittedBatchMeta.
 func DeleteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64) {
 	if err := db.Delete(batchChunkRangesKey(batchIndex)); err != nil {
 		log.Crit("failed to delete batch chunk ranges", "batch index", batchIndex, "err", err)
@@ -81,6 +82,7 @@ func DeleteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64) {
 
 // ReadBatchChunkRanges retrieves the block ranges of all chunks associated with a specific batch from the database.
 // It returns a list of ChunkBlockRange pointers, or nil if no chunk ranges are found for the given batch index.
+// for backward compatibility, new info is also stored in CommittedBatchMeta.
 func ReadBatchChunkRanges(db ethdb.Reader, batchIndex uint64) []*ChunkBlockRange {
 	data, err := db.Get(batchChunkRangesKey(batchIndex))
 	if err != nil && isNotFoundErr(err) {

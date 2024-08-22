@@ -29,6 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 // This test case is a repro of an annoying bug that took us forever to catch.
@@ -152,13 +153,13 @@ func TestShadowFork(t *testing.T) {
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
 	copy(genspec.ExtraData[extraVanity:], addr[:])
-	genesis := genspec.MustCommit(db)
+	genesis := genspec.MustCommit(db, trie.NewDatabase(db, trie.HashDefaultsWithZktrie))
 
 	// Generate a batch of blocks, each properly signed
-	chain, _ := core.NewBlockChain(db, nil, params.AllCliqueProtocolChanges, engine, vm.Config{}, nil, nil)
+	chain, _ := core.NewBlockChain(db, nil, genspec, nil, engine, vm.Config{}, nil, nil)
 	defer chain.Stop()
 
-	forkedChain, _ := core.NewBlockChain(db, nil, params.AllCliqueProtocolChanges, forkedEngine, vm.Config{}, nil, nil)
+	forkedChain, _ := core.NewBlockChain(db, nil, genspec, nil, forkedEngine, vm.Config{}, nil, nil)
 	defer forkedChain.Stop()
 
 	blocks, _ := core.GenerateChain(params.AllCliqueProtocolChanges, genesis, forkedEngine, db, 16, func(i int, block *core.BlockGen) {

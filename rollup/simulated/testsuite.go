@@ -30,7 +30,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 	l1, err := NewL1(km)
 	require.NoError(test, err)
 
-	l2, err := NewL2(km, l1.SendTransaction, l1.scrollChain, l1.l1MessageQueue)
+	l2, err := NewL2(km, l1)
 	require.NoError(test, err)
 
 	t := &TestSuite{

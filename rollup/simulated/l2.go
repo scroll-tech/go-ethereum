@@ -11,6 +11,7 @@ import (
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
 	"github.com/scroll-tech/da-codec/encoding/codecv3"
 
+	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind/backends"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -19,17 +20,13 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/simulated/contracts"
 )
 
 type L2 struct {
 	keyManager *KeyManager
 	backend    *backends.SimulatedBackend
 
-	scrollChainAddress common.Address
-	scrollChain        *contracts.ScrollChainMockFinalize
-	l1MessageQueue     *contracts.L1MessageQueue
-	l1Sender           func(transaction *types.Transaction) error
+	l1 *L1
 
 	batches            map[uint64]*Batch
 	lastProducedBlock  *types.Block
@@ -37,7 +34,7 @@ type L2 struct {
 	lastFinalizedBatch *Batch
 }
 
-func NewL2(km *KeyManager, l1Sender func(transaction *types.Transaction) error, scrollChain *contracts.ScrollChainMockFinalize, l1MessageQueue *contracts.L1MessageQueue) (*L2, error) {
+func NewL2(km *KeyManager, l1 *L1) (*L2, error) {
 	gAlloc := core.GenesisAlloc{
 		km.Address(defaultKeyAlias): {Balance: new(big.Int).SetUint64(1 * params.Ether)},
 	}
@@ -49,12 +46,10 @@ func NewL2(km *KeyManager, l1Sender func(transaction *types.Transaction) error, 
 	}
 
 	l2 := &L2{
-		keyManager:     km,
-		backend:        backend,
-		scrollChain:    scrollChain,
-		l1MessageQueue: l1MessageQueue,
-		l1Sender:       l1Sender,
-		batches:        make(map[uint64]*Batch),
+		keyManager: km,
+		backend:    backend,
+		l1:         l1,
+		batches:    make(map[uint64]*Batch),
 	}
 
 	return l2, nil
@@ -111,19 +106,6 @@ func (l2 *L2) SendDynamicFeeTransaction(fromAlias string, toAlias string, value 
 	return signedTx, nil
 }
 
-type Batch struct {
-	DABatch *codecv3.DABatch
-	*encoding.Batch
-	LastL2BlockNumber uint64
-	Hash              common.Hash
-}
-
-func (b *Batch) StateRoot() common.Hash {
-	lastChunk := len(b.Chunks) - 1
-	lastBlock := len(b.Chunks[lastChunk].Blocks) - 1
-	return b.Chunks[lastChunk].Blocks[lastBlock].Header.Root
-}
-
 func (l2 *L2) CommitBlock() *types.Block {
 	hash := l2.backend.Commit()
 
@@ -164,24 +146,27 @@ func (l2 *L2) commitGenesisBatch() (*Batch, error) {
 		return nil, errors.Wrap(err, "failed to create DA batch")
 	}
 
-	_, err = l2.scrollChain.ImportGenesisBatch(l2.defaultTransactor(), daBatch.Encode(), genesis.Root)
+	_, err = l2.l1.ScrollChain().ImportGenesisBatch(l2.defaultTransactor(), daBatch.Encode(), genesis.Root)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to submit genesis batch transaction")
 	}
 
 	l2.lastCommittedBatch = &Batch{
-		Batch:             batch,
-		LastL2BlockNumber: genesis.Number.Uint64(),
+		BatchHeaderBytes:  daBatch.Encode(),
 		Hash:              daBatch.Hash(),
+		LastL2BlockNumber: genesis.Number.Uint64(),
+		Batch:             batch,
 	}
 
 	return l2.lastCommittedBatch, nil
 }
 
 func (l2 *L2) CommitBatch() (*Batch, error) {
+	parentBatch := l2.lastCommittedBatch
+
 	// put all blocks from the last committed to the last produced block into the new chunk
 	var newChunk encoding.Chunk
-	firstBlock := l2.lastCommittedBatch.LastL2BlockNumber + 1
+	firstBlock := parentBatch.LastL2BlockNumber + 1
 	lastBlock := l2.lastProducedBlock.NumberU64()
 
 	for i := firstBlock; i <= lastBlock; i++ {
@@ -200,10 +185,10 @@ func (l2 *L2) CommitBatch() (*Batch, error) {
 
 	// we only have one chunk in the batch
 	newBatch := &encoding.Batch{
-		Index: l2.lastCommittedBatch.Index + 1,
-		//	TotalL1MessagePoppedBefore: dbChunks[0].TotalL1MessagesPoppedBefore,
-		//	ParentBatchHash:            common.HexToHash(l2.lastCommittedBatch.Hash),
-		Chunks: []*encoding.Chunk{&newChunk},
+		Index:                      parentBatch.Index + 1,
+		TotalL1MessagePoppedBefore: 0,
+		ParentBatchHash:            parentBatch.Hash,
+		Chunks:                     []*encoding.Chunk{&newChunk},
 	}
 
 	// now we can construct the DA batch, DA chunks and commit the batch
@@ -213,13 +198,13 @@ func (l2 *L2) CommitBatch() (*Batch, error) {
 	}
 
 	encodedChunks := make([][]byte, len(newBatch.Chunks))
-	for _, chunk := range newBatch.Chunks {
+	for i, chunk := range newBatch.Chunks {
 		// TODO: totalL1MessagesPoppedBefore
 		daChunk, err := codecv3.NewDAChunk(chunk, 0)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create DA chunk")
 		}
-		encodedChunks = append(encodedChunks, daChunk.Encode())
+		encodedChunks[i] = daChunk.Encode()
 	}
 
 	blobDataProof, err := daBatch.BlobDataProofForPointEvaluation()
@@ -232,55 +217,74 @@ func (l2 *L2) CommitBatch() (*Batch, error) {
 		return nil, errors.Wrap(err, "failed to construct skipped bitmap")
 	}
 
-	abi, err := contracts.ScrollChainMockFinalizeMetaData.GetAbi()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get abi")
-	}
-	calldata, err := abi.Pack("commitBatchWithBlobProof", daBatch.Version, l2.lastCommittedBatch.Hash[:], encodedChunks, skippedL1MessageBitmap, blobDataProof)
+	calldata, err := l2.l1.ScrollChainABI().Pack("commitBatchWithBlobProof", daBatch.Version, parentBatch.BatchHeaderBytes, encodedChunks, skippedL1MessageBitmap, blobDataProof)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to pack calldata")
 	}
 
+	tx, err := l2.createCommitBatchTransaction(calldata, daBatch.Blob())
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create commit batch transaction for batch %s", daBatch.Hash())
+	}
+
+	// simulate call to contract before sending tx
+	msg := ethereum.CallMsg{
+		From:          l2.keyManager.Address(defaultKeyAlias),
+		To:            tx.To(),
+		Gas:           tx.Gas(),
+		GasFeeCap:     tx.GasFeeCap(),
+		GasTipCap:     tx.GasTipCap(),
+		Value:         tx.Value(),
+		Data:          tx.Data(),
+		AccessList:    tx.AccessList(),
+		BlobGasFeeCap: tx.BlobGasFeeCap(),
+		BlobHashes:    tx.BlobHashes(),
+	}
+	_, err = l2.l1.backend.PendingCallContract(context.Background(), msg)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to call contract for batch %s", daBatch.Hash())
+	}
+
+	if err = l2.l1.SendTransaction(tx); err != nil {
+		return nil, errors.Wrapf(err, "failed to send commit batch transaction for batch %s", daBatch.Hash())
+	}
+
+	fmt.Printf("Committed batch: %d with hash %s - %d chunks - blocks %d to %d in tx %s\n", newBatch.Index, daBatch.Hash(), len(newBatch.Chunks), firstBlock, lastBlock, tx.Hash())
+
 	l2.lastCommittedBatch = &Batch{
-		DABatch:           daBatch,
-		Batch:             newBatch,
-		LastL2BlockNumber: lastBlock,
+		BatchHeaderBytes:  daBatch.Encode(),
 		Hash:              daBatch.Hash(),
+		LastL2BlockNumber: lastBlock,
+		Batch:             newBatch,
 	}
-
-	tx, err := l2.createCommitBatchTransaction(calldata, l2.lastCommittedBatch)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create commit batch transaction for batch %s", l2.lastCommittedBatch.Hash)
-	}
-
-	err = l2.l1Sender(tx)
-	if err != nil {
-		fmt.Println("Failed to send commit batch transaction for batch", l2.lastCommittedBatch.Hash)
-		return nil, errors.Wrapf(err, "failed to send commit batch transaction for batch %s", l2.lastCommittedBatch.Hash)
-	}
-	fmt.Printf("Committed batch: %d - %d chunks - blocks %d to %d\n", newBatch.Index, len(newBatch.Chunks), firstBlock, lastBlock)
 
 	return l2.lastCommittedBatch, nil
 }
 
-func (l2 *L2) createCommitBatchTransaction(calldata []byte, batch *Batch) (*types.Transaction, error) {
-	sidecar, err := makeSidecar(batch.DABatch.Blob())
+func (l2 *L2) createCommitBatchTransaction(calldata []byte, blob *kzg4844.Blob) (*types.Transaction, error) {
+	sidecar, err := makeSidecar(blob)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create blob sidecar")
+		return nil, errors.New("failed to create blob sidecar")
 	}
 
-	_, err = l2.backend.PendingNonceAt(context.Background(), l2.keyManager.Address(defaultKeyAlias))
+	nonce, err := l2.l1.backend.PendingNonceAt(context.Background(), l2.keyManager.Address(defaultKeyAlias))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get nonce")
 	}
 
+	gasPrice, err := l2.l1.backend.SuggestGasPrice(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get suggested gas price")
+	}
+
+	// TODO: whenever sending txs, double check gas price and gas limit
 	txData := &types.BlobTx{
 		ChainID:    uint256.MustFromBig(l2.backend.Blockchain().Config().ChainID),
-		Nonce:      8,
-		GasTipCap:  uint256.NewInt(100000000000),
-		GasFeeCap:  uint256.NewInt(100000000000),
-		Gas:        27060,
-		To:         l2.scrollChainAddress,
+		Nonce:      nonce,
+		GasTipCap:  uint256.NewInt(gasPrice.Uint64()),
+		GasFeeCap:  uint256.NewInt(gasPrice.Uint64()),
+		Gas:        gasPrice.Uint64(),
+		To:         l2.l1.ScrollChainAddress(),
 		Data:       calldata,
 		AccessList: nil,
 		BlobFeeCap: uint256.NewInt(100),

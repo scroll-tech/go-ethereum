@@ -349,7 +349,11 @@ func (s *RollupSyncService) getLocalChunksForBatch(batchIndex uint64) ([]*encodi
 
 func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types.Log) (*rawdb.CommittedBatchMeta, []*rawdb.ChunkBlockRange, error) {
 	if batchIndex == 0 {
-		return nil, []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
+		return &rawdb.CommittedBatchMeta{
+			Version:             0,
+			BlobVersionedHashes: nil,
+			ChunkBlockRanges:    []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}},
+		}, []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
 	}
 
 	tx, _, err := s.client.client.TransactionByHash(s.ctx, vLog.TxHash)

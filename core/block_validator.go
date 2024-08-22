@@ -32,6 +32,7 @@ import (
 
 var (
 	validateL1MessagesTimer = metrics.NewRegisteredTimer("validator/l1msg", nil)
+	asyncValidatorTimer     = metrics.NewRegisteredTimer("validator/async", nil)
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -98,9 +99,11 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	}
 
 	if v.asyncValidator != nil {
+		asyncStart := time.Now()
 		if err := v.asyncValidator(block); err != nil {
 			return err
 		}
+		asyncValidatorTimer.UpdateSince(asyncStart)
 	}
 	return nil
 }

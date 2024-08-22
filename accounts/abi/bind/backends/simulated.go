@@ -429,7 +429,8 @@ func (b *SimulatedBackend) PendingCodeAt(ctx context.Context, contract common.Ad
 
 func newRevertError(result *core.ExecutionResult) *revertError {
 	reason, errUnpack := abi.UnpackRevert(result.Revert())
-	err := errors.New("execution reverted")
+	// always show at least the function selector so that we can identify errors in the contract
+	err := fmt.Errorf("execution reverted: %s", hexutil.Encode(result.Revert()))
 	if errUnpack == nil {
 		err = fmt.Errorf("execution reverted: %v", reason)
 	}

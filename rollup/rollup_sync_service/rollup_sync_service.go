@@ -536,7 +536,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		codec.SetCompression(true)
 		daBatch, err := codec.NewDABatch(batch)
 
-		blobVersionHashes := committedBatchMeta.BlobVersionedHashes
+		blobVersionHashes := daBatch.BlobVersionedHashes()
 		if blobVersionHashes == nil || len(blobVersionHashes) == 1 {
 			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, codec version: %v, blob hashes: %v", batchIndex, codecVersion, blobVersionHashes)
 		}

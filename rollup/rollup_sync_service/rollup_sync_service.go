@@ -514,8 +514,6 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		codecVersion = encoding.GetCodecVersion(chainCfg, startBlock.Header.Number, startBlock.Header.Time)
 	}
 
-	var localBatchHash common.Hash
-
 	codec, err := encoding.GetCodec(codecVersion)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)

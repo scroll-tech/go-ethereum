@@ -521,43 +521,15 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		return 0, nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)
 	}
 
-	if codecVersion != encoding.CodecV4 {
-		daBatch, err := codec.NewDABatch(batch)
-		if err != nil {
-			return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, err: %w", batchIndex, codecVersion, err)
-		}
-		localBatchHash = daBatch.Hash()
-	} else {
-		if committedBatchMeta == nil {
-			return 0, nil, fmt.Errorf("missing committed batch metadata, please use the latest client version, batch index: %v, codec version: %v", batchIndex, codecVersion)
-		}
-
-		if committedBatchMeta.BlobVersionedHashes == nil || len(committedBatchMeta.BlobVersionedHashes) == 1 {
-			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, codec version: %v, blob hashes: %v", batchIndex, codecVersion, committedBatchMeta.BlobVersionedHashes)
-		}
-
-		// Try creating the DA batch with compression
-		codec.SetCompression(true)
-		daBatch, err := codec.NewDABatch(batch)
-
-		blobVersionHashes := daBatch.BlobVersionedHashes()
-		if blobVersionHashes == nil || len(blobVersionHashes) == 1 {
-			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, codec version: %v, blob hashes: %v", batchIndex, codecVersion, blobVersionHashes)
-		}
-
-		if err != nil || blobVersionHashes[0] != committedBatchMeta.BlobVersionedHashes[0] {
-			// Log the compression failure or hash inconsistency
-			log.Warn("failed to create DA batch with compression", "batch index", batchIndex, "codec version", codecVersion, "blob hash", committedBatchMeta.BlobVersionedHashes[0].Hex(), "local blob hash", blobVersionHashes[0], "err", err)
-
-			// Retry without compression
-			codec.SetCompression(false)
-			daBatch, err = codec.NewDABatch(batch)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, err: %w", batchIndex, codecVersion, err)
-			}
-		}
-		localBatchHash = daBatch.Hash()
+	if committedBatchMeta == nil {
+		return 0, nil, fmt.Errorf("missing committed batch metadata, please use the latest client version, batch index: %v, codec version: %v", batchIndex, codecVersion)
 	}
+
+	daBatch, err := codec.NewDABatchWithExpectedBlobVersionedHashes(batch, committedBatchMeta.BlobVersionedHashes)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, expected blob hashes: %v, err: %w", batchIndex, codecVersion, committedBatchMeta.BlobVersionedHashes, err)
+	}
+	localBatchHash = daBatch.Hash()
 
 	localStateRoot := endBlock.Header.Root
 	localWithdrawRoot := endBlock.WithdrawRoot

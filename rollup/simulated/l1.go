@@ -20,9 +20,14 @@ type L1 struct {
 	keyManager *KeyManager
 	backend    *backends.SimulatedBackend
 
-	scrollChain      *contracts.ScrollChainMockFinalize
-	l2GasPriceOracle *contracts.L2GasPriceOracle
-	l1MessageQueue   *contracts.L1MessageQueue
+	scrollChain        *contracts.ScrollChainMockFinalize
+	scrollChainAddress common.Address
+
+	l2GasPriceOracle        *contracts.L2GasPriceOracle
+	l2GasPriceOracleAddress common.Address
+
+	l1MessageQueue        *contracts.L1MessageQueue
+	l1MessageQueueAddress common.Address
 }
 
 func NewL1(km *KeyManager) (*L1, error) {
@@ -57,6 +62,7 @@ func (l1 *L1) setupContracts() error {
 		return errors.Wrap(err, "failed to deploy ScrollChain")
 	}
 	l1.scrollChain = scrollChain
+	l1.scrollChainAddress = scrollChainAddress
 	fmt.Println("Deployed ScrollChain:", scrollChainAddress)
 
 	l2GasPriceOracleAddress, _, l2GasPriceOracle, err := contracts.DeployL2GasPriceOracle(l1.defaultTransactor(), l1.backend)
@@ -64,6 +70,7 @@ func (l1 *L1) setupContracts() error {
 		return errors.Wrap(err, "failed to deploy L2GasPriceOracle")
 	}
 	l1.l2GasPriceOracle = l2GasPriceOracle
+	l1.l2GasPriceOracleAddress = l2GasPriceOracleAddress
 	fmt.Println("Deployed L2GasPriceOracle:", l2GasPriceOracleAddress)
 
 	// we don't deploy enforcedTxGateway
@@ -72,6 +79,7 @@ func (l1 *L1) setupContracts() error {
 		return errors.Wrap(err, "failed to deploy L1MessageQueue")
 	}
 	l1.l1MessageQueue = l1MessageQueue
+	l1.l1MessageQueueAddress = l1MessageQueueAddress
 	fmt.Println("Deployed L1MessageQueue:", l1MessageQueueAddress)
 
 	// first 3 parameters are deprecated and not used
@@ -136,7 +144,7 @@ func (l1 *L1) CommitBlock() *types.Block {
 
 	// this should never happen as we just committed the block
 	if err != nil {
-		panic(err)
+		panic(errors.Wrapf(err, "failed to get block by hash %s", hash.String()))
 	}
 
 	return block
@@ -150,6 +158,13 @@ func (l1 *L1) L1MessageQueue() *contracts.L1MessageQueue {
 	return l1.l1MessageQueue
 }
 
+func (l1 *L1) ScrollChainAddress() common.Address {
+	return l1.scrollChainAddress
+}
+
+func (l1 *L1) L1MessageQueueAddress() common.Address {
+	return l1.l1MessageQueueAddress
+}
 func (l1 *L1) transactor(alias string) *bind.TransactOpts {
 	return l1.keyManager.Transactor(alias, l1.backend.Blockchain().Config().ChainID)
 }
@@ -159,6 +174,11 @@ func (l1 *L1) defaultTransactor() *bind.TransactOpts {
 }
 
 func (l1 *L1) SendTransaction(tx *types.Transaction) error {
+	// Remove the sidecar from the tx before applying it to the backend
+	if tx.Type() == types.BlobTxType {
+		tx = tx.WithoutBlobTxSidecar()
+	}
+
 	err := l1.backend.SendTransaction(context.Background(), tx)
 	if err != nil {
 		return errors.Wrap(err, "failed to send tx")

@@ -552,7 +552,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		}
 
 		// Validate BlobVersionedHashes
-		if committedBatchMeta.BlobVersionedHashes == nil || len(committedBatchMeta.BlobVersionedHashes) == 1 {
+		if committedBatchMeta.BlobVersionedHashes == nil || len(committedBatchMeta.BlobVersionedHashes) != 1 {
 			return 0, nil, fmt.Errorf("invalid blob hashes, batch index: %v, blob hashes: %v", batchIndex, committedBatchMeta.BlobVersionedHashes)
 		}
 

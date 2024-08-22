@@ -81,7 +81,7 @@ func (api *API) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Trans
 
 // Make trace environment for current block, and then get the trace for the block.
 func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *TraceConfig, block *types.Block) (*types.BlockTrace, error) {
-	legacyStorageTrace := false
+	legacyStorageTrace := true
 	unionStorageTrace := false
 	if config == nil {
 		config = &TraceConfig{
@@ -98,8 +98,8 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	}
 
 	if config.LogConfig != nil && config.StorageProofFormat != nil {
-		if *config.StorageProofFormat == "legacy" {
-			legacyStorageTrace = true
+		if *config.StorageProofFormat == "flatten" {
+			legacyStorageTrace = false
 		} else if *config.StorageProofFormat == "union" {
 			unionStorageTrace = true
 		}

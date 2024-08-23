@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	godebug "runtime/debug"
 	"strconv"
 	"strings"
@@ -1000,6 +1001,12 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage: "Enable circuit capacity check during block validation",
 	}
 
+	CircuitCapacityCheckWorkersFlag = cli.UintFlag{
+		Name:  "ccc.numworkers",
+		Usage: "Set the number of workers that will be used for background CCC tasks",
+		Value: uint(runtime.GOMAXPROCS(0)),
+	}
+
 	// Rollup verify service settings
 	RollupVerifyEnabledFlag = &cli.BoolFlag{
 		Name:  "rollup.verify",
@@ -1740,8 +1747,17 @@ func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
 }
 
 func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
+<<<<<<< HEAD
 	if ctx.IsSet(CircuitCapacityCheckEnabledFlag.Name) {
 		cfg.CheckCircuitCapacity = ctx.Bool(CircuitCapacityCheckEnabledFlag.Name)
+=======
+	if ctx.GlobalIsSet(CircuitCapacityCheckEnabledFlag.Name) {
+		cfg.CheckCircuitCapacity = ctx.GlobalBool(CircuitCapacityCheckEnabledFlag.Name)
+		cfg.CCCMaxWorkers = runtime.GOMAXPROCS(0)
+		if ctx.GlobalIsSet(CircuitCapacityCheckWorkersFlag.Name) {
+			cfg.CCCMaxWorkers = int(ctx.GlobalUint(CircuitCapacityCheckWorkersFlag.Name))
+		}
+>>>>>>> 233a6adc1 (feat: async ccc checker (#996))
 	}
 }
 

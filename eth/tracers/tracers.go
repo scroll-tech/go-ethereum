@@ -74,7 +74,7 @@ func New(code string, ctx *Context) (Tracer, error) {
 }
 
 const (
-	memoryPadLimit = 1024 * 1024
+	memoryPadLimit = 1024 * 1024 * 10
 )
 
 // GetMemoryCopyPadded returns offset + size as a new slice.

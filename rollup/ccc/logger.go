@@ -9,6 +9,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/eth/tracers"
 )
 
 const (
@@ -90,8 +91,7 @@ func (l *Logger) logRawBytecode(code []byte) {
 
 // logPrecompileAccess checks if the invoked address is a precompile and increments
 // resource usage of associated subcircuit
-func (l *Logger) logPrecompileAccess(to common.Address, input []byte) {
-	inputLen := uint64(len(input))
+func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn func(int64, int64) []byte) {
 	l.logCopy(inputLen)
 	var outputLen uint64
 	switch to {
@@ -108,7 +108,7 @@ func (l *Logger) logPrecompileAccess(to common.Address, input []byte) {
 		const rowsPerModExpCall = 39962
 		l.modExpUsage += rowsPerModExpCall
 		if inputLen >= 96 {
-			outputLen = new(big.Int).SetBytes(input[64:96]).Uint64() // mSize
+			outputLen = new(big.Int).SetBytes(inputFn(64, 32)).Uint64() // mSize
 		}
 	case common.BytesToAddress([]byte{6}): // &bn256AddIstanbul{},
 		l.ecAddCount++
@@ -125,9 +125,9 @@ func (l *Logger) logPrecompileAccess(to common.Address, input []byte) {
 }
 
 // logCall logs call to a given address, regardless of the address being a precompile or not
-func (l *Logger) logCall(to common.Address, input []byte) {
+func (l *Logger) logCall(to common.Address, inputLen uint64, inputFn func(int64, int64) []byte) {
 	l.logBytecodeAccessAt(to)
-	l.logPrecompileAccess(to, input)
+	l.logPrecompileAccess(to, inputLen, inputFn)
 }
 
 func (l *Logger) logCopy(len uint64) {
@@ -147,7 +147,9 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 	l.currentEnv = env
 	l.isCreate = create
 	if !l.isCreate {
-		l.logCall(to, input)
+		l.logCall(to, uint64(len(input)), func(argOffset, argLen int64) []byte {
+			return input[argOffset : argOffset+argLen]
+		})
 	} else {
 		l.logRawBytecode(input) // init bytecode
 	}
@@ -158,8 +160,21 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 }
 
 func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+	if err != nil {
+		return
+	}
+
 	l.evmUsage += evmUsagePerOpCode[op]
 	l.stateUsage += stateUsagePerOpCode[op](scope, depth)
+
+	getInputFn := func(inputOffset int64) func(int64, int64) []byte {
+		return func(argOffset, argLen int64) []byte {
+			// it is safe to ignore the error, with current block gas limits (10M) it is not possible to go past
+			// GetMemoryCopyPadded's internal padding limit (10M) or trigger and overflow in offset/len
+			input, _ := tracers.GetMemoryCopyPadded(scope.Memory, inputOffset+argOffset, argLen)
+			return input
+		}
+	}
 
 	switch op {
 	case vm.EXTCODECOPY:
@@ -172,11 +187,11 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 	case vm.DELEGATECALL, vm.STATICCALL:
 		inputOffset := int64(scope.Stack.Back(2).Uint64())
 		inputLen := int64(scope.Stack.Back(3).Uint64())
-		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Memory.GetPtr(inputOffset, inputLen))
+		l.logCall(scope.Stack.Back(1).Bytes20(), uint64(inputLen), getInputFn(inputOffset))
 	case vm.CALL, vm.CALLCODE:
 		inputOffset := int64(scope.Stack.Back(3).Uint64())
 		inputLen := int64(scope.Stack.Back(4).Uint64())
-		l.logCall(scope.Stack.Back(1).Bytes20(), scope.Memory.GetPtr(inputOffset, inputLen))
+		l.logCall(scope.Stack.Back(1).Bytes20(), uint64(inputLen), getInputFn(inputOffset))
 	case vm.EXP:
 		const rowsPerExpCall = 8
 		l.expUsage += rowsPerExpCall
@@ -184,6 +199,10 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 }
 
 func (l *Logger) CaptureStateAfter(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+	if err != nil {
+		return
+	}
+
 	switch op {
 	case vm.CREATE, vm.CREATE2:
 		l.logBytecodeAccessAt(scope.Stack.Back(0).Bytes20()) // deployed bytecode
@@ -206,7 +225,7 @@ func (l *Logger) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 }
 
 func (l *Logger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
-	if l.isCreate {
+	if l.isCreate && err != nil {
 		l.logRawBytecode(output) // deployed bytecode
 	}
 }

@@ -146,6 +146,7 @@ func TestShadowFork(t *testing.T) {
 		forkedEngine = New(&forkedEngineConf, db)
 	)
 	genspec := &core.Genesis{
+		Config:    params.AllCliqueProtocolChanges,
 		ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
 		Alloc: map[common.Address]core.GenesisAccount{
 			addr: {Balance: big.NewInt(10000000000000000)},
@@ -153,7 +154,7 @@ func TestShadowFork(t *testing.T) {
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
 	copy(genspec.ExtraData[extraVanity:], addr[:])
-	genesis := genspec.MustCommit(db, trie.NewDatabase(db, trie.HashDefaultsWithZktrie))
+	genesis := genspec.MustCommit(db, trie.NewDatabase(db, trie.HashDefaults))
 
 	// Generate a batch of blocks, each properly signed
 	chain, _ := core.NewBlockChain(db, nil, genspec, nil, engine, vm.Config{}, nil, nil)

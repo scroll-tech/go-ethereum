@@ -213,7 +213,6 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			log.Trace("found new RevertBatch event", "batch index", batchIndex)
 
 			rawdb.DeleteCommittedBatchMeta(s.db, batchIndex)
-			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
 		case s.l1FinalizeBatchEventSignature:
 			event := &L1FinalizeBatchEvent{}
@@ -248,12 +247,12 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			for index := startBatchIndex; index <= batchIndex; index++ {
 				committedBatchMeta := rawdb.ReadCommittedBatchMeta(s.db, index)
 
-				chunks, err := s.getLocalChunksForBatch(index)
+				chunks, err := s.getLocalChunksForBatch(committedBatchMeta.ChunkBlockRanges)
 				if err != nil {
 					return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", index, err)
 				}
 
-				endBlock, finalizedBatchMeta, err := validateBatch(index, event, parentFinalizedBatchMeta, committedBatchMeta, chunks, s.bc.Config(), s.stack)
+				endBlock, finalizedBatchMeta, err := validateBatch(index, event, parentFinalizedBatchMeta, committedBatchMeta, chunks, s.stack)
 				if err != nil {
 					return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 				}
@@ -288,12 +287,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 	return nil
 }
 
-func (s *RollupSyncService) getLocalChunksForBatch(batchIndex uint64) ([]*encoding.Chunk, error) {
-	chunkBlockRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
-	if len(chunkBlockRanges) == 0 {
-		return nil, fmt.Errorf("failed to get batch chunk ranges, empty chunk block ranges")
-	}
-
+func (s *RollupSyncService) getLocalChunksForBatch(chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*encoding.Chunk, error) {
 	endBlockNumber := chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
 	for i := 0; i < defaultMaxRetries; i++ {
 		if s.ctx.Err() != nil {
@@ -469,9 +463,6 @@ func (s *RollupSyncService) decodeBatchVersionAndChunkBlockRanges(txData []byte)
 //   - event: L1 finalize batch event data
 //   - parentFinalizedBatchMeta: metadata of the finalized parent batch
 //   - committedBatchMeta: committed batch metadata stored in the database.
-//     Can be nil for older client versions that don't store this information.
-//   - chunks: slice of chunk data for the current batch
-//   - chainCfg: chain configuration to identify the codec version when committedBatchMeta is nil
 //   - stack: node stack to terminate the node in case of inconsistency
 //
 // Returns:
@@ -482,7 +473,7 @@ func (s *RollupSyncService) decodeBatchVersionAndChunkBlockRanges(txData []byte)
 // Note: This function is compatible with both "finalize by batch" and "finalize by bundle" methods.
 // In "finalize by bundle", only the last batch of each bundle is fully verified.
 // This check still ensures the correctness of all batch hashes in the bundle due to the parent-child relationship between batch hashes.
-func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinalizedBatchMeta *rawdb.FinalizedBatchMeta, committedBatchMeta *rawdb.CommittedBatchMeta, chunks []*encoding.Chunk, chainCfg *params.ChainConfig, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
+func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinalizedBatchMeta *rawdb.FinalizedBatchMeta, committedBatchMeta *rawdb.CommittedBatchMeta, chunks []*encoding.Chunk, stack *node.Node) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
 		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0, batch index: %v", batchIndex)
 	}
@@ -507,13 +498,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		Chunks:                     chunks,
 	}
 
-	var codecVersion encoding.CodecVersion
-	if committedBatchMeta != nil {
-		codecVersion = encoding.CodecVersion(committedBatchMeta.Version)
-	} else {
-		codecVersion = encoding.GetCodecVersion(chainCfg, startBlock.Header.Number, startBlock.Header.Time)
-	}
-
+	codecVersion := encoding.CodecVersion(committedBatchMeta.Version)
 	codec, err := encoding.GetCodec(codecVersion)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)

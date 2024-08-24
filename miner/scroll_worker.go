@@ -857,7 +857,6 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 		}
 
 		// first txn overflowed the circuit, skip
-		log.Info("Circuit capacity limit reached for a single tx", "isL1Message", tx.IsL1MessageTx(), "tx", tx.Hash().String())
 		w.skipTransaction(tx, err)
 	} else if tx.IsL1MessageTx() {
 		if errors.Is(err, ErrUnexpectedL1MessageIndex) {
@@ -887,6 +886,7 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 
 // skipTransaction
 func (w *worker) skipTransaction(tx *types.Transaction, err error) {
+	log.Info("Circuit capacity limit reached for a single tx", "isL1Message", tx.IsL1MessageTx(), "tx", tx.Hash().String())
 	rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, err.Error(),
 		w.current.header.Number.Uint64(), nil)
 	if tx.IsL1MessageTx() {

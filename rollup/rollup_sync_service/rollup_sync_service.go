@@ -519,10 +519,6 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 		return 0, nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)
 	}
 
-	if committedBatchMeta == nil {
-		return 0, nil, fmt.Errorf("missing committed batch metadata, please use the latest client version, batch index: %v, codec version: %v", batchIndex, codecVersion)
-	}
-
 	daBatch, err := codec.NewDABatchWithExpectedBlobVersionedHashes(batch, committedBatchMeta.BlobVersionedHashes)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, expected blob hashes: %v, err: %w", batchIndex, codecVersion, committedBatchMeta.BlobVersionedHashes, err)

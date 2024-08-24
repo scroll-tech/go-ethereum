@@ -198,12 +198,11 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			batchIndex := event.BatchIndex.Uint64()
 			log.Trace("found new CommitBatch event", "batch index", batchIndex)
 
-			committedBatchMeta, chunkBlockRanges, err := s.getCommittedBatchMeta(batchIndex, &vLog)
+			committedBatchMeta, err := s.getCommittedBatchMeta(batchIndex, &vLog)
 			if err != nil {
 				return fmt.Errorf("failed to get chunk ranges, batch index: %v, err: %w", batchIndex, err)
 			}
 			rawdb.WriteCommittedBatchMeta(s.db, batchIndex, committedBatchMeta)
-			rawdb.WriteBatchChunkRanges(s.db, batchIndex, chunkBlockRanges)
 
 		case s.l1RevertBatchEventSignature:
 			event := &L1RevertBatchEvent{}
@@ -213,6 +212,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			batchIndex := event.BatchIndex.Uint64()
 			log.Trace("found new RevertBatch event", "batch index", batchIndex)
 
+			rawdb.DeleteCommittedBatchMeta(s.db, batchIndex)
 			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
 		case s.l1FinalizeBatchEventSignature:
@@ -341,13 +341,13 @@ func (s *RollupSyncService) getLocalChunksForBatch(batchIndex uint64) ([]*encodi
 	return chunks, nil
 }
 
-func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types.Log) (*rawdb.CommittedBatchMeta, []*rawdb.ChunkBlockRange, error) {
+func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types.Log) (*rawdb.CommittedBatchMeta, error) {
 	if batchIndex == 0 {
 		return &rawdb.CommittedBatchMeta{
 			Version:             0,
 			BlobVersionedHashes: nil,
 			ChunkBlockRanges:    []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}},
-		}, []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
+		}, nil
 	}
 
 	tx, _, err := s.client.client.TransactionByHash(s.ctx, vLog.TxHash)
@@ -356,11 +356,11 @@ func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types
 			"tx hash", vLog.TxHash.Hex(), "block number", vLog.BlockNumber, "block hash", vLog.BlockHash.Hex(), "err", err)
 		block, err := s.client.client.BlockByHash(s.ctx, vLog.BlockHash)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
+			return nil, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
 		}
 
 		if block == nil {
-			return nil, nil, fmt.Errorf("failed to get block by hash, block not found, block number: %v, block hash: %v", vLog.BlockNumber, vLog.BlockHash.Hex())
+			return nil, fmt.Errorf("failed to get block by hash, block not found, block number: %v, block hash: %v", vLog.BlockNumber, vLog.BlockHash.Hex())
 		}
 
 		found := false
@@ -372,7 +372,7 @@ func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types
 			}
 		}
 		if !found {
-			return nil, nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block number: %v, block hash: %v", vLog.TxHash.Hex(), vLog.BlockNumber, vLog.BlockHash.Hex())
+			return nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block number: %v, block hash: %v", vLog.TxHash.Hex(), vLog.BlockNumber, vLog.BlockHash.Hex())
 		}
 	}
 
@@ -381,19 +381,19 @@ func (s *RollupSyncService) getCommittedBatchMeta(batchIndex uint64, vLog *types
 	if tx.Type() == types.BlobTxType {
 		blobVersionedHashes := tx.BlobHashes()
 		if blobVersionedHashes == nil {
-			return nil, nil, fmt.Errorf("invalid blob transaction, blob hashes is nil, tx hash: %v", tx.Hash().Hex())
+			return nil, fmt.Errorf("invalid blob transaction, blob hashes is nil, tx hash: %v", tx.Hash().Hex())
 		}
 		commitBatchMeta.BlobVersionedHashes = blobVersionedHashes
 	}
 
 	version, ranges, err := s.decodeBatchVersionAndChunkBlockRanges(tx.Data())
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode chunk block ranges, batch index: %v, err: %w", batchIndex, err)
+		return nil, fmt.Errorf("failed to decode chunk block ranges, batch index: %v, err: %w", batchIndex, err)
 	}
 
 	commitBatchMeta.Version = version
 	commitBatchMeta.ChunkBlockRanges = ranges
-	return &commitBatchMeta, ranges, nil
+	return &commitBatchMeta, nil
 }
 
 // decodeBatchVersionAndChunkBlockRanges decodes version and chunks' block ranges in a batch based on the commit batch transaction's calldata.

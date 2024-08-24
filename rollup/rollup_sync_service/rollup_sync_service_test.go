@@ -313,7 +313,7 @@ func TestGetCommittedBatchMetaCodecv0(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x0"),
 	}
-	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
+	metadata, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
 	assert.Equal(t, encoding.CodecV0, encoding.CodecVersion(metadata.Version))
@@ -324,13 +324,13 @@ func TestGetCommittedBatchMetaCodecv0(t *testing.T) {
 		{StartBlockNumber: 911156, EndBlockNumber: 911159},
 	}
 
-	if len(expectedRanges) != len(ranges) {
-		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(ranges))
+	if len(expectedRanges) != len(metadata.ChunkBlockRanges) {
+		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(metadata.ChunkBlockRanges))
 	}
 
-	for i := range ranges {
-		if *expectedRanges[i] != *ranges[i] {
-			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+	for i := range metadata.ChunkBlockRanges {
+		if *expectedRanges[i] != *metadata.ChunkBlockRanges[i] {
+			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *metadata.ChunkBlockRanges[i])
 		}
 	}
 }
@@ -367,7 +367,7 @@ func TestGetCommittedBatchMetaCodecv1(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x1"),
 	}
-	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
+	metadata, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
 	assert.Equal(t, encoding.CodecV1, encoding.CodecVersion(metadata.Version))
@@ -376,13 +376,13 @@ func TestGetCommittedBatchMetaCodecv1(t *testing.T) {
 		{StartBlockNumber: 1, EndBlockNumber: 11},
 	}
 
-	if len(expectedRanges) != len(ranges) {
-		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(ranges))
+	if len(expectedRanges) != len(metadata.ChunkBlockRanges) {
+		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(metadata.ChunkBlockRanges))
 	}
 
-	for i := range ranges {
-		if *expectedRanges[i] != *ranges[i] {
-			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+	for i := range metadata.ChunkBlockRanges {
+		if *expectedRanges[i] != *metadata.ChunkBlockRanges[i] {
+			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *metadata.ChunkBlockRanges[i])
 		}
 	}
 }
@@ -499,7 +499,7 @@ func TestGetCommittedBatchMetaCodecv3(t *testing.T) {
 	vLog := &types.Log{
 		TxHash: common.HexToHash("0x3"),
 	}
-	metadata, ranges, err := service.getCommittedBatchMeta(1, vLog)
+	metadata, err := service.getCommittedBatchMeta(1, vLog)
 	require.NoError(t, err)
 
 	assert.Equal(t, encoding.CodecV3, encoding.CodecVersion(metadata.Version))
@@ -537,13 +537,13 @@ func TestGetCommittedBatchMetaCodecv3(t *testing.T) {
 		{StartBlockNumber: 70, EndBlockNumber: 70},
 	}
 
-	if len(expectedRanges) != len(ranges) {
-		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(ranges))
+	if len(expectedRanges) != len(metadata.ChunkBlockRanges) {
+		t.Fatalf("Expected range length %v, got %v", len(expectedRanges), len(metadata.ChunkBlockRanges))
 	}
 
-	for i := range ranges {
-		if *expectedRanges[i] != *ranges[i] {
-			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
+	for i := range metadata.ChunkBlockRanges {
+		if *expectedRanges[i] != *metadata.ChunkBlockRanges[i] {
+			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *metadata.ChunkBlockRanges[i])
 		}
 	}
 }

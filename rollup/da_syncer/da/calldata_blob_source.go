@@ -226,7 +226,15 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, vLog *types.Lo
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
 		}
-		return NewCommitBatchDAV2(ds.ctx, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+		switch args.Version {
+		case 3:
+			// we can use V2 for version 3, because it's same
+			return NewCommitBatchDAV2(ds.ctx, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+		case 4:
+			return NewCommitBatchDAV4(ds.ctx, ds.db, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+		default:
+			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
+		}
 	}
 
 	return nil, fmt.Errorf("unknown method name: %s", method.Name)

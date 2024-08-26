@@ -15,6 +15,8 @@ const (
 	CommitBatchV1Type
 	// CommitBatchV2Type contains data of event of CommitBatchV2Type
 	CommitBatchV2Type
+	// CommitBatchV4Type contains data of event of CommitBatchV2Type
+	CommitBatchV4Type
 	// RevertBatchType contains data of event of RevertBatchType
 	RevertBatchType
 	// FinalizeBatchType contains data of event of FinalizeBatchType

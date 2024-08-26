@@ -284,6 +284,8 @@ type TxPool struct {
 	initDoneCh               chan struct{}  // is closed once the pool is initialized (for tests)
 
 	changesSinceReorg int // A counter for how many drops we've performed in-between reorg.
+
+	isMiner atomic.Bool
 }
 
 type txpoolResetRequest struct {
@@ -495,6 +497,17 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 	}
 
 	log.Info("Transaction pool price threshold updated", "price", price)
+}
+
+// SetIsMiner updates the miner status of the node.
+func (pool *TxPool) SetIsMiner(isMiner bool) {
+	pool.isMiner.Store(isMiner)
+	log.Info("Transaction pool miner status updated", "isMiner", isMiner)
+}
+
+// IsMiner returns the current miner status of the node.
+func (pool *TxPool) IsMiner() bool {
+	return pool.isMiner.Load()
 }
 
 // Nonce returns the next nonce of an account, with all transactions executable
@@ -773,7 +786,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		return false, ErrAlreadyKnown
 	}
 
-	if rawdb.IsSkippedTransaction(pool.chain.Database(), hash) {
+	if pool.IsMiner() && rawdb.IsSkippedTransaction(pool.chain.Database(), hash) {
 		log.Trace("Discarding already known skipped transaction", "hash", hash)
 		knownSkippedTxMeter.Mark(1)
 		return false, ErrAlreadyKnown

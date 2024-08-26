@@ -55,10 +55,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -75,6 +75,7 @@ type Ethereum struct {
 	syncService        *sync_service.SyncService
 	rollupSyncService  *rollup_sync_service.RollupSyncService
 	syncingPipeline    *da_syncer.SyncingPipeline
+	asyncChecker       *ccc.AsyncChecker
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -202,8 +203,11 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 	if config.CheckCircuitCapacity {
-		tracer := tracing.NewTracerWrapper()
-		eth.blockchain.Validator().SetupTracerAndCircuitCapacityChecker(tracer)
+		eth.asyncChecker = ccc.NewAsyncChecker(eth.blockchain, config.CCCMaxWorkers, true)
+		eth.asyncChecker.WithOnFailingBlock(func(b *types.Block, err error) {
+			log.Warn("block failed CCC check, it will be reorged by the sequencer", "hash", b.Hash(), "err", err)
+		})
+		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
 	}
 
 	// Rewind the chain in case of an incompatible config upgrade.
@@ -627,6 +631,9 @@ func (s *Ethereum) Stop() error {
 		s.syncingPipeline.Stop()
 	}
 	s.miner.Close()
+	if s.config.CheckCircuitCapacity {
+		s.asyncChecker.Wait()
+	}
 	s.blockchain.Stop()
 	s.engine.Close()
 	rawdb.PopUncleanShutdownMarker(s.chainDb)

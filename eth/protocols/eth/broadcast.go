@@ -114,7 +114,7 @@ func (p *Peer) broadcastTransactions() {
 			}
 			// New batch of transactions to be broadcast, queue them (with cap)
 			queue = append(queue, hashes...)
-			log.Debug("Queue size in broadcastTransactions ", "len(hashes)", len(hashes), "len(queue)", len(queue), "maxQueuedTxs", maxQueuedTxs)
+			log.Debug("Queue size in broadcastTransactions", "len(hashes)", len(hashes), "len(queue)", len(queue), "maxQueuedTxs", maxQueuedTxs)
 			if len(queue) > maxQueuedTxs {
 				// Fancy copy and resize to ensure buffer doesn't grow indefinitely
 				queue = queue[:copy(queue, queue[len(queue)-maxQueuedTxs:])]
@@ -185,7 +185,7 @@ func (p *Peer) announceTransactions() {
 			}
 			// New batch of transactions to be broadcast, queue them (with cap)
 			queue = append(queue, hashes...)
-			log.Debug("Queue size in announceTransactions ", "len(hashes)", len(hashes), "len(queue)", len(queue), "maxQueuedTxAnns", maxQueuedTxAnns)
+			log.Debug("Queue size in announceTransactions", "len(hashes)", len(hashes), "len(queue)", len(queue), "maxQueuedTxAnns", maxQueuedTxAnns)
 			if len(queue) > maxQueuedTxAnns {
 				// Fancy copy and resize to ensure buffer doesn't grow indefinitely
 				queue = queue[:copy(queue, queue[len(queue)-maxQueuedTxAnns:])]

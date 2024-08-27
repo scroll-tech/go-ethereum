@@ -791,7 +791,7 @@ func (f *TxFetcher) scheduleFetches(timer *mclock.Timer, timeout chan struct{}, 
 			return true // continue in the for-each
 		})
 
-		log.Debug("Scheduling transaction retrieval", "peer", peer, "len(f.announces[peer])", f.announces[peer], "len(hashes)", len(hashes))
+		log.Debug("Scheduling transaction retrieval", "peer", peer, "len(f.announces[peer])", len(f.announces[peer]), "len(hashes)", len(hashes))
 
 		// If any hashes were allocated, request them from the peer
 		if len(hashes) > 0 {

@@ -323,7 +323,7 @@ func handleNewPooledTransactionHashes(backend Backend, msg Decoder, peer *Peer) 
 	}
 	ann := new(NewPooledTransactionHashesPacket)
 	if err := msg.Decode(ann); err != nil {
-		log.Debug("Failed to decode new pooled transaction hashes", "peer", peer.String(), "err", err)
+		log.Debug("Failed to decode `NewPooledTransactionHashesPacket`", "peer", peer.String(), "err", err)
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
 	// Schedule all the unknown hashes for retrieval
@@ -338,7 +338,7 @@ func handleGetPooledTransactions66(backend Backend, msg Decoder, peer *Peer) err
 	// Decode the pooled transactions retrieval message
 	var query GetPooledTransactionsPacket66
 	if err := msg.Decode(&query); err != nil {
-		log.Debug("Failed to decode get pooled transactions", "peer", peer.String(), "err", err)
+		log.Debug("Failed to decode `GetPooledTransactionsPacket66`", "peer", peer.String(), "err", err)
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
 	hashes, txs := answerGetPooledTransactions(backend, query.GetPooledTransactionsPacket, peer)
@@ -382,14 +382,14 @@ func handleTransactions(backend Backend, msg Decoder, peer *Peer) error {
 	// Transactions can be processed, parse all of them and deliver to the pool
 	var txs TransactionsPacket
 	if err := msg.Decode(&txs); err != nil {
-		log.Debug("Failed to decode transactions", "peer", peer.String(), "err", err)
+		log.Debug("Failed to decode `TransactionsPacket`", "peer", peer.String(), "err", err)
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
 	log.Debug("handleTransactions", "peer", peer.String(), "len(txs)", len(txs))
 	for i, tx := range txs {
 		// Validate and mark the remote transaction
 		if tx == nil {
-			log.Debug("handleTransactions", "peer", peer.String(), "transaction is nil", i)
+			log.Debug("handleTransactions: transaction is nil", "peer", peer.String(), "i", i)
 			return fmt.Errorf("%w: transaction %d is nil", errDecode, i)
 		}
 		peer.markTransaction(tx.Hash())
@@ -405,13 +405,13 @@ func handlePooledTransactions66(backend Backend, msg Decoder, peer *Peer) error 
 	// Transactions can be processed, parse all of them and deliver to the pool
 	var txs PooledTransactionsPacket66
 	if err := msg.Decode(&txs); err != nil {
-		log.Debug("Failed to decode pooled transactions", "peer", peer.String(), "err", err)
+		log.Debug("Failed to decode `PooledTransactionsPacket66`", "peer", peer.String(), "err", err)
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
 	for i, tx := range txs.PooledTransactionsPacket {
 		// Validate and mark the remote transaction
 		if tx == nil {
-			log.Debug("handlePooledTransactions", "peer", peer.String(), "transaction is nil", i)
+			log.Debug("handlePooledTransactions: transaction is nil", "peer", peer.String(), "i", i)
 			return fmt.Errorf("%w: transaction %d is nil", errDecode, i)
 		}
 		peer.markTransaction(tx.Hash())

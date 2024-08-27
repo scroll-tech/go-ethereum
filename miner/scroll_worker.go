@@ -590,14 +590,14 @@ func (w *worker) processReorgedTxns(reason error) (bool, error) {
 	reorgedTxns := w.chain.GetBlockByNumber(w.current.header.Number.Uint64()).Transactions()
 	var errorWithTxnIdx *ccc.ErrorWithTxnIdx
 	if len(reorgedTxns) > 0 && errors.As(reason, &errorWithTxnIdx) {
+		if errorWithTxnIdx.ShouldSkip {
+			w.skipTransaction(reorgedTxns[errorWithTxnIdx.TxIdx], reason)
+		}
+
 		if errorWithTxnIdx.TxIdx == 0 {
 			reorgedTxns = reorgedTxns[1:]
 		} else {
 			reorgedTxns = reorgedTxns[:errorWithTxnIdx.TxIdx]
-		}
-
-		if errorWithTxnIdx.ShouldSkip {
-			w.skipTransaction(reorgedTxns[errorWithTxnIdx.TxIdx], reason)
 		}
 	}
 

@@ -171,7 +171,7 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	gasPool := new(core.GasPool).AddGas(header.GasLimit)
 	ccc.Reset()
 
-	var accRc types.RowConsumption
+	accRc := new(types.RowConsumption)
 	for txIdx, tx := range block.Transactions() {
 		if !isForkStillActive(forkCtx) {
 			return noopCb
@@ -185,18 +185,18 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 				err:   err,
 				// if the txn is the first in block or the additional resource utilization caused
 				// by this txn alone is enough to overflow the circuit, skip
-				ShouldSkip: txIdx == 0 || curRc.Difference(accRc).IsOverflown(),
+				ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
 			}
 			return failingCallback
 		}
-		accRc = *curRc
+		accRc = curRc
 	}
 
 	return func() {
 		if isForkStillActive(forkCtx) {
 			// all good, write the row consumption
 			log.Debug("CCC passed", "blockhash", block.Hash(), "height", block.NumberU64())
-			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), &accRc)
+			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), accRc)
 		}
 	}
 }

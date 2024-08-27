@@ -378,11 +378,14 @@ func handleTransactions(backend Backend, msg Decoder, peer *Peer) error {
 	// Transactions can be processed, parse all of them and deliver to the pool
 	var txs TransactionsPacket
 	if err := msg.Decode(&txs); err != nil {
+		log.Debug("Failed to decode transactions", "peer", peer.String(), "err", err)
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
+	log.Debug("handleTransactions", "peer", peer.String(), "len(txs)", len(txs))
 	for i, tx := range txs {
 		// Validate and mark the remote transaction
 		if tx == nil {
+			log.Debug("handleTransactions", "peer", peer.String(), "transaction is nil", i)
 			return fmt.Errorf("%w: transaction %d is nil", errDecode, i)
 		}
 		peer.markTransaction(tx.Hash())

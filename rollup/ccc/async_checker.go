@@ -171,7 +171,7 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	gasPool := new(core.GasPool).AddGas(header.GasLimit)
 	ccc.Reset()
 
-	var accRc *types.RowConsumption
+	accRc := new(types.RowConsumption)
 	for txIdx, tx := range block.Transactions() {
 		if !isForkStillActive(forkCtx) {
 			return noopCb

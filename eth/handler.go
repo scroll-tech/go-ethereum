@@ -530,8 +530,12 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		"announce packs", annoPeers, "announced hashes", annoCount,
 		"tx packs", directPeers, "broadcast txs", directCount)
 
-	directTxsLenGauge.Update(int64(directCount / directPeers))
-	annoTxsLenGauge.Update(int64(annoCount / annoPeers))
+	if directPeers > 0 {
+		directTxsLenGauge.Update(int64(directCount / directPeers))
+	}
+	if annoPeers > 0 {
+		annoTxsLenGauge.Update(int64(annoCount / annoPeers))
+	}
 }
 
 // minedBroadcastLoop sends mined blocks to connected peers.

@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	peerRequestTxsCntGuage = metrics.NewRegisteredGauge("eth/protocols/eth/peer/request/txs", nil)
+	peerRequestTxsCntGauge = metrics.NewRegisteredGauge("eth/protocols/eth/peer/request/txs", nil)
 )
 
 const (
@@ -426,7 +426,7 @@ func (p *Peer) RequestTxs(hashes []common.Hash) error {
 	id := rand.Uint64()
 
 	log.Debug("Requesting transactions", "RequestId", id, "Peer.id", p.id, "count", len(hashes))
-	peerRequestTxsCntGuage.Update(int64(len(hashes)))
+	peerRequestTxsCntGauge.Update(int64(len(hashes)))
 
 	requestTracker.Track(p.id, p.version, GetPooledTransactionsMsg, PooledTransactionsMsg, id)
 	return p2p.Send(p.rw, GetPooledTransactionsMsg, &GetPooledTransactionsPacket66{

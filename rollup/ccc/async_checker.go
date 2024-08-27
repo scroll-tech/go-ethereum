@@ -172,24 +172,35 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	ccc.Reset()
 
 	var accRc *types.RowConsumption
-	for txIdx, tx := range block.Transactions() {
+	if len(block.Transactions()) == 0 {
 		if !isForkStillActive(forkCtx) {
 			return noopCb
 		}
 
-		var curRc *types.RowConsumption
-		curRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
+		accRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, nil, ccc)
 		if err != nil {
-			err = &ErrorWithTxnIdx{
-				TxIdx: uint(txIdx),
-				err:   err,
-				// if the txn is the first in block or the additional resource utilization caused
-				// by this txn alone is enough to overflow the circuit, skip
-				ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
-			}
 			return failingCallback
 		}
-		accRc = curRc
+	} else {
+		for txIdx, tx := range block.Transactions() {
+			if !isForkStillActive(forkCtx) {
+				return noopCb
+			}
+
+			var curRc *types.RowConsumption
+			curRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
+			if err != nil {
+				err = &ErrorWithTxnIdx{
+					TxIdx: uint(txIdx),
+					err:   err,
+					// if the txn is the first in block or the additional resource utilization caused
+					// by this txn alone is enough to overflow the circuit, skip
+					ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
+				}
+				return failingCallback
+			}
+			accRc = curRc
+		}
 	}
 
 	return func() {

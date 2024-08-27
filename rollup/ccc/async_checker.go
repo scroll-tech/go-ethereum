@@ -171,43 +171,32 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	gasPool := new(core.GasPool).AddGas(header.GasLimit)
 	ccc.Reset()
 
-	var accRc *types.RowConsumption
-	if len(block.Transactions()) == 0 {
+	var accRc types.RowConsumption
+	for txIdx, tx := range block.Transactions() {
 		if !isForkStillActive(forkCtx) {
 			return noopCb
 		}
 
-		accRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, nil, ccc)
+		var curRc *types.RowConsumption
+		curRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
 		if err != nil {
+			err = &ErrorWithTxnIdx{
+				TxIdx: uint(txIdx),
+				err:   err,
+				// if the txn is the first in block or the additional resource utilization caused
+				// by this txn alone is enough to overflow the circuit, skip
+				ShouldSkip: txIdx == 0 || curRc.Difference(accRc).IsOverflown(),
+			}
 			return failingCallback
 		}
-	} else {
-		for txIdx, tx := range block.Transactions() {
-			if !isForkStillActive(forkCtx) {
-				return noopCb
-			}
-
-			var curRc *types.RowConsumption
-			curRc, err = c.checkTxAndApply(parent, header, statedb, gasPool, tx, ccc)
-			if err != nil {
-				err = &ErrorWithTxnIdx{
-					TxIdx: uint(txIdx),
-					err:   err,
-					// if the txn is the first in block or the additional resource utilization caused
-					// by this txn alone is enough to overflow the circuit, skip
-					ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
-				}
-				return failingCallback
-			}
-			accRc = curRc
-		}
+		accRc = *curRc
 	}
 
 	return func() {
 		if isForkStillActive(forkCtx) {
 			// all good, write the row consumption
 			log.Debug("CCC passed", "blockhash", block.Hash(), "height", block.NumberU64())
-			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), accRc)
+			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), &accRc)
 		}
 	}
 }

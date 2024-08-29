@@ -13,14 +13,22 @@ import (
 )
 
 const (
-	sigCountMax       = 127
-	ecAddCountMax     = 50
-	ecMulCountMax     = 50
-	ecPairingCountMax = 2
-	rowUsageMax       = 1_000_000
+	sigCountMax        = 127
+	ecAddCountMax      = 50
+	ecMulCountMax      = 50
+	ecPairingCountMax  = 2
+	rowUsageMax        = 1_000_000
+	keccakRounds       = 24
+	keccakRowsPerRound = 12
+	keccakRowsPerChunk = (keccakRounds + 1) * keccakRowsPerRound
 )
 
 var _ vm.EVMLogger = (*Logger)(nil)
+
+// computeKeccakChunks computes the number of chunks used in keccak256 for the given bytes array length
+func computeKeccakChunks(length uint64) uint64 {
+	return (length + 135) / 136
+}
 
 // Logger is a tracer that keeps track of resource usages of each subcircuit
 // that Scroll's halo2 based zkEVM has. Some subcircuits are not tracked
@@ -43,17 +51,20 @@ type Logger struct {
 	isCreate      bool
 	codesAccessed map[common.Hash]bool
 
-	evmUsage       uint64
-	stateUsage     uint64
-	bytecodeUsage  uint64
-	sigCount       uint64
-	ecAddCount     uint64
-	ecMulCount     uint64
-	ecPairingCount uint64
-	copyUsage      uint64
-	sha256Usage    uint64
-	expUsage       uint64
-	modExpUsage    uint64
+	evmUsage          uint64
+	stateUsage        uint64
+	bytecodeUsage     uint64
+	sigCount          uint64
+	ecAddCount        uint64
+	ecMulCount        uint64
+	ecPairingCount    uint64
+	copyUsage         uint64
+	sha256Usage       uint64
+	expUsage          uint64
+	modExpUsage       uint64
+	l1TxnCount        uint64
+	keccakChunkCount  uint64
+	keccakAllL2TxsLen uint64
 }
 
 func NewLogger() *Logger {
@@ -143,6 +154,15 @@ func (l *Logger) logSha256(inputLen uint64) {
 	l.sha256Usage += numBlocks * blockRows
 }
 
+// LogKeccakChunks records the number of chunks used for keccak given the length of bytes.
+func (l *Logger) LogKeccakChunks(length uint64) {
+	l.keccakChunkCount += computeKeccakChunks(length)
+}
+
+func (l *Logger) LogKeccakAllL2TxsLen(length uint64) {
+	l.keccakAllL2TxsLen += length
+}
+
 func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.currentEnv = env
 	l.isCreate = create
@@ -156,6 +176,8 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 
 	if !env.TxContext.IsL1MessageTx {
 		l.sigCount++
+	} else {
+		l.l1TxnCount++
 	}
 }
 
@@ -184,6 +206,10 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 		l.logCopy(scope.Stack.Back(2).Uint64())
 	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.SHA3, vm.RETURN, vm.REVERT:
 		l.logCopy(scope.Stack.Back(1).Uint64())
+		// keccak: add inputs from sha3 opcode in the block
+		if op == vm.SHA3 {
+			l.LogKeccakChunks(scope.Stack.Back(1).Uint64())
+		}
 	case vm.DELEGATECALL, vm.STATICCALL:
 		inputOffset := int64(scope.Stack.Back(2).Uint64())
 		inputLen := int64(scope.Stack.Back(3).Uint64())
@@ -274,6 +300,14 @@ func (l *Logger) RowConsumption() types.RowConsumption {
 		}, {
 			Name:      "mod_exp",
 			RowNumber: l.modExpUsage,
+		}, {
+			Name: "keccak",
+			// todo: dummy signature data
+			// ecrecover: sigCount * computeKeccakChunks(64) = sigCount
+			// data_bytes: 8 + 8 + 32 + 8 + 2 + 32 * numL1Txs bytes
+			// pi_bytes: 8 + 32 * 5 = 168 bytes
+			// all_l2_txs_bytes_mashed_together:
+			RowNumber: (l.keccakChunkCount+l.sigCount+computeKeccakChunks(58+32*l.l1TxnCount)+computeKeccakChunks(168)+computeKeccakChunks(l.keccakAllL2TxsLen))*keccakRowsPerChunk + keccakRowsPerRound,
 		},
 	}
 }

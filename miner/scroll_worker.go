@@ -699,11 +699,18 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 
+	txRlp, _ := tx.MarshalBinary()
 	if !tx.IsL1MessageTx() {
 		// only consider block size limit for L2 transactions
 		w.current.blockSize += tx.Size()
+		// keccak: all l2 tx's rlp_signed_bytes combined together makes a single input to keccak
+		w.current.cccLogger.LogKeccakAllL2TxsLen(uint64(len(txRlp)))
+		// keccak: add block txs' signatures
+		w.current.cccLogger.LogKeccakChunks(uint64(len(txRlp))) // @todo: should use unsigned length, but no interface yet use signed one
 	} else {
 		w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
+		// keccak: each l1 tx's signed bytes is a standalone input to keccak
+		w.current.cccLogger.LogKeccakChunks(uint64(len(txRlp)))
 	}
 	return false, nil
 }

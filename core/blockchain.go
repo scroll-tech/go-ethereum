@@ -2051,7 +2051,7 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
 
 	header.GasUsed = gasUsed
-	header.Root = statedb.GetRootHash()
+	header.Root = statedb.IntermediateRoot(true) // should be chain.Config().IsEIP158(header.Number) instead of true
 
 	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
 

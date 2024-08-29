@@ -25,22 +25,24 @@ func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
 
 // SyncOneBlock receives a PartialBlock, makes sure it's the next block in the chain, executes it and inserts it to the blockchain.
 func (s *DASyncer) SyncOneBlock(block *da.PartialBlock) error {
-	parentBlock := s.blockchain.CurrentBlock()
+	currentBlock := s.blockchain.CurrentBlock()
+
 	// we expect blocks to be consecutive. block.PartialHeader.Number == parentBlock.Number+1.
-	if block.PartialHeader.Number <= parentBlock.NumberU64() {
-		log.Debug("block number is too low", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
+	if block.PartialHeader.Number <= currentBlock.Number.Uint64() {
+		log.Debug("block number is too low", "block number", block.PartialHeader.Number, "parent block number", currentBlock.Number.Uint64())
 		return ErrBlockTooLow
-	} else if block.PartialHeader.Number > parentBlock.NumberU64()+1 {
-		log.Debug("block number is too high", "block number", block.PartialHeader.Number, "parent block number", parentBlock.NumberU64())
+	} else if block.PartialHeader.Number > currentBlock.Number.Uint64()+1 {
+		log.Debug("block number is too high", "block number", block.PartialHeader.Number, "parent block number", currentBlock.Number.Uint64())
 		return ErrBlockTooHigh
 	}
 
+	parentBlock := s.blockchain.GetBlockByNumber(currentBlock.Number.Uint64())
 	if _, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions); err != nil {
 		return fmt.Errorf("failed building and writing block, number: %d, error: %v", block.PartialHeader.Number, err)
 	}
 
-	if s.blockchain.CurrentBlock().Header().Number.Uint64()%1000 == 0 {
-		log.Info("L1 sync progress", "blockhain height", s.blockchain.CurrentBlock().Header().Number, "block hash", s.blockchain.CurrentBlock().Header().Hash(), "root", s.blockchain.CurrentBlock().Header().Root)
+	if s.blockchain.CurrentBlock().Number.Uint64()%1000 == 0 {
+		log.Info("L1 sync progress", "blockhain height", s.blockchain.CurrentBlock().Number.Uint64(), "block hash", s.blockchain.CurrentBlock().Hash(), "root", s.blockchain.CurrentBlock().Root)
 	}
 
 	return nil

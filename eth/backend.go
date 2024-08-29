@@ -57,6 +57,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
@@ -75,6 +76,7 @@ type Ethereum struct {
 	txPool            *txpool.TxPool
 	syncService       *sync_service.SyncService
 	rollupSyncService *rollup_sync_service.RollupSyncService
+	syncingPipeline   *da_syncer.SyncingPipeline
 
 	blockchain         *core.BlockChain
 	handler            *handler
@@ -352,7 +354,6 @@ func (s *Ethereum) APIs() []rpc.API {
 		apis = append(apis, rpc.API{
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
 			Public:    true,
 		})
 	}

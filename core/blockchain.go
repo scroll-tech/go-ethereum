@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/lru"
 	"github.com/scroll-tech/go-ethereum/common/mclock"
@@ -50,7 +52,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 	"github.com/scroll-tech/go-ethereum/trie/triedb/hashdb"
 	"github.com/scroll-tech/go-ethereum/trie/triedb/pathdb"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -2070,7 +2071,7 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 		l.BlockHash = blockHash
 	}
 
-	return bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)
+	return bc.writeBlockAndSetHead(fullBlock, receipts, logs, statedb, false)
 }
 
 // insertSideChain is called when an import batch hits upon a pruned ancestor

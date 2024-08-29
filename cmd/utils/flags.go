@@ -72,6 +72,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/nat"
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -1017,6 +1018,34 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Name:  "net.shadowforkpeers",
 		Usage: "peer ids of shadow fork peers",
 	}
+
+	// DA syncing settings
+	DASyncEnabledFlag = cli.BoolFlag{
+		Name:  "da.sync",
+		Usage: "Enable node syncing from DA",
+	}
+	defaultDA  = ethconfig.Defaults.DA.FetcherMode
+	DAModeFlag = TextMarshalerFlag{
+		Name:  "da.mode",
+		Usage: `DA sync mode ("l1rpc" or "snapshot")`,
+		Value: &defaultDA,
+	}
+	DASnapshotFileFlag = cli.StringFlag{
+		Name:  "da.snapshot.file",
+		Usage: "Snapshot file to sync from DA",
+	}
+	DABlobScanAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.blobscan",
+		Usage: "BlobScan blob API endpoint",
+	}
+	DABlockNativeAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.blocknative",
+		Usage: "BlockNative blob API endpoint",
+	}
+	DABeaconNodeAPIEndpointFlag = cli.StringFlag{
+		Name:  "da.blob.beaconnode",
+		Usage: "Beacon node API endpoint",
+	}
 )
 
 var (
@@ -1505,6 +1534,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	SetDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
 	setL1(ctx, cfg)
+	if ctx.GlobalIsSet(DASyncEnabledFlag.Name) {
+		cfg.DaSyncingEnabled = ctx.GlobalBool(DASyncEnabledFlag.Name)
+	}
 
 	if ctx.IsSet(JWTSecretFlag.Name) {
 		cfg.JWTSecret = ctx.String(JWTSecretFlag.Name)
@@ -1751,6 +1783,27 @@ func setEnableRollupVerify(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(DASyncEnabledFlag.Name) {
+		cfg.EnableDASyncing = ctx.GlobalBool(DASyncEnabledFlag.Name)
+		if ctx.GlobalIsSet(DAModeFlag.Name) {
+			cfg.DA.FetcherMode = *GlobalTextMarshaler(ctx, DAModeFlag.Name).(*da_syncer.FetcherMode)
+		}
+		if ctx.GlobalIsSet(DASnapshotFileFlag.Name) {
+			cfg.DA.SnapshotFilePath = ctx.GlobalString(DASnapshotFileFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABlobScanAPIEndpointFlag.Name) {
+			cfg.DA.BlobScanAPIEndpoint = ctx.GlobalString(DABlobScanAPIEndpointFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABlockNativeAPIEndpointFlag.Name) {
+			cfg.DA.BlockNativeAPIEndpoint = ctx.GlobalString(DABlockNativeAPIEndpointFlag.Name)
+		}
+		if ctx.GlobalIsSet(DABeaconNodeAPIEndpointFlag.Name) {
+			cfg.DA.BeaconNodeAPIEndpoint = ctx.GlobalString(DABeaconNodeAPIEndpointFlag.Name)
+		}
+	}
+}
+
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.IsSet(MaxBlockRangeFlag.Name) {
 		cfg.MaxBlockRange = ctx.Int64(MaxBlockRangeFlag.Name)
@@ -1816,6 +1869,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
 	setEnableRollupVerify(ctx, cfg)
+	setDA(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
 	if ctx.IsSet(ShadowforkPeersFlag.Name) {
 		cfg.ShadowForkPeerIDs = ctx.StringSlice(ShadowforkPeersFlag.Name)

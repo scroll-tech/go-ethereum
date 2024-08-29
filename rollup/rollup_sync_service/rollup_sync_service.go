@@ -72,12 +72,12 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		return nil, fmt.Errorf("missing L1 config in genesis")
 	}
 
-	scrollChainABI, err := scrollChainMetaData.GetAbi()
+	scrollChainABI, err := ScrollChainMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
 
-	client, err := newL1Client(ctx, l1Client, genesisConfig.Scroll.L1Config.L1ChainId, genesisConfig.Scroll.L1Config.ScrollChainAddress, scrollChainABI)
+	client, err := NewL1Client(ctx, l1Client, genesisConfig.Scroll.L1Config.L1ChainId, genesisConfig.Scroll.L1Config.ScrollChainAddress, scrollChainABI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize l1 client: %w", err)
 	}
@@ -154,7 +154,7 @@ func (s *RollupSyncService) Stop() {
 }
 
 func (s *RollupSyncService) fetchRollupEvents() {
-	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber()
+	latestConfirmed, err := s.client.GetLatestFinalizedBlockNumber()
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)
 		return
@@ -174,7 +174,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 			to = latestConfirmed
 		}
 
-		logs, err := s.client.fetchRollupEventsInRange(from, to)
+		logs, err := s.client.FetchRollupEventsInRange(from, to)
 		if err != nil {
 			log.Error("failed to fetch rollup events in range", "from block", from, "to block", to, "err", err)
 			return

@@ -153,6 +153,12 @@ var (
 		utils.CircuitCapacityCheckEnabledFlag,
 		utils.RollupVerifyEnabledFlag,
 		utils.ShadowforkPeersFlag,
+		utils.DASyncEnabledFlag,
+		utils.DAModeFlag,
+		utils.DASnapshotFileFlag,
+		utils.DABlockNativeAPIEndpointFlag,
+		utils.DABlobScanAPIEndpointFlag,
+		utils.DABeaconNodeAPIEndpointFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{

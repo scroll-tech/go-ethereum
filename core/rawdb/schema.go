@@ -154,6 +154,9 @@ var (
 	finalizedL2BlockNumberKey         = []byte("R-finalized")
 	lastFinalizedBatchIndexKey        = []byte("R-finalizedBatchIndex")
 
+	// Scroll da syncer store
+	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")
+
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
 

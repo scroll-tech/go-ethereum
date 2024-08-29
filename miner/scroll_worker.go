@@ -138,7 +138,7 @@ type worker struct {
 	beforeTxHook func() // Method to call before processing a transaction.
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Header) bool, init bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Header) bool, init bool, daSyncingEnabled bool) *worker {
 	worker := &worker{
 		config:                 config,
 		chainConfig:            chainConfig,
@@ -156,6 +156,10 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		circuitCapacityChecker: ccc.NewChecker(true),
 	}
 	log.Info("created new worker", "Checker ID", worker.circuitCapacityChecker.ID)
+	if daSyncingEnabled {
+		log.Info("Worker will not start, because DA syncing is enabled")
+		return worker
+	}
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeTransactions(worker.txsCh, true)

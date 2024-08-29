@@ -240,6 +240,18 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 
+	// Initialize and start DA syncing pipeline before SyncService as SyncService is blocking until all L1 messages are loaded.
+	// We need SyncService to load the L1 messages for DA syncing, but since both sync from last known L1 state, we can
+	// simply let them run simultaneously. If messages are missing in DA syncing, it will be handled by the syncing pipeline
+	// by waiting and retrying.
+	if config.EnableDASyncing {
+		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
+		}
+		eth.syncingPipeline.Start()
+	}
+
 	// initialize and start L1 message sync service
 	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
 	if err != nil {
@@ -273,7 +285,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 
-	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock)
+	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
@@ -336,6 +348,14 @@ func (s *Ethereum) APIs() []rpc.API {
 
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, s.engine.APIs(s.BlockChain())...)
+	if !s.config.EnableDASyncing {
+		apis = append(apis, rpc.API{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
+			Public:    true,
+		})
+	}
 
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
@@ -524,6 +544,10 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 // Protocols returns all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
+	// if DA syncing enabled then we don't create handler
+	if s.config.EnableDASyncing {
+		return nil
+	}
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)
 	if !s.blockchain.Config().Scroll.ZktrieEnabled() && s.config.SnapshotCache > 0 {
 		protos = append(protos, snap.MakeProtocols((*snapHandler)(s.handler), s.snapDialCandidates)...)
@@ -551,7 +575,10 @@ func (s *Ethereum) Start() error {
 	// 	maxPeers -= s.config.LightPeers
 	// }
 	// Start the networking layer and the light server if requested
-	s.handler.Start(maxPeers)
+	// handler is not enabled when DA syncing enabled
+	if !s.config.EnableDASyncing {
+		s.handler.Start(maxPeers)
+	}
 	return nil
 }
 
@@ -561,7 +588,10 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	s.handler.Stop()
+	// handler is not enabled if DA syncing enabled
+	if !s.config.EnableDASyncing {
+		s.handler.Stop()
+	}
 
 	// Then stop everything else.
 	s.bloomIndexer.Close()
@@ -570,6 +600,9 @@ func (s *Ethereum) Stop() error {
 	s.syncService.Stop()
 	if s.config.EnableRollupVerify {
 		s.rollupSyncService.Stop()
+	}
+	if s.config.EnableDASyncing {
+		s.syncingPipeline.Stop()
 	}
 	s.miner.Close()
 	s.blockchain.Stop()

@@ -353,8 +353,7 @@ func (s *Ethereum) APIs() []rpc.API {
 	if !s.config.EnableDASyncing {
 		apis = append(apis, rpc.API{
 			Namespace: "eth",
-			Version:   "1.0",
-			Public:    true,
+			Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.eventMux),
 		})
 	}
 
@@ -366,9 +365,6 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "miner",
 			Service:   NewMinerAPI(s),
-		}, {
-			Namespace: "eth",
-			Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.eventMux),
 		}, {
 			Namespace: "admin",
 			Service:   NewAdminAPI(s),
@@ -547,6 +543,7 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 func (s *Ethereum) Protocols() []p2p.Protocol {
 	// if DA syncing enabled then we don't create handler
 	if s.config.EnableDASyncing {
+		fmt.Println(">>>>>> DA syncing enabled, do not start protocols")
 		return nil
 	}
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)

@@ -2044,14 +2044,15 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
 	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
 	if err != nil {
-		return NonStatTy, err
+		return NonStatTy, fmt.Errorf("error processing block: %w", err)
 	}
 
 	// TODO: once we have the extra and difficulty we need to verify the signature of the block with Clique
 	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
 
+	// finalize and assemble block as fullBlock
 	header.GasUsed = gasUsed
-	header.Root = statedb.IntermediateRoot(true) // should be chain.Config().IsEIP158(header.Number) instead of true
+	header.Root = statedb.IntermediateRoot(bc.chainConfig.IsEIP158(header.Number))
 
 	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
 

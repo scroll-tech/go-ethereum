@@ -74,6 +74,7 @@ func NewEVMTxContext(msg Message) vm.TxContext {
 		To:            msg.To(),
 		GasPrice:      new(big.Int).Set(msg.GasPrice()),
 		IsL1MessageTx: msg.IsL1MessageTx(),
+		TxSize:        msg.TxSize(),
 	}
 }
 

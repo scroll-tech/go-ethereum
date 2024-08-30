@@ -154,15 +154,6 @@ func (l *Logger) logSha256(inputLen uint64) {
 	l.sha256Usage += numBlocks * blockRows
 }
 
-// LogKeccakChunks records the number of chunks used for keccak given the length of bytes.
-func (l *Logger) LogKeccakChunks(length uint64) {
-	l.keccakChunkCount += computeKeccakChunks(length)
-}
-
-func (l *Logger) LogKeccakAllL2TxsLen(length uint64) {
-	l.keccakAllL2TxsLen += length
-}
-
 func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	l.currentEnv = env
 	l.isCreate = create
@@ -176,9 +167,11 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 
 	if !env.TxContext.IsL1MessageTx {
 		l.sigCount++
+		l.keccakAllL2TxsLen += uint64(env.TxContext.TxSize)
 	} else {
 		l.l1TxnCount++
 	}
+	l.keccakChunkCount += computeKeccakChunks(uint64(env.TxContext.TxSize))
 }
 
 func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
@@ -204,12 +197,11 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 		l.logCopy(scope.Stack.Back(3).Uint64())
 	case vm.CALLDATACOPY, vm.RETURNDATACOPY, vm.CODECOPY, vm.MCOPY, vm.CREATE, vm.CREATE2:
 		l.logCopy(scope.Stack.Back(2).Uint64())
-	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.SHA3, vm.RETURN, vm.REVERT:
+	case vm.SHA3:
+		l.keccakChunkCount += computeKeccakChunks(scope.Stack.Back(1).Uint64())
+		fallthrough // log copy as well
+	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.RETURN, vm.REVERT:
 		l.logCopy(scope.Stack.Back(1).Uint64())
-		// keccak: add inputs from sha3 opcode in the block
-		if op == vm.SHA3 {
-			l.LogKeccakChunks(scope.Stack.Back(1).Uint64())
-		}
 	case vm.DELEGATECALL, vm.STATICCALL:
 		inputOffset := int64(scope.Stack.Back(2).Uint64())
 		inputLen := int64(scope.Stack.Back(3).Uint64())
@@ -302,12 +294,13 @@ func (l *Logger) RowConsumption() types.RowConsumption {
 			RowNumber: l.modExpUsage,
 		}, {
 			Name: "keccak",
-			// dummy tx: 37 rlp unsigned tx bytes
-			// ecrecover: (sigCount + 1) * computeKeccakChunks(64), another one from dummy tx
-			// data_bytes: 8 + 8 + 32 + 8 + 2 + 32 * numL1Txs bytes
-			// pi_bytes: 8 + 32 * 5 = 168 bytes
-			// all_l2_txs_bytes_mashed_together:
-			RowNumber: (l.keccakChunkCount+computeKeccakChunks(37)+(l.sigCount+1)*computeKeccakChunks(64)+computeKeccakChunks(58+32*l.l1TxnCount)+computeKeccakChunks(168)+computeKeccakChunks(l.keccakAllL2TxsLen))*keccakRowsPerChunk + keccakRowsPerRound,
+			RowNumber: (l.keccakChunkCount+
+				computeKeccakChunks(27)+ // dummy tx: 27 rlp unsigned tx bytes
+				(l.sigCount+1)*computeKeccakChunks(64)+ // ecrecover: (sigCount + 1) * computeKeccakChunks(64), another one from dummy tx
+				computeKeccakChunks(58+32*l.l1TxnCount)+ // data_bytes: 8 + 8 + 32 + 8 + 2 + 32 * numL1Txs bytes
+				computeKeccakChunks(168)+ // pi_bytes: 8 + 32 * 5 = 168 bytes
+				computeKeccakChunks(l.keccakAllL2TxsLen))*keccakRowsPerChunk + // all_l2_txs_bytes_mashed_together
+				keccakRowsPerRound,
 		},
 	}
 }

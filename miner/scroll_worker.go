@@ -310,6 +310,15 @@ func (w *worker) mainLoop() {
 			w.current = nil
 		}
 
+		// check for reorgs first to lower the chances of trying to handle another
+		// event eventhough a reorg is pending (due to Go `select` pseudo-randomly picking a case
+		// to execute if multiple of them are ready)
+		select {
+		case trigger := <-w.reorgCh:
+			err = w.handleReorg(&trigger)
+		default:
+		}
+
 		select {
 		case <-w.startCh:
 			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)

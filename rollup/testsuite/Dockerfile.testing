@@ -1,0 +1,9 @@
+FROM golang:1.22-bookworm
+
+COPY ../../go.mod /go-ethereum/
+COPY ../../go.sum /go-ethereum/
+
+COPY go.mod /go-ethereum/rollup/testsuite/
+COPY go.sum /go-ethereum/rollup/testsuite/
+
+RUN cd /go-ethereum/rollup/testsuite/ && go mod download && go mod verify

@@ -1,15 +1,15 @@
-package simulated
+package testsuite
 
 import (
 	"fmt"
 	"math/big"
 	"testing"
 
+	bindETH "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/stretchr/testify/require"
 
-	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/rollup/simulated/contracts"
+	"github.com/scroll-tech/go-ethereum/rollup/testsuite/contracts"
 )
 
 const defaultKeyAlias = "default"
@@ -60,7 +60,7 @@ func (t *TestSuite) Close() {
 }
 
 func (t *TestSuite) RequireCommitBatchEvent(start uint64, end *uint64, expectedBatches ...*Batch) {
-	opts := &bind.FilterOpts{
+	opts := &bindETH.FilterOpts{
 		Start: start,
 		End:   end,
 	}
@@ -80,14 +80,14 @@ func (t *TestSuite) RequireCommitBatchEvent(start uint64, end *uint64, expectedB
 	events := make([]*contracts.ScrollChainMockFinalizeCommitBatch, 0)
 	for iter.Next() {
 		events = append(events, iter.Event)
-
 		require.Contains(t.t, expectedBatchesMap, (common.Hash)(iter.Event.BatchHash))
+		require.EqualValues(t.t, expectedBatchesMap[iter.Event.BatchHash].Index, iter.Event.BatchIndex.Uint64())
 	}
 	require.Len(t.t, events, len(expectedBatches))
 }
 
 func (t *TestSuite) RequireFinalizeBatchEvent(start uint64, end *uint64, expectedBatches ...*Batch) {
-	opts := &bind.FilterOpts{
+	opts := &bindETH.FilterOpts{
 		Start: start,
 		End:   end,
 	}

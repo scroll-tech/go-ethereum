@@ -1,9 +1,14 @@
-package simulated
+package testsuite
 
 import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+
+	commonETH "github.com/ethereum/go-ethereum/common"
+	cryptoETH "github.com/ethereum/go-ethereum/crypto"
+
+	bindETH "github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -45,6 +50,23 @@ func (k *KeyManager) Transactor(alias string, chainID *big.Int) *bind.TransactOp
 	key := k.Key(alias)
 
 	transactor, err := bind.NewKeyedTransactorWithChainID(key, chainID)
+	if err != nil {
+		panic(err)
+	}
+
+	return transactor
+}
+
+func (k *KeyManager) L1Address(alias string) commonETH.Address {
+	key := k.Key(alias)
+	address := cryptoETH.PubkeyToAddress(key.PublicKey)
+	return address
+}
+
+func (k *KeyManager) L1Transactor(alias string, chainID *big.Int) *bindETH.TransactOpts {
+	key := k.Key(alias)
+
+	transactor, err := bindETH.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
 		panic(err)
 	}

@@ -1,4 +1,4 @@
-package simulated
+package testsuite
 
 import (
 	"github.com/scroll-tech/da-codec/encoding"

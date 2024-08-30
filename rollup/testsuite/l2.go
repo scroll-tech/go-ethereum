@@ -1,4 +1,4 @@
-package simulated
+package testsuite
 
 import (
 	"context"
@@ -6,20 +6,22 @@ import (
 	"math/big"
 
 	"github.com/cockroachdb/errors"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/holiman/uint256"
 	"github.com/scroll-tech/da-codec/encoding"
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
 	"github.com/scroll-tech/da-codec/encoding/codecv3"
 
-	"github.com/scroll-tech/go-ethereum"
+	typesETH "github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind/backends"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
-	"github.com/scroll-tech/go-ethereum/params"
 )
 
 type L2 struct {
@@ -146,7 +148,7 @@ func (l2 *L2) commitGenesisBatch() (*Batch, error) {
 		return nil, errors.Wrap(err, "failed to create DA batch")
 	}
 
-	_, err = l2.l1.ScrollChain().ImportGenesisBatch(l2.defaultTransactor(), daBatch.Encode(), genesis.Root)
+	_, err = l2.l1.ScrollChain().ImportGenesisBatch(l2.l1.defaultTransactor(), daBatch.Encode(), genesis.Root)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to submit genesis batch transaction")
 	}
@@ -222,26 +224,13 @@ func (l2 *L2) CommitBatch() (*Batch, error) {
 		return nil, errors.Wrap(err, "failed to pack calldata")
 	}
 
-	tx, err := l2.createCommitBatchTransaction(calldata, daBatch.Blob())
+	tx, err := l2.createCommitBatchTransaction(calldata, (*kzg4844.Blob)(daBatch.Blob()))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create commit batch transaction for batch %s", daBatch.Hash())
 	}
 
 	// simulate call to contract before sending tx
-	msg := ethereum.CallMsg{
-		From:          l2.keyManager.Address(defaultKeyAlias),
-		To:            tx.To(),
-		Gas:           tx.Gas(),
-		GasFeeCap:     tx.GasFeeCap(),
-		GasTipCap:     tx.GasTipCap(),
-		Value:         tx.Value(),
-		Data:          tx.Data(),
-		AccessList:    tx.AccessList(),
-		BlobGasFeeCap: tx.BlobGasFeeCap(),
-		BlobHashes:    tx.BlobHashes(),
-	}
-	_, err = l2.l1.backend.PendingCallContract(context.Background(), msg)
-	if err != nil {
+	if err = l2.l1.simulateTxCall(tx); err != nil {
 		return nil, errors.Wrapf(err, "failed to call contract for batch %s", daBatch.Hash())
 	}
 
@@ -261,39 +250,39 @@ func (l2 *L2) CommitBatch() (*Batch, error) {
 	return l2.lastCommittedBatch, nil
 }
 
-func (l2 *L2) createCommitBatchTransaction(calldata []byte, blob *kzg4844.Blob) (*types.Transaction, error) {
+func (l2 *L2) createCommitBatchTransaction(calldata []byte, blob *kzg4844.Blob) (*typesETH.Transaction, error) {
 	sidecar, err := makeSidecar(blob)
 	if err != nil {
 		return nil, errors.New("failed to create blob sidecar")
 	}
 
-	nonce, err := l2.l1.backend.PendingNonceAt(context.Background(), l2.keyManager.Address(defaultKeyAlias))
+	nonce, err := l2.l1.client.PendingNonceAt(context.Background(), l2.keyManager.L1Address(defaultKeyAlias))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get nonce")
 	}
 
-	gasPrice, err := l2.l1.backend.SuggestGasPrice(context.Background())
+	gasPrice, err := l2.l1.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get suggested gas price")
 	}
 
+	fmt.Println("Suggested gas price", gasPrice)
 	// TODO: whenever sending txs, double check gas price and gas limit
-	txData := &types.BlobTx{
-		ChainID:    uint256.MustFromBig(l2.backend.Blockchain().Config().ChainID),
+	txData := &typesETH.BlobTx{
+		ChainID:    uint256.MustFromBig(l2.l1.ChainID()),
 		Nonce:      nonce,
 		GasTipCap:  uint256.NewInt(gasPrice.Uint64()),
 		GasFeeCap:  uint256.NewInt(gasPrice.Uint64()),
-		Gas:        gasPrice.Uint64(),
+		Gas:        10000000,
 		To:         l2.l1.ScrollChainAddress(),
 		Data:       calldata,
 		AccessList: nil,
-		BlobFeeCap: uint256.NewInt(100),
+		BlobFeeCap: uint256.NewInt(100000),
 		BlobHashes: sidecar.BlobHashes(),
 		Sidecar:    sidecar,
 	}
 
-	signer := types.LatestSigner(l2.backend.Blockchain().Config())
-	signedTx, err := types.SignTx(types.NewTx(txData), signer, l2.keyManager.Key(defaultKeyAlias))
+	signedTx, err := typesETH.SignTx(typesETH.NewTx(txData), l2.l1.LatestSigner(), l2.keyManager.Key(defaultKeyAlias))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to sign tx")
 	}
@@ -353,7 +342,7 @@ func txsToTxsData(txs types.Transactions) []*types.TransactionData {
 	return txsData
 }
 
-func makeSidecar(blob *kzg4844.Blob) (*types.BlobTxSidecar, error) {
+func makeSidecar(blob *kzg4844.Blob) (*typesETH.BlobTxSidecar, error) {
 	if blob == nil {
 		return nil, errors.New("blob cannot be nil")
 	}
@@ -377,7 +366,7 @@ func makeSidecar(blob *kzg4844.Blob) (*types.BlobTxSidecar, error) {
 		proofs = append(proofs, p)
 	}
 
-	return &types.BlobTxSidecar{
+	return &typesETH.BlobTxSidecar{
 		Blobs:       blobs,
 		Commitments: commitments,
 		Proofs:      proofs,

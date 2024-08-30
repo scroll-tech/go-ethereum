@@ -25,11 +25,6 @@ const (
 
 var _ vm.EVMLogger = (*Logger)(nil)
 
-// computeKeccakChunks computes the number of chunks used in keccak256 for the given bytes array length
-func computeKeccakChunks(length uint64) uint64 {
-	return (length + 135) / 136
-}
-
 // Logger is a tracer that keeps track of resource usages of each subcircuit
 // that Scroll's halo2 based zkEVM has. Some subcircuits are not tracked
 // here for the following reasons.
@@ -45,31 +40,32 @@ func computeKeccakChunks(length uint64) uint64 {
 // tx: row usage depends on the length of raw txns and the number of storage
 // slots and/or accounts accessed. With the current gas limit of 10M, it is not possible
 // to overflow the circuit.
-// keccak: coming soon
 type Logger struct {
 	currentEnv    *vm.EVM
 	isCreate      bool
 	codesAccessed map[common.Hash]bool
 
-	evmUsage          uint64
-	stateUsage        uint64
-	bytecodeUsage     uint64
-	sigCount          uint64
-	ecAddCount        uint64
-	ecMulCount        uint64
-	ecPairingCount    uint64
-	copyUsage         uint64
-	sha256Usage       uint64
-	expUsage          uint64
-	modExpUsage       uint64
-	l1TxnCount        uint64
-	keccakChunkCount  uint64
-	keccakAllL2TxsLen uint64
+	evmUsage       uint64
+	stateUsage     uint64
+	bytecodeUsage  uint64
+	sigCount       uint64
+	ecAddCount     uint64
+	ecMulCount     uint64
+	ecPairingCount uint64
+	copyUsage      uint64
+	sha256Usage    uint64
+	expUsage       uint64
+	modExpUsage    uint64
+	keccakUsage    uint64
+
+	l2TxnsRlpSize uint64
 }
 
 func NewLogger() *Logger {
+	const miscKeccakUsage = 50_000 // heuristically selected safe number to account for Rust side implementation details
 	return &Logger{
 		codesAccessed: make(map[common.Hash]bool),
+		keccakUsage:   miscKeccakUsage,
 	}
 }
 
@@ -100,6 +96,11 @@ func (l *Logger) logRawBytecode(code []byte) {
 	l.logBytecodeAccess(crypto.Keccak256Hash(code), uint64(len(code)))
 }
 
+// computeKeccakRows computes the number of rows used in keccak256 for the given bytes array length
+func computeKeccakRows(length uint64) uint64 {
+	return ((length + 135) / 136) * keccakRowsPerChunk
+}
+
 // logPrecompileAccess checks if the invoked address is a precompile and increments
 // resource usage of associated subcircuit
 func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn func(int64, int64) []byte) {
@@ -108,6 +109,7 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn
 	switch to {
 	case common.BytesToAddress([]byte{1}): // &ecrecover{},
 		l.sigCount++
+		l.keccakUsage += computeKeccakRows(64)
 		outputLen = 32
 	case common.BytesToAddress([]byte{2}): // &sha256hash{},
 		l.logSha256(inputLen)
@@ -167,11 +169,10 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 
 	if !env.TxContext.IsL1MessageTx {
 		l.sigCount++
-		l.keccakAllL2TxsLen += uint64(env.TxContext.TxSize)
-	} else {
-		l.l1TxnCount++
+		l.l2TxnsRlpSize += uint64(env.TxContext.TxSize)
 	}
-	l.keccakChunkCount += computeKeccakChunks(uint64(env.TxContext.TxSize))
+	l.keccakUsage += computeKeccakRows(uint64(env.TxContext.TxSize))
+	l.keccakUsage += computeKeccakRows(64) // ecrecover per txn
 }
 
 func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
@@ -198,7 +199,7 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 	case vm.CALLDATACOPY, vm.RETURNDATACOPY, vm.CODECOPY, vm.MCOPY, vm.CREATE, vm.CREATE2:
 		l.logCopy(scope.Stack.Back(2).Uint64())
 	case vm.SHA3:
-		l.keccakChunkCount += computeKeccakChunks(scope.Stack.Back(1).Uint64())
+		l.keccakUsage += computeKeccakRows(scope.Stack.Back(1).Uint64())
 		fallthrough // log copy as well
 	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.RETURN, vm.REVERT:
 		l.logCopy(scope.Stack.Back(1).Uint64())
@@ -293,14 +294,8 @@ func (l *Logger) RowConsumption() types.RowConsumption {
 			Name:      "mod_exp",
 			RowNumber: l.modExpUsage,
 		}, {
-			Name: "keccak",
-			RowNumber: (l.keccakChunkCount+
-				computeKeccakChunks(27)+ // dummy tx: 27 rlp unsigned tx bytes
-				(l.sigCount+1)*computeKeccakChunks(64)+ // ecrecover: (sigCount + 1) * computeKeccakChunks(64), another one from dummy tx
-				computeKeccakChunks(58+32*l.l1TxnCount)+ // data_bytes: 8 + 8 + 32 + 8 + 2 + 32 * numL1Txs bytes
-				computeKeccakChunks(168)+ // pi_bytes: 8 + 32 * 5 = 168 bytes
-				computeKeccakChunks(l.keccakAllL2TxsLen))*keccakRowsPerChunk + // all_l2_txs_bytes_mashed_together
-				keccakRowsPerRound,
+			Name:      "keccak",
+			RowNumber: l.keccakUsage + computeKeccakRows(l.l2TxnsRlpSize),
 		},
 	}
 }

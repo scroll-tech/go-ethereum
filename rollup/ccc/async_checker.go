@@ -98,8 +98,10 @@ func (c *AsyncChecker) Wait() {
 // Check spawns an async CCC verification task.
 func (c *AsyncChecker) Check(block *types.Block) error {
 	if block.NumberU64() > c.currentHead.Number.Uint64()+1 {
-		log.Error("non continuous chain observed in AsyncChecker", "prev", c.currentHead, "got", block.Header())
-	} else if block.ParentHash() != c.currentHead.Hash() {
+		log.Warn("non continuous chain observed in AsyncChecker", "prev", c.currentHead, "got", block.Header())
+	}
+
+	if block.ParentHash() != c.currentHead.Hash() {
 		// seems like there is a fork happening, a block from the canonical chain must have failed CCC check
 		// assume the incoming block is the new tip in the fork
 		c.forkCtx, c.forkCtxCancelFunc = context.WithCancel(context.Background())

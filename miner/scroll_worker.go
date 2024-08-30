@@ -705,8 +705,9 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 		w.current.blockSize += tx.Size()
 		// keccak: all l2 tx's rlp_signed_bytes combined together makes a single input to keccak
 		w.current.cccLogger.LogKeccakAllL2TxsLen(uint64(len(txRlp)))
-		// keccak: add block txs' signatures
-		w.current.cccLogger.LogKeccakChunks(uint64(len(txRlp))) // @todo: should use unsigned length, but no interface yet use signed one
+		// keccak: add block txs' rlp unsigned bytes,
+		// @note we should use unsigned length, but no interface yet use signed one. so the results will over-estimate a little.
+		w.current.cccLogger.LogKeccakChunks(uint64(len(txRlp)))
 	} else {
 		w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
 		// keccak: each l1 tx's signed bytes is a standalone input to keccak

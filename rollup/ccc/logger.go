@@ -302,12 +302,12 @@ func (l *Logger) RowConsumption() types.RowConsumption {
 			RowNumber: l.modExpUsage,
 		}, {
 			Name: "keccak",
-			// todo: dummy signature data
-			// ecrecover: sigCount * computeKeccakChunks(64) = sigCount
+			// dummy tx: 37 rlp unsigned tx bytes
+			// ecrecover: (sigCount + 1) * computeKeccakChunks(64), another one from dummy tx
 			// data_bytes: 8 + 8 + 32 + 8 + 2 + 32 * numL1Txs bytes
 			// pi_bytes: 8 + 32 * 5 = 168 bytes
 			// all_l2_txs_bytes_mashed_together:
-			RowNumber: (l.keccakChunkCount+l.sigCount+computeKeccakChunks(58+32*l.l1TxnCount)+computeKeccakChunks(168)+computeKeccakChunks(l.keccakAllL2TxsLen))*keccakRowsPerChunk + keccakRowsPerRound,
+			RowNumber: (l.keccakChunkCount+computeKeccakChunks(37)+(l.sigCount+1)*computeKeccakChunks(64)+computeKeccakChunks(58+32*l.l1TxnCount)+computeKeccakChunks(168)+computeKeccakChunks(l.keccakAllL2TxsLen))*keccakRowsPerChunk + keccakRowsPerRound,
 		},
 	}
 }

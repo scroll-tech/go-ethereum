@@ -200,7 +200,7 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 		l.logCopy(scope.Stack.Back(2).Uint64())
 	case vm.SHA3:
 		l.keccakUsage += computeKeccakRows(scope.Stack.Back(1).Uint64())
-		fallthrough // log copy as well
+		l.logCopy(scope.Stack.Back(1).Uint64())
 	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.RETURN, vm.REVERT:
 		l.logCopy(scope.Stack.Back(1).Uint64())
 	case vm.DELEGATECALL, vm.STATICCALL:

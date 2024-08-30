@@ -292,6 +292,28 @@ func (w *worker) close() {
 	w.wg.Wait()
 }
 
+// checkHeadRowConsumption will start some initial workers to CCC check block close to the HEAD
+func (w *worker) checkHeadRowConsumption() error {
+	checkStart := uint64(1)
+	numOfBlocksToCheck := uint64(w.config.CCCMaxWorkers + 1)
+	currentHeight := w.chain.CurrentHeader().Number.Uint64()
+	if currentHeight > numOfBlocksToCheck {
+		checkStart = currentHeight - numOfBlocksToCheck
+	}
+
+	for curBlockNum := checkStart; curBlockNum <= currentHeight; curBlockNum++ {
+		block := w.chain.GetBlockByNumber(curBlockNum)
+		// only spawn CCC checkers for blocks with no row consumption data stored in DB
+		if rawdb.ReadBlockRowConsumption(w.chain.Database(), block.Hash()) == nil {
+			if err := w.asyncChecker.Check(block); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
@@ -322,6 +344,11 @@ func (w *worker) mainLoop() {
 
 		select {
 		case <-w.startCh:
+			if err := w.checkHeadRowConsumption(); err != nil {
+				log.Error("failed to start head checkers", "err", err)
+				return
+			}
+
 			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)
 		case trigger := <-w.reorgCh:
 			err = w.handleReorg(&trigger)

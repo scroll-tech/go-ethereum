@@ -1142,3 +1142,46 @@ secondReorg:
 		require.Equal(t, oldBlock.Transactions()[1:][i].Hash(), newBlock.Transactions()[i].Hash())
 	}
 }
+
+func TestRestartHeadCCC(t *testing.T) {
+	var (
+		engine      consensus.Engine
+		chainConfig *params.ChainConfig
+		db          = rawdb.NewMemoryDatabase()
+	)
+	chainConfig = params.AllCliqueProtocolChanges
+	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000, RelaxedPeriod: true}
+	chainConfig.Scroll.FeeVaultAddress = &common.Address{}
+	engine = clique.New(chainConfig.Clique, db)
+
+	maxTxPerBlock := 2
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
+	chainConfig.Scroll.L1Config = &params.L1Config{
+		NumL1MessagesPerBlock: 10,
+	}
+
+	chainConfig.LondonBlock = big.NewInt(0)
+	w, b := newTestWorker(t, chainConfig, engine, db, 0)
+	defer w.close()
+
+	// This test chain imports the mined blocks.
+	b.genesis.MustCommit(db)
+
+	// Insert local tx
+	for i := 0; i < 10; i++ {
+		b.txPool.AddLocal(b.newRandomTx(true))
+	}
+
+	// Start mining!
+	w.start()
+	time.Sleep(time.Second * 5)
+	w.stop()
+
+	headHash := w.chain.CurrentHeader().Hash()
+	rawdb.DeleteBlockRowConsumption(db, headHash)
+	require.Nil(t, rawdb.ReadBlockRowConsumption(db, headHash))
+	w.start()
+	time.Sleep(time.Second)
+	// head should be rechecked by CCC
+	require.NotNil(t, rawdb.ReadBlockRowConsumption(db, headHash))
+}

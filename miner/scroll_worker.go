@@ -316,6 +316,7 @@ func (w *worker) mainLoop() {
 		select {
 		case trigger := <-w.reorgCh:
 			err = w.handleReorg(&trigger)
+			continue
 		default:
 		}
 

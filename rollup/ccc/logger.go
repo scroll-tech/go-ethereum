@@ -13,11 +13,14 @@ import (
 )
 
 const (
-	sigCountMax       = 127
-	ecAddCountMax     = 50
-	ecMulCountMax     = 50
-	ecPairingCountMax = 2
-	rowUsageMax       = 1_000_000
+	sigCountMax        = 127
+	ecAddCountMax      = 50
+	ecMulCountMax      = 50
+	ecPairingCountMax  = 2
+	rowUsageMax        = 1_000_000
+	keccakRounds       = 24
+	keccakRowsPerRound = 12
+	keccakRowsPerChunk = (keccakRounds + 1) * keccakRowsPerRound
 )
 
 var _ vm.EVMLogger = (*Logger)(nil)
@@ -37,7 +40,6 @@ var _ vm.EVMLogger = (*Logger)(nil)
 // tx: row usage depends on the length of raw txns and the number of storage
 // slots and/or accounts accessed. With the current gas limit of 10M, it is not possible
 // to overflow the circuit.
-// keccak: coming soon
 type Logger struct {
 	currentEnv    *vm.EVM
 	isCreate      bool
@@ -54,11 +56,16 @@ type Logger struct {
 	sha256Usage    uint64
 	expUsage       uint64
 	modExpUsage    uint64
+	keccakUsage    uint64
+
+	l2TxnsRlpSize uint64
 }
 
 func NewLogger() *Logger {
+	const miscKeccakUsage = 50_000 // heuristically selected safe number to account for Rust side implementation details
 	return &Logger{
 		codesAccessed: make(map[common.Hash]bool),
+		keccakUsage:   miscKeccakUsage,
 	}
 }
 
@@ -89,6 +96,11 @@ func (l *Logger) logRawBytecode(code []byte) {
 	l.logBytecodeAccess(crypto.Keccak256Hash(code), uint64(len(code)))
 }
 
+// computeKeccakRows computes the number of rows used in keccak256 for the given bytes array length
+func computeKeccakRows(length uint64) uint64 {
+	return ((length + 135) / 136) * keccakRowsPerChunk
+}
+
 // logPrecompileAccess checks if the invoked address is a precompile and increments
 // resource usage of associated subcircuit
 func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn func(int64, int64) []byte) {
@@ -97,6 +109,7 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn
 	switch to {
 	case common.BytesToAddress([]byte{1}): // &ecrecover{},
 		l.sigCount++
+		l.keccakUsage += computeKeccakRows(64)
 		outputLen = 32
 	case common.BytesToAddress([]byte{2}): // &sha256hash{},
 		l.logSha256(inputLen)
@@ -156,7 +169,10 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 
 	if !env.TxContext.IsL1MessageTx {
 		l.sigCount++
+		l.l2TxnsRlpSize += uint64(env.TxContext.TxSize)
 	}
+	l.keccakUsage += computeKeccakRows(uint64(env.TxContext.TxSize))
+	l.keccakUsage += computeKeccakRows(64) // ecrecover per txn
 }
 
 func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
@@ -182,7 +198,10 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 		l.logCopy(scope.Stack.Back(3).Uint64())
 	case vm.CALLDATACOPY, vm.RETURNDATACOPY, vm.CODECOPY, vm.MCOPY, vm.CREATE, vm.CREATE2:
 		l.logCopy(scope.Stack.Back(2).Uint64())
-	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.SHA3, vm.RETURN, vm.REVERT:
+	case vm.SHA3:
+		l.keccakUsage += computeKeccakRows(scope.Stack.Back(1).Uint64())
+		l.logCopy(scope.Stack.Back(1).Uint64())
+	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.RETURN, vm.REVERT:
 		l.logCopy(scope.Stack.Back(1).Uint64())
 	case vm.DELEGATECALL, vm.STATICCALL:
 		inputOffset := int64(scope.Stack.Back(2).Uint64())
@@ -274,6 +293,9 @@ func (l *Logger) RowConsumption() types.RowConsumption {
 		}, {
 			Name:      "mod_exp",
 			RowNumber: l.modExpUsage,
+		}, {
+			Name:      "keccak",
+			RowNumber: l.keccakUsage + computeKeccakRows(l.l2TxnsRlpSize),
 		},
 	}
 }

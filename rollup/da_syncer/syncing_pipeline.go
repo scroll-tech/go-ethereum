@@ -57,7 +57,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 
 	blobClientList := blob_client.NewBlobClientList()
 	if config.BeaconNodeAPIEndpoint != "" {
-		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint, l1Client)
+		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint)
 		if err != nil {
 			log.Warn("failed to create BeaconNodeClient", "err", err)
 		} else {

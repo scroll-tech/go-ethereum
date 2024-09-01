@@ -55,7 +55,11 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
 	}
 
-	blob, err := blobClient.GetBlobByVersionedHashAndBlockNumber(ctx, versionedHash, vLog.BlockNumber)
+	header, err := l1Client.GetHeaderByNumber(vLog.BlockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header by number, err: %w", err)
+	}
+	blob, err := blobClient.GetBlobByVersionedHashAndBlockTime(ctx, versionedHash, header.Time)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)
 	}

@@ -185,7 +185,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		chainHeadCh:  make(chan core.ChainHeadEvent, chainHeadChanSize),
 		exitCh:       make(chan struct{}),
 		startCh:      make(chan struct{}, 1),
-		reorgCh:      make(chan reorgTrigger, 1),
+		reorgCh:      make(chan reorgTrigger, 2*(config.CCCMaxWorkers+1)),
 	}
 	worker.asyncChecker = ccc.NewAsyncChecker(worker.chain, config.CCCMaxWorkers, false).WithOnFailingBlock(worker.onBlockFailingCCC)
 
@@ -975,14 +975,10 @@ func (w *worker) skip(txHash common.Hash) {
 // onBlockFailingCCC is called when block produced by worker fails CCC
 func (w *worker) onBlockFailingCCC(failingBlock *types.Block, err error) {
 	log.Warn("block failed CCC", "hash", failingBlock.Hash().Hex(), "number", failingBlock.NumberU64(), "err", err)
-	// w.asyncChecker.Check() might block until this callback returns and if the write to reorgCh
-	// below blocks, we have a deadlock. Make sure this callback can never block.
-	go func() {
-		w.reorgCh <- reorgTrigger{
-			block:  failingBlock,
-			reason: err,
-		}
-	}()
+	w.reorgCh <- reorgTrigger{
+		block:  failingBlock,
+		reason: err,
+	}
 }
 
 // handleReorg reorgs all blocks following the trigger block

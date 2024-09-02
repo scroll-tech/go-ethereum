@@ -133,14 +133,20 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	checkStart := time.Now()
 	defer func() {
 		checkTimer.UpdateSince(checkStart)
-		c.freeCheckers <- ccc
 		activeWorkersGauge.Dec(1)
 	}()
+
+	releaseCCCWrapper := func(cb stream.Callback) stream.Callback {
+		return func() {
+			cb()
+			c.freeCheckers <- ccc
+		}
+	}
 
 	noopCb := func() {}
 	parent := c.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
-		return noopCb // not part of a chain
+		return releaseCCCWrapper(noopCb) // not part of a chain
 	}
 
 	var err error
@@ -161,12 +167,12 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 			err:   err,
 		}
 		c.blockNumberToFail = 0
-		return failingCallback
+		return releaseCCCWrapper(failingCallback)
 	}
 
 	statedb, err := c.bc.StateAt(parent.Root())
 	if err != nil {
-		return failingCallback
+		return releaseCCCWrapper(failingCallback)
 	}
 
 	header := block.Header()
@@ -177,7 +183,7 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	accRc := new(types.RowConsumption)
 	for txIdx, tx := range block.Transactions() {
 		if !isForkStillActive(forkCtx) {
-			return noopCb
+			return releaseCCCWrapper(noopCb)
 		}
 
 		var curRc *types.RowConsumption
@@ -191,18 +197,18 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 				ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
 				AccRc:      curRc,
 			}
-			return failingCallback
+			return releaseCCCWrapper(failingCallback)
 		}
 		accRc = curRc
 	}
 
-	return func() {
+	return releaseCCCWrapper(func() {
 		if isForkStillActive(forkCtx) {
 			// all good, write the row consumption
 			log.Debug("CCC passed", "blockhash", block.Hash(), "height", block.NumberU64())
 			rawdb.WriteBlockRowConsumption(c.bc.Database(), block.Hash(), accRc)
 		}
-	}
+	})
 }
 
 func (c *AsyncChecker) checkTxAndApply(parent *types.Block, header *types.Header, state *state.StateDB, gasPool *core.GasPool, tx *types.Transaction, ccc *Checker) (*types.RowConsumption, error) {

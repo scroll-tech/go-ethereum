@@ -58,10 +58,11 @@ type ErrorWithTxnIdx struct {
 	TxIdx      uint
 	err        error
 	ShouldSkip bool
+	AccRc      *types.RowConsumption
 }
 
 func (e *ErrorWithTxnIdx) Error() string {
-	return fmt.Sprintf("txn at index %d failed with %s", e.TxIdx, e.err)
+	return fmt.Sprintf("txn at index %d failed with %s (rc = %s)", e.TxIdx, e.err, fmt.Sprint(e.AccRc))
 }
 
 func (e *ErrorWithTxnIdx) Unwrap() error {
@@ -188,6 +189,7 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 				// if the txn is the first in block or the additional resource utilization caused
 				// by this txn alone is enough to overflow the circuit, skip
 				ShouldSkip: txIdx == 0 || curRc.Difference(*accRc).IsOverflown(),
+				AccRc:      curRc,
 			}
 			return failingCallback
 		}

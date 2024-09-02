@@ -972,7 +972,7 @@ func (w *worker) skip(txHash common.Hash) {
 
 // onBlockFailingCCC is called when block produced by worker fails CCC
 func (w *worker) onBlockFailingCCC(failingBlock *types.Block, err error) {
-	log.Warn("block failed CCC", "hash", failingBlock.Hash(), "number", failingBlock.NumberU64())
+	log.Warn("block failed CCC", "hash", failingBlock.Hash().Hex(), "number", failingBlock.NumberU64(), "err", err)
 	// w.asyncChecker.Check() might block until this callback returns and if the write to reorgCh
 	// below blocks, we have a deadlock. Make sure this callback can never block.
 	go func() {

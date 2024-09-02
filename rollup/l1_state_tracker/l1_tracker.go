@@ -42,7 +42,7 @@ func NewL1Tracker(ctx context.Context, l1Client sync_service.EthClient) (*L1Trac
 	return l1Tracker, nil
 }
 
-func (t *L1Tracker) headerByDepth(depth ChainDepth) (*types.Header, error) {
+func (t *L1Tracker) headerByDepth(depth ChainDepth, latestNumber *big.Int) (*types.Header, error) {
 	var blockNumber *big.Int
 	switch depth {
 	case LatestBlock:
@@ -52,7 +52,7 @@ func (t *L1Tracker) headerByDepth(depth ChainDepth) (*types.Header, error) {
 	case FinalizedBlock:
 		blockNumber = big.NewInt(int64(rpc.FinalizedBlockNumber))
 	default:
-		blockNumber = big.NewInt(int64(depth))
+		blockNumber = big.NewInt(0).Sub(latestNumber, big.NewInt(int64(depth)))
 	}
 	header, err := t.client.HeaderByNumber(t.ctx, blockNumber)
 	if err != nil {
@@ -64,7 +64,7 @@ func (t *L1Tracker) headerByDepth(depth ChainDepth) (*types.Header, error) {
 func (t *L1Tracker) newHead(header *types.Header) {
 	t.lastSyncedHeader = header
 	t.subList.stopSending()
-	t.subList.sendNewHeads(t.headerByDepth)
+	t.subList.sendNewHeads(t.headerByDepth, header)
 }
 
 func (t *L1Tracker) syncLatestHead() error {
@@ -157,10 +157,10 @@ func (l *headerSubList) remove(sub *headerSub) {
 	l.mu.Unlock()
 }
 
-func (l *headerSubList) sendNewHeads(fetchHeaderFunc func(ChainDepth) (*types.Header, error)) {
+func (l *headerSubList) sendNewHeads(fetchHeaderFunc func(ChainDepth, *big.Int) (*types.Header, error), header *types.Header) {
 	l.mu.Lock()
 	for _, sub := range l.list {
-		sub.value, _ = fetchHeaderFunc(sub.depth)
+		sub.value, _ = fetchHeaderFunc(sub.depth, header.Number)
 	}
 	for _, sub := range l.list {
 		if sub.value != nil {

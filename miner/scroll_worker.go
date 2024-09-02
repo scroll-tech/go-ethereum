@@ -624,7 +624,9 @@ func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
 
 // processReorgedTxns
 func (w *worker) processReorgedTxns(reason error) (bool, error) {
-	reorgedTxns := w.chain.GetBlockByNumber(w.current.header.Number.Uint64()).Transactions()
+	reorgedBlock := w.chain.GetBlockByNumber(w.current.header.Number.Uint64())
+	commitGasCounter.Dec(int64(reorgedBlock.GasUsed()))
+	reorgedTxns := reorgedBlock.Transactions()
 	var errorWithTxnIdx *ccc.ErrorWithTxnIdx
 	if len(reorgedTxns) > 0 && errors.As(reason, &errorWithTxnIdx) {
 		if errorWithTxnIdx.ShouldSkip {

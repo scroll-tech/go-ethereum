@@ -9,13 +9,15 @@ on:
         type: string
 
 jobs:
+
   build-and-push-arm64-image:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch:
           - aarch64
-
+    timeout-minutes: 1440
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v2

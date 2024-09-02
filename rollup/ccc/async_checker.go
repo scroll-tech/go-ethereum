@@ -113,7 +113,11 @@ func (c *AsyncChecker) Check(block *types.Block) error {
 	// all blocks in the same fork share the same context to allow terminating them all at once if needed
 	ctx, ctxCancelFunc := c.forkCtx, c.forkCtxCancelFunc
 	c.workers.Go(func() stream.Callback {
-		return c.checkerTask(block, checker, ctx, ctxCancelFunc)
+		taskCb := c.checkerTask(block, checker, ctx, ctxCancelFunc)
+		return func() {
+			taskCb()
+			c.freeCheckers <- checker
+		}
 	})
 	return nil
 }
@@ -133,7 +137,6 @@ func (c *AsyncChecker) checkerTask(block *types.Block, ccc *Checker, forkCtx con
 	checkStart := time.Now()
 	defer func() {
 		checkTimer.UpdateSince(checkStart)
-		c.freeCheckers <- ccc
 		activeWorkersGauge.Dec(1)
 	}()
 

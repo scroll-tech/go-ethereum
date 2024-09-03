@@ -877,9 +877,9 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	return result
 }
 
-func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool {
+func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) {
 	if !w.isRunning() {
-		return false
+		return
 	}
 
 	if errors.Is(err, ccc.ErrBlockRowConsumptionOverflow) {
@@ -893,7 +893,7 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 					tx:          tx,
 				}
 			}
-			return true
+			return
 		}
 
 		// first txn overflowed the circuit, skip
@@ -903,10 +903,10 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 			log.Warn(
 				"Unexpected L1 message queue index in worker", "got", tx.AsL1MessageTx().QueueIndex,
 			)
-			return false
+			return
 		} else if txIndex > 0 {
 			// If this block already contains some L1 messages try again in the next block.
-			return false
+			return
 		}
 
 		queueIndex := tx.AsL1MessageTx().QueueIndex
@@ -920,8 +920,6 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) bool
 		log.Trace("Skipping tx with insufficient funds", "tx", tx.Hash().String())
 		w.eth.TxPool().RemoveTx(tx.Hash(), true)
 	}
-
-	return false
 }
 
 // skipTransaction

@@ -633,11 +633,12 @@ func (w *worker) processReorgedTxns(reason error) (bool, error) {
 			w.skipTransaction(reorgedTxns[errorWithTxnIdx.TxIdx], reason)
 		}
 
-		if errorWithTxnIdx.TxIdx == 0 {
-			reorgedTxns = reorgedTxns[1:]
-		} else {
-			reorgedTxns = reorgedTxns[:errorWithTxnIdx.TxIdx]
-		}
+		// if errorWithTxnIdx.TxIdx is 0, we will end up creating an empty block.
+		// This is necessary to make sure that same height can not fail CCC check multiple times.
+		// Each reorg forces a block to be appended to the chain. If we let the same block to trigger
+		// multiple reorgs, we can't guarantee an upper bound on reorg depth anymore. We can revisit this
+		// when we can handle reorgs on sidechains that we are building to replace the canonical chain.
+		reorgedTxns = reorgedTxns[:errorWithTxnIdx.TxIdx]
 	}
 
 	w.processTxnSlice(reorgedTxns)

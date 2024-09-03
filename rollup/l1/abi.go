@@ -35,8 +35,8 @@ type RollupEvents []RollupEvent
 
 // CommitBatchEventUnpacked represents a CommitBatch event raised by the ScrollChain contract.
 type CommitBatchEventUnpacked struct {
-	batchIndex  *big.Int
-	batchHash   common.Hash
+	batchIndex *big.Int
+	batchHash  common.Hash
 }
 
 // CommitBatchEvent represents a CommitBatch event raised by the ScrollChain contract with additional fields.
@@ -58,6 +58,18 @@ func (c *CommitBatchEvent) BatchIndex() *big.Int {
 
 func (c *CommitBatchEvent) BatchHash() common.Hash {
 	return c.batchHash
+}
+
+func (c *CommitBatchEvent) TxHash() common.Hash {
+	return c.txHash
+}
+
+func (c *CommitBatchEvent) BlockHash() common.Hash {
+	return c.blockHash
+}
+
+func (c *CommitBatchEvent) BlockNumber() uint64 {
+	return c.blockNumber
 }
 
 // RevertBatchEvent represents a RevertBatch event raised by the ScrollChain contract.

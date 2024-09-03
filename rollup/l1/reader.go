@@ -8,22 +8,26 @@ import (
 
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
+	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
+	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 const (
 	commitBatchEventName   = "CommitBatch"
 	revertBatchEventName   = "RevertBatch"
 	finalizeBatchEventName = "FinalizeBatch"
+
+	defaultL1MsgFetchBlockRange = 100
 )
 
 type Reader struct {
-	ctx    context.Context
-	config Config
-	client sync_service.EthClient
+	ctx      context.Context
+	config   Config
+	client   EthClient
+	filterer *L1MessageQueueFilterer
 
 	scrollChainABI                *abi.ABI
 	l1CommitBatchEventSignature   common.Hash
@@ -33,12 +37,13 @@ type Reader struct {
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	scrollChainAddress common.Address // address of ScrollChain contract
+	ScrollChainAddress    common.Address // address of ScrollChain contract
+	L1MessageQueueAddress common.Address // address of L1MessageQueue contract
 }
 
 // NewReader initializes a new Reader instance
-func NewReader(ctx context.Context, config Config, l1Client sync_service.EthClient) (*Reader, error) {
-	if config.scrollChainAddress == (common.Address{}) {
+func NewReader(ctx context.Context, config Config, l1Client EthClient) (*Reader, error) {
+	if config.ScrollChainAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}
 
@@ -47,10 +52,16 @@ func NewReader(ctx context.Context, config Config, l1Client sync_service.EthClie
 		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
 
-	client := Reader{
-		ctx:    ctx,
-		config: config,
-		client: l1Client,
+	filterer, err := NewL1MessageQueueFilterer(config.L1MessageQueueAddress, l1Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize L1MessageQueueFilterer, err = %w", err)
+	}
+
+	reader := Reader{
+		ctx:      ctx,
+		config:   config,
+		client:   l1Client,
+		filterer: filterer,
 
 		scrollChainABI:                scrollChainABI,
 		l1CommitBatchEventSignature:   scrollChainABI.Events[commitBatchEventName].ID,
@@ -58,12 +69,24 @@ func NewReader(ctx context.Context, config Config, l1Client sync_service.EthClie
 		l1FinalizeBatchEventSignature: scrollChainABI.Events[finalizeBatchEventName].ID,
 	}
 
-	return &client, nil
+	return &reader, nil
+}
+
+// GetLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.
+func (r *Reader) GetLatestFinalizedBlockNumber() (uint64, error) {
+	header, err := r.client.HeaderByNumber(r.ctx, big.NewInt(int64(rpc.FinalizedBlockNumber)))
+	if err != nil {
+		return 0, err
+	}
+	if !header.Number.IsInt64() {
+		return 0, fmt.Errorf("received unexpected block number in L1Client: %v", header.Number)
+	}
+	return header.Number.Uint64(), nil
 }
 
 // FetchTxData fetches tx data corresponding to given event log
-func (r *Reader) FetchTxData(vLog *types.Log) ([]byte, error) {
-	tx, err := r.fetchTx(vLog)
+func (r *Reader) FetchTxData(txHash, blockHash common.Hash) ([]byte, error) {
+	tx, err := r.fetchTx(txHash, blockHash)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +101,7 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 		FromBlock: big.NewInt(int64(from)), // inclusive
 		ToBlock:   big.NewInt(int64(to)),   // inclusive
 		Addresses: []common.Address{
-			r.config.scrollChainAddress,
+			r.config.ScrollChainAddress,
 		},
 		Topics: make([][]common.Hash, 1),
 	}
@@ -92,6 +115,48 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 		return nil, fmt.Errorf("failed to filter logs, err: %w", err)
 	}
 	return r.processLogsToRollupEvents(logs)
+}
+
+func (r *Reader) FetchL1MessagesInRange(fromBlock, toBlock uint64) ([]types.L1MessageTx, error) {
+	var msgs []types.L1MessageTx
+	// query in batches
+	for from := fromBlock; from <= toBlock; from += defaultL1MsgFetchBlockRange {
+		to := from + defaultL1MsgFetchBlockRange - 1
+		if to > toBlock {
+			to = toBlock
+		}
+		it, err := r.filterer.FilterQueueTransaction(&bind.FilterOpts{
+			Start:   from,
+			End:     &to,
+			Context: r.ctx,
+		}, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		for it.Next() {
+			event := it.Event
+			log.Trace("Received new L1 QueueTransaction event", "event", event)
+
+			if !event.GasLimit.IsUint64() {
+				return nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
+			}
+
+			msgs = append(msgs, types.L1MessageTx{
+				QueueIndex: event.QueueIndex,
+				Gas:        event.GasLimit.Uint64(),
+				To:         &event.Target,
+				Value:      event.Value,
+				Data:       event.Data,
+				Sender:     event.Sender,
+			})
+		}
+
+		if err := it.Error(); err != nil {
+			return nil, err
+		}
+	}
+	return msgs, nil
 }
 
 func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, error) {
@@ -141,31 +206,31 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 }
 
 // FetchBlockHeaderByNumber fetches the block header by number
-func (r *Reader) FetchBlockHeaderByNumber(blockNumber *big.Int) (*types.Header, error) {
-	return r.client.HeaderByNumber(r.ctx, blockNumber)
+func (r *Reader) FetchBlockHeaderByNumber(blockNumber uint64) (*types.Header, error) {
+	return r.client.HeaderByNumber(r.ctx, big.NewInt(int64(blockNumber)))
 }
 
 // fetchTx fetches tx corresponding to given event log
-func (r *Reader) fetchTx(vLog *types.Log) (*types.Transaction, error) {
-	tx, _, err := r.client.TransactionByHash(r.ctx, vLog.TxHash)
+func (r *Reader) fetchTx(txHash, blockHash common.Hash) (*types.Transaction, error) {
+	tx, _, err := r.client.TransactionByHash(r.ctx, txHash)
 	if err != nil {
 		log.Debug("failed to get transaction by hash, probably an unindexed transaction, fetching the whole block to get the transaction",
-			"tx hash", vLog.TxHash.Hex(), "block number", vLog.BlockNumber, "block hash", vLog.BlockHash.Hex(), "err", err)
-		block, err := r.client.BlockByHash(r.ctx, vLog.BlockHash)
+			"tx hash", txHash.Hex(), "block hash", blockHash.Hex(), "err", err)
+		block, err := r.client.BlockByHash(r.ctx, blockHash)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get block by hash, block number: %v, block hash: %v, err: %w", vLog.BlockNumber, vLog.BlockHash.Hex(), err)
+			return nil, fmt.Errorf("failed to get block by hash, block hash: %v, err: %w", blockHash.Hex(), err)
 		}
 
 		found := false
 		for _, txInBlock := range block.Transactions() {
-			if txInBlock.Hash() == vLog.TxHash {
+			if txInBlock.Hash() == txHash {
 				tx = txInBlock
 				found = true
 				break
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block number: %v, block hash: %v", vLog.TxHash.Hex(), vLog.BlockNumber, vLog.BlockHash.Hex())
+			return nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block hash: %v", txHash.Hex(), blockHash.Hex())
 		}
 	}
 
@@ -173,14 +238,14 @@ func (r *Reader) fetchTx(vLog *types.Log) (*types.Transaction, error) {
 }
 
 // FetchTxBlobHash fetches tx blob hash corresponding to given event log
-func (r *Reader) FetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
-	tx, err := r.fetchTx(vLog)
+func (r *Reader) FetchTxBlobHash(txHash, blockHash common.Hash) (common.Hash, error) {
+	tx, err := r.fetchTx(txHash, blockHash)
 	if err != nil {
 		return common.Hash{}, err
 	}
 	blobHashes := tx.BlobHashes()
 	if len(blobHashes) == 0 {
-		return common.Hash{}, fmt.Errorf("transaction does not contain any blobs, tx hash: %v", vLog.TxHash.Hex())
+		return common.Hash{}, fmt.Errorf("transaction does not contain any blobs, tx hash: %v", txHash.Hex())
 	}
 	return blobHashes[0], nil
 }

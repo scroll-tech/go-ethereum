@@ -11,7 +11,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -19,7 +18,7 @@ type Tracker struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	client           sync_service.EthClient
+	client           EthClient
 	lastSyncedHeader *types.Header
 	subList          headerSubList
 	scope            event.SubscriptionScope
@@ -30,7 +29,7 @@ const (
 	defaultSyncInterval = 12 * time.Second
 )
 
-func NewTracker(ctx context.Context, l1Client sync_service.EthClient) (*Tracker, error) {
+func NewTracker(ctx context.Context, l1Client EthClient) (*Tracker, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	l1Tracker := &Tracker{
 		ctx:    ctx,

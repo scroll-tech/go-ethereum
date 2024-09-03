@@ -10,6 +10,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
+	"github.com/scroll-tech/go-ethereum/log"
 )
 
 const (
@@ -104,7 +105,7 @@ func computeKeccakRows(length uint64) uint64 {
 
 // logPrecompileAccess checks if the invoked address is a precompile and increments
 // resource usage of associated subcircuit
-func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn func(int64, int64) []byte) {
+func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn func(int64, int64) ([]byte, error)) {
 	l.logCopy(inputLen)
 	var outputLen uint64
 	switch to {
@@ -122,7 +123,10 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn
 		const rowsPerModExpCall = 39962
 		l.modExpUsage += rowsPerModExpCall
 		if inputLen >= 96 {
-			outputLen = new(big.Int).SetBytes(inputFn(64, 32)).Uint64() // mSize
+			input, err := inputFn(64, 32)
+			if err != nil {
+				outputLen = new(big.Int).SetBytes(input).Uint64() // mSize
+			}
 		}
 	case common.BytesToAddress([]byte{6}): // &bn256AddIstanbul{},
 		l.ecAddCount++
@@ -139,7 +143,7 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn
 }
 
 // logCall logs call to a given address, regardless of the address being a precompile or not
-func (l *Logger) logCall(to common.Address, inputLen uint64, inputFn func(int64, int64) []byte) {
+func (l *Logger) logCall(to common.Address, inputLen uint64, inputFn func(int64, int64) ([]byte, error)) {
 	l.logBytecodeAccessAt(to)
 	l.logPrecompileAccess(to, inputLen, inputFn)
 }
@@ -161,8 +165,8 @@ func (l *Logger) CaptureStart(env *vm.EVM, from common.Address, to common.Addres
 	l.currentEnv = env
 	l.isCreate = create
 	if !l.isCreate {
-		l.logCall(to, uint64(len(input)), func(argOffset, argLen int64) []byte {
-			return input[argOffset : argOffset+argLen]
+		l.logCall(to, uint64(len(input)), func(argOffset, argLen int64) ([]byte, error) {
+			return input[argOffset : argOffset+argLen], nil
 		})
 	} else {
 		l.logRawBytecode(input) // init bytecode
@@ -184,12 +188,13 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 	l.evmUsage += evmUsagePerOpCode[op]
 	l.stateUsage += stateUsagePerOpCode[op](scope, depth)
 
-	getInputFn := func(inputOffset int64) func(int64, int64) []byte {
-		return func(argOffset, argLen int64) []byte {
-			// it is safe to ignore the error, with current block gas limits (10M) it is not possible to go past
-			// GetMemoryCopyPadded's internal padding limit (10M) or trigger and overflow in offset/len
-			input, _ := tracers.GetMemoryCopyPadded(scope.Memory, inputOffset+argOffset, argLen)
-			return input
+	getInputFn := func(inputOffset int64) func(int64, int64) ([]byte, error) {
+		return func(argOffset, argLen int64) ([]byte, error) {
+			input, err := tracers.GetMemoryCopyPadded(scope.Memory, inputOffset+argOffset, argLen)
+			if err != nil {
+				log.Warn("failed to read call input", "err", err)
+			}
+			return input, err
 		}
 	}
 

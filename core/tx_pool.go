@@ -1362,6 +1362,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			txs = append(txs, set.Flatten()...)
 		}
 		pool.txFeed.Send(NewTxsEvent{txs})
+		log.Debug("runReorg", "len(txs)", len(txs))
 	}
 }
 

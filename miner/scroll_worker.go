@@ -185,7 +185,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		chainHeadCh:  make(chan core.ChainHeadEvent, chainHeadChanSize),
 		exitCh:       make(chan struct{}),
 		startCh:      make(chan struct{}, 1),
-		reorgCh:      make(chan reorgTrigger, 2*(config.CCCMaxWorkers+1)),
+		reorgCh:      make(chan reorgTrigger, 1),
 	}
 	worker.asyncChecker = ccc.NewAsyncChecker(worker.chain, config.CCCMaxWorkers, false).WithOnFailingBlock(worker.onBlockFailingCCC)
 

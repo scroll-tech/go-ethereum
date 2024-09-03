@@ -10,18 +10,22 @@ import (
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
-type Reader struct {
-	ctx        context.Context
-	config     Config
-	client     sync_service.EthClient
-	blobClient blob_client.BlobClient
+const (
+	commitBatchEventName   = "CommitBatch"
+	revertBatchEventName   = "RevertBatch"
+	finalizeBatchEventName = "FinalizeBatch"
+)
 
+type Reader struct {
+	ctx    context.Context
+	config Config
+	client sync_service.EthClient
+
+	scrollChainABI                *abi.ABI
 	l1CommitBatchEventSignature   common.Hash
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
@@ -29,46 +33,29 @@ type Reader struct {
 
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
-	BlobScanAPIEndpoint    string         // BlobScan blob api endpoint
-	BlockNativeAPIEndpoint string         // BlockNative blob api endpoint
-	BeaconNodeAPIEndpoint  string         // Beacon node api endpoint
-	scrollChainAddress     common.Address // address of ScrollChain contract
+	scrollChainAddress common.Address // address of ScrollChain contract
 }
 
 // NewReader initializes a new Reader instance
-func NewReader(ctx context.Context, config Config, l1Client sync_service.EthClient, scrollChainABI *abi.ABI) (*Reader, error) {
+func NewReader(ctx context.Context, config Config, l1Client sync_service.EthClient) (*Reader, error) {
 	if config.scrollChainAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}
 
-	blobClientList := blob_client.NewBlobClientList()
-	if config.BeaconNodeAPIEndpoint != "" {
-		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint)
-		if err != nil {
-			log.Warn("failed to create BeaconNodeClient", "err", err)
-		} else {
-			blobClientList.AddBlobClient(beaconNodeClient)
-		}
-	}
-	if config.BlobScanAPIEndpoint != "" {
-		blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
-	}
-	if config.BlockNativeAPIEndpoint != "" {
-		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
-	}
-	if blobClientList.Size() == 0 {
-		log.Crit("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag.")
+	scrollChainABI, err := ScrollChainMetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
 	}
 
 	client := Reader{
-		ctx:        ctx,
-		config:     config,
-		client:     l1Client,
-		blobClient: blobClientList,
+		ctx:    ctx,
+		config: config,
+		client: l1Client,
 
-		l1CommitBatchEventSignature:   scrollChainABI.Events["CommitBatch"].ID,
-		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
-		l1FinalizeBatchEventSignature: scrollChainABI.Events["FinalizeBatch"].ID,
+		scrollChainABI:                scrollChainABI,
+		l1CommitBatchEventSignature:   scrollChainABI.Events[commitBatchEventName].ID,
+		l1RevertBatchEventSignature:   scrollChainABI.Events[revertBatchEventName].ID,
+		l1FinalizeBatchEventSignature: scrollChainABI.Events[finalizeBatchEventName].ID,
 	}
 
 	return &client, nil
@@ -83,21 +70,8 @@ func (r *Reader) FetchTxData(vLog *types.Log) ([]byte, error) {
 	return tx.Data(), nil
 }
 
-// FetchBlobByEventLog returns blob corresponding for the given event log
-func (r *Reader) FetchBlobByEventLog(vLog *types.Log) (*kzg4844.Blob, error) {
-	versionedHash, err := r.fetchTxBlobHash(vLog)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
-	}
-	header, err := r.FetchBlockHeaderByNumber(big.NewInt(0).SetUint64(vLog.BlockNumber))
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch header by number, err: %w", err)
-	}
-	return r.blobClient.GetBlobByVersionedHashAndBlockTime(r.ctx, versionedHash, header.Time)
-}
-
 // FetchRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
-func (r *Reader) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error) {
+func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error) {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 
 	query := ethereum.FilterQuery{
@@ -117,7 +91,53 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter logs, err: %w", err)
 	}
-	return logs, nil
+	return r.processLogsToRollupEvents(logs)
+}
+
+func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, error) {
+	var rollupEvents RollupEvents
+	var rollupEvent RollupEvent
+	var err error
+
+	for _, vLog := range logs {
+		switch vLog.Topics[0] {
+		case r.l1CommitBatchEventSignature:
+			event := &CommitBatchEventUnpacked{}
+			if err = UnpackLog(r.scrollChainABI, event, commitBatchEventName, vLog); err != nil {
+				return nil, fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
+			}
+			log.Trace("found new CommitBatch event", "batch index", event.batchIndex.Uint64())
+			rollupEvent = &CommitBatchEvent{
+				batchIndex:  event.batchIndex,
+				batchHash:   event.batchHash,
+				txHash:      vLog.TxHash,
+				blockHash:   vLog.BlockHash,
+				blockNumber: vLog.BlockNumber,
+			}
+
+		case r.l1RevertBatchEventSignature:
+			event := &RevertBatchEvent{}
+			if err = UnpackLog(r.scrollChainABI, event, revertBatchEventName, vLog); err != nil {
+				return nil, fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
+			}
+			log.Trace("found new RevertBatchType event", "batch index", event.batchIndex.Uint64())
+			rollupEvent = event
+
+		case r.l1FinalizeBatchEventSignature:
+			event := &FinalizeBatchEvent{}
+			if err = UnpackLog(r.scrollChainABI, event, finalizeBatchEventName, vLog); err != nil {
+				return nil, fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
+			}
+			log.Trace("found new FinalizeBatchType event", "batch index", event.batchIndex.Uint64())
+			rollupEvent = event
+
+		default:
+			return nil, fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
+		}
+
+		rollupEvents = append(rollupEvents, rollupEvent)
+	}
+	return rollupEvents, nil
 }
 
 // FetchBlockHeaderByNumber fetches the block header by number
@@ -152,8 +172,8 @@ func (r *Reader) fetchTx(vLog *types.Log) (*types.Transaction, error) {
 	return tx, nil
 }
 
-// fetchTxBlobHash fetches tx blob hash corresponding to given event log
-func (r *Reader) fetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
+// FetchTxBlobHash fetches tx blob hash corresponding to given event log
+func (r *Reader) FetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
 	tx, err := r.fetchTx(vLog)
 	if err != nil {
 		return common.Hash{}, err

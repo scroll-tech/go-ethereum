@@ -73,6 +73,7 @@ func NewLogger() *Logger {
 func (l *Logger) Snapshot() *Logger {
 	newL := *l
 	newL.codesAccessed = maps.Clone(newL.codesAccessed)
+	newL.currentEnv = nil
 	return &newL
 }
 

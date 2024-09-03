@@ -1,4 +1,4 @@
-package l1_state_tracker
+package l1
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
-type L1Tracker struct {
+type Tracker struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -30,9 +30,9 @@ const (
 	defaultSyncInterval = 12 * time.Second
 )
 
-func NewL1Tracker(ctx context.Context, l1Client sync_service.EthClient) (*L1Tracker, error) {
+func NewTracker(ctx context.Context, l1Client sync_service.EthClient) (*Tracker, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	l1Tracker := &L1Tracker{
+	l1Tracker := &Tracker{
 		ctx:    ctx,
 		cancel: cancel,
 
@@ -42,7 +42,7 @@ func NewL1Tracker(ctx context.Context, l1Client sync_service.EthClient) (*L1Trac
 	return l1Tracker, nil
 }
 
-func (t *L1Tracker) headerByDepth(depth ChainDepth, latestNumber *big.Int) (*types.Header, error) {
+func (t *Tracker) headerByDepth(depth ChainDepth, latestNumber *big.Int) (*types.Header, error) {
 	var blockNumber *big.Int
 	switch depth {
 	case LatestBlock:
@@ -61,13 +61,13 @@ func (t *L1Tracker) headerByDepth(depth ChainDepth, latestNumber *big.Int) (*typ
 	return header, nil
 }
 
-func (t *L1Tracker) newHead(header *types.Header) {
+func (t *Tracker) newHead(header *types.Header) {
 	t.lastSyncedHeader = header
 	t.subList.stopSending()
 	t.subList.sendNewHeads(t.headerByDepth, header)
 }
 
-func (t *L1Tracker) syncLatestHead() error {
+func (t *Tracker) syncLatestHead() error {
 	header, err := t.client.HeaderByNumber(t.ctx, big.NewInt(int64(rpc.LatestBlockNumber)))
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (t *L1Tracker) syncLatestHead() error {
 	return nil
 }
 
-func (t *L1Tracker) Subscribe(channel HeaderChan, depth ChainDepth) event.Subscription {
+func (t *Tracker) Subscribe(channel HeaderChan, depth ChainDepth) event.Subscription {
 	sub := &headerSub{
 		list:    &t.subList,
 		depth:   depth,
@@ -96,8 +96,8 @@ func (t *L1Tracker) Subscribe(channel HeaderChan, depth ChainDepth) event.Subscr
 	return t.scope.Track(sub)
 }
 
-func (t *L1Tracker) Start() {
-	log.Info("starting L1Tracker")
+func (t *Tracker) Start() {
+	log.Info("starting Tracker")
 	go func() {
 		syncTicker := time.NewTicker(defaultSyncInterval)
 		defer syncTicker.Stop()
@@ -114,18 +114,18 @@ func (t *L1Tracker) Start() {
 			case <-syncTicker.C:
 				err := t.syncLatestHead()
 				if err != nil {
-					log.Warn("L1Tracker: failed to sync latest head", "err", err)
+					log.Warn("Tracker: failed to sync latest head", "err", err)
 				}
 			}
 		}
 	}()
 }
 
-func (t *L1Tracker) Stop() {
-	log.Info("stopping L1Tracker")
+func (t *Tracker) Stop() {
+	log.Info("stopping Tracker")
 	t.cancel()
 	t.scope.Close()
-	log.Info("L1Tracker stopped")
+	log.Info("Tracker stopped")
 }
 
 type headerSubList struct {

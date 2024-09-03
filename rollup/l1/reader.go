@@ -1,4 +1,4 @@
-package l1_state_tracker
+package l1
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 )
 
-type L1Reader struct {
+type Reader struct {
 	ctx        context.Context
 	config     Config
 	client     sync_service.EthClient
@@ -35,8 +35,8 @@ type Config struct {
 	scrollChainAddress     common.Address // address of ScrollChain contract
 }
 
-// NewL1Reader initializes a new L1Reader instance
-func NewL1Reader(ctx context.Context, config Config, l1Client sync_service.EthClient, scrollChainABI *abi.ABI) (*L1Reader, error) {
+// NewReader initializes a new Reader instance
+func NewReader(ctx context.Context, config Config, l1Client sync_service.EthClient, scrollChainABI *abi.ABI) (*Reader, error) {
 	if config.scrollChainAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}
@@ -60,7 +60,7 @@ func NewL1Reader(ctx context.Context, config Config, l1Client sync_service.EthCl
 		log.Crit("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag.")
 	}
 
-	client := L1Reader{
+	client := Reader{
 		ctx:        ctx,
 		config:     config,
 		client:     l1Client,
@@ -75,7 +75,7 @@ func NewL1Reader(ctx context.Context, config Config, l1Client sync_service.EthCl
 }
 
 // FetchTxData fetches tx data corresponding to given event log
-func (r *L1Reader) FetchTxData(vLog *types.Log) ([]byte, error) {
+func (r *Reader) FetchTxData(vLog *types.Log) ([]byte, error) {
 	tx, err := r.fetchTx(vLog)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (r *L1Reader) FetchTxData(vLog *types.Log) ([]byte, error) {
 }
 
 // FetchBlobByEventLog returns blob corresponding for the given event log
-func (r *L1Reader) FetchBlobByEventLog(vLog *types.Log) (*kzg4844.Blob, error) {
+func (r *Reader) FetchBlobByEventLog(vLog *types.Log) (*kzg4844.Blob, error) {
 	versionedHash, err := r.fetchTxBlobHash(vLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
@@ -97,7 +97,7 @@ func (r *L1Reader) FetchBlobByEventLog(vLog *types.Log) (*kzg4844.Blob, error) {
 }
 
 // FetchRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
-func (r *L1Reader) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error) {
+func (r *Reader) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error) {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 
 	query := ethereum.FilterQuery{
@@ -121,12 +121,12 @@ func (r *L1Reader) FetchRollupEventsInRange(from, to uint64) ([]types.Log, error
 }
 
 // FetchBlockHeaderByNumber fetches the block header by number
-func (r *L1Reader) FetchBlockHeaderByNumber(blockNumber *big.Int) (*types.Header, error) {
+func (r *Reader) FetchBlockHeaderByNumber(blockNumber *big.Int) (*types.Header, error) {
 	return r.client.HeaderByNumber(r.ctx, blockNumber)
 }
 
 // fetchTx fetches tx corresponding to given event log
-func (r *L1Reader) fetchTx(vLog *types.Log) (*types.Transaction, error) {
+func (r *Reader) fetchTx(vLog *types.Log) (*types.Transaction, error) {
 	tx, _, err := r.client.TransactionByHash(r.ctx, vLog.TxHash)
 	if err != nil {
 		log.Debug("failed to get transaction by hash, probably an unindexed transaction, fetching the whole block to get the transaction",
@@ -153,7 +153,7 @@ func (r *L1Reader) fetchTx(vLog *types.Log) (*types.Transaction, error) {
 }
 
 // fetchTxBlobHash fetches tx blob hash corresponding to given event log
-func (r *L1Reader) fetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
+func (r *Reader) fetchTxBlobHash(vLog *types.Log) (common.Hash, error) {
 	tx, err := r.fetchTx(vLog)
 	if err != nil {
 		return common.Hash{}, err

@@ -124,7 +124,7 @@ func (l *Logger) logPrecompileAccess(to common.Address, inputLen uint64, inputFn
 		l.modExpUsage += rowsPerModExpCall
 		if inputLen >= 96 {
 			input, err := inputFn(64, 32)
-			if err != nil {
+			if err == nil {
 				outputLen = new(big.Int).SetBytes(input).Uint64() // mSize
 			}
 		}

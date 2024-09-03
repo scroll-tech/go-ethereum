@@ -78,6 +78,10 @@ func (l *Logger) Snapshot() *Logger {
 	return &newL
 }
 
+func (l *Logger) Codes() map[common.Hash]bool {
+	return maps.Clone(l.codesAccessed)
+}
+
 // logBytecodeAccess logs access to the bytecode identified by the given code hash
 func (l *Logger) logBytecodeAccess(codeHash common.Hash, codeSize uint64) {
 	if codeHash != (common.Hash{}) && !l.codesAccessed[codeHash] {

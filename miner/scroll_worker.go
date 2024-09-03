@@ -847,6 +847,7 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 	}
 
 	log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealHash, "hash", blockHash)
+	log.Info("GoCCC", "rc", w.current.cccLogger.RowConsumption(), "codes", w.current.cccLogger.Codes())
 
 	// Broadcast the block and announce chain insertion event
 	w.mux.Post(core.NewMinedBlockEvent{Block: block})

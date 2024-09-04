@@ -320,6 +320,14 @@ func (w *worker) mainLoop() {
 	defer w.asyncChecker.Wait()
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
+	defer func() {
+		// training wheels on
+		// lets not crash the node and allow us some time to inspect
+		p := recover()
+		if p != nil {
+			log.Error("worker mainLoop panic", "panic", p)
+		}
+	}()
 
 	var err error
 	for {

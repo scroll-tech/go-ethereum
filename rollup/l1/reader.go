@@ -20,7 +20,8 @@ const (
 	revertBatchEventName   = "RevertBatch"
 	finalizeBatchEventName = "FinalizeBatch"
 
-	defaultL1MsgFetchBlockRange = 100
+	defaultL1MsgFetchBlockRange        = 500
+	defaultRollupEventsFetchBlockRange = 100
 )
 
 type Reader struct {
@@ -84,6 +85,11 @@ func (r *Reader) GetLatestFinalizedBlockNumber() (uint64, error) {
 	return header.Number.Uint64(), nil
 }
 
+// FetchBlockHeaderByNumber fetches the block header by number
+func (r *Reader) FetchBlockHeaderByNumber(blockNumber uint64) (*types.Header, error) {
+	return r.client.HeaderByNumber(r.ctx, big.NewInt(int64(blockNumber)))
+}
+
 // FetchTxData fetches tx data corresponding to given event log
 func (r *Reader) FetchTxData(txHash, blockHash common.Hash) ([]byte, error) {
 	tx, err := r.fetchTx(txHash, blockHash)
@@ -93,53 +99,69 @@ func (r *Reader) FetchTxData(txHash, blockHash common.Hash) ([]byte, error) {
 	return tx.Data(), nil
 }
 
+// FetchTxBlobHash fetches tx blob hash corresponding to given event log
+func (r *Reader) FetchTxBlobHash(txHash, blockHash common.Hash) (common.Hash, error) {
+	tx, err := r.fetchTx(txHash, blockHash)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	blobHashes := tx.BlobHashes()
+	if len(blobHashes) == 0 {
+		return common.Hash{}, fmt.Errorf("transaction does not contain any blobs, tx hash: %v", txHash.Hex())
+	}
+	return blobHashes[0], nil
+}
+
 // FetchRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
 func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error) {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
+	var logs []types.Log
 
-	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(int64(from)), // inclusive
-		ToBlock:   big.NewInt(int64(to)),   // inclusive
-		Addresses: []common.Address{
-			r.config.ScrollChainAddress,
-		},
-		Topics: make([][]common.Hash, 1),
-	}
-	query.Topics[0] = make([]common.Hash, 3)
-	query.Topics[0][0] = r.l1CommitBatchEventSignature
-	query.Topics[0][1] = r.l1RevertBatchEventSignature
-	query.Topics[0][2] = r.l1FinalizeBatchEventSignature
+	err := r.queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) error {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(int64(from)), // inclusive
+			ToBlock:   big.NewInt(int64(to)),   // inclusive
+			Addresses: []common.Address{
+				r.config.ScrollChainAddress,
+			},
+			Topics: make([][]common.Hash, 1),
+		}
+		query.Topics[0] = make([]common.Hash, 3)
+		query.Topics[0][0] = r.l1CommitBatchEventSignature
+		query.Topics[0][1] = r.l1RevertBatchEventSignature
+		query.Topics[0][2] = r.l1FinalizeBatchEventSignature
 
-	logs, err := r.client.FilterLogs(r.ctx, query)
+		logsBatch, err := r.client.FilterLogs(r.ctx, query)
+		if err != nil {
+			return fmt.Errorf("failed to filter logs, err: %w", err)
+		}
+		logs = append(logs, logsBatch...)
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to filter logs, err: %w", err)
+		return nil, err
 	}
 	return r.processLogsToRollupEvents(logs)
 }
 
 func (r *Reader) FetchL1MessagesInRange(fromBlock, toBlock uint64) ([]types.L1MessageTx, error) {
 	var msgs []types.L1MessageTx
-	// query in batches
-	for from := fromBlock; from <= toBlock; from += defaultL1MsgFetchBlockRange {
-		to := from + defaultL1MsgFetchBlockRange - 1
-		if to > toBlock {
-			to = toBlock
-		}
+
+	err := r.queryInBatches(fromBlock, toBlock, defaultL1MsgFetchBlockRange, func(from, to uint64) error {
 		it, err := r.filterer.FilterQueueTransaction(&bind.FilterOpts{
 			Start:   from,
 			End:     &to,
 			Context: r.ctx,
 		}, nil, nil)
 		if err != nil {
-			return nil, err
+			return err
 		}
-
 		for it.Next() {
 			event := it.Event
 			log.Trace("Received new L1 QueueTransaction event", "event", event)
 
 			if !event.GasLimit.IsUint64() {
-				return nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
+				return fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
 			}
 
 			msgs = append(msgs, types.L1MessageTx{
@@ -151,10 +173,10 @@ func (r *Reader) FetchL1MessagesInRange(fromBlock, toBlock uint64) ([]types.L1Me
 				Sender:     event.Sender,
 			})
 		}
-
-		if err := it.Error(); err != nil {
-			return nil, err
-		}
+		return it.Error()
+	})
+	if err != nil {
+		return nil, err
 	}
 	return msgs, nil
 }
@@ -205,9 +227,18 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 	return rollupEvents, nil
 }
 
-// FetchBlockHeaderByNumber fetches the block header by number
-func (r *Reader) FetchBlockHeaderByNumber(blockNumber uint64) (*types.Header, error) {
-	return r.client.HeaderByNumber(r.ctx, big.NewInt(int64(blockNumber)))
+func (r *Reader) queryInBatches(fromBlock, toBlock uint64, batchSize int, queryFunc func(from, to uint64) error) error {
+	for from := fromBlock; from <= toBlock; from += uint64(batchSize) {
+		to := from + defaultL1MsgFetchBlockRange - 1
+		if to > toBlock {
+			to = toBlock
+		}
+		err := queryFunc(from, to)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // fetchTx fetches tx corresponding to given event log
@@ -235,17 +266,4 @@ func (r *Reader) fetchTx(txHash, blockHash common.Hash) (*types.Transaction, err
 	}
 
 	return tx, nil
-}
-
-// FetchTxBlobHash fetches tx blob hash corresponding to given event log
-func (r *Reader) FetchTxBlobHash(txHash, blockHash common.Hash) (common.Hash, error) {
-	tx, err := r.fetchTx(txHash, blockHash)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	blobHashes := tx.BlobHashes()
-	if len(blobHashes) == 0 {
-		return common.Hash{}, fmt.Errorf("transaction does not contain any blobs, tx hash: %v", txHash.Hex())
-	}
-	return blobHashes[0], nil
 }

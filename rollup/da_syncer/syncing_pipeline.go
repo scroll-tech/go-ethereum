@@ -43,7 +43,7 @@ type SyncingPipeline struct {
 	daSyncer   *DASyncer
 }
 
-func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient l1.EthClient, l1DeploymentBlock uint64, config Config) (*SyncingPipeline, error) {
+func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient l1.Client, l1DeploymentBlock uint64, config Config) (*SyncingPipeline, error) {
 	l1Reader, err := l1.NewReader(ctx, l1.Config{
 		ScrollChainAddress:    genesisConfig.Scroll.L1Config.ScrollChainAddress,
 		L1MessageQueueAddress: genesisConfig.Scroll.L1Config.L1MessageQueueAddress,

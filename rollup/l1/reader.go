@@ -26,7 +26,7 @@ const (
 type Reader struct {
 	ctx      context.Context
 	config   Config
-	client   EthClient
+	client   Client
 	filterer *L1MessageQueueFilterer
 
 	scrollChainABI                *abi.ABI
@@ -42,7 +42,7 @@ type Config struct {
 }
 
 // NewReader initializes a new Reader instance
-func NewReader(ctx context.Context, config Config, l1Client EthClient) (*Reader, error) {
+func NewReader(ctx context.Context, config Config, l1Client Client) (*Reader, error) {
 	if config.ScrollChainAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}

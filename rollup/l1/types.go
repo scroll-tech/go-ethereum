@@ -9,9 +9,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 )
 
-// We cannot use ethclient.Client directly as that would lead
-// to circular dependency between eth, rollup, and ethclient.
-type EthClient interface {
+type Client interface {
 	BlockNumber(ctx context.Context) (uint64, error)
 	ChainID(ctx context.Context) (*big.Int, error)
 	FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)

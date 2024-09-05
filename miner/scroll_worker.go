@@ -332,6 +332,7 @@ func (w *worker) mainLoop() {
 	var err error
 	for {
 		if _, isRetryable := err.(retryableCommitError); isRetryable {
+			log.Warn("failed to commit to a block, retrying", "err", err)
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorgReason); err != nil {
 				continue
 			}

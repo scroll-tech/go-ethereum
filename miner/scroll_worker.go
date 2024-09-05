@@ -845,6 +845,20 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 		)
 	}
 
+	ancestorHeight := uint64(1)
+	currentHeight := w.current.header.Number.Uint64()
+	maxReorgDepth := uint64(w.config.CCCMaxWorkers + 1)
+	if currentHeight > maxReorgDepth {
+		ancestorHeight = currentHeight - maxReorgDepth
+	}
+
+	ancestorHash := w.chain.GetHeaderByNumber(ancestorHeight).Hash()
+	if rawdb.ReadBlockRowConsumption(w.chain.Database(), ancestorHash) == nil {
+		// reject committing to a block if its ancestor doesn't have its RC stored in DB yet.
+		// which may either mean that it failed CCC or it is still in the process of being checked
+		return common.Hash{}, retryableCommitError{inner: errors.New("ancestor doesn't have RC yet")}
+	}
+
 	// A new block event will trigger a reorg in the txpool, pause reorgs to defer this until we fetch txns for next block.
 	// We may end up trying to process txns that we already included in the previous block, but they will all fail the nonce check
 	w.eth.TxPool().PauseReorgs()

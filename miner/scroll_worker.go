@@ -331,6 +331,19 @@ func (w *worker) mainLoop() {
 
 	var err error
 	for {
+		// check for reorgs first to lower the chances of trying to handle another
+		// event eventhough a reorg is pending (due to Go `select` pseudo-randomly picking a case
+		// to execute if multiple of them are ready)
+		select {
+		case trigger := <-w.reorgCh:
+			err = w.handleReorg(&trigger)
+			continue
+			// System stopped
+		case <-w.exitCh:
+			return
+		default:
+		}
+
 		if _, isRetryable := err.(retryableCommitError); isRetryable {
 			log.Warn("failed to commit to a block, retrying", "err", err)
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorgReason); err != nil {
@@ -339,16 +352,6 @@ func (w *worker) mainLoop() {
 		} else if err != nil {
 			log.Error("failed to mine block", "err", err)
 			w.current = nil
-		}
-
-		// check for reorgs first to lower the chances of trying to handle another
-		// event eventhough a reorg is pending (due to Go `select` pseudo-randomly picking a case
-		// to execute if multiple of them are ready)
-		select {
-		case trigger := <-w.reorgCh:
-			err = w.handleReorg(&trigger)
-			continue
-		default:
 		}
 
 		select {

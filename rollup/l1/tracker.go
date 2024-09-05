@@ -224,7 +224,7 @@ func (t *Tracker) syncFinalizedHead() error {
 		// This means the finalized block changed as read from L1. The Ethereum protocol guarantees that this can never
 		// happen. Must be some issue with the RPC node.
 		if t.lastFinalizedHeader.Number.Uint64() >= newHeader.Number.Uint64() {
-			log.Crit("RPC node faulty: finalized block number decreased", "old", t.lastFinalizedHeader.Number, "new", newHeader.Number, "old hash", t.lastFinalizedHeader.Hash(), "new hash", newHeader.Hash())
+			return errors.Errorf("RPC node faulty: finalized block number decreased from %d to %d", t.lastFinalizedHeader.Number.Uint64(), newHeader.Number.Uint64())
 		}
 	}
 
@@ -262,7 +262,7 @@ func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback Subscrip
 	case confirmationRule >= LatestChainHead && confirmationRule <= maxConfirmationRule:
 		confirmationType = LatestChainHead
 	default:
-		log.Crit("invalid confirmation rule", "confirmationRule", confirmationRule)
+		panic(fmt.Sprintf("invalid confirmation rule %d", confirmationRule))
 	}
 
 	sub := newSubscription(t.subscriptionCounter, confirmationRule, callback)

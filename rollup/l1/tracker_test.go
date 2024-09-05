@@ -284,3 +284,25 @@ func TestTracker_HappyCases(t *testing.T) {
 	//  .- test unsubscribe
 	//  - test running with Start and RPC errors -> recovering automatically
 }
+
+func TestTracker_Subscribe_ConfirmationRules(t *testing.T) {
+	client := newMockETHClient()
+	tracker := NewTracker(context.Background(), client)
+
+	// valid rules
+	tracker.Subscribe(FinalizedChainHead, func(last, new *types.Header, reorg bool) {})
+	tracker.Subscribe(SafeChainHead, func(last, new *types.Header, reorg bool) {})
+	tracker.Subscribe(LatestChainHead, func(last, new *types.Header, reorg bool) {})
+	tracker.Subscribe(5, func(last, new *types.Header, reorg bool) {})
+	tracker.Subscribe(maxConfirmationRule, func(last, new *types.Header, reorg bool) {})
+
+	require.Panics(t, func() {
+		tracker.Subscribe(maxConfirmationRule+1, func(last, new *types.Header, reorg bool) {})
+	})
+	require.Panics(t, func() {
+		tracker.Subscribe(0, func(last, new *types.Header, reorg bool) {})
+	})
+	require.Panics(t, func() {
+		tracker.Subscribe(FinalizedChainHead-1, func(last, new *types.Header, reorg bool) {})
+	})
+}

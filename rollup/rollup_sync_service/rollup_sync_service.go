@@ -562,31 +562,28 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 
 // decodeBlockRangesFromEncodedChunks decodes the provided chunks into a list of block ranges.
 func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
+	codec, err := encoding.GetCodec(codecVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get codec: %w", err)
+	}
+
+	daChunks, err := codec.DecodeDAChunks(chunks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode DA chunks: %w", err)
+	}
+
 	var chunkBlockRanges []*rawdb.ChunkBlockRange
-	for _, chunk := range chunks {
-		if len(chunk) < 1 {
-			return nil, fmt.Errorf("invalid chunk, length is less than 1")
-		}
-
-		numBlocks := int(chunk[0])
-		if len(chunk) < 1+numBlocks*60 {
-			return nil, fmt.Errorf("invalid chunk byte length, codc version: %v, expected: %v, got: %v", codecVersion, 1+numBlocks*60, len(chunk))
-		}
-
-		daBlocks := make([]*encoding.DABlock, numBlocks)
-		for i := 0; i < numBlocks; i++ {
-			startIdx := 1 + i*60 // add 1 to skip numBlocks byte
-			endIdx := startIdx + 60
-			daBlocks[i] = &encoding.DABlock{}
-			if err := daBlocks[i].Decode(chunk[startIdx:endIdx]); err != nil {
-				return nil, err
-			}
+	for _, daChunk := range daChunks {
+		startBlockNumber, endBlockNumber, err := daChunk.BlockRange()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get start block number: %w", err)
 		}
 
 		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-			StartBlockNumber: daBlocks[0].BlockNumber,
-			EndBlockNumber:   daBlocks[len(daBlocks)-1].BlockNumber,
+			StartBlockNumber: startBlockNumber,
+			EndBlockNumber:   endBlockNumber,
 		})
 	}
+
 	return chunkBlockRanges, nil
 }

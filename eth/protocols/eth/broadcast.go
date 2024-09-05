@@ -21,6 +21,19 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
+)
+
+var (
+	broadcastSendTxsLenGauge    = metrics.NewRegisteredGauge("eth/protocols/eth/broadcast/direct/txs", nil)
+	broadcastSendTxsFailMeter   = metrics.NewRegisteredMeter("eth/protocols/eth/broadcast/direct/fail", nil)
+	broadcastSendHashesLenGauge = metrics.NewRegisteredGauge("eth/protocols/eth/broadcast/direct/hashes", nil)
+	broadcastSendQueueLenGauge  = metrics.NewRegisteredGauge("eth/protocols/eth/broadcast/direct/queue", nil)
+	broadcastAnnoTxsLenGauge    = metrics.NewRegisteredGauge("eth/protocols/eth/broadcast/anno/txs", nil)
+	broadcastAnnoTxsFailMeter   = metrics.NewRegisteredMeter("eth/protocols/eth/broadcast/anno/fail", nil)
+	broadcastAnnoHashesLenGauge = metrics.NewRegisteredGauge("eth/protocols/eth/broadcast/anno/hashes", nil)
+	broadcastAnnoQueueLenGauge  = metrics.NewRegisteredGauge("eth/protocols/eth/broadcast/anno/queue", nil)
 )
 
 const (
@@ -92,10 +105,15 @@ func (p *Peer) broadcastTransactions() {
 			if len(txs) > 0 {
 				done = make(chan struct{})
 				go func() {
+					log.Debug("Sending transactions", "count", len(txs))
+					broadcastSendTxsLenGauge.Update(int64(len(txs)))
 					if err := p.SendTransactions(txs); err != nil {
+						log.Debug("Sending transactions", "count", len(txs), "err", err)
+						broadcastSendTxsFailMeter.Mark(1)
 						fail <- err
 						return
 					}
+					log.Debug("Sent transactions", "count", len(txs))
 					close(done)
 					p.Log().Trace("Sent transactions", "count", len(txs))
 				}()
@@ -110,6 +128,9 @@ func (p *Peer) broadcastTransactions() {
 			}
 			// New batch of transactions to be broadcast, queue them (with cap)
 			queue = append(queue, hashes...)
+			log.Debug("Queue size in broadcastTransactions", "len(hashes)", len(hashes), "len(queue)", len(queue), "maxQueuedTxs", maxQueuedTxs)
+			broadcastSendHashesLenGauge.Update(int64(len(hashes)))
+			broadcastSendQueueLenGauge.Update(int64(len(queue)))
 			if len(queue) > maxQueuedTxs {
 				// Fancy copy and resize to ensure buffer doesn't grow indefinitely
 				queue = queue[:copy(queue, queue[len(queue)-maxQueuedTxs:])]
@@ -159,10 +180,15 @@ func (p *Peer) announceTransactions() {
 			if len(pending) > 0 {
 				done = make(chan struct{})
 				go func() {
+					log.Debug("Sending transaction announcements", "count", len(pending))
+					broadcastAnnoTxsLenGauge.Update(int64(len(pending)))
 					if err := p.sendPooledTransactionHashes(pending); err != nil {
+						log.Debug("Sending transaction announcements", "count", len(pending), "err", err)
+						broadcastAnnoTxsFailMeter.Mark(1)
 						fail <- err
 						return
 					}
+					log.Debug("Sent transaction announcements", "count", len(pending))
 					close(done)
 					p.Log().Trace("Sent transaction announcements", "count", len(pending))
 				}()
@@ -177,6 +203,9 @@ func (p *Peer) announceTransactions() {
 			}
 			// New batch of transactions to be broadcast, queue them (with cap)
 			queue = append(queue, hashes...)
+			log.Debug("Queue size in announceTransactions", "len(hashes)", len(hashes), "len(queue)", len(queue), "maxQueuedTxAnns", maxQueuedTxAnns)
+			broadcastAnnoHashesLenGauge.Update(int64(len(hashes)))
+			broadcastAnnoQueueLenGauge.Update(int64(len(queue)))
 			if len(queue) > maxQueuedTxAnns {
 				// Fancy copy and resize to ensure buffer doesn't grow indefinitely
 				queue = queue[:copy(queue, queue[len(queue)-maxQueuedTxAnns:])]

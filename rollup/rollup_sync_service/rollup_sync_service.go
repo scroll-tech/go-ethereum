@@ -499,7 +499,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 	}
 
 	codecVersion := encoding.CodecVersion(committedBatchMeta.Version)
-	codec, err := encoding.GetCodec(codecVersion)
+	codec, err := encoding.CodecFromVersion(codecVersion)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)
 	}
@@ -562,7 +562,7 @@ func validateBatch(batchIndex uint64, event *L1FinalizeBatchEvent, parentFinaliz
 
 // decodeBlockRangesFromEncodedChunks decodes the provided chunks into a list of block ranges.
 func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
-	codec, err := encoding.GetCodec(codecVersion)
+	codec, err := encoding.CodecFromVersion(codecVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get codec: %w", err)
 	}

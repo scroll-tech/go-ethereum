@@ -75,13 +75,22 @@ func (t *Tracker) Start() {
 	}()
 }
 
-func (t *Tracker) syncLatestHead() error {
-	newHeader, err := t.client.HeaderByNumber(t.ctx, big.NewInt(int64(rpc.LatestBlockNumber)))
+func (t *Tracker) headerByNumber(number rpc.BlockNumber) (*types.Header, error) {
+	newHeader, err := t.client.HeaderByNumber(t.ctx, big.NewInt(int64(number)))
 	if err != nil {
-		return errors.Wrapf(err, "failed to get latest header")
+		return nil, errors.Wrapf(err, "failed to get %s header", number)
 	}
 	if !newHeader.Number.IsUint64() {
-		return fmt.Errorf("received unexpected block number in L1Client: %v", newHeader.Number)
+		return nil, fmt.Errorf("received unexpected block number in Tracker: %v", newHeader.Number)
+	}
+
+	return newHeader, nil
+}
+
+func (t *Tracker) syncLatestHead() error {
+	newHeader, err := t.headerByNumber(rpc.LatestBlockNumber)
+	if err != nil {
+		return errors.Wrapf(err, "failed to retrieve latest header")
 	}
 
 	storedHeader, exists := t.headers.Get(newHeader.Number.Uint64())
@@ -133,7 +142,13 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorg bool) error {
 		headerToNotifyNumber := newHeader.Number.Uint64() - depth
 		headerToNotify, exists := t.headers.Get(headerToNotifyNumber)
 		if !exists {
-			return fmt.Errorf("header %d not found for confirmationRule %d", headerToNotifyNumber, sub.confirmationRule)
+			// This might happen if there's a gap in the headers cache. We need to fetch the header from the RPC node.
+			h, err := t.headerByNumber(rpc.BlockNumber(headerToNotifyNumber))
+			if err != nil {
+				return errors.Wrapf(err, "failed to retrieve latest header")
+			}
+			headerToNotify = h
+			t.headers.Set(h.Number.Uint64(), h)
 		}
 
 		if reorg && sub.lastSentHeader != nil {
@@ -158,12 +173,9 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorg bool) error {
 }
 
 func (t *Tracker) syncSafeHead() error {
-	newHeader, err := t.client.HeaderByNumber(t.ctx, big.NewInt(int64(rpc.SafeBlockNumber)))
+	newHeader, err := t.headerByNumber(rpc.SafeBlockNumber)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get latest safe header")
-	}
-	if !newHeader.Number.IsUint64() {
-		return fmt.Errorf("received unexpected block number in L1Client: %v", newHeader.Number)
+		return errors.Wrapf(err, "failed to retrieve safe header")
 	}
 
 	if t.lastSafeHeader != nil {
@@ -173,7 +185,7 @@ func (t *Tracker) syncSafeHead() error {
 		}
 
 		// This means there was a L1 reorg and the safe block changed. While this is possible, it should be very rare.
-		if t.lastSafeHeader.Number.Uint64() <= newHeader.Number.Uint64() {
+		if t.lastSafeHeader.Number.Uint64() >= newHeader.Number.Uint64() {
 			t.notifySafeHead(newHeader, true)
 			return nil
 		}
@@ -198,12 +210,9 @@ func (t *Tracker) notifySafeHead(newHeader *types.Header, reorg bool) {
 }
 
 func (t *Tracker) syncFinalizedHead() error {
-	newHeader, err := t.client.HeaderByNumber(t.ctx, big.NewInt(int64(rpc.FinalizedBlockNumber)))
+	newHeader, err := t.headerByNumber(rpc.FinalizedBlockNumber)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get latest finalized header")
-	}
-	if !newHeader.Number.IsUint64() {
-		return fmt.Errorf("received unexpected block number in L1Client: %v", newHeader.Number)
+		return errors.Wrapf(err, "failed to retrieve safe header")
 	}
 
 	if t.lastFinalizedHeader != nil {
@@ -214,7 +223,7 @@ func (t *Tracker) syncFinalizedHead() error {
 
 		// This means the finalized block changed as read from L1. The Ethereum protocol guarantees that this can never
 		// happen. Must be some issue with the RPC node.
-		if t.lastFinalizedHeader.Number.Uint64() <= newHeader.Number.Uint64() {
+		if t.lastFinalizedHeader.Number.Uint64() >= newHeader.Number.Uint64() {
 			log.Crit("RPC node faulty: finalized block number decreased", "old", t.lastFinalizedHeader.Number, "new", newHeader.Number, "old hash", t.lastFinalizedHeader.Hash(), "new hash", newHeader.Hash())
 		}
 	}

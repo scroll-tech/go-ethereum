@@ -78,7 +78,19 @@ func (t *Tracker) Start() {
 func (t *Tracker) headerByNumber(number rpc.BlockNumber) (*types.Header, error) {
 	newHeader, err := t.client.HeaderByNumber(t.ctx, big.NewInt(int64(number)))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get %s header", number)
+		return nil, errors.Wrapf(err, "failed to get %s header by number", number)
+	}
+	if !newHeader.Number.IsUint64() {
+		return nil, fmt.Errorf("received unexpected block number in Tracker: %v", newHeader.Number)
+	}
+
+	return newHeader, nil
+}
+
+func (t *Tracker) headerByHash(hash common.Hash) (*types.Header, error) {
+	newHeader, err := t.client.HeaderByHash(t.ctx, hash)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get %s header by hash", hash)
 	}
 	if !newHeader.Number.IsUint64() {
 		return nil, fmt.Errorf("received unexpected block number in Tracker: %v", newHeader.Number)
@@ -93,27 +105,80 @@ func (t *Tracker) syncLatestHead() error {
 		return errors.Wrapf(err, "failed to retrieve latest header")
 	}
 
-	storedHeader, exists := t.headers.Get(newHeader.Number.Uint64())
+	reorged := newReorgedHeaders()
+
+	seenHeader, exists := t.headers.Get(newHeader.Number.Uint64())
 	if exists {
-		// We already processed the header, nothing to do.
-		if storedHeader.Hash() == newHeader.Hash() {
+		if seenHeader.Hash() == newHeader.Hash() {
+			// We already saw this header, nothing to do.
 			return nil
 		}
 
-		// Since we already processed a header at this height with different hash this means a L1 reorg happened.
-		// TODO: reset cache.
+		// L1 reorg of (at least) depth 1 as the seenHeader.Hash() != newHeader.Hash().
+		reorged.add(seenHeader)
+	}
 
-		// Notify all subscribers to new LatestChainHead at their respective confirmation depth.
-		err = t.notifyLatest(newHeader, true)
-		if err != nil {
-			return errors.Wrapf(err, "failed to notify subscribers of new latest header")
+	// Make sure that we have a continuous sequence of headers (chain) in the cache.
+	// If there's a gap, we need to fetch the missing headers.
+	// A gap can happen due to a reorg or because the node was offline for a while/the RPC didn't return the headers.
+	// TODO: what about genesis block?
+	current := newHeader
+	for newHeader.Number.Uint64() > 1 {
+		prevNumber := current.Number.Uint64() - 1
+		prevHeader, exists := t.headers.Get(prevNumber)
+
+		if !exists {
+			// There's a gap. We need to fetch the previous header.
+			prev, err := t.headerByNumber(rpc.BlockNumber(prevNumber))
+			if err != nil {
+				return errors.Wrapf(err, "failed to retrieve previous header %d", current.Number.Uint64()-1)
+			}
+
+			t.headers.Set(prev.Number.Uint64(), prev)
+			prevHeader = prev
 		}
 
-		return nil
+		// Make sure that the headers are connected in a chain.
+		if current.ParentHash == prevHeader.Hash() {
+			// We already had this header in cache, this means the chain is complete.
+			if exists {
+				break
+			}
+
+			// We had a gap in the chain. Continue fetching the previous headers.
+			current = prevHeader
+			continue
+		}
+
+		// L1 reorg as the current.ParentHash != prevHeader.Hash(). We need to fetch the new chain.
+		newChainPrev, err := t.headerByHash(current.ParentHash)
+		if err != nil {
+			return errors.Wrapf(err, "failed to retrieve new chain previous header")
+		}
+
+		// sanity check - should never happen
+		if newChainPrev.Number.Uint64() != prevNumber {
+			return errors.Errorf("new chain previous header number %d does not match expected number %d", newChainPrev.Number.Uint64(), prevNumber)
+		}
+
+		// we need to store the reorged headers to notify the subscribers about the reorg.
+		reorged.add(prevHeader)
+
+		// update the headers cache with the new chain
+		t.headers.Set(newChainPrev.Number.Uint64(), newChainPrev)
+
+		// continue reconciling the new chain - stops when we reach the forking point
+		current = newChainPrev
+	}
+
+	// TODO: reset cache beyond newHeader.Number if there was a reorg
+	//  might not be necessary if we always wait for longest-chain to take over.
+	if !reorged.isEmpty() {
+
 	}
 
 	// Notify all subscribers to new LatestChainHead at their respective confirmation depth.
-	err = t.notifyLatest(newHeader, false)
+	err = t.notifyLatest(newHeader, reorged)
 	if err != nil {
 		return errors.Wrapf(err, "failed to notify subscribers of new latest header")
 	}
@@ -121,7 +186,7 @@ func (t *Tracker) syncLatestHead() error {
 	return nil
 }
 
-func (t *Tracker) notifyLatest(newHeader *types.Header, reorg bool) error {
+func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders) error {
 	// TODO: add mutex for headers, lastSafeHeader, lastFinalizedHeader
 	t.headers.Set(newHeader.Number.Uint64(), newHeader)
 
@@ -142,26 +207,33 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorg bool) error {
 		headerToNotifyNumber := newHeader.Number.Uint64() - depth
 		headerToNotify, exists := t.headers.Get(headerToNotifyNumber)
 		if !exists {
-			// This might happen if there's a gap in the headers cache. We need to fetch the header from the RPC node.
-			h, err := t.headerByNumber(rpc.BlockNumber(headerToNotifyNumber))
-			if err != nil {
-				return errors.Wrapf(err, "failed to retrieve latest header")
-			}
-			headerToNotify = h
-			t.headers.Set(h.Number.Uint64(), h)
+			// This should never happen since we're making sure that the headers are continuous.
+			return errors.Errorf("failed to find header %d in cache", headerToNotifyNumber)
 		}
 
-		if reorg && sub.lastSentHeader != nil {
-			// The subscriber is subscribed to a deeper ConfirmationRule than the reorg depth -> this reorg doesn't affect the subscriber.
-			// Since the subscribers are sorted by ConfirmationRule, we can return here.
-			if sub.lastSentHeader.Number.Uint64() < headerToNotify.Number.Uint64() {
-				return nil
-			}
-
-			// We already sent this header to the subscriber. This shouldn't happen here since we're handling a reorg and
-			// by definition the last sent header should be different from the header we're notifying about if the header number is the same.
+		var reorg bool
+		if sub.lastSentHeader != nil {
+			// We already sent this header to the subscriber. Nothing to do.
 			if sub.lastSentHeader.Hash() == headerToNotify.Hash() {
 				continue
+			}
+
+			// We are in a reorg. Check if the subscriber is affected by the reorg.
+			if !reorged.isEmpty() {
+				for _, reorgedHeader := range reorged.headers {
+					fmt.Println("reorged headers", reorgedHeader.Number.Uint64())
+				}
+				fmt.Println("reorged min", reorged.minNumber)
+				fmt.Println("reorged max", reorged.maxNumber)
+				fmt.Println("sub last sent header", sub.lastSentHeader.Number.Uint64())
+
+				if sub.lastSentHeader.Number.Uint64() < reorged.minNumber {
+					// The subscriber is subscribed to a deeper ConfirmationRule than the reorg depth -> this reorg doesn't affect the subscriber.
+					reorg = false
+				} else {
+					// The subscriber is affected by the reorg.
+					reorg = true
+				}
 			}
 		}
 
@@ -307,32 +379,3 @@ func (t *Tracker) Stop() {
 	t.cancel()
 	log.Info("Tracker stopped")
 }
-
-type subscription struct {
-	id               int
-	confirmationRule ConfirmationRule
-	callback         SubscriptionCallback
-	lastSentHeader   *types.Header
-}
-
-func newSubscription(id int, confirmationRule ConfirmationRule, callback SubscriptionCallback) *subscription {
-	return &subscription{
-		id:               id,
-		confirmationRule: confirmationRule,
-		callback:         callback,
-	}
-}
-
-type ConfirmationRule int8
-
-// maxConfirmationRule is the maximum number of confirmations we can subscribe to.
-// This is equal to the best case scenario where Ethereum L1 is finalizing 2 epochs in the past (64 blocks).
-const maxConfirmationRule = ConfirmationRule(64)
-
-const (
-	FinalizedChainHead = ConfirmationRule(-2)
-	SafeChainHead      = ConfirmationRule(-1)
-	LatestChainHead    = ConfirmationRule(1)
-)
-
-type SubscriptionCallback func(last, new *types.Header, reorg bool)

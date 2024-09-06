@@ -65,6 +65,7 @@ var (
 	collectL2Timer     = metrics.NewRegisteredTimer("miner/collect_l2_txns", nil)
 	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit", nil)
 	cccStallTimer      = metrics.NewRegisteredTimer("miner/ccc_stall", nil)
+	idleTimer          = metrics.NewRegisteredTimer("miner/idle", nil)
 
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)
@@ -331,7 +332,21 @@ func (w *worker) mainLoop() {
 
 	var err error
 	for {
+		// check for reorgs first to lower the chances of trying to handle another
+		// event eventhough a reorg is pending (due to Go `select` pseudo-randomly picking a case
+		// to execute if multiple of them are ready)
+		select {
+		case trigger := <-w.reorgCh:
+			err = w.handleReorg(&trigger)
+			continue
+			// System stopped
+		case <-w.exitCh:
+			return
+		default:
+		}
+
 		if _, isRetryable := err.(retryableCommitError); isRetryable {
+			log.Warn("failed to commit to a block, retrying", "err", err)
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorgReason); err != nil {
 				continue
 			}
@@ -340,36 +355,33 @@ func (w *worker) mainLoop() {
 			w.current = nil
 		}
 
-		// check for reorgs first to lower the chances of trying to handle another
-		// event eventhough a reorg is pending (due to Go `select` pseudo-randomly picking a case
-		// to execute if multiple of them are ready)
-		select {
-		case trigger := <-w.reorgCh:
-			err = w.handleReorg(&trigger)
-			continue
-		default:
-		}
-
+		idleStart := time.Now()
 		select {
 		case <-w.startCh:
-			if err := w.checkHeadRowConsumption(); err != nil {
-				log.Error("failed to start head checkers", "err", err)
-				return
+			idleTimer.UpdateSince(idleStart)
+			if w.isRunning() {
+				if err := w.checkHeadRowConsumption(); err != nil {
+					log.Error("failed to start head checkers", "err", err)
+					return
+				}
 			}
-
 			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)
 		case trigger := <-w.reorgCh:
+			idleTimer.UpdateSince(idleStart)
 			err = w.handleReorg(&trigger)
 		case chainHead := <-w.chainHeadCh:
+			idleTimer.UpdateSince(idleStart)
 			if w.isCanonical(chainHead.Block.Header()) {
 				_, err = w.tryCommitNewWork(time.Now(), chainHead.Block.Hash(), nil)
 			}
 		case <-w.current.deadlineCh():
+			idleTimer.UpdateSince(idleStart)
 			w.current.deadlineReached = true
 			if len(w.current.txs) > 0 {
 				_, err = w.commit(false)
 			}
 		case ev := <-w.txsCh:
+			idleTimer.UpdateSince(idleStart)
 			// Apply transactions to the pending state
 			//
 			// Note all transactions received may not be continuous with transactions
@@ -842,6 +854,18 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 			"index", *index,
 			"nextL1MsgIndex", w.current.nextL1MsgIndex,
 		)
+	}
+
+	currentHeight := w.current.header.Number.Uint64()
+	maxReorgDepth := uint64(w.config.CCCMaxWorkers + 1)
+	if currentHeight > maxReorgDepth {
+		ancestorHeight := currentHeight - maxReorgDepth
+		ancestorHash := w.chain.GetHeaderByNumber(ancestorHeight).Hash()
+		if rawdb.ReadBlockRowConsumption(w.chain.Database(), ancestorHash) == nil {
+			// reject committing to a block if its ancestor doesn't have its RC stored in DB yet.
+			// which may either mean that it failed CCC or it is still in the process of being checked
+			return common.Hash{}, retryableCommitError{inner: errors.New("ancestor doesn't have RC yet")}
+		}
 	}
 
 	// A new block event will trigger a reorg in the txpool, pause reorgs to defer this until we fetch txns for next block.

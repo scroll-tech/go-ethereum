@@ -91,6 +91,10 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 	return bc.chainHeadFeed.Subscribe(ch)
 }
 
+func (bc *testBlockChain) Database() ethdb.Database {
+	return nil
+}
+
 func TestMiner(t *testing.T) {
 	miner, mux := createMiner(t)
 	miner.Start(common.HexToAddress("0x12345"))
@@ -247,6 +251,7 @@ func createMiner(t *testing.T) (*Miner, *event.TypeMux) {
 	config := Config{
 		Etherbase:      common.HexToAddress("123456789"),
 		MaxAccountsNum: math.MaxInt,
+		CCCMaxWorkers:  2,
 	}
 	// Create chainConfig
 	memdb := memorydb.New()

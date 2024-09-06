@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	zktrie "github.com/scroll-tech/zktrie/types"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -40,6 +42,9 @@ var (
 // TracerWrapper implements ScrollTracerWrapper interface
 type TracerWrapper struct{}
 
+// alias for proof list
+type proofList = state.FullProofList
+
 // NewTracerWrapper TracerWrapper creates a new TracerWrapper
 func NewTracerWrapper() *TracerWrapper {
 	return &TracerWrapper{}
@@ -69,7 +74,7 @@ type TraceEnv struct {
 	// The following Mutexes are used to protect against parallel read/write,
 	// since txs are executed in parallel.
 	pMu sync.Mutex // for `TraceEnv.StorageTrace.Proofs`
-	sMu sync.Mutex // for `TraceEnv.state``
+	sMu sync.Mutex // for `TraceEnv.state`
 	cMu sync.Mutex // for `TraceEnv.Codes`
 
 	*types.StorageTrace
@@ -109,10 +114,13 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *vm.LogConf
 		state:            statedb,
 		blockCtx:         blockCtx,
 		StorageTrace: &types.StorageTrace{
-			RootBefore:    rootBefore,
-			RootAfter:     block.Root(),
-			Proofs:        make(map[string][]hexutil.Bytes),
-			StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+			RootBefore:     rootBefore,
+			RootAfter:      block.Root(),
+			Proofs:         make(map[string][]hexutil.Bytes),
+			StorageProofs:  make(map[string]map[string][]hexutil.Bytes),
+			FlattenProofs:  make(map[common.Hash]hexutil.Bytes),
+			AddressHashes:  make(map[common.Address]common.Hash),
+			StoreKeyHashes: make(map[common.Hash]common.Hash),
 		},
 		Codes:             make(map[common.Hash]vm.CodeInfo),
 		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
@@ -170,12 +178,15 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 
 	key := coinbase.String()
 	if _, exist := env.Proofs[key]; !exist {
-		proof, err := env.state.GetProof(coinbase)
+		proof, addrHash, err := env.state.GetFullProof(coinbase)
 		if err != nil {
 			log.Error("Proof for coinbase not available", "coinbase", coinbase, "error", err)
 			// but we still mark the proofs map with nil array
 		}
-		env.Proofs[key] = types.WrapProof(proof)
+		// TODO:
+		env.AddressHashes[coinbase] = addrHash
+		env.fillFlattenStorageProof(nil, proof)
+		env.Proofs[key] = types.WrapProof(proof.GetData())
 	}
 
 	return env, nil
@@ -249,21 +260,32 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	pend.Wait()
 
 	// after all tx has been traced, collect "deletion proof" for zktrie
+	deleteionProofs := make(map[common.Hash]hexutil.Bytes)
+
 	for _, tracer := range env.ZkTrieTracer {
 		delProofs, err := tracer.GetDeletionProofs()
 		if err != nil {
 			log.Error("deletion proof failure", "error", err)
 		} else {
-			for _, proof := range delProofs {
+			for key, proof := range delProofs {
+				deleteionProofs[common.BytesToHash(key.Bytes())] = proof
 				env.DeletionProofs = append(env.DeletionProofs, proof)
 			}
 		}
+	}
+
+	//TODO: merge deletion proof
+	for k, v := range deleteionProofs {
+		env.FlattenProofs[k] = v
 	}
 
 	// build dummy per-tx deletion proof
 	for _, txStorageTrace := range env.TxStorageTraces {
 		if txStorageTrace != nil {
 			txStorageTrace.DeletionProofs = env.DeletionProofs
+			for k, v := range deleteionProofs {
+				txStorageTrace.FlattenProofs[k] = v
+			}
 		}
 	}
 
@@ -372,8 +394,11 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 
 	txStorageTrace := &types.StorageTrace{
-		Proofs:        make(map[string][]hexutil.Bytes),
-		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+		Proofs:         make(map[string][]hexutil.Bytes),
+		StorageProofs:  make(map[string]map[string][]hexutil.Bytes),
+		FlattenProofs:  make(map[common.Hash]hexutil.Bytes),
+		AddressHashes:  make(map[common.Address]common.Hash),
+		StoreKeyHashes: make(map[common.Hash]common.Hash),
 	}
 	// still we have no state root for per tx, only set the head and tail
 	if index == 0 {
@@ -407,13 +432,17 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		if existed {
 			continue
 		}
-		proof, err := state.GetProof(addr)
+		proof, addrHash, err := state.GetFullProof(addr)
 		if err != nil {
 			log.Error("Proof not available", "address", addrStr, "error", err)
 			// but we still mark the proofs map with nil array
 		}
-		wrappedProof := types.WrapProof(proof)
+		wrappedProof := types.WrapProof(proof.GetData())
 		env.pMu.Lock()
+		// TODO:
+		env.fillFlattenStorageProof(txStorageTrace, proof)
+		txStorageTrace.AddressHashes[addr] = addrHash
+		env.AddressHashes[addr] = addrHash
 		env.Proofs[addrStr] = wrappedProof
 		txStorageTrace.Proofs[addrStr] = wrappedProof
 		env.pMu.Unlock()
@@ -465,18 +494,27 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			}
 			env.sMu.Unlock()
 
-			var proof [][]byte
+			var proof proofList
+			var keyHash common.Hash
 			var err error
 			if zktrieTracer.Available() {
-				proof, err = state.GetSecureTrieProof(zktrieTracer, key)
+				proof, keyHash, err = state.GetSecureTrieProof(zktrieTracer, key)
 			} else {
-				proof, err = state.GetSecureTrieProof(trie, key)
+				proof, keyHash, err = state.GetSecureTrieProof(trie, key)
 			}
 			if err != nil {
 				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 				// but we still mark the proofs map with nil array
 			}
-			wrappedProof := types.WrapProof(proof)
+
+			env.pMu.Lock()
+			// TODO:
+			env.fillFlattenStorageProof(txStorageTrace, proof)
+			txStorageTrace.StoreKeyHashes[key] = keyHash
+			env.StoreKeyHashes[key] = keyHash
+			env.pMu.Unlock()
+
+			wrappedProof := types.WrapProof(proof.GetData())
 			env.sMu.Lock()
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
@@ -515,6 +553,18 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	return nil
 }
 
+func (env *TraceEnv) fillFlattenStorageProof(trace *types.StorageTrace, proof proofList) {
+	for _, i := range proof {
+		// the "raw key" is in fact a zktrie.Hash (bytes stored with little-endian)
+		// we need to convert it into big-endian
+		hash := common.BytesToHash(zktrie.NewHashFromBytes(i.Key)[:])
+		env.FlattenProofs[hash] = i.Value
+		if trace != nil {
+			trace.FlattenProofs[hash] = i.Value
+		}
+	}
+}
+
 // fillBlockTrace content after all the txs are finished running.
 func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
 	defer func(t time.Time) {
@@ -543,10 +593,13 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 
 	for addr, storages := range intrinsicStorageProofs {
 		if _, existed := env.Proofs[addr.String()]; !existed {
-			if proof, err := statedb.GetProof(addr); err != nil {
+			if proof, addrHash, err := statedb.GetFullProof(addr); err != nil {
 				log.Error("Proof for intrinstic address not available", "error", err, "address", addr)
 			} else {
-				env.Proofs[addr.String()] = types.WrapProof(proof)
+				// TODO:
+				env.fillFlattenStorageProof(nil, proof)
+				env.AddressHashes[addr] = addrHash
+				env.Proofs[addr.String()] = types.WrapProof(proof.GetData())
 			}
 		}
 
@@ -558,10 +611,13 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			if _, existed := env.StorageProofs[addr.String()][slot.String()]; !existed {
 				if trie, err := statedb.GetStorageTrieForProof(addr); err != nil {
 					log.Error("Storage proof for intrinstic address not available", "error", err, "address", addr)
-				} else if proof, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
+				} else if proof, keyHash, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
 				} else {
-					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof)
+					// TODO:
+					env.fillFlattenStorageProof(nil, proof)
+					env.StoreKeyHashes[slot] = keyHash
+					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof.GetData())
 				}
 			}
 		}

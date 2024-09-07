@@ -151,7 +151,7 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 		if err != nil {
 			return nil, err
 		}
-		trace.StorageTrace.ApplyFilter(false)
+		// trace.StorageTrace.ApplyFilter(false)
 		traces = append(traces, trace)
 	}
 	return traces, nil

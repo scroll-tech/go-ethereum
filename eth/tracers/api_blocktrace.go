@@ -22,8 +22,14 @@ type TraceBlock interface {
 	GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (*types.BlockTrace, error)
 }
 
+type TracerEnv interface {
+	ResetForPartialTrace(*types.Block) error
+	GetBlockTrace(*types.Block) (*types.BlockTrace, error)
+}
+
 type scrollTracerWrapper interface {
 	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, core.ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
+	CreateTraceEnv(*params.ChainConfig, core.ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (TracerEnv, error)
 }
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
@@ -132,12 +138,20 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 
 	chaindb := api.backend.ChainDb()
 	traces := []*types.BlockTrace{}
+	traceEnv, err := api.scrollTracerWrapper.CreateTraceEnv(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	if err != nil {
+		return nil, err
+	}
 	for _, tx := range block.Transactions() {
 		singleTxBlock := types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{tx}, nil)
-		trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, singleTxBlock, true)
+		if err := traceEnv.ResetForPartialTrace(singleTxBlock); err != nil {
+			return nil, err
+		}
+		trace, err := traceEnv.GetBlockTrace(singleTxBlock)
 		if err != nil {
 			return nil, err
 		}
+		trace.StorageTrace.ApplyFilter(false)
 		traces = append(traces, trace)
 	}
 	return traces, nil

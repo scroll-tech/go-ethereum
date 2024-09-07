@@ -50,6 +50,11 @@ func NewTracerWrapper() *TracerWrapper {
 	return &TracerWrapper{}
 }
 
+func (tw *TracerWrapper) CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (tracers.TracerEnv, error) {
+	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parent, block, commitAfterApply)
+	return traceEnv, err
+}
+
 // CreateTraceEnvAndGetBlockTrace wraps the whole block tracing logic for a block
 func (tw *TracerWrapper) CreateTraceEnvAndGetBlockTrace(chainConfig *params.ChainConfig, chainContext core.ChainContext, engine consensus.Engine, chaindb ethdb.Database, statedb *state.StateDB, parent *types.Block, block *types.Block, commitAfterApply bool) (*types.BlockTrace, error) {
 	traceEnv, err := CreateTraceEnv(chainConfig, chainContext, engine, chaindb, statedb, parent, block, commitAfterApply)
@@ -190,6 +195,41 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext core.ChainCont
 	}
 
 	return env, nil
+}
+
+func (env *TraceEnv) ResetForPartialTrace(partialBlk *types.Block) error {
+
+	if env.StorageTrace == nil {
+		return fmt.Errorf("not init")
+	}
+
+	// TODO: can we chained the RootBefore / After?
+	oldStorage := env.StorageTrace
+
+	// only reset which can be reset
+	env.signer = types.MakeSigner(env.chainConfig, partialBlk.Number())
+	env.StorageTrace = &types.StorageTrace{
+		RootBefore:     oldStorage.RootBefore,
+		RootAfter:      partialBlk.Root(),
+		Proofs:         make(map[string][]hexutil.Bytes),
+		StorageProofs:  make(map[string]map[string][]hexutil.Bytes),
+		FlattenProofs:  make(map[common.Hash]hexutil.Bytes),
+		AddressHashes:  make(map[common.Address]common.Hash),
+		StoreKeyHashes: make(map[common.Hash]common.Hash),
+	}
+	env.Codes = make(map[common.Hash]vm.CodeInfo)
+	env.ExecutionResults = make([]*types.ExecutionResult, partialBlk.Transactions().Len())
+	env.TxStorageTraces = make([]*types.StorageTrace, partialBlk.Transactions().Len())
+
+	// still need to restore coinbase's proof ....
+	proof, addrHash, err := env.state.GetFullProof(env.coinbase)
+	if err == nil {
+		env.AddressHashes[env.coinbase] = addrHash
+		env.fillFlattenStorageProof(nil, proof)
+		env.Proofs[env.coinbase.String()] = types.WrapProof(proof.GetData())
+	}
+
+	return nil
 }
 
 func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error) {

@@ -330,12 +330,14 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 
 func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
 	// the last logged op should be CALL/STATICCALL/CALLCODE/CREATE/CREATE2
-	lastLogPos := len(l.logs) - 1
-	log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
-	l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
-	// sanity check
-	if len(l.callStackLogInd) != l.env.depth {
-		panic("unexpected evm depth in capture enter")
+	if !l.cfg.ExcludeExecutionResults {
+		lastLogPos := len(l.logs) - 1
+		log.Debug("mark call stack", "pos", lastLogPos, "op", l.logs[lastLogPos].Op)
+		l.callStackLogInd = append(l.callStackLogInd, lastLogPos)
+		// sanity check
+		if len(l.callStackLogInd) != l.env.depth {
+			panic("unexpected evm depth in capture enter")
+		}
 	}
 	l.statesAffected[to] = struct{}{}
 
@@ -343,12 +345,14 @@ func (l *StructLogger) CaptureEnter(typ OpCode, from common.Address, to common.A
 
 // CaptureExit phase, a CREATE has its target address's code being set and queryable
 func (l *StructLogger) CaptureExit(output []byte, gasUsed uint64, err error) {
-	stackH := len(l.callStackLogInd)
-	if stackH == 0 {
-		panic("unexpected capture exit occur")
-	}
+	if !l.cfg.ExcludeExecutionResults {
+		stackH := len(l.callStackLogInd)
+		if stackH == 0 {
+			panic("unexpected capture exit occur")
+		}
 
-	l.callStackLogInd = l.callStackLogInd[:stackH-1]
+		l.callStackLogInd = l.callStackLogInd[:stackH-1]
+	}
 
 }
 

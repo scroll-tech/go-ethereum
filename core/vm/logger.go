@@ -301,7 +301,9 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	}
 
 	structLog.RefundCounter = l.env.StateDB.GetRefund()
-	l.logs = append(l.logs, structLog)
+	if !l.cfg.ExcludeExecutionResults {
+		l.logs = append(l.logs, structLog)
+	}
 }
 
 func (l *StructLogger) CaptureStateAfter(pc uint64, op OpCode, gas, cost uint64, scope *ScopeContext, rData []byte, depth int, err error) {

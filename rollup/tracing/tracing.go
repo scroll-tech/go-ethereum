@@ -677,19 +677,6 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 		}
 	}
 
-	if env.logConfig.ExcludeExecutionResults {
-		env.ExecutionResults = nil
-	}
-	if env.logConfig.ExcludeTxStorageTraces {
-		env.TxStorageTraces = nil
-	}
-	if env.logConfig.FlattenProofsOnly {
-		env.Proofs = nil
-		env.StorageProofs = nil
-		env.AddressHashes = nil
-		env.StoreKeyHashes = nil
-	}
-
 	var chainID uint64
 	if env.chainConfig.ChainID != nil {
 		chainID = env.chainConfig.ChainID.Uint64()

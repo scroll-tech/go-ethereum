@@ -207,5 +207,17 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 			st.ApplyFilter(legacyStorageTrace)
 		}
 	}
+	if config.LogConfig.ExcludeExecutionResults {
+		l2Trace.ExecutionResults = nil
+	}
+	if config.LogConfig.ExcludeTxStorageTraces {
+		l2Trace.TxStorageTraces = nil
+	}
+	if config.LogConfig.FlattenProofsOnly {
+		l2Trace.StorageTrace.Proofs = nil
+		l2Trace.StorageTrace.StorageProofs = nil
+		l2Trace.StorageTrace.AddressHashes = nil
+		l2Trace.StorageTrace.StoreKeyHashes = nil
+	}
 	return l2Trace, nil
 }

@@ -28,8 +28,8 @@ type TracerEnv interface {
 }
 
 type scrollTracerWrapper interface {
-	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, core.ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
-	CreateTraceEnv(*params.ChainConfig, core.ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (TracerEnv, error)
+	CreateTraceEnvAndGetBlockTrace(*vm.LogConfig, *params.ChainConfig, core.ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (*types.BlockTrace, error)
+	CreateTraceEnv(*vm.LogConfig, *params.ChainConfig, core.ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Block, *types.Block, bool) (TracerEnv, error)
 }
 
 // GetBlockTraceByNumberOrHash replays the block and returns the structured BlockTrace by hash or number.
@@ -138,7 +138,7 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 
 	chaindb := api.backend.ChainDb()
 	traces := []*types.BlockTrace{}
-	traceEnv, err := api.scrollTracerWrapper.CreateTraceEnv(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	traceEnv, err := api.scrollTracerWrapper.CreateTraceEnv(config.LogConfig, api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	}
 
 	chaindb := api.backend.ChainDb()
-	l2Trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	l2Trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(config.LogConfig, api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
 	if err != nil {
 		return nil, err
 	}

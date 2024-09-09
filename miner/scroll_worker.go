@@ -858,7 +858,7 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 
 	currentHeight := w.current.header.Number.Uint64()
 	maxReorgDepth := uint64(w.config.CCCMaxWorkers + 1)
-	if currentHeight > maxReorgDepth {
+	if !force && currentHeight > maxReorgDepth {
 		ancestorHeight := currentHeight - maxReorgDepth
 		ancestorHash := w.chain.GetHeaderByNumber(ancestorHeight).Hash()
 		if rawdb.ReadBlockRowConsumption(w.chain.Database(), ancestorHash) == nil {

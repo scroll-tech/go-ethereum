@@ -203,8 +203,10 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	}
 	if !unionStorageTrace {
 		l2Trace.StorageTrace.ApplyFilter(legacyStorageTrace)
-		for _, st := range l2Trace.TxStorageTraces {
-			st.ApplyFilter(legacyStorageTrace)
+		if !config.LogConfig.ExcludeTxStorageTraces {
+			for _, st := range l2Trace.TxStorageTraces {
+				st.ApplyFilter(legacyStorageTrace)
+			}
 		}
 	}
 	if config.LogConfig.ExcludeExecutionResults {

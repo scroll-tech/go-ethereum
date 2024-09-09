@@ -602,7 +602,9 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			CallTrace:      callTrace,
 		}
 	}
-	env.TxStorageTraces[index] = txStorageTrace
+	if !env.logConfig.ExcludeTxStorageTraces {
+		env.TxStorageTraces[index] = txStorageTrace
+	}
 
 	return nil
 }

@@ -581,30 +581,26 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 	getTxResultZkTrieBuildTimer.UpdateSince(zkTrieBuildStart)
 
-	if !env.logConfig.ExcludeExecutionResults {
-		tracerResultTimer := time.Now()
-		callTrace, err := callTracer.GetResult()
-		if err != nil {
-			return fmt.Errorf("failed to get callTracer result: %w", err)
-		}
-		getTxResultTracerResultTimer.UpdateSince(tracerResultTimer)
+	tracerResultTimer := time.Now()
+	callTrace, err := callTracer.GetResult()
+	if err != nil {
+		return fmt.Errorf("failed to get callTracer result: %w", err)
+	}
+	getTxResultTracerResultTimer.UpdateSince(tracerResultTimer)
 
-		env.ExecutionResults[index] = &types.ExecutionResult{
-			From:           sender,
-			To:             receiver,
-			AccountCreated: createdAcc,
-			AccountsAfter:  after,
-			L1DataFee:      (*hexutil.Big)(result.L1DataFee),
-			Gas:            result.UsedGas,
-			Failed:         result.Failed(),
-			ReturnValue:    fmt.Sprintf("%x", returnVal),
-			StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
-			CallTrace:      callTrace,
-		}
+	env.ExecutionResults[index] = &types.ExecutionResult{
+		From:           sender,
+		To:             receiver,
+		AccountCreated: createdAcc,
+		AccountsAfter:  after,
+		L1DataFee:      (*hexutil.Big)(result.L1DataFee),
+		Gas:            result.UsedGas,
+		Failed:         result.Failed(),
+		ReturnValue:    fmt.Sprintf("%x", returnVal),
+		StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
+		CallTrace:      callTrace,
 	}
-	if !env.logConfig.ExcludeTxStorageTraces {
-		env.TxStorageTraces[index] = txStorageTrace
-	}
+	env.TxStorageTraces[index] = txStorageTrace
 
 	return nil
 }

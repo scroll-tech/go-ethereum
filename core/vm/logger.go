@@ -50,13 +50,16 @@ func (s Storage) Copy() Storage {
 
 // LogConfig are the configuration options for structured logger the EVM
 type LogConfig struct {
-	EnableMemory       bool    // enable memory capture
-	DisableStack       bool    // disable stack capture
-	DisableStorage     bool    // disable storage capture
-	EnableReturnData   bool    // enable return data capture
-	Debug              bool    // print output during capture end
-	Limit              int     // maximum length of output, but zero means unlimited
-	StorageProofFormat *string // format of storage proofs, can be
+	EnableMemory            bool    // enable memory capture
+	DisableStack            bool    // disable stack capture
+	DisableStorage          bool    // disable storage capture
+	EnableReturnData        bool    // enable return data capture
+	ExcludeExecutionResults bool    // exclude execution results from the trace
+	ExcludeTxStorageTraces  bool    // exclude storage traces from the trace
+	FlattenProofsOnly       bool    // exclude storage traces from the trace
+	Debug                   bool    // print output during capture end
+	Limit                   int     // maximum length of output, but zero means unlimited
+	StorageProofFormat      *string // format of storage proofs, can be
 	// "legacy" (use the legacy proof format) or
 	// "union" (output both flatten and legacy proof)
 	// Chain overrides, can be used to execute a trace using future fork rules
@@ -227,42 +230,45 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	if l.cfg.Limit != 0 && l.cfg.Limit <= len(l.logs) {
 		return
 	}
-	// Copy a snapshot of the current memory state to a new buffer
-	if l.cfg.EnableMemory {
-		structLog.Memory.Write(memory.Data())
-		structLog.MemorySize = memory.Len()
-	}
-	// Copy a snapshot of the current stack state to a new buffer
-	if !l.cfg.DisableStack {
-		structLog.Stack = append(structLog.Stack, stack.Data()...)
-	}
-	var (
-		recordStorageDetail bool
-		storageKey          common.Hash
-		storageValue        common.Hash
-	)
-	if op == SLOAD && stack.len() >= 1 {
-		recordStorageDetail = true
-		storageKey = stack.data[stack.len()-1].Bytes32()
-		storageValue = l.env.StateDB.GetState(contract.Address(), storageKey)
-	} else if op == SSTORE && stack.len() >= 2 {
-		recordStorageDetail = true
-		storageKey = stack.data[stack.len()-1].Bytes32()
-		storageValue = stack.data[stack.len()-2].Bytes32()
-	}
-	if recordStorageDetail {
-		contractAddress := contract.Address()
-		if l.storage[contractAddress] == nil {
-			l.storage[contractAddress] = make(Storage)
+	if !l.cfg.ExcludeExecutionResults {
+		// Copy a snapshot of the current memory state to a new buffer
+		if l.cfg.EnableMemory {
+			structLog.Memory.Write(memory.Data())
+			structLog.MemorySize = memory.Len()
 		}
-		l.storage[contractAddress][storageKey] = storageValue
-		if !l.cfg.DisableStorage {
-			structLog.Storage = l.storage[contractAddress].Copy()
+		// Copy a snapshot of the current stack state to a new buffer
+		if !l.cfg.DisableStack {
+			structLog.Stack = append(structLog.Stack, stack.Data()...)
+		}
+		var (
+			recordStorageDetail bool
+			storageKey          common.Hash
+			storageValue        common.Hash
+		)
+		if op == SLOAD && stack.len() >= 1 {
+			recordStorageDetail = true
+			storageKey = stack.data[stack.len()-1].Bytes32()
+			storageValue = l.env.StateDB.GetState(contract.Address(), storageKey)
+		} else if op == SSTORE && stack.len() >= 2 {
+			recordStorageDetail = true
+			storageKey = stack.data[stack.len()-1].Bytes32()
+			storageValue = stack.data[stack.len()-2].Bytes32()
+		}
+		if recordStorageDetail {
+			contractAddress := contract.Address()
+			if l.storage[contractAddress] == nil {
+				l.storage[contractAddress] = make(Storage)
+			}
+			l.storage[contractAddress][storageKey] = storageValue
+			if !l.cfg.DisableStorage {
+				structLog.Storage = l.storage[contractAddress].Copy()
+			}
+		}
+		if l.cfg.EnableReturnData {
+			structLog.ReturnData.Write(rData)
 		}
 	}
-	if l.cfg.EnableReturnData {
-		structLog.ReturnData.Write(rData)
-	}
+
 	execFuncList, ok := OpcodeExecs[op]
 	if ok {
 		// execute trace func list.

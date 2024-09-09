@@ -381,14 +381,22 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		TxIndex:     index,
 		TxHash:      tx.Hash(),
 	}
-	callTracer, err := tracers.New("callTracer", &tracerContext)
-	if err != nil {
-		return fmt.Errorf("failed to create callTracer: %w", err)
-	}
+	var callTracer tracers.Tracer
+	var tracer vm.EVMLogger
+	var err error
 
 	applyMessageStart := time.Now()
 	structLogger := vm.NewStructLogger(env.logConfig)
-	tracer := NewMuxTracer(structLogger, callTracer)
+	if !env.logConfig.ExcludeExecutionResults {
+		callTracer, err = tracers.New("callTracer", &tracerContext)
+		if err != nil {
+			return fmt.Errorf("failed to create callTracer: %w", err)
+		}
+		tracer = NewMuxTracer(structLogger, callTracer)
+	} else {
+		tracer = structLogger
+	}
+
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(env.blockCtx, txContext, state, env.chainConfig, vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
 
@@ -569,26 +577,30 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	}
 	getTxResultZkTrieBuildTimer.UpdateSince(zkTrieBuildStart)
 
-	tracerResultTimer := time.Now()
-	callTrace, err := callTracer.GetResult()
-	if err != nil {
-		return fmt.Errorf("failed to get callTracer result: %w", err)
-	}
-	getTxResultTracerResultTimer.UpdateSince(tracerResultTimer)
+	if !env.logConfig.ExcludeExecutionResults {
+		tracerResultTimer := time.Now()
+		callTrace, err := callTracer.GetResult()
+		if err != nil {
+			return fmt.Errorf("failed to get callTracer result: %w", err)
+		}
+		getTxResultTracerResultTimer.UpdateSince(tracerResultTimer)
 
-	env.ExecutionResults[index] = &types.ExecutionResult{
-		From:           sender,
-		To:             receiver,
-		AccountCreated: createdAcc,
-		AccountsAfter:  after,
-		L1DataFee:      (*hexutil.Big)(result.L1DataFee),
-		Gas:            result.UsedGas,
-		Failed:         result.Failed(),
-		ReturnValue:    fmt.Sprintf("%x", returnVal),
-		StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
-		CallTrace:      callTrace,
+		env.ExecutionResults[index] = &types.ExecutionResult{
+			From:           sender,
+			To:             receiver,
+			AccountCreated: createdAcc,
+			AccountsAfter:  after,
+			L1DataFee:      (*hexutil.Big)(result.L1DataFee),
+			Gas:            result.UsedGas,
+			Failed:         result.Failed(),
+			ReturnValue:    fmt.Sprintf("%x", returnVal),
+			StructLogs:     vm.FormatLogs(structLogger.StructLogs()),
+			CallTrace:      callTrace,
+		}
 	}
-	env.TxStorageTraces[index] = txStorageTrace
+	if !env.logConfig.ExcludeTxStorageTraces {
+		env.TxStorageTraces[index] = txStorageTrace
+	}
 
 	return nil
 }
@@ -661,6 +673,19 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 				}
 			}
 		}
+	}
+
+	if env.logConfig.ExcludeExecutionResults {
+		env.ExecutionResults = nil
+	}
+	if env.logConfig.ExcludeTxStorageTraces {
+		env.TxStorageTraces = nil
+	}
+	if env.logConfig.FlattenProofsOnly {
+		env.Proofs = nil
+		env.StorageProofs = nil
+		env.AddressHashes = nil
+		env.StoreKeyHashes = nil
 	}
 
 	var chainID uint64

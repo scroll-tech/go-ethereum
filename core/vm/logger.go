@@ -240,32 +240,33 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		if !l.cfg.DisableStack {
 			structLog.Stack = append(structLog.Stack, stack.Data()...)
 		}
-		var (
-			recordStorageDetail bool
-			storageKey          common.Hash
-			storageValue        common.Hash
-		)
-		if op == SLOAD && stack.len() >= 1 {
-			recordStorageDetail = true
-			storageKey = stack.data[stack.len()-1].Bytes32()
-			storageValue = l.env.StateDB.GetState(contract.Address(), storageKey)
-		} else if op == SSTORE && stack.len() >= 2 {
-			recordStorageDetail = true
-			storageKey = stack.data[stack.len()-1].Bytes32()
-			storageValue = stack.data[stack.len()-2].Bytes32()
-		}
-		if recordStorageDetail {
-			contractAddress := contract.Address()
-			if l.storage[contractAddress] == nil {
-				l.storage[contractAddress] = make(Storage)
-			}
-			l.storage[contractAddress][storageKey] = storageValue
-			if !l.cfg.DisableStorage {
-				structLog.Storage = l.storage[contractAddress].Copy()
-			}
-		}
 		if l.cfg.EnableReturnData {
 			structLog.ReturnData.Write(rData)
+		}
+	}
+
+	var (
+		recordStorageDetail bool
+		storageKey          common.Hash
+		storageValue        common.Hash
+	)
+	if op == SLOAD && stack.len() >= 1 {
+		recordStorageDetail = true
+		storageKey = stack.data[stack.len()-1].Bytes32()
+		storageValue = l.env.StateDB.GetState(contract.Address(), storageKey)
+	} else if op == SSTORE && stack.len() >= 2 {
+		recordStorageDetail = true
+		storageKey = stack.data[stack.len()-1].Bytes32()
+		storageValue = stack.data[stack.len()-2].Bytes32()
+	}
+	if recordStorageDetail {
+		contractAddress := contract.Address()
+		if l.storage[contractAddress] == nil {
+			l.storage[contractAddress] = make(Storage)
+		}
+		l.storage[contractAddress][storageKey] = storageValue
+		if !l.cfg.DisableStorage {
+			structLog.Storage = l.storage[contractAddress].Copy()
 		}
 	}
 

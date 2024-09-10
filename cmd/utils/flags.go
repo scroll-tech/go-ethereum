@@ -1747,17 +1747,12 @@ func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
 }
 
 func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
-<<<<<<< HEAD
 	if ctx.IsSet(CircuitCapacityCheckEnabledFlag.Name) {
 		cfg.CheckCircuitCapacity = ctx.Bool(CircuitCapacityCheckEnabledFlag.Name)
-=======
-	if ctx.GlobalIsSet(CircuitCapacityCheckEnabledFlag.Name) {
-		cfg.CheckCircuitCapacity = ctx.GlobalBool(CircuitCapacityCheckEnabledFlag.Name)
 		cfg.CCCMaxWorkers = runtime.GOMAXPROCS(0)
-		if ctx.GlobalIsSet(CircuitCapacityCheckWorkersFlag.Name) {
-			cfg.CCCMaxWorkers = int(ctx.GlobalUint(CircuitCapacityCheckWorkersFlag.Name))
+		if ctx.IsSet(CircuitCapacityCheckWorkersFlag.Name) {
+			cfg.CCCMaxWorkers = int(ctx.Uint(CircuitCapacityCheckWorkersFlag.Name))
 		}
->>>>>>> 233a6adc1 (feat: async ccc checker (#996))
 	}
 }
 

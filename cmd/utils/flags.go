@@ -1001,7 +1001,7 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage: "Enable circuit capacity check during block validation",
 	}
 
-	CircuitCapacityCheckWorkersFlag = cli.UintFlag{
+	CircuitCapacityCheckWorkersFlag = &cli.UintFlag{
 		Name:  "ccc.numworkers",
 		Usage: "Set the number of workers that will be used for background CCC tasks",
 		Value: uint(runtime.GOMAXPROCS(0)),

@@ -41,9 +41,10 @@ var (
 //
 // BlockValidator implements Validator.
 type BlockValidator struct {
-	config         *params.ChainConfig      // Chain configuration options
-	bc             *BlockChain              // Canonical block chain
-	engine         consensus.Engine         // Consensus engine used for validating
+	config *params.ChainConfig // Chain configuration options
+	bc     *BlockChain         // Canonical block chain
+	engine consensus.Engine    // Consensus engine used for validating
+
 	asyncValidator func(*types.Block) error // Asynchronously run a validation task
 }
 
@@ -56,17 +57,6 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 	}
 	return validator
 }
-
-// type tracerWrapper interface {
-// 	CreateTraceEnvAndGetBlockTrace(*params.ChainConfig, ChainContext, consensus.Engine, ethdb.Database, *state.StateDB, *types.Header, *types.Block, bool) (*types.BlockTrace, error)
-// }
-
-// func (v *BlockValidator) SetupTracerAndCircuitCapacityChecker(tracer tracerWrapper) {
-// 	v.checkCircuitCapacity = true
-// 	v.tracer = tracer
-// 	v.circuitCapacityChecker = ccc.NewChecker(true)
-// 	log.Info("new Checker in BlockValidator", "ID", v.circuitCapacityChecker.ID)
-// }
 
 // WithAsyncValidator sets up an async validator to be triggered on each new block
 func (v *BlockValidator) WithAsyncValidator(asyncValidator func(*types.Block) error) Validator {
@@ -156,18 +146,6 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		return err
 	}
 
-	// if v.checkCircuitCapacity {
-	// 	// if a block's RowConsumption has been stored, which means it has been processed before,
-	// 	// (e.g., in miner/worker.go or in insertChain),
-	// 	// we simply skip its calculation and validation
-	// 	if rawdb.ReadBlockRowConsumption(v.bc.db, block.Hash()) != nil {
-	// 		return nil
-	// 	}
-	// 	rowConsumption, err := v.validateCircuitRowConsumption(block)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 	if v.asyncValidator != nil {
 		asyncStart := time.Now()
 		if err := v.asyncValidator(block); err != nil {
@@ -326,61 +304,3 @@ func CalcGasLimit(parentGasLimit, desiredLimit uint64) uint64 {
 	}
 	return limit
 }
-
-// func (v *BlockValidator) createTraceEnvAndGetBlockTrace(block *types.Block) (*types.BlockTrace, error) {
-// 	parent := v.bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
-// 	if parent == nil {
-// 		return nil, errors.New("validateCircuitRowConsumption: no parent block found")
-// 	}
-
-// 	statedb, err := v.bc.StateAt(parent.Root())
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return v.tracer.CreateTraceEnvAndGetBlockTrace(v.config, v.bc, v.engine, v.bc.db, statedb, parent.Header(), block, true)
-// }
-
-// func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*types.RowConsumption, error) {
-// 	defer func(t0 time.Time) {
-// 		validateRowConsumptionTimer.Update(time.Since(t0))
-// 	}(time.Now())
-
-// 	log.Trace(
-// 		"Validator apply ccc for block",
-// 		"id", v.circuitCapacityChecker.ID,
-// 		"number", block.NumberU64(),
-// 		"hash", block.Hash().String(),
-// 		"len(txs)", block.Transactions().Len(),
-// 	)
-
-// 	traceStartTime := time.Now()
-// 	traces, err := v.createTraceEnvAndGetBlockTrace(block)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	validateTraceTimer.Update(time.Since(traceStartTime))
-
-// 	lockStartTime := time.Now()
-// 	v.cMu.Lock()
-// 	defer v.cMu.Unlock()
-// 	validateLockTimer.Update(time.Since(lockStartTime))
-
-// 	cccStartTime := time.Now()
-// 	v.circuitCapacityChecker.Reset()
-// 	log.Trace("Validator reset ccc", "id", v.circuitCapacityChecker.ID)
-// 	rc, err := v.circuitCapacityChecker.ApplyBlock(traces)
-// 	validateCccTimer.Update(time.Since(cccStartTime))
-
-// 	log.Trace(
-// 		"Validator apply ccc for block result",
-// 		"id", v.circuitCapacityChecker.ID,
-// 		"number", block.NumberU64(),
-// 		"hash", block.Hash().String(),
-// 		"len(txs)", block.Transactions().Len(),
-// 		"rc", rc,
-// 		"err", err,
-// 	)
-
-// 	return rc, err
-// }

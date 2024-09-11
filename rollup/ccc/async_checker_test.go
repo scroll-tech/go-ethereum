@@ -15,6 +15,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 func TestAsyncChecker(t *testing.T) {
@@ -25,18 +26,19 @@ func TestAsyncChecker(t *testing.T) {
 
 	// Create a database pre-initialize with a genesis block
 	db := rawdb.NewMemoryDatabase()
-	(&core.Genesis{
+	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 		Alloc:  core.GenesisAlloc{testAddr: {Balance: new(big.Int).Mul(big.NewInt(1000), big.NewInt(params.Ether))}},
-	}).MustCommit(db)
+	}
+	gspec.MustCommit(db, trie.NewDatabase(db, trie.HashDefaultsWithZktrie))
 
-	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil)
+	chain, _ := core.NewBlockChain(db, nil, gspec, nil, ethash.NewFaker(), vm.Config{}, nil, nil)
 	asyncChecker := NewAsyncChecker(chain, 1, false)
 	chain.Validator().WithAsyncValidator(asyncChecker.Check)
 
 	bs, _ := core.GenerateChain(params.TestChainConfig, chain.Genesis(), ethash.NewFaker(), db, 100, func(i int, block *core.BlockGen) {
 		for i := 0; i < 10; i++ {
-			signer := types.MakeSigner(params.TestChainConfig, block.Number())
+			signer := types.MakeSigner(params.TestChainConfig, block.Number(), block.Timestamp())
 			tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testAddr), testAddr, big.NewInt(1000), params.TxGas, block.BaseFee(), nil), signer, testKey)
 			if err != nil {
 				panic(err)

@@ -105,11 +105,12 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 
 	if config == nil {
 		config = &TraceConfig{
-			LogConfig: &vm.LogConfig{
+			Config: &logger.Config{
 				DisableStorage:   true,
 				DisableStack:     true,
 				EnableMemory:     false,
 				EnableReturnData: true,
+				Debug:            true,
 			},
 		}
 	} else if config.Tracer != nil {
@@ -125,7 +126,7 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 	if config != nil && config.Reexec != nil {
 		reexec = *config.Reexec
 	}
-	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, true)
+	statedb, _, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, true) // TODO: release?
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,7 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 	traces := []*types.BlockTrace{}
 	for _, tx := range block.Transactions() {
 		singleTxBlock := types.NewBlockWithHeader(block.Header()).WithBody([]*types.Transaction{tx}, nil)
-		trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, singleTxBlock, true)
+		trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent.Header(), singleTxBlock, true)
 		if err != nil {
 			return nil, err
 		}
@@ -148,8 +149,11 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	if config == nil {
 		config = &TraceConfig{
 			Config: &logger.Config{
+				DisableStorage:   true,
+				DisableStack:     true,
 				EnableMemory:     false,
 				EnableReturnData: true,
+				Debug:            true,
 			},
 		}
 	} else if config.Tracer != nil {

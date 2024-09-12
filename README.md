@@ -11,7 +11,7 @@ https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/6874
 
 ## ZK-Rollup
 
-ZK-Rollup adapts the Go Ethereum to run as Layer 2 Sequencer. The codebase is based on v1.10.13.
+ZK-Rollup adapts the [Go Ethereum](https://geth.ethereum.org/) to run as Layer 2 Sequencer. The codebase is based on v1.10.13.
 
 ### ZKTrie Storage
 

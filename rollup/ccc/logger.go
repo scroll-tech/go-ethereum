@@ -3,7 +3,6 @@ package ccc
 import (
 	"maps"
 	"math/big"
-	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -206,7 +205,7 @@ func (l *Logger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *
 		l.logCopy(scope.Stack.Back(3).Uint64())
 	case vm.CALLDATACOPY, vm.RETURNDATACOPY, vm.CODECOPY, vm.MCOPY, vm.CREATE, vm.CREATE2:
 		l.logCopy(scope.Stack.Back(2).Uint64())
-	case vm.SHA3:
+	case vm.KECCAK256:
 		l.keccakUsage += computeKeccakRows(scope.Stack.Back(1).Uint64())
 		l.logCopy(scope.Stack.Back(1).Uint64())
 	case vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4, vm.RETURN, vm.REVERT:
@@ -244,17 +243,21 @@ func (l *Logger) CaptureEnter(typ vm.OpCode, from common.Address, to common.Addr
 }
 
 func (l *Logger) CaptureExit(output []byte, gasUsed uint64, err error) {
-
 }
 
 func (l *Logger) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {
-
 }
 
-func (l *Logger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {
+func (l *Logger) CaptureEnd(output []byte, gasUsed uint64, err error) {
 	if l.isCreate && err != nil {
 		l.logRawBytecode(output) // deployed bytecode
 	}
+}
+
+func (l *Logger) CaptureTxStart(gasLimit uint64) {
+}
+
+func (l *Logger) CaptureTxEnd(restGas uint64) {
 }
 
 // Error returns an error if executed txns triggered an overflow

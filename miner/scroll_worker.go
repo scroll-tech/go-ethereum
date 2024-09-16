@@ -598,7 +598,7 @@ func (w *worker) processReorgedTxns(reason error) (bool, error) {
 }
 
 // processTxns
-func (w *worker) processTxns(txs types.OrderedTransactionSet) (bool, error) {
+func (w *worker) processTxns(txs orderedTransactionSet) (bool, error) {
 	for {
 		tx := txs.Peek()
 		if tx == nil {

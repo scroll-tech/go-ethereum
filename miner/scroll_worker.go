@@ -721,34 +721,31 @@ func (e retryableCommitError) Unwrap() error {
 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
-func (w *worker) commit(res *pipeline.Result) error {
+func (w *worker) commit(force bool) (common.Hash, error) {
 	sealDelay := time.Duration(0)
 	defer func(t0 time.Time) {
 		l2CommitTimer.Update(time.Since(t0) - sealDelay)
 	}(time.Now())
 
-	if res.CCCErr != nil {
-		commitReasonCCCCounter.Inc(1)
-	} else {
-		commitReasonDeadlineCounter.Inc(1)
+	w.updateSnapshot()
+	if !w.isRunning() && !force {
+		return common.Hash{}, nil
 	}
-	commitGasCounter.Inc(int64(res.FinalBlock.Header.GasUsed))
 
-	block, err := w.engine.FinalizeAndAssemble(w.chain, res.FinalBlock.Header, res.FinalBlock.State,
-		res.FinalBlock.Txs, nil, res.FinalBlock.Receipts, nil)
+	block, err := w.engine.FinalizeAndAssemble(w.chain, w.current.header, w.current.state,
+		w.current.txs, nil, w.current.receipts)
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 
 	sealHash := w.engine.SealHash(block.Header())
 	log.Info("Committing new mining work", "number", block.Number(), "sealhash", sealHash,
-		"txs", res.FinalBlock.Txs.Len(),
-		"gas", block.GasUsed(), "fees", totalFees(block, res.FinalBlock.Receipts),
-		"elapsed", common.PrettyDuration(time.Since(w.currentPipelineStart)))
+		"txs", w.current.txs.Len(),
+		"gas", block.GasUsed(), "fees", totalFees(block, w.current.receipts))
 
 	resultCh, stopCh := make(chan *types.Block), make(chan struct{})
 	if err := w.engine.Seal(w.chain, block, resultCh, stopCh); err != nil {
-		return err
+		return common.Hash{}, err
 	}
 	// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
 	// or a call that blocks between the call to Seal and the line below. Seal might introduce some delay, so we keep track of
@@ -757,17 +754,17 @@ func (w *worker) commit(res *pipeline.Result) error {
 	block = <-resultCh
 	sealDelay = time.Since(sealStart)
 	if block == nil {
-		return errors.New("missed seal response from consensus engine")
+		return common.Hash{}, errors.New("missed seal response from consensus engine")
 	}
 
 	// verify the generated block with local consensus engine to make sure everything is as expected
-	if err = w.engine.VerifyHeader(w.chain, block.Header()); err != nil {
-		return retryableCommitError{inner: err}
+	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
+		return common.Hash{}, retryableCommitError{inner: err}
 	}
 
 	blockHash := block.Hash()
-	var logs []*types.Log
-	for i, receipt := range res.FinalBlock.Receipts {
+
+	for i, receipt := range w.current.receipts {
 		// add block location fields
 		receipt.BlockHash = blockHash
 		receipt.BlockNumber = block.Number()
@@ -776,11 +773,9 @@ func (w *worker) commit(res *pipeline.Result) error {
 		for _, log := range receipt.Logs {
 			log.BlockHash = blockHash
 		}
-
-		logs = append(logs, receipt.Logs...)
 	}
 
-	for _, log := range res.FinalBlock.CoalescedLogs {
+	for _, log := range w.current.coalescedLogs {
 		log.BlockHash = blockHash
 	}
 
@@ -795,37 +790,27 @@ func (w *worker) commit(res *pipeline.Result) error {
 			"Worker WriteFirstQueueIndexNotInL2Block",
 			"number", block.Number(),
 			"hash", blockHash.String(),
-			"nextL1MsgIndex", res.FinalBlock.NextL1MsgIndex,
+			"nextL1MsgIndex", w.current.nextL1MsgIndex,
 		)
-		rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), blockHash, res.FinalBlock.NextL1MsgIndex)
+		rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), blockHash, w.current.nextL1MsgIndex)
 	} else {
 		log.Trace(
 			"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
 			"number", block.Number(),
 			"hash", blockHash.String(),
 			"index", *index,
-			"nextL1MsgIndex", res.FinalBlock.NextL1MsgIndex,
+			"nextL1MsgIndex", w.current.nextL1MsgIndex,
 		)
 	}
-	// Store circuit row consumption.
-	log.Trace(
-		"Worker write block row consumption",
-		"id", w.circuitCapacityChecker.ID,
-		"number", block.Number(),
-		"hash", blockHash.String(),
-		"accRows", res.Rows,
-	)
 
 	// A new block event will trigger a reorg in the txpool, pause reorgs to defer this until we fetch txns for next block.
 	// We may end up trying to process txns that we already included in the previous block, but they will all fail the nonce check
 	w.eth.TxPool().PauseReorgs()
 
-	rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), blockHash, res.Rows)
 	// Commit block and state to database.
-	_, err = w.chain.WriteBlockAndSetHead(block, res.FinalBlock.Receipts, logs, res.FinalBlock.State, true)
+	_, err = w.chain.WriteBlockWithState(block, w.current.receipts, w.current.coalescedLogs, w.current.state, true)
 	if err != nil {
-		log.Error("Failed writing block to chain", "err", err)
-		return err
+		return common.Hash{}, err
 	}
 
 	log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealHash, "hash", blockHash)
@@ -833,7 +818,20 @@ func (w *worker) commit(res *pipeline.Result) error {
 	// Broadcast the block and announce chain insertion event
 	w.mux.Post(core.NewMinedBlockEvent{Block: block})
 
-	return nil
+	checkStart := time.Now()
+	if err = w.asyncChecker.Check(block); err != nil {
+		log.Error("failed to launch CCC background task", "err", err)
+	}
+	cccStallTimer.UpdateSince(checkStart)
+
+	commitGasCounter.Inc(int64(block.GasUsed()))
+	if w.current.deadlineReached {
+		commitReasonDeadlineCounter.Inc(1)
+	} else {
+		commitReasonCCCCounter.Inc(1)
+	}
+	w.current = nil
+	return block.Hash(), nil
 }
 
 // copyReceipts makes a deep copy of the given receipts.

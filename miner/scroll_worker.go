@@ -915,3 +915,68 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 	}
 	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
 }
+
+func (w *worker) forceTestErr(tx *types.Transaction) {
+	if w.skipTxHash == tx.Hash() {
+		w.current.cccLogger.ForceError()
+	}
+
+	w.errCountdown--
+	if w.errCountdown == 0 {
+		w.current.cccLogger.ForceError()
+	}
+}
+
+// scheduleCCCError schedules an CCC error with a countdown, only used in tests.
+func (w *worker) scheduleCCCError(countdown int) {
+	w.errCountdown = countdown
+}
+
+// skip forces a txn to be skipped by worker
+func (w *worker) skip(txHash common.Hash) {
+	w.skipTxHash = txHash
+}
+
+// onBlockFailingCCC is called when block produced by worker fails CCC
+func (w *worker) onBlockFailingCCC(failingBlock *types.Block, err error) {
+	log.Warn("block failed CCC", "hash", failingBlock.Hash().Hex(), "number", failingBlock.NumberU64(), "err", err)
+	w.reorgCh <- reorgTrigger{
+		block:  failingBlock,
+		reason: err,
+	}
+}
+
+// handleReorg reorgs all blocks following the trigger block
+func (w *worker) handleReorg(trigger *reorgTrigger) error {
+	parentHash := trigger.block.ParentHash()
+	reorgReason := trigger.reason
+
+	for {
+		if !w.isCanonical(trigger.block.Header()) {
+			// trigger block is no longer part of the canonical chain, we are done
+			return nil
+		}
+
+		newBlockHash, err := w.tryCommitNewWork(time.Now(), parentHash, reorgReason)
+		if err != nil {
+			return err
+		}
+
+		// we created replacement blocks for all existing blocks in canonical chain, but not quite ready to commit the new HEAD
+		if newBlockHash == (common.Hash{}) {
+			// force committing the new canonical head to trigger a reorg in blockchain
+			// otherwise we might ignore CCC errors from the new side chain since it is not canonical yet
+			newBlockHash, err = w.commit(true)
+			if err != nil {
+				return err
+			}
+		}
+
+		parentHash = newBlockHash
+		reorgReason = nil // clear reorg reason after trigger block gets reorged
+	}
+}
+
+func (w *worker) isCanonical(header *types.Header) bool {
+	return w.chain.GetBlockByNumber(header.Number.Uint64()).Hash() == header.Hash()
+}

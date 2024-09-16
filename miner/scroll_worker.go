@@ -218,12 +218,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	return worker
 }
 
-// getCCC returns a pointer to this worker's CCC instance.
-// Only used in tests.
-func (w *worker) getCCC() *ccc.Checker {
-	return w.circuitCapacityChecker
-}
-
 // disablePreseal disables pre-sealing mining feature
 func (w *worker) disablePreseal() {
 	atomic.StoreUint32(&w.noempty, 1)

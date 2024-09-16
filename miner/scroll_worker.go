@@ -483,6 +483,15 @@ func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorgReason
 	return common.Hash{}, nil
 }
 
+// handleForks
+func (w *worker) handleForks() (bool, error) {
+	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(w.current.header.Number) == 0 {
+		misc.ApplyCurieHardFork(w.current.state)
+		return true, nil
+	}
+	return false, nil
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

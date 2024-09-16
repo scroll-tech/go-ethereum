@@ -577,6 +577,18 @@ func (w *worker) processTxPool() (bool, error) {
 	return false, nil
 }
 
+// processTxnSlice
+func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
+	txsMap := make(map[common.Address]types.Transactions)
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	for _, tx := range txns {
+		acc, _ := types.Sender(signer, tx)
+		txsMap[acc] = append(txsMap[acc], tx)
+	}
+	txset := types.NewTransactionsByPriceAndNonce(signer, txsMap, w.current.header.BaseFee)
+	return w.processTxns(txset)
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

@@ -358,19 +358,19 @@ func (w *worker) mainLoop() {
 
 // updateSnapshot updates pending snapshot block and state.
 // Note this function assumes the current variable is thread safe.
-func (w *worker) updateSnapshot(current *pipeline.BlockCandidate) {
+func (w *worker) updateSnapshot() {
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
 
 	w.snapshotBlock = types.NewBlock(
-		current.Header,
-		current.Txs,
+		w.current.header,
+		w.current.txs,
 		nil,
-		current.Receipts,
+		w.current.receipts,
 		trie.NewStackTrie(nil),
 	)
-	w.snapshotReceipts = copyReceipts(current.Receipts)
-	w.snapshotState = current.State.Copy()
+	w.snapshotReceipts = copyReceipts(w.current.receipts)
+	w.snapshotState = w.current.state.Copy()
 }
 
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {

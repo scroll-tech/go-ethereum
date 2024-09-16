@@ -316,32 +316,6 @@ func (w *worker) mainLoop() {
 					_, err = w.commit(false)
 				}
 			}
-			// Apply transactions to the pending state
-			//
-			// Note all transactions received may not be continuous with transactions
-			// already included in the current mining block. These transactions will
-			// be automatically eliminated.
-			//  if w.currentPipeline != nil {
-			//  	txs := make(map[common.Address][]*txpool.LazyTransaction)
-			//  	signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number, w.currentPipeline.Header.Time)
-			//  	for _, tx := range ev.Txs {
-			//  		acc, _ := types.Sender(signer, tx)
-			//  		txs[acc] = append(txs[acc], &txpool.LazyTransaction{
-			//  			Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
-			//  			Hash:      tx.Hash(),
-			//  			Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
-			//  			Time:      tx.Time(),
-			//  			GasFeeCap: tx.GasFeeCap(),
-			//  			GasTipCap: tx.GasTipCap(),
-			//  			Gas:       tx.Gas(),
-			//  			BlobGas:   tx.BlobGas(),
-			//  		})
-			//  	}
-			//  	txset := newTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
-			//  	if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
-			//  		w.handlePipelineResult(result)
-			//  	}
-			//  }
 			w.newTxs.Add(int32(len(ev.Txs)))
 
 		// System stopped
@@ -581,11 +555,20 @@ func (w *worker) processTxPool() (bool, error) {
 
 // processTxnSlice
 func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
-	txsMap := make(map[common.Address]types.Transactions)
+	txsMap := make(map[common.Address][]*txpool.LazyTransaction)
 	signer := types.MakeSigner(w.chainConfig, w.current.header.Number, w.current.header.Time)
 	for _, tx := range txns {
 		acc, _ := types.Sender(signer, tx)
-		txsMap[acc] = append(txsMap[acc], tx)
+		txsMap[acc] = append(txsMap[acc], &txpool.LazyTransaction{
+			Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
+			Hash:      tx.Hash(),
+			Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
+			Time:      tx.Time(),
+			GasFeeCap: tx.GasFeeCap(),
+			GasTipCap: tx.GasTipCap(),
+			Gas:       tx.Gas(),
+			BlobGas:   tx.BlobGas(),
+		})
 	}
 	txset := newTransactionsByPriceAndNonce(signer, txsMap, w.current.header.BaseFee)
 	return w.processTxns(txset)

@@ -645,6 +645,67 @@ func (w *worker) processTxns(txs types.OrderedTransactionSet) (bool, error) {
 	return false, nil
 }
 
+// processTxn
+func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
+	if w.beforeTxHook != nil {
+		w.beforeTxHook()
+	}
+
+	// If we don't have enough gas for any further transactions then we're done
+	if w.current.gasPool.Gas() < params.TxGas {
+		return true, nil
+	}
+
+	// If we have collected enough transactions then we're done
+	// Originally we only limit l2txs count, but now strictly limit total txs number.
+	if !w.chain.Config().Scroll.IsValidTxCount(w.current.txs.Len() + 1) {
+		return true, nil
+	}
+
+	if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != w.current.nextL1MsgIndex {
+		// Continue, we might still be able to include some L2 messages
+		return false, ErrUnexpectedL1MessageIndex
+	}
+
+	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
+		// can't fit this txn in this block, silently ignore and continue looking for more txns
+		return false, errors.New("tx too big")
+	}
+
+	// Start executing the transaction
+	w.current.state.SetTxContext(tx.Hash(), w.current.txs.Len())
+
+	// create new snapshot for `core.ApplyTransaction`
+	snapState := w.current.state.Snapshot()
+	snapGasPool := *w.current.gasPool
+	snapGasUsed := w.current.header.GasUsed
+	snapCccLogger := w.current.cccLogger.Snapshot()
+
+	w.forceTestErr(tx)
+	receipt, err := core.ApplyTransaction(w.chain.Config(), w.chain, nil /* coinbase will default to chainConfig.Scroll.FeeVaultAddress */, w.current.gasPool,
+		w.current.state, w.current.header, tx, &w.current.header.GasUsed, w.current.vmConfig)
+	if err != nil {
+		w.current.state.RevertToSnapshot(snapState)
+		*w.current.gasPool = snapGasPool
+		w.current.header.GasUsed = snapGasUsed
+		*w.current.cccLogger = *snapCccLogger
+		return false, err
+	}
+
+	// Everything ok, collect the logs and shift in the next transaction from the same account
+	w.current.coalescedLogs = append(w.current.coalescedLogs, receipt.Logs...)
+	w.current.txs = append(w.current.txs, tx)
+	w.current.receipts = append(w.current.receipts, receipt)
+
+	if !tx.IsL1MessageTx() {
+		// only consider block size limit for L2 transactions
+		w.current.blockSize += tx.Size()
+	} else {
+		w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
+	}
+	return false, nil
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

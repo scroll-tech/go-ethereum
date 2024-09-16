@@ -110,6 +110,11 @@ func (w *work) deadlineCh() <-chan time.Time {
 	return w.deadlineTimer.C
 }
 
+type reorgTrigger struct {
+	block  *types.Block
+	reason error
+}
+
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {

@@ -179,22 +179,22 @@ type worker struct {
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Header) bool, init bool) *worker {
 	worker := &worker{
-		config:                 config,
-		chainConfig:            chainConfig,
-		engine:                 engine,
-		eth:                    eth,
-		chain:                  eth.BlockChain(),
-		mux:                    mux,
-		isLocalBlock:           isLocalBlock,
-		coinbase:               config.Etherbase,
-		extra:                  config.ExtraData,
-		txsCh:                  make(chan core.NewTxsEvent, txChanSize),
-		chainHeadCh:            make(chan core.ChainHeadEvent, chainHeadChanSize),
-		exitCh:                 make(chan struct{}),
-		startCh:                make(chan struct{}, 1),
-		circuitCapacityChecker: ccc.NewChecker(true),
+		config:       config,
+		chainConfig:  chainConfig,
+		engine:       engine,
+		eth:          eth,
+		chain:        eth.BlockChain(),
+		mux:          mux,
+		isLocalBlock: isLocalBlock,
+		coinbase:     config.Etherbase,
+		extra:        config.ExtraData,
+		txsCh:        make(chan core.NewTxsEvent, txChanSize),
+		chainHeadCh:  make(chan core.ChainHeadEvent, chainHeadChanSize),
+		exitCh:       make(chan struct{}),
+		startCh:      make(chan struct{}, 1),
+		reorgCh:      make(chan reorgTrigger, 1),
 	}
-	log.Info("created new worker", "Checker ID", worker.circuitCapacityChecker.ID)
+	worker.asyncChecker = ccc.NewAsyncChecker(worker.chain, config.CCCMaxWorkers, false).WithOnFailingBlock(worker.onBlockFailingCCC)
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeTransactions(worker.txsCh, true)

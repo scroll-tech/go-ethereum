@@ -522,7 +522,7 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 	if w.prioritizedTx != nil {
 		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
-		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
+		txList := map[common.Address][]*txpool.LazyTransaction{from: {txToLazyTx(w.eth.TxPool(), w.prioritizedTx.tx)}}
 		txs := newTransactionsByPriceAndNonce(signer, txList, w.current.header.BaseFee)
 
 		if shouldCommit, err := w.processTxns(txs); err != nil {
@@ -793,7 +793,7 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 	w.eth.TxPool().PauseReorgs()
 
 	// Commit block and state to database.
-	_, err = w.chain.WriteBlockWithState(block, w.current.receipts, w.current.coalescedLogs, w.current.state, true)
+	_, err = w.chain.WriteBlockAndSetHead(block, w.current.receipts, w.current.coalescedLogs, w.current.state, true)
 	if err != nil {
 		return common.Hash{}, err
 	}

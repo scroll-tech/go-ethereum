@@ -888,6 +888,24 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) {
 	}
 }
 
+// skipTransaction
+func (w *worker) skipTransaction(tx *types.Transaction, err error) {
+	log.Info("Circuit capacity limit reached for a single tx", "isL1Message", tx.IsL1MessageTx(), "tx", tx.Hash().String())
+	rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, err.Error(),
+		w.current.header.Number.Uint64(), nil)
+	if tx.IsL1MessageTx() {
+		w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
+		l1SkippedCounter.Inc(1)
+	} else {
+		if w.prioritizedTx != nil && w.prioritizedTx.tx.Hash() == tx.Hash() {
+			w.prioritizedTx = nil
+		}
+
+		w.eth.TxPool().RemoveTx(tx.Hash(), true)
+		l2SkippedCounter.Inc(1)
+	}
+}
+
 // totalFees computes total consumed miner fees in ETH. Block transactions and receipts have to have the same order.
 func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 	feesWei := new(big.Int)

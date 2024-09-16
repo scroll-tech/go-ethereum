@@ -27,9 +27,12 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
+	"github.com/scroll-tech/go-ethereum/consensus/misc/eip1559"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
+	"github.com/scroll-tech/go-ethereum/core/txpool"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
@@ -393,7 +396,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorgReason erro
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(parentState)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+		header.BaseFee = eip1559.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -501,7 +504,7 @@ func (w *worker) processTxPool() (bool, error) {
 	w.eth.TxPool().ResumeReorgs()
 
 	// Split the pending transactions into locals and remotes
-	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
+	localTxs, remoteTxs := make(map[common.Address][]*txpool.LazyTransaction), pending
 	for _, account := range w.eth.TxPool().Locals() {
 		if txs := remoteTxs[account]; len(txs) > 0 {
 			delete(remoteTxs, account)
@@ -527,7 +530,7 @@ func (w *worker) processTxPool() (bool, error) {
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
-		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
+		txs, err := newL1MessagesByQueueIndex(w.eth.TxPool(), l1Messages)
 		if err != nil {
 			return false, fmt.Errorf("failed to create L1 message set: %w", err)
 		}
@@ -539,14 +542,14 @@ func (w *worker) processTxPool() (bool, error) {
 		}
 	}
 
-	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number, w.current.header.Time)
 	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
 		w.prioritizedTx = nil
 	}
 	if w.prioritizedTx != nil {
 		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
 		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
-		txs := types.NewTransactionsByPriceAndNonce(signer, txList, w.current.header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, txList, w.current.header.BaseFee)
 
 		if shouldCommit, err := w.processTxns(txs); err != nil {
 			return false, fmt.Errorf("failed to include prioritized tx: %w", err)
@@ -556,7 +559,7 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 
 	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(signer, localTxs, w.current.header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, localTxs, w.current.header.BaseFee)
 		if shouldCommit, err := w.processTxns(txs); err != nil {
 			return false, fmt.Errorf("failed to include locals: %w", err)
 		} else if shouldCommit {
@@ -565,7 +568,7 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 
 	if len(remoteTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(signer, remoteTxs, w.current.header.BaseFee)
+		txs := newTransactionsByPriceAndNonce(signer, remoteTxs, w.current.header.BaseFee)
 		if shouldCommit, err := w.processTxns(txs); err != nil {
 			return false, fmt.Errorf("failed to include remotes: %w", err)
 		} else if shouldCommit {
@@ -579,12 +582,12 @@ func (w *worker) processTxPool() (bool, error) {
 // processTxnSlice
 func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
 	txsMap := make(map[common.Address]types.Transactions)
-	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number, w.current.header.Time)
 	for _, tx := range txns {
 		acc, _ := types.Sender(signer, tx)
 		txsMap[acc] = append(txsMap[acc], tx)
 	}
-	txset := types.NewTransactionsByPriceAndNonce(signer, txsMap, w.current.header.BaseFee)
+	txset := newTransactionsByPriceAndNonce(signer, txsMap, w.current.header.BaseFee)
 	return w.processTxns(txset)
 }
 
@@ -666,7 +669,7 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 		return false, ErrUnexpectedL1MessageIndex
 	}
 
-	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
+	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSize(uint64(w.current.blockSize)+tx.Size()) {
 		// can't fit this txn in this block, silently ignore and continue looking for more txns
 		return false, errors.New("tx too big")
 	}
@@ -698,7 +701,7 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 
 	if !tx.IsL1MessageTx() {
 		// only consider block size limit for L2 transactions
-		w.current.blockSize += tx.Size()
+		w.current.blockSize += common.StorageSize(tx.Size())
 	} else {
 		w.current.nextL1MsgIndex = tx.AsL1MessageTx().QueueIndex + 1
 	}
@@ -732,7 +735,7 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 	}
 
 	block, err := w.engine.FinalizeAndAssemble(w.chain, w.current.header, w.current.state,
-		w.current.txs, nil, w.current.receipts)
+		w.current.txs, nil, w.current.receipts, nil)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -757,7 +760,7 @@ func (w *worker) commit(force bool) (common.Hash, error) {
 	}
 
 	// verify the generated block with local consensus engine to make sure everything is as expected
-	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
+	if err = w.engine.VerifyHeader(w.chain, block.Header()); err != nil {
 		return common.Hash{}, retryableCommitError{inner: err}
 	}
 
@@ -884,7 +887,7 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) {
 		l1SkippedCounter.Inc(1)
 	} else if errors.Is(err, core.ErrInsufficientFunds) {
 		log.Trace("Skipping tx with insufficient funds", "tx", tx.Hash().String())
-		w.eth.TxPool().RemoveTx(tx.Hash(), true)
+		w.eth.TxPool().RemoveTx(tx.Hash(), true, true)
 	}
 }
 
@@ -901,7 +904,7 @@ func (w *worker) skipTransaction(tx *types.Transaction, err error) {
 			w.prioritizedTx = nil
 		}
 
-		w.eth.TxPool().RemoveTx(tx.Hash(), true)
+		w.eth.TxPool().RemoveTx(tx.Hash(), true, true)
 		l2SkippedCounter.Inc(1)
 	}
 }

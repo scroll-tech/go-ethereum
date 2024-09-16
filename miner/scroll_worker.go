@@ -442,6 +442,47 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorgReason erro
 	return nil
 }
 
+// tryCommitNewWork
+func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorgReason error) (common.Hash, error) {
+	err := w.newWork(now, parent, reorgReason)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed creating new work: %w", err)
+	}
+
+	shouldCommit, err := w.handleForks()
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed handling forks: %w", err)
+	}
+
+	// check if we are reorging
+	reorging := w.chain.GetBlockByNumber(w.current.header.Number.Uint64()) != nil
+	if !shouldCommit && reorging {
+		shouldCommit, err = w.processReorgedTxns(w.current.reorgReason)
+	}
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed handling reorged txns: %w", err)
+	}
+
+	if !shouldCommit {
+		shouldCommit, err = w.processTxPool()
+	}
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed processing tx pool: %w", err)
+	}
+
+	if shouldCommit {
+		// if reorging, force committing even if we are not "running"
+		// this can happen when sequencer is instructed to shutdown while handling a reorg
+		// we should make sure reorg is not interrupted
+		if blockHash, err := w.commit(reorging); err != nil {
+			return common.Hash{}, fmt.Errorf("failed committing new work: %w", err)
+		} else {
+			return blockHash, nil
+		}
+	}
+	return common.Hash{}, nil
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

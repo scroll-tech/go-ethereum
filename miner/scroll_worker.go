@@ -492,6 +492,91 @@ func (w *worker) handleForks() (bool, error) {
 	return false, nil
 }
 
+// processTxPool
+func (w *worker) processTxPool() (bool, error) {
+	tidyPendingStart := time.Now()
+	// Fill the block with all available pending transactions.
+	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
+
+	// Allow txpool to be reorged as we build current block
+	w.eth.TxPool().ResumeReorgs()
+
+	// Split the pending transactions into locals and remotes
+	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
+	for _, account := range w.eth.TxPool().Locals() {
+		if txs := remoteTxs[account]; len(txs) > 0 {
+			delete(remoteTxs, account)
+			localTxs[account] = txs
+		}
+	}
+	collectL2Timer.UpdateSince(tidyPendingStart)
+
+	// fetch l1Txs
+	var l1Messages []types.L1MessageTx
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
+		common.WithTimer(collectL1MsgsTimer, func() {
+			l1Messages = w.collectPendingL1Messages(w.current.nextL1MsgIndex)
+		})
+	}
+
+	// Short circuit if there is no available pending transactions.
+	// But if we disable empty precommit already, ignore it. Since
+	// empty block is necessary to keep the liveness of the network.
+	if len(localTxs) == 0 && len(remoteTxs) == 0 && len(l1Messages) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
+		return false, nil
+	}
+
+	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
+		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
+		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
+		if err != nil {
+			return false, fmt.Errorf("failed to create L1 message set: %w", err)
+		}
+
+		if shouldCommit, err := w.processTxns(txs); err != nil {
+			return false, fmt.Errorf("failed to include l1 msgs: %w", err)
+		} else if shouldCommit {
+			return true, nil
+		}
+	}
+
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
+		w.prioritizedTx = nil
+	}
+	if w.prioritizedTx != nil {
+		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
+		txList := map[common.Address]types.Transactions{from: []*types.Transaction{w.prioritizedTx.tx}}
+		txs := types.NewTransactionsByPriceAndNonce(signer, txList, w.current.header.BaseFee)
+
+		if shouldCommit, err := w.processTxns(txs); err != nil {
+			return false, fmt.Errorf("failed to include prioritized tx: %w", err)
+		} else if shouldCommit {
+			return true, nil
+		}
+	}
+
+	if len(localTxs) > 0 {
+		txs := types.NewTransactionsByPriceAndNonce(signer, localTxs, w.current.header.BaseFee)
+		if shouldCommit, err := w.processTxns(txs); err != nil {
+			return false, fmt.Errorf("failed to include locals: %w", err)
+		} else if shouldCommit {
+			return true, nil
+		}
+	}
+
+	if len(remoteTxs) > 0 {
+		txs := types.NewTransactionsByPriceAndNonce(signer, remoteTxs, w.current.header.BaseFee)
+		if shouldCommit, err := w.processTxns(txs); err != nil {
+			return false, fmt.Errorf("failed to include remotes: %w", err)
+		} else if shouldCommit {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

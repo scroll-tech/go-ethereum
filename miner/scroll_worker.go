@@ -38,7 +38,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
-	"github.com/scroll-tech/go-ethereum/rollup/pipeline"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -844,57 +843,49 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	return result
 }
 
-func (w *worker) onTxFailingInPipeline(txIndex int, tx *types.Transaction, err error) bool {
+func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) {
 	if !w.isRunning() {
-		return false
+		return
 	}
 
-	writeTrace := func() {
-		var trace *types.BlockTrace
-		var errWithTrace *pipeline.ErrorWithTrace
-		if w.config.StoreSkippedTxTraces && errors.As(err, &errWithTrace) {
-			trace = errWithTrace.Trace
-		}
-		rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, trace, err.Error(),
-			w.currentPipeline.Header.Number.Uint64(), nil)
-	}
-
-	switch {
-	case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
-		// If this block already contains some L1 messages try again in the next block.
+	if errors.Is(err, ccc.ErrBlockRowConsumptionOverflow) {
 		if txIndex > 0 {
-			break
+			if !tx.IsL1MessageTx() {
+				// prioritize overflowing L2 message as the first txn next block
+				// no need to prioritize L1 messages, they are fetched in order
+				// and processed first in every block anyways
+				w.prioritizedTx = &prioritizedTransaction{
+					blockNumber: w.current.header.Number.Uint64() + 1,
+					tx:          tx,
+				}
+			}
+			return
 		}
-		// A single L1 message leads to out-of-gas. Skip it.
+
+		// first txn overflowed the circuit, skip
+		w.skipTransaction(tx, err)
+	} else if tx.IsL1MessageTx() {
+		if errors.Is(err, ErrUnexpectedL1MessageIndex) {
+			log.Warn(
+				"Unexpected L1 message queue index in worker", "got", tx.AsL1MessageTx().QueueIndex,
+			)
+			return
+		} else if txIndex > 0 {
+			// If this block already contains some L1 messages try again in the next block.
+			return
+		}
+
 		queueIndex := tx.AsL1MessageTx().QueueIndex
-		log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block",
-			w.currentPipeline.Header.Number, "reason", "gas limit exceeded")
-		writeTrace()
-		l1TxGasLimitExceededCounter.Inc(1)
-
-	case errors.Is(err, core.ErrInsufficientFunds):
+		log.Warn("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block",
+			w.current.header.Number, "reason", err)
+		rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, err.Error(),
+			w.current.header.Number.Uint64(), nil)
+		w.current.nextL1MsgIndex = queueIndex + 1
+		l1SkippedCounter.Inc(1)
+	} else if errors.Is(err, core.ErrInsufficientFunds) {
 		log.Trace("Skipping tx with insufficient funds", "tx", tx.Hash().String())
-		w.eth.TxPool().RemoveTx(tx.Hash(), true, true)
-
-	case errors.Is(err, pipeline.ErrUnexpectedL1MessageIndex):
-		log.Warn(
-			"Unexpected L1 message queue index in worker",
-			"got", tx.AsL1MessageTx().QueueIndex,
-		)
-	case errors.Is(err, core.ErrGasLimitReached), errors.Is(err, core.ErrNonceTooLow), errors.Is(err, core.ErrNonceTooHigh), errors.Is(err, core.ErrTxTypeNotSupported):
-		break
-	default:
-		// Strange error
-		log.Debug("Transaction failed, account skipped", "hash", tx.Hash().String(), "err", err)
-		if tx.IsL1MessageTx() {
-			queueIndex := tx.AsL1MessageTx().QueueIndex
-			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block",
-				w.currentPipeline.Header.Number, "reason", "strange error", "err", err)
-			writeTrace()
-			l1TxStrangeErrCounter.Inc(1)
-		}
+		w.eth.TxPool().RemoveTx(tx.Hash(), true)
 	}
-	return false
 }
 
 // totalFees computes total consumed miner fees in ETH. Block transactions and receipts have to have the same order.

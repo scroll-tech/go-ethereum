@@ -612,6 +612,39 @@ func (w *worker) processReorgedTxns(reason error) (bool, error) {
 	return true, nil
 }
 
+// processTxns
+func (w *worker) processTxns(txs types.OrderedTransactionSet) (bool, error) {
+	for {
+		tx := txs.Peek()
+		if tx == nil {
+			break
+		}
+
+		shouldCommit, err := w.processTxn(tx)
+		if shouldCommit {
+			return true, nil
+		}
+
+		switch {
+		case err == nil, errors.Is(err, core.ErrNonceTooLow):
+			txs.Shift()
+		default:
+			w.onTxFailing(w.current.txs.Len(), tx, err)
+			if errors.Is(err, ccc.ErrBlockRowConsumptionOverflow) && w.current.txs.Len() > 0 {
+				return true, nil
+			}
+
+			if tx.IsL1MessageTx() {
+				txs.Shift()
+			} else {
+				txs.Pop()
+			}
+		}
+	}
+
+	return false, nil
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

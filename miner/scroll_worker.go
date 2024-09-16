@@ -393,7 +393,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorgReason erro
 
 	vmConfig := *w.chain.GetVMConfig()
 	cccLogger := ccc.NewLogger()
-	vmConfig.Debug = true
+	// vmConfig.Debug = true
 	vmConfig.Tracer = cccLogger
 
 	deadline := time.Unix(int64(header.Time), 0)

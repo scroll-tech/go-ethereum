@@ -144,7 +144,7 @@ func applyTransaction(msg *Message, config *params.ChainConfig, gp *GasPool, sta
 	// Apply the transaction to the current state (included in the env).
 	applyMessageStartTime := time.Now()
 	result, err := ApplyMessage(evm, msg, gp, l1DataFee)
-	if true { //TODO: if evm.Config.Debug
+	if true { // TODO: if evm.Config.Debug
 		if erroringTracer, ok := evm.Config.Tracer.(interface{ Error() error }); ok {
 			err = errors.Join(err, erroringTracer.Error())
 		}

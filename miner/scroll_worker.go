@@ -137,11 +137,11 @@ type worker struct {
 	// Channels
 	startCh chan struct{}
 	exitCh  chan struct{}
+	reorgCh chan reorgTrigger
 
 	wg sync.WaitGroup
 
-	currentPipelineStart time.Time
-	currentPipeline      *pipeline.Pipeline
+	current *work
 
 	mu       sync.RWMutex // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
@@ -167,11 +167,14 @@ type worker struct {
 	// External functions
 	isLocalBlock func(block *types.Header) bool // Function used to determine whether the specified block is mined by local miner.
 
-	circuitCapacityChecker *ccc.Checker
-	prioritizedTx          *prioritizedTransaction
+	prioritizedTx *prioritizedTransaction
+	asyncChecker  *ccc.AsyncChecker
 
 	// Test hooks
 	beforeTxHook func() // Method to call before processing a transaction.
+
+	errCountdown int
+	skipTxHash   common.Hash
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Header) bool, init bool) *worker {

@@ -773,8 +773,8 @@ web3._extend({
 			params: 1,
 		}),
 		new web3._extend.Method({
-			name: 'remove',
-			call: 'txpool_remove',
+			name: 'removeTransactionByHash',
+			call: 'txpool_removeTransactionByHash',
 			params: 1
 		}),
 	]

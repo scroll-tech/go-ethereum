@@ -54,18 +54,20 @@ const (
 )
 
 var (
+	deadCh = make(chan time.Time)
+
+	ErrUnexpectedL1MessageIndex = errors.New("unexpected L1 message index")
+
 	// Metrics for the skipped txs
-	l1TxGasLimitExceededCounter       = metrics.NewRegisteredCounter("miner/skipped_txs/l1/gas_limit_exceeded", nil)
-	l1TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1/row_consumption_overflow", nil)
-	l2TxRowConsumptionOverflowCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2/row_consumption_overflow", nil)
-	l1TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l1/ccc_unknown_err", nil)
-	l2TxCccUnknownErrCounter          = metrics.NewRegisteredCounter("miner/skipped_txs/l2/ccc_unknown_err", nil)
-	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
+	l1SkippedCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l1", nil)
+	l2SkippedCounter = metrics.NewRegisteredCounter("miner/skipped_txs/l2", nil)
 
 	collectL1MsgsTimer = metrics.NewRegisteredTimer("miner/collect_l1_msgs", nil)
 	prepareTimer       = metrics.NewRegisteredTimer("miner/prepare", nil)
 	collectL2Timer     = metrics.NewRegisteredTimer("miner/collect_l2_txns", nil)
 	l2CommitTimer      = metrics.NewRegisteredTimer("miner/commit", nil)
+	cccStallTimer      = metrics.NewRegisteredTimer("miner/ccc_stall", nil)
+	idleTimer          = metrics.NewRegisteredTimer("miner/idle", nil)
 
 	commitReasonCCCCounter      = metrics.NewRegisteredCounter("miner/commit_reason_ccc", nil)
 	commitReasonDeadlineCounter = metrics.NewRegisteredCounter("miner/commit_reason_deadline", nil)

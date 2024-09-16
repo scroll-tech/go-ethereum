@@ -228,6 +228,28 @@ func (w *worker) enablePreseal() {
 	atomic.StoreUint32(&w.noempty, 0)
 }
 
+// checkHeadRowConsumption will start some initial workers to CCC check block close to the HEAD
+func (w *worker) checkHeadRowConsumption() error {
+	checkStart := uint64(1)
+	numOfBlocksToCheck := uint64(w.config.CCCMaxWorkers + 1)
+	currentHeight := w.chain.CurrentHeader().Number.Uint64()
+	if currentHeight > numOfBlocksToCheck {
+		checkStart = currentHeight - numOfBlocksToCheck
+	}
+
+	for curBlockNum := checkStart; curBlockNum <= currentHeight; curBlockNum++ {
+		block := w.chain.GetBlockByNumber(curBlockNum)
+		// only spawn CCC checkers for blocks with no row consumption data stored in DB
+		if rawdb.ReadBlockRowConsumption(w.chain.Database(), block.Hash()) == nil {
+			if err := w.asyncChecker.Check(block); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
 func (w *worker) mainLoop() {
 	defer w.wg.Done()

@@ -589,6 +589,29 @@ func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
 	return w.processTxns(txset)
 }
 
+// processReorgedTxns
+func (w *worker) processReorgedTxns(reason error) (bool, error) {
+	reorgedBlock := w.chain.GetBlockByNumber(w.current.header.Number.Uint64())
+	commitGasCounter.Dec(int64(reorgedBlock.GasUsed()))
+	reorgedTxns := reorgedBlock.Transactions()
+	var errorWithTxnIdx *ccc.ErrorWithTxnIdx
+	if len(reorgedTxns) > 0 && errors.As(reason, &errorWithTxnIdx) {
+		if errorWithTxnIdx.ShouldSkip {
+			w.skipTransaction(reorgedTxns[errorWithTxnIdx.TxIdx], reason)
+		}
+
+		// if errorWithTxnIdx.TxIdx is 0, we will end up creating an empty block.
+		// This is necessary to make sure that same height can not fail CCC check multiple times.
+		// Each reorg forces a block to be appended to the chain. If we let the same block to trigger
+		// multiple reorgs, we can't guarantee an upper bound on reorg depth anymore. We can revisit this
+		// when we can handle reorgs on sidechains that we are building to replace the canonical chain.
+		reorgedTxns = reorgedTxns[:errorWithTxnIdx.TxIdx]
+	}
+
+	w.processTxnSlice(reorgedTxns)
+	return true, nil
+}
+
 // retryableCommitError wraps an error that happened during commit phase and indicates that worker can retry to build a new block
 type retryableCommitError struct {
 	inner error

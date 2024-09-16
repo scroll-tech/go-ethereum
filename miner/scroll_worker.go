@@ -34,6 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/txpool"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -79,6 +80,34 @@ var (
 type prioritizedTransaction struct {
 	blockNumber uint64
 	tx          *types.Transaction
+}
+
+// work represents the active block building task
+type work struct {
+	deadlineTimer   *time.Timer
+	deadlineReached bool
+	cccLogger       *ccc.Logger
+	vmConfig        vm.Config
+
+	reorgReason error
+
+	// accumulated state
+	nextL1MsgIndex uint64
+	gasPool        *core.GasPool
+	blockSize      common.StorageSize
+
+	header        *types.Header
+	state         *state.StateDB
+	txs           types.Transactions
+	receipts      types.Receipts
+	coalescedLogs []*types.Log
+}
+
+func (w *work) deadlineCh() <-chan time.Time {
+	if w == nil {
+		return deadCh
+	}
+	return w.deadlineTimer.C
 }
 
 // worker is the main object which takes care of submitting new work to consensus engine

@@ -17,8 +17,8 @@
 package miner
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"sync"
@@ -27,12 +27,9 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
-	"github.com/scroll-tech/go-ethereum/consensus/misc"
-	"github.com/scroll-tech/go-ethereum/consensus/misc/eip1559"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
-	"github.com/scroll-tech/go-ethereum/core/txpool"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
@@ -378,144 +375,50 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
 }
 
-// startNewPipeline generates several new sealing tasks based on the parent block.
-func (w *worker) startNewPipeline(timestamp int64) {
-	// Abort if node is still syncing
-	if w.syncing.Load() {
-		return
-	}
-
-	if w.currentPipeline != nil {
-		w.currentPipeline.Release()
-		w.currentPipeline = nil
-	}
-
-	parent := w.chain.CurrentBlock()
-
-	num := parent.Number
+// newWork
+func (w *worker) newWork(now time.Time, parentHash common.Hash, reorgReason error) error {
+	parent := w.chain.GetBlockByHash(parentHash)
 	header := &types.Header{
 		ParentHash: parent.Hash(),
-		Number:     new(big.Int).Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent.GasLimit, w.config.GasCeil),
+		Number:     new(big.Int).Add(parent.Number(), common.Big1),
+		GasLimit:   core.CalcGasLimit(parent.GasLimit(), w.config.GasCeil),
 		Extra:      w.extra,
-		Time:       uint64(timestamp),
+		Time:       uint64(now.Unix()),
 	}
+
+	parentState, err := w.chain.StateAt(parent.Root())
+	if err != nil {
+		return fmt.Errorf("failed to fetch parent state: %w", err)
+	}
+
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
-		state, err := w.chain.StateAt(parent.Root)
-		if err != nil {
-			log.Error("Failed to create mining context", "err", err)
-			return
-		}
-		parentL1BaseFee := fees.GetL1BaseFee(state)
-		header.BaseFee = eip1559.CalcBaseFee(w.chainConfig, parent, parentL1BaseFee)
+		parentL1BaseFee := fees.GetL1BaseFee(parentState)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
 		if w.coinbase == (common.Address{}) {
-			log.Error("Refusing to mine without etherbase")
-			return
+			return errors.New("refusing to mine without etherbase")
 		}
 		header.Coinbase = w.coinbase
 	}
 
 	prepareStart := time.Now()
 	if err := w.engine.Prepare(w.chain, header); err != nil {
-		log.Error("Failed to prepare header for mining", "err", err)
-		return
+		return fmt.Errorf("failed to prepare header for mining: %w", err)
 	}
 	prepareTimer.UpdateSince(prepareStart)
 
-	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
-	if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
-		// Check whether the block is among the fork extra-override range
-		limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-		if header.Number.Cmp(daoBlock) >= 0 && header.Number.Cmp(limit) < 0 {
-			// Depending whether we support or oppose the fork, override differently
-			if w.chainConfig.DAOForkSupport {
-				header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-			} else if bytes.Equal(header.Extra, params.DAOForkBlockExtra) {
-				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
-			}
-		}
-	}
-
-	parentState, err := w.chain.StateAt(parent.Root)
-	if err != nil {
-		log.Error("failed to fetch parent state", "err", err)
-		return
-	}
-
-	// Apply special state transition at Curie block
-	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(header.Number) == 0 {
-		misc.ApplyCurieHardFork(parentState)
-
-		var nextL1MsgIndex uint64
-		if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
-			nextL1MsgIndex = *dbVal
-		}
-
-		// zkEVM requirement: Curie transition block contains 0 transactions, bypass pipeline.
-		err = w.commit(&pipeline.Result{
-			// Note: Signer nodes will not store CCC results for empty blocks in their database.
-			// In practice, this is acceptable, since this block will never overflow, and follower
-			// nodes will still store CCC results.
-			Rows: &types.RowConsumption{},
-			FinalBlock: &pipeline.BlockCandidate{
-				Header:         header,
-				State:          parentState,
-				Txs:            types.Transactions{},
-				Receipts:       types.Receipts{},
-				CoalescedLogs:  []*types.Log{},
-				NextL1MsgIndex: nextL1MsgIndex,
-			},
-		})
-
-		if err != nil {
-			log.Error("failed to commit Curie fork block", "reason", err)
-		}
-
-		return
-	}
-
-	// fetch l1Txs
-	var l1Messages []types.L1MessageTx
-	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
-		common.WithTimer(collectL1MsgsTimer, func() {
-			l1Messages = w.collectPendingL1Messages(*rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), parent.Hash()))
-		})
-	}
-
-	tidyPendingStart := time.Now()
-	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
-	// Split the pending transactions into locals and remotes
-	localTxs, remoteTxs := make(map[common.Address][]*txpool.LazyTransaction), pending
-	for _, account := range w.eth.TxPool().Locals() {
-		if txs := remoteTxs[account]; len(txs) > 0 {
-			delete(remoteTxs, account)
-			localTxs[account] = txs
-		}
-	}
-	collectL2Timer.UpdateSince(tidyPendingStart)
-
-	// Allow txpool to be reorged as we build current block
-	w.eth.TxPool().ResumeReorgs()
-
 	var nextL1MsgIndex uint64
-	if dbIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.chain.Database(), parent.Hash()); dbIndex != nil {
-		nextL1MsgIndex = *dbIndex
-	} else {
-		log.Error("failed to read nextL1MsgIndex", "parent", parent.Hash())
-		return
+	if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
+		nextL1MsgIndex = *dbVal
 	}
 
-	w.currentPipelineStart = time.Now()
-	pipelineCCC := w.getCCC()
-	if !w.isRunning() {
-		pipelineCCC = nil
-	}
-	w.currentPipeline = pipeline.NewPipeline(w.chain, *w.chain.GetVMConfig(), parentState, header, nextL1MsgIndex, pipelineCCC).WithBeforeTxHook(w.beforeTxHook)
+	vmConfig := *w.chain.GetVMConfig()
+	cccLogger := ccc.NewLogger()
+	vmConfig.Debug = true
+	vmConfig.Tracer = cccLogger
 
 	deadline := time.Unix(int64(header.Time), 0)
 	if w.chainConfig.Clique != nil && w.chainConfig.Clique.RelaxedPeriod {
@@ -523,66 +426,20 @@ func (w *worker) startNewPipeline(timestamp int64) {
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
 	}
 
-	if err := w.currentPipeline.Start(deadline); err != nil {
-		log.Error("failed to start pipeline", "err", err)
-		return
+	w.current = &work{
+		deadlineTimer:  time.NewTimer(time.Until(deadline)),
+		cccLogger:      cccLogger,
+		vmConfig:       vmConfig,
+		header:         header,
+		state:          parentState,
+		txs:            types.Transactions{},
+		receipts:       types.Receipts{},
+		coalescedLogs:  []*types.Log{},
+		gasPool:        new(core.GasPool).AddGas(header.GasLimit),
+		nextL1MsgIndex: nextL1MsgIndex,
+		reorgReason:    reorgReason,
 	}
-
-	// Short circuit if there is no available pending transactions.
-	// But if we disable empty precommit already, ignore it. Since
-	// empty block is necessary to keep the liveness of the network.
-	if len(localTxs) == 0 && len(remoteTxs) == 0 && len(l1Messages) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
-		return
-	}
-
-	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
-		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
-		txs, err := newL1MessagesByQueueIndex(w.eth.TxPool(), l1Messages)
-		if err != nil {
-			log.Error("Failed to create L1 message set", "l1Messages", l1Messages, "err", err)
-			return
-		}
-
-		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handlePipelineResult(result)
-			return
-		}
-	}
-	signer := types.MakeSigner(w.chainConfig, header.Number, header.Time)
-
-	if w.prioritizedTx != nil && w.currentPipeline.Header.Number.Uint64() > w.prioritizedTx.blockNumber {
-		w.prioritizedTx = nil
-	}
-	if w.prioritizedTx != nil {
-		from, _ := types.Sender(signer, w.prioritizedTx.tx) // error already checked before
-		txList := map[common.Address][]*txpool.LazyTransaction{from: {txToLazyTx(w.eth.TxPool(), w.prioritizedTx.tx)}}
-		txs := newTransactionsByPriceAndNonce(signer, txList, header.BaseFee)
-		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handlePipelineResult(result)
-			return
-		}
-	}
-
-	if len(localTxs) > 0 {
-		txs := newTransactionsByPriceAndNonce(signer, localTxs, header.BaseFee)
-		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handlePipelineResult(result)
-			return
-		}
-	}
-	if len(remoteTxs) > 0 {
-		txs := newTransactionsByPriceAndNonce(signer, remoteTxs, header.BaseFee)
-		if result := w.currentPipeline.TryPushTxns(txs, w.onTxFailingInPipeline); result != nil {
-			w.handlePipelineResult(result)
-			return
-		}
-	}
-
-	// pipelineCCC was nil, so the block was built for RPC purposes only. Stop the pipeline immediately
-	// and update the pending block.
-	if pipelineCCC == nil {
-		w.currentPipeline.Stop()
-	}
+	return nil
 }
 
 func (w *worker) handlePipelineResult(res *pipeline.Result) error {

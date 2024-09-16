@@ -253,52 +253,96 @@ func (w *worker) checkHeadRowConsumption() error {
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
 func (w *worker) mainLoop() {
 	defer w.wg.Done()
+	defer w.asyncChecker.Wait()
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
-
-	deadCh := make(chan *pipeline.Result)
-	pipelineResultCh := func() <-chan *pipeline.Result {
-		if w.currentPipeline == nil {
-			return deadCh
+	defer func() {
+		// training wheels on
+		// lets not crash the node and allow us some time to inspect
+		p := recover()
+		if p != nil {
+			log.Error("worker mainLoop panic", "panic", p)
 		}
-		return w.currentPipeline.ResultCh
-	}
+	}()
 
+	var err error
 	for {
+		if _, isRetryable := err.(retryableCommitError); isRetryable {
+			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorgReason); err != nil {
+				continue
+			}
+		} else if err != nil {
+			log.Error("failed to mine block", "err", err)
+			w.current = nil
+		}
+
+		// check for reorgs first to lower the chances of trying to handle another
+		// event eventhough a reorg is pending (due to Go `select` pseudo-randomly picking a case
+		// to execute if multiple of them are ready)
+		select {
+		case trigger := <-w.reorgCh:
+			err = w.handleReorg(&trigger)
+			continue
+		default:
+		}
+
 		select {
 		case <-w.startCh:
-			w.startNewPipeline(time.Now().Unix())
-		case <-w.chainHeadCh:
-			w.startNewPipeline(time.Now().Unix())
-		case result := <-pipelineResultCh():
-			w.handlePipelineResult(result)
+			if err := w.checkHeadRowConsumption(); err != nil {
+				log.Error("failed to start head checkers", "err", err)
+				return
+			}
+
+			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)
+		case trigger := <-w.reorgCh:
+			err = w.handleReorg(&trigger)
+		case chainHead := <-w.chainHeadCh:
+			if w.isCanonical(chainHead.Block.Header()) {
+				_, err = w.tryCommitNewWork(time.Now(), chainHead.Block.Hash(), nil)
+			}
+		case <-w.current.deadlineCh():
+			w.current.deadlineReached = true
+			if len(w.current.txs) > 0 {
+				_, err = w.commit(false)
+			}
 		case ev := <-w.txsCh:
 			// Apply transactions to the pending state
 			//
 			// Note all transactions received may not be continuous with transactions
 			// already included in the current mining block. These transactions will
 			// be automatically eliminated.
-			if w.currentPipeline != nil {
-				txs := make(map[common.Address][]*txpool.LazyTransaction)
-				signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number, w.currentPipeline.Header.Time)
-				for _, tx := range ev.Txs {
-					acc, _ := types.Sender(signer, tx)
-					txs[acc] = append(txs[acc], &txpool.LazyTransaction{
-						Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
-						Hash:      tx.Hash(),
-						Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
-						Time:      tx.Time(),
-						GasFeeCap: tx.GasFeeCap(),
-						GasTipCap: tx.GasTipCap(),
-						Gas:       tx.Gas(),
-						BlobGas:   tx.BlobGas(),
-					})
-				}
-				txset := newTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
-				if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
-					w.handlePipelineResult(result)
+			if w.current != nil {
+				shouldCommit, _ := w.processTxnSlice(ev.Txs)
+				if shouldCommit || w.current.deadlineReached {
+					_, err = w.commit(false)
 				}
 			}
+			// Apply transactions to the pending state
+			//
+			// Note all transactions received may not be continuous with transactions
+			// already included in the current mining block. These transactions will
+			// be automatically eliminated.
+			//  if w.currentPipeline != nil {
+			//  	txs := make(map[common.Address][]*txpool.LazyTransaction)
+			//  	signer := types.MakeSigner(w.chainConfig, w.currentPipeline.Header.Number, w.currentPipeline.Header.Time)
+			//  	for _, tx := range ev.Txs {
+			//  		acc, _ := types.Sender(signer, tx)
+			//  		txs[acc] = append(txs[acc], &txpool.LazyTransaction{
+			//  			Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
+			//  			Hash:      tx.Hash(),
+			//  			Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
+			//  			Time:      tx.Time(),
+			//  			GasFeeCap: tx.GasFeeCap(),
+			//  			GasTipCap: tx.GasTipCap(),
+			//  			Gas:       tx.Gas(),
+			//  			BlobGas:   tx.BlobGas(),
+			//  		})
+			//  	}
+			//  	txset := newTransactionsByPriceAndNonce(signer, txs, w.currentPipeline.Header.BaseFee)
+			//  	if result := w.currentPipeline.TryPushTxns(txset, w.onTxFailingInPipeline); result != nil {
+			//  		w.handlePipelineResult(result)
+			//  	}
+			//  }
 			w.newTxs.Add(int32(len(ev.Txs)))
 
 		// System stopped

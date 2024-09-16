@@ -600,9 +600,14 @@ func (w *worker) processReorgedTxns(reason error) (bool, error) {
 // processTxns
 func (w *worker) processTxns(txs orderedTransactionSet) (bool, error) {
 	for {
-		tx := txs.Peek()
-		if tx == nil {
+		ltx := txs.Peek()
+		if ltx == nil {
 			break
+		}
+		tx := ltx.Resolve()
+		if tx == nil {
+			txs.Shift()
+			continue
 		}
 
 		shouldCommit, err := w.processTxn(tx)

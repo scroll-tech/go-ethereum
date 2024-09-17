@@ -833,3 +833,17 @@ func (api *ScrollAPI) CalculateRowConsumptionByBlockNumber(ctx context.Context, 
 	asyncChecker.Wait()
 	return rawdb.ReadBlockRowConsumption(api.eth.ChainDb(), block.Hash()), checkErr
 }
+
+// SetRollupEventSyncL1Height sets the synced L1 height for rollup event synchronization
+func (api *ScrollAPI) SetRollupEventSyncedL1Height(height uint64) error {
+	log.Info("Setting rollup event synced L1 height", "height", height)
+	rawdb.WriteRollupEventSyncedL1BlockNumber(api.eth.ChainDb(), height)
+	return nil
+}
+
+// SetL1MessageSyncL1Height sets the synced L1 height for L1 message synchronization
+func (api *ScrollAPI) SetL1MessageSyncedL1Height(height uint64) error {
+	rawdb.WriteSyncedL1BlockNumber(api.eth.ChainDb(), height)
+	log.Info("Setting L1 message synced L1 height", "height", height)
+	return nil
+}

@@ -932,6 +932,16 @@ web3._extend({
 			params: 1,
 			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
 		}),
+		new web3._extend.Method({
+			name: 'setRollupEventSyncedL1Height',
+			call: 'scroll_setRollupEventSyncedL1Height',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'setL1MessageSyncedL1Height',
+			call: 'scroll_setL1MessageSyncedL1Height',
+			params: 1
+		}),
 	],
 	properties:
 	[

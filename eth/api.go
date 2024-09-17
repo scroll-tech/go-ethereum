@@ -824,7 +824,7 @@ func (api *ScrollAPI) CalculateRowConsumptionByBlockNumber(ctx context.Context, 
 	// todo: fix temp AsyncChecker leaking the internal Checker instances
 	var checkErr error
 	asyncChecker := ccc.NewAsyncChecker(api.eth.blockchain, 1, false).WithOnFailingBlock(func(b *types.Block, err error) {
-		log.Error("failed to calculate row consumption on demand", "number", number, "hash", b.Hash(), "err", err)
+		log.Error("failed to calculate row consumption on demand", "number", number, "hash", b.Hash().Hex(), "err", err)
 		checkErr = err
 	})
 	if err := asyncChecker.Check(block); err != nil {

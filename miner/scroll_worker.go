@@ -287,9 +287,11 @@ func (w *worker) mainLoop() {
 
 		select {
 		case <-w.startCh:
-			if err := w.checkHeadRowConsumption(); err != nil {
-				log.Error("failed to start head checkers", "err", err)
-				return
+			if w.isRunning() {
+				if err := w.checkHeadRowConsumption(); err != nil {
+					log.Error("failed to start head checkers", "err", err)
+					return
+				}
 			}
 
 			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)

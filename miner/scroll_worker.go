@@ -289,8 +289,10 @@ func (w *worker) mainLoop() {
 			w.current = nil
 		}
 
+		idleStart := time.Now()
 		select {
 		case <-w.startCh:
+			idleTimer.UpdateSince(idleStart)
 			if w.isRunning() {
 				if err := w.checkHeadRowConsumption(); err != nil {
 					log.Error("failed to start head checkers", "err", err)
@@ -300,17 +302,21 @@ func (w *worker) mainLoop() {
 
 			_, err = w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), nil)
 		case trigger := <-w.reorgCh:
+			idleTimer.UpdateSince(idleStart)
 			err = w.handleReorg(&trigger)
 		case chainHead := <-w.chainHeadCh:
+			idleTimer.UpdateSince(idleStart)
 			if w.isCanonical(chainHead.Block.Header()) {
 				_, err = w.tryCommitNewWork(time.Now(), chainHead.Block.Hash(), nil)
 			}
 		case <-w.current.deadlineCh():
+			idleTimer.UpdateSince(idleStart)
 			w.current.deadlineReached = true
 			if len(w.current.txs) > 0 {
 				_, err = w.commit(false)
 			}
 		case ev := <-w.txsCh:
+			idleTimer.UpdateSince(idleStart)
 			// Apply transactions to the pending state
 			//
 			// Note all transactions received may not be continuous with transactions

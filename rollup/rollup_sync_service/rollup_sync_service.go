@@ -157,6 +157,19 @@ func (s *RollupSyncService) Stop() {
 	}
 }
 
+// ResetToHeight resets the RollupSyncService to a specific L1 block height
+func (s *RollupSyncService) ResetToHeight(height uint64) {
+	s.Stop()
+
+	s.latestProcessedBlock = height
+
+	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, height)
+
+	log.Info("Reset rollup sync service", "height", height)
+
+	go s.Start()
+}
+
 func (s *RollupSyncService) fetchRollupEvents() {
 	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber()
 	if err != nil {

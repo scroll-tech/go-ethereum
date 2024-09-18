@@ -836,40 +836,28 @@ func (api *ScrollAPI) CalculateRowConsumptionByBlockNumber(ctx context.Context, 
 
 // SetRollupEventSyncedL1Height sets the synced L1 height for rollup event synchronization
 func (api *ScrollAPI) SetRollupEventSyncedL1Height(height uint64) error {
-	prevHeightPtr := rawdb.ReadRollupEventSyncedL1BlockNumber(api.eth.ChainDb())
-
-	if prevHeightPtr == nil {
-		log.Warn("No previous rollup event synced L1 height found in database")
-		return fmt.Errorf("no previous rollup event synced L1 height found in database")
-	}
-
-	prevHeight := *prevHeightPtr
-	if height >= prevHeight {
-		log.Warn("New rollup event synced L1 height is not lower than previous height", "newHeight", height, "prevHeight", prevHeight)
-		return fmt.Errorf("new rollup event synced L1 height (%d) is not lower than previous height (%d)", height, prevHeight)
+	rollupSyncService := api.eth.GetRollupSyncService()
+	if rollupSyncService == nil {
+		return errors.New("RollupSyncService is not available")
 	}
 
 	log.Info("Setting rollup event synced L1 height", "height", height)
-	rawdb.WriteRollupEventSyncedL1BlockNumber(api.eth.ChainDb(), height)
+
+	rollupSyncService.ResetToHeight(height)
+
 	return nil
 }
 
 // SetL1MessageSyncedL1Height sets the synced L1 height for L1 message synchronization
 func (api *ScrollAPI) SetL1MessageSyncedL1Height(height uint64) error {
-	prevHeightPtr := rawdb.ReadSyncedL1BlockNumber(api.eth.ChainDb())
-
-	if prevHeightPtr == nil {
-		log.Warn("No previous L1 message synced L1 height found in database")
-		return fmt.Errorf("no previous L1 message synced L1 height found in database")
-	}
-
-	prevHeight := *prevHeightPtr
-	if height >= prevHeight {
-		log.Warn("New L1 message synced L1 height is not lower than previous height", "newHeight", height, "prevHeight", prevHeight)
-		return fmt.Errorf("new L1 message synced L1 height (%d) is not lower than previous height (%d)", height, prevHeight)
+	syncService := api.eth.GetSyncService()
+	if syncService == nil {
+		return errors.New("SyncService is not available")
 	}
 
 	log.Info("Setting L1 message synced L1 height", "height", height)
-	rawdb.WriteSyncedL1BlockNumber(api.eth.ChainDb(), height)
+
+	syncService.ResetToHeight(height)
+
 	return nil
 }

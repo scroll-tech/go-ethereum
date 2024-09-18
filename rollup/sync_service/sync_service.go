@@ -139,6 +139,19 @@ func (s *SyncService) Stop() {
 	}
 }
 
+// ResetToHeight resets the SyncService to a specific L1 block height
+func (s *SyncService) ResetToHeight(height uint64) {
+	s.Stop()
+
+	s.latestProcessedBlock = height
+
+	rawdb.WriteSyncedL1BlockNumber(s.db, height)
+
+	log.Info("Reset sync service", "height", height)
+
+	go s.Start()
+}
+
 // SubscribeNewL1MsgsEvent registers a subscription of NewL1MsgsEvent and
 // starts sending event to the given channel.
 func (s *SyncService) SubscribeNewL1MsgsEvent(ch chan<- core.NewL1MsgsEvent) event.Subscription {

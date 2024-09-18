@@ -431,6 +431,7 @@ func (pool *TxPool) loop() {
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					list := pool.queue[addr].Flatten()
 					for _, tx := range list {
+						log.Info("evict tx for timeout", "tx", tx.Hash().String())
 						pool.removeTx(tx.Hash(), true)
 					}
 					queuedEvictionMeter.Mark(int64(len(list)))
@@ -861,7 +862,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		pool.priced.Put(tx, isLocal)
 		pool.journalTx(from, tx)
 		pool.queueTxEvent(tx)
-		log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
+		log.Info("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
 
 		// Successful promotion, bump the heartbeat
 		pool.beats[from] = time.Now()
@@ -883,7 +884,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	}
 	pool.journalTx(from, tx)
 
-	log.Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
+	log.Info("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
 	return replaced, nil
 }
 
@@ -918,6 +919,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 	if pool.all.Get(hash) == nil && !addAll {
 		log.Error("Missing transaction in lookup set, please report the issue", "hash", hash)
 	}
+	log.Info("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "isFrom pending", !addAll)
 	if addAll {
 		pool.all.Add(tx, local)
 		pool.priced.Put(tx, local)
@@ -971,6 +973,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		// Nothing was replaced, bump the pending counter
 		pendingGauge.Inc(1)
 	}
+	log.Info("Promoted transaction from queue to pending", "hash", hash.String(), "from", addr, "to", tx.To())
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.pendingNonces.set(addr, tx.Nonce()+1)
 
@@ -1142,6 +1145,9 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 	if tx == nil {
 		return
 	}
+
+	log.Info("remove tx", "hash", hash, "outofbound", outofbound)
+
 	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
 
 	// Remove it from the list of known transactions
@@ -1763,6 +1769,9 @@ func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 	for _, tx := range txs {
 		if tx.Time().Before(t) {
 			txLifecycle := t.Sub(tx.Time())
+			if txLifecycle >= time.Minute*30 {
+				log.Warn("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String())
+			}
 			txLifecycleTimer.Update(txLifecycle)
 		}
 	}

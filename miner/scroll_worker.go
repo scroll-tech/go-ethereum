@@ -139,8 +139,9 @@ type worker struct {
 	exitCh  chan struct{}
 	reorgCh chan reorgTrigger
 
-	wg      sync.WaitGroup
-	current *work
+	wg          sync.WaitGroup
+	pendingTxns map[common.Address]types.Transactions
+	current     *work
 
 	mu       sync.RWMutex // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
@@ -561,8 +562,13 @@ func (w *worker) handleForks() (bool, error) {
 // processTxPool
 func (w *worker) processTxPool() (bool, error) {
 	tidyPendingStart := time.Now()
-	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
+
+	pending := w.pendingTxns
+	// if we have pending txns left from the last block, we should try to include them
+	if pending == nil {
+		// Fill the block with all available pending transactions.
+		pending = w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
+	}
 
 	// Allow txpool to be reorged as we build current block
 	w.eth.TxPool().ResumeReorgs()
@@ -903,6 +909,11 @@ func (w *worker) commit(reorging bool) (common.Hash, error) {
 		log.Error("failed to launch CCC background task", "err", err)
 	}
 	cccStallTimer.UpdateSince(checkStart)
+
+	// Reset the pending transactions if we have reached the deadline or every 10th block
+	if w.current.deadlineReached || w.current.header.Number.Uint64()%10 == 0 {
+		w.pendingTxns = nil
+	}
 
 	commitGasCounter.Inc(int64(block.GasUsed()))
 	if w.current.deadlineReached {

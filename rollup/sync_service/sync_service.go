@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/core"
@@ -51,6 +52,9 @@ type SyncService struct {
 	pollInterval         time.Duration
 	latestProcessedBlock uint64
 	scope                event.SubscriptionScope
+
+	stateMu sync.Mutex // protects the service state
+	resetMu sync.Mutex // protects critical sections during reset operation
 }
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
@@ -97,6 +101,9 @@ func (s *SyncService) Start() {
 		return
 	}
 
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	// wait for initial sync before starting node
 	log.Info("Starting L1 message sync service", "latestProcessedBlock", s.latestProcessedBlock)
 
@@ -131,6 +138,9 @@ func (s *SyncService) Stop() {
 		return
 	}
 
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	log.Info("Stopping sync service")
 
 	// Unsubscribe all subscriptions registered
@@ -143,6 +153,13 @@ func (s *SyncService) Stop() {
 
 // ResetToHeight resets the SyncService to a specific L1 block height
 func (s *SyncService) ResetToHeight(height uint64) {
+	if s == nil {
+		return
+	}
+
+	s.resetMu.Lock()
+	defer s.resetMu.Unlock()
+
 	s.Stop()
 
 	newCtx, newCancel := context.WithCancel(s.originalCtx)

@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/scroll-tech/da-codec/encoding"
@@ -64,6 +65,9 @@ type RollupSyncService struct {
 	l1FinalizeBatchEventSignature common.Hash
 	bc                            *core.BlockChain
 	stack                         *node.Node
+
+	stateMu sync.Mutex // protects the service state
+	resetMu sync.Mutex // protects critical sections during reset operation
 }
 
 func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, stack *node.Node) (*RollupSyncService, error) {
@@ -125,6 +129,9 @@ func (s *RollupSyncService) Start() {
 		return
 	}
 
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	log.Info("Starting rollup event sync background service", "latest processed block", s.latestProcessedBlock)
 
 	go func() {
@@ -152,6 +159,9 @@ func (s *RollupSyncService) Stop() {
 		return
 	}
 
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	log.Info("Stopping rollup event sync background service")
 
 	if s.cancel != nil {
@@ -161,6 +171,13 @@ func (s *RollupSyncService) Stop() {
 
 // ResetToHeight resets the RollupSyncService to a specific L1 block height
 func (s *RollupSyncService) ResetToHeight(height uint64) {
+	if s == nil {
+		return
+	}
+
+	s.resetMu.Lock()
+	defer s.resetMu.Unlock()
+
 	s.Stop()
 
 	newCtx, newCancel := context.WithCancel(s.originalCtx)

@@ -565,7 +565,7 @@ func (w *worker) processTxPool() (bool, error) {
 
 	pending := w.pendingTxns
 	// if we have pending txns left from the last block, we should try to include them
-	if pending == nil {
+	if pending == nil || !w.isRunning() {
 		// Fill the block with all available pending transactions.
 		pending = w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
 	}

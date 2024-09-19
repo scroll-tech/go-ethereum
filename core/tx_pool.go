@@ -1308,9 +1308,10 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		promoteAddrs = dirtyAccounts.flatten()
 	}
 	pool.mu.Lock()
+	var affectedAccounts map[common.Address]bool
 	if reset != nil {
 		// Reset from the old head to the new, rescheduling any reorged transactions
-		pool.reset(reset.oldHead, reset.newHead)
+		affectedAccounts = pool.reset(reset.oldHead, reset.newHead)
 
 		// Nonces were reset, discard any events that became stale
 		for addr := range events {
@@ -1332,7 +1333,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	// remove any transaction that has been included in the block or was invalidated
 	// because of another transaction (e.g. higher gas price).
 	if reset != nil {
-		pool.demoteUnexecutables()
+		pool.demoteUnexecutables(affectedAccounts)
 		if reset.newHead != nil && pool.chainconfig.IsCurie(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
 			l1BaseFee := fees.GetL1BaseFee(pool.currentState)
 			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead, l1BaseFee)
@@ -1380,9 +1381,18 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 
 // reset retrieves the current state of the blockchain and ensures the content
 // of the transaction pool is valid with regard to the chain state.
-func (pool *TxPool) reset(oldHead, newHead *types.Header) {
+func (pool *TxPool) reset(oldHead, newHead *types.Header) map[common.Address]bool {
 	// If we're reorging an old state, reinject all dropped transactions
 	var reinject types.Transactions
+	affectedAccounts := make(map[common.Address]bool)
+	collectAffectedAccounts := func(txs types.Transactions) {
+		if affectedAccounts != nil {
+			for _, tx := range txs {
+				addr, _ := types.Sender(pool.signer, tx)
+				affectedAccounts[addr] = true
+			}
+		}
+	}
 
 	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
 		// If the reorg is too deep, avoid doing it (will happen during fast sync)
@@ -1391,6 +1401,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
 			log.Debug("Skipping deep transaction reorg", "depth", depth)
+			affectedAccounts = nil // do a deep txPool reorg
 		} else {
 			// Reorg seems shallow enough to pull in all transactions into memory
 			var discarded, included types.Transactions
@@ -1407,7 +1418,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 					// If we reorged to a same or higher number, then it's not a case of setHead
 					log.Warn("Transaction pool reset with missing oldhead",
 						"old", oldHead.Hash(), "oldnum", oldNum, "new", newHead.Hash(), "newnum", newNum)
-					return
+					return nil
 				}
 				// If the reorg ended up on a lower number, it's indicative of setHead being the cause
 				log.Debug("Skipping transaction reset caused by setHead",
@@ -1418,44 +1429,48 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 					discarded = append(discarded, rem.Transactions()...)
 					if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
 						log.Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
-						return
+						return nil
 					}
 				}
 				for add.NumberU64() > rem.NumberU64() {
 					included = append(included, add.Transactions()...)
 					if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 						log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
-						return
+						return nil
 					}
 				}
 				for rem.Hash() != add.Hash() {
 					discarded = append(discarded, rem.Transactions()...)
 					if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
 						log.Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
-						return
+						return nil
 					}
 					included = append(included, add.Transactions()...)
 					if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 						log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
-						return
+						return nil
 					}
 				}
 				reinject = types.TxDifference(discarded, included)
+				collectAffectedAccounts(discarded)
+				collectAffectedAccounts(included)
 			}
 		}
 	}
 	// Initialize the internal state to the current head
 	if newHead == nil {
+		affectedAccounts = nil
 		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
 	}
 	statedb, err := pool.chain.StateAt(newHead.Root)
 	if err != nil {
 		log.Error("Failed to reset txpool state", "err", err)
-		return
+		return nil
 	}
 	pool.currentState = statedb
 	pool.pendingNonces = newTxNoncer(statedb)
 	pool.currentMaxGas = newHead.GasLimit
+	collectAffectedAccounts(pool.chain.GetBlock(newHead.Hash(), newHead.Number.Uint64()).Transactions())
 
 	// Inject any transactions discarded due to reorgs
 	log.Debug("Reinjecting stale transactions", "count", len(reinject))
@@ -1472,6 +1487,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 	// Update current head
 	pool.currentHead = next
+	return affectedAccounts
 }
 
 // promoteExecutables moves transactions that have become processable from the
@@ -1706,9 +1722,14 @@ func (pool *TxPool) truncateQueue() {
 // Note: transactions are not marked as removed in the priced list because re-heaping
 // is always explicitly triggered by SetBaseFee and it would be unnecessary and wasteful
 // to trigger a re-heap is this function
-func (pool *TxPool) demoteUnexecutables() {
+func (pool *TxPool) demoteUnexecutables(affectedAccounts map[common.Address]bool) {
+	log.Info("Demoting unexecutable transactions", "affected", len(affectedAccounts))
 	// Iterate over all accounts and demote any non-executable transactions
 	for addr, list := range pool.pending {
+		if affectedAccounts != nil && !affectedAccounts[addr] {
+			continue
+		}
+
 		nonce := pool.currentState.GetNonce(addr)
 
 		// Drop all transactions that are deemed too old (low nonce)

@@ -52,6 +52,7 @@ const (
 
 // RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
 type RollupSyncService struct {
+	originalCtx                   context.Context
 	ctx                           context.Context
 	cancel                        context.CancelFunc
 	client                        *L1Client
@@ -99,10 +100,11 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		latestProcessedBlock = *block
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	serviceCtx, cancel := context.WithCancel(ctx)
 
 	service := RollupSyncService{
-		ctx:                           ctx,
+		originalCtx:                   ctx,
+		ctx:                           serviceCtx,
 		cancel:                        cancel,
 		client:                        client,
 		db:                            db,
@@ -161,6 +163,9 @@ func (s *RollupSyncService) Stop() {
 func (s *RollupSyncService) ResetToHeight(height uint64) {
 	s.Stop()
 
+	newCtx, newCancel := context.WithCancel(s.originalCtx)
+	s.ctx = newCtx
+	s.cancel = newCancel
 	s.latestProcessedBlock = height
 
 	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, height)

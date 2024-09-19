@@ -42,6 +42,7 @@ var (
 
 // SyncService collects all L1 messages and stores them in a local database.
 type SyncService struct {
+	originalCtx          context.Context
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	client               *BridgeClient
@@ -76,10 +77,11 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		latestProcessedBlock = *block
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	serviceCtx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
-		ctx:                  ctx,
+		originalCtx:          ctx,
+		ctx:                  serviceCtx,
 		cancel:               cancel,
 		client:               client,
 		db:                   db,
@@ -143,6 +145,9 @@ func (s *SyncService) Stop() {
 func (s *SyncService) ResetToHeight(height uint64) {
 	s.Stop()
 
+	newCtx, newCancel := context.WithCancel(s.originalCtx)
+	s.ctx = newCtx
+	s.cancel = newCancel
 	s.latestProcessedBlock = height
 
 	rawdb.WriteSyncedL1BlockNumber(s.db, height)

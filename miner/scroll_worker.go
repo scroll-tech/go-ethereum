@@ -507,6 +507,8 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		reorging:       reorging,
 		reorgReason:    reorgReason,
 	}
+
+	w.updateSnapshot()
 	return nil
 }
 

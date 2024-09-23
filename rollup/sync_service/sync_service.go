@@ -79,10 +79,10 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		latestProcessedBlock = *block
 	}
 
-	serviceCtx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
-		ctx:                  serviceCtx,
+		ctx:                  ctx,
 		cancel:               cancel,
 		client:               client,
 		db:                   db,
@@ -97,9 +97,6 @@ func (s *SyncService) Start() {
 	if s == nil {
 		return
 	}
-
-	s.stateMu.Lock()
-	defer s.stateMu.Unlock()
 
 	// wait for initial sync before starting node
 	log.Info("Starting L1 message sync service", "latestProcessedBlock", s.latestProcessedBlock)
@@ -134,9 +131,6 @@ func (s *SyncService) Stop() {
 	if s == nil {
 		return
 	}
-
-	s.stateMu.Lock()
-	defer s.stateMu.Unlock()
 
 	log.Info("Stopping sync service")
 

@@ -102,10 +102,10 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		latestProcessedBlock = *block
 	}
 
-	serviceCtx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	service := RollupSyncService{
-		ctx:                           serviceCtx,
+		ctx:                           ctx,
 		cancel:                        cancel,
 		client:                        client,
 		db:                            db,
@@ -125,9 +125,6 @@ func (s *RollupSyncService) Start() {
 	if s == nil {
 		return
 	}
-
-	s.stateMu.Lock()
-	defer s.stateMu.Unlock()
 
 	log.Info("Starting rollup event sync background service", "latest processed block", s.latestProcessedBlock)
 
@@ -155,9 +152,6 @@ func (s *RollupSyncService) Stop() {
 	if s == nil {
 		return
 	}
-
-	s.stateMu.Lock()
-	defer s.stateMu.Unlock()
 
 	log.Info("Stopping rollup event sync background service")
 

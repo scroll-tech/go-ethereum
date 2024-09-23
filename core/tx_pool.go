@@ -923,7 +923,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 	if pool.all.Get(hash) == nil && !addAll {
 		log.Error("Missing transaction in lookup set, please report the issue", "hash", hash)
 	}
-	log.Info("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "isFrom pending", !addAll)
+	log.Info("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "new tx", !addAll)
 	if addAll {
 		pool.all.Add(tx, local)
 		pool.priced.Put(tx, local)

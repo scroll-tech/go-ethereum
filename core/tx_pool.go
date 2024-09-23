@@ -280,7 +280,6 @@ type TxPool struct {
 	queueTxEventCh           chan *types.Transaction
 	reorgDoneCh              chan chan struct{}
 	reorgShutdownCh          chan struct{} // requests shutdown of scheduleReorgLoop
-	reorgPauseCh             chan bool     // requests to pause scheduleReorgLoop
 	realTxActivityShutdownCh chan struct{}
 	wg                       sync.WaitGroup // tracks loop, scheduleReorgLoop
 	initDoneCh               chan struct{}  // is closed once the pool is initialized (for tests)
@@ -317,7 +316,6 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		reorgDoneCh:              make(chan chan struct{}),
 		reorgShutdownCh:          make(chan struct{}),
 		realTxActivityShutdownCh: make(chan struct{}),
-		reorgPauseCh:             make(chan bool),
 		initDoneCh:               make(chan struct{}),
 		gasPrice:                 new(big.Int).SetUint64(config.PriceLimit),
 	}
@@ -1229,14 +1227,13 @@ func (pool *TxPool) scheduleReorgLoop() {
 		curDone       chan struct{} // non-nil while runReorg is active
 		nextDone      = make(chan struct{})
 		launchNextRun bool
-		reorgsPaused  bool
 		reset         *txpoolResetRequest
 		dirtyAccounts *accountSet
 		queuedEvents  = make(map[common.Address]*txSortedMap)
 	)
 	for {
 		// Launch next background reorg if needed
-		if curDone == nil && launchNextRun && !reorgsPaused {
+		if curDone == nil && launchNextRun {
 			// Run the background reorg and announcements
 			go pool.runReorg(nextDone, reset, dirtyAccounts, queuedEvents)
 
@@ -1288,7 +1285,6 @@ func (pool *TxPool) scheduleReorgLoop() {
 			}
 			close(nextDone)
 			return
-		case reorgsPaused = <-pool.reorgPauseCh:
 		}
 	}
 }
@@ -1790,24 +1786,6 @@ func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 			txLifecycle := t.Sub(tx.Time())
 			txLifecycleTimer.Update(txLifecycle)
 		}
-	}
-}
-
-// PauseReorgs stops any new reorg jobs to be started but doesn't interrupt any existing ones that are in flight
-// Keep in mind this function might block, although it is not expected to block for any significant amount of time
-func (pool *TxPool) PauseReorgs() {
-	select {
-	case pool.reorgPauseCh <- true:
-	case <-pool.reorgShutdownCh:
-	}
-}
-
-// ResumeReorgs allows new reorg jobs to be started.
-// Keep in mind this function might block, although it is not expected to block for any significant amount of time
-func (pool *TxPool) ResumeReorgs() {
-	select {
-	case pool.reorgPauseCh <- false:
-	case <-pool.reorgShutdownCh:
 	}
 }
 

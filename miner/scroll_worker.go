@@ -569,9 +569,6 @@ func (w *worker) processTxPool() (bool, error) {
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().PendingWithMax(false, w.config.MaxAccountsNum)
 
-	// Allow txpool to be reorged as we build current block
-	w.eth.TxPool().ResumeReorgs()
-
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
 	for _, account := range w.eth.TxPool().Locals() {
@@ -891,10 +888,6 @@ func (w *worker) commit() (common.Hash, error) {
 			return common.Hash{}, retryableCommitError{inner: errors.New("ancestor doesn't have RC yet")}
 		}
 	}
-
-	// A new block event will trigger a reorg in the txpool, pause reorgs to defer this until we fetch txns for next block.
-	// We may end up trying to process txns that we already included in the previous block, but they will all fail the nonce check
-	w.eth.TxPool().PauseReorgs()
 
 	// Commit block and state to database.
 	_, err = w.chain.WriteBlockWithState(block, w.current.receipts, w.current.coalescedLogs, w.current.state, true)

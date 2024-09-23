@@ -141,14 +141,13 @@ func (s *SyncService) Stop() {
 	}
 }
 
-// ResetToHeight resets the SyncService to a specific L1 block height
-func (s *SyncService) ResetToHeight(height uint64) {
+// ResetStartSyncHeight resets the SyncService to a specific L1 block height
+func (s *SyncService) ResetStartSyncHeight(height uint64) {
 	if s == nil {
 		return
 	}
 
 	s.latestProcessedBlock.Store(height)
-
 	log.Info("Reset sync service", "height", height)
 }
 

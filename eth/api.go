@@ -262,8 +262,7 @@ func (api *PrivateAdminAPI) SetRollupEventSyncedL1Height(height uint64) error {
 	}
 
 	log.Info("Setting rollup event synced L1 height", "height", height)
-
-	rollupSyncService.ResetToHeight(height)
+	rollupSyncService.ResetStartSyncHeight(height)
 
 	return nil
 }
@@ -276,8 +275,7 @@ func (api *PrivateAdminAPI) SetL1MessageSyncedL1Height(height uint64) error {
 	}
 
 	log.Info("Setting L1 message synced L1 height", "height", height)
-
-	syncService.ResetToHeight(height)
+	syncService.ResetStartSyncHeight(height)
 
 	return nil
 }

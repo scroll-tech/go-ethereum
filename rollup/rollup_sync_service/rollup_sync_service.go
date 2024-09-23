@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"os"
 	"reflect"
-	"runtime/internal/atomic"
+	"sync/atomic"
 	"time"
 
 	"github.com/scroll-tech/da-codec/encoding"

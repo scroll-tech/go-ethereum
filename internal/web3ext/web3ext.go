@@ -772,6 +772,11 @@ web3._extend({
 			call: 'txpool_contentFrom',
 			params: 1,
 		}),
+		new web3._extend.Method({
+			name: 'removeTransactionByHash',
+			call: 'txpool_removeTransactionByHash',
+			params: 1
+		}),
 	]
 });
 `
@@ -920,6 +925,12 @@ web3._extend({
 			params: 2,
 			inputFormatter: [web3._extend.formatters.inputCallFormatter, web3._extend.formatters.inputBlockNumberFormatter],
 			outputFormatter: web3._extend.utils.toDecimal
+		}),
+		new web3._extend.Method({
+			name: 'calculateRowConsumptionByBlockNumber',
+			call: 'scroll_calculateRowConsumptionByBlockNumber',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
 		}),
 	],
 	properties:

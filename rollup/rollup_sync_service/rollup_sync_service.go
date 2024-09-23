@@ -53,7 +53,6 @@ const (
 
 // RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
 type RollupSyncService struct {
-	originalCtx                   context.Context
 	ctx                           context.Context
 	cancel                        context.CancelFunc
 	client                        *L1Client
@@ -66,8 +65,7 @@ type RollupSyncService struct {
 	bc                            *core.BlockChain
 	stack                         *node.Node
 
-	stateMu sync.Mutex // protects the service state
-	resetMu sync.Mutex // protects critical sections during reset operation
+	stateMu sync.Mutex // protects the service state, e.g. db and latestProcessedBlock updates
 }
 
 func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, stack *node.Node) (*RollupSyncService, error) {
@@ -107,7 +105,6 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 	serviceCtx, cancel := context.WithCancel(ctx)
 
 	service := RollupSyncService{
-		originalCtx:                   ctx,
 		ctx:                           serviceCtx,
 		cancel:                        cancel,
 		client:                        client,
@@ -175,24 +172,19 @@ func (s *RollupSyncService) ResetToHeight(height uint64) {
 		return
 	}
 
-	s.resetMu.Lock()
-	defer s.resetMu.Unlock()
-
-	s.Stop()
-
-	newCtx, newCancel := context.WithCancel(s.originalCtx)
-	s.ctx = newCtx
-	s.cancel = newCancel
-	s.latestProcessedBlock = height
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 
 	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, height)
+	s.latestProcessedBlock = height
 
-	log.Info("Reset rollup sync service", "height", height)
-
-	go s.Start()
+	log.Info("Reset sync service", "height", height)
 }
 
 func (s *RollupSyncService) fetchRollupEvents() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber()
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)

@@ -43,7 +43,6 @@ var (
 
 // SyncService collects all L1 messages and stores them in a local database.
 type SyncService struct {
-	originalCtx          context.Context
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	client               *BridgeClient
@@ -53,8 +52,7 @@ type SyncService struct {
 	latestProcessedBlock uint64
 	scope                event.SubscriptionScope
 
-	stateMu sync.Mutex // protects the service state
-	resetMu sync.Mutex // protects critical sections during reset operation
+	stateMu sync.Mutex // protects the service state, e.g. db and latestProcessedBlock updates
 }
 
 func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client EthClient) (*SyncService, error) {
@@ -84,7 +82,6 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 	serviceCtx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
-		originalCtx:          ctx,
 		ctx:                  serviceCtx,
 		cancel:               cancel,
 		client:               client,
@@ -157,21 +154,13 @@ func (s *SyncService) ResetToHeight(height uint64) {
 		return
 	}
 
-	s.resetMu.Lock()
-	defer s.resetMu.Unlock()
-
-	s.Stop()
-
-	newCtx, newCancel := context.WithCancel(s.originalCtx)
-	s.ctx = newCtx
-	s.cancel = newCancel
-	s.latestProcessedBlock = height
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 
 	rawdb.WriteSyncedL1BlockNumber(s.db, height)
+	s.latestProcessedBlock = height
 
 	log.Info("Reset sync service", "height", height)
-
-	go s.Start()
 }
 
 // SubscribeNewL1MsgsEvent registers a subscription of NewL1MsgsEvent and
@@ -181,6 +170,9 @@ func (s *SyncService) SubscribeNewL1MsgsEvent(ch chan<- core.NewL1MsgsEvent) eve
 }
 
 func (s *SyncService) fetchMessages() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	latestConfirmed, err := s.client.getLatestConfirmedBlockNumber(s.ctx)
 	if err != nil {
 		log.Warn("Failed to get latest confirmed block number", "err", err)

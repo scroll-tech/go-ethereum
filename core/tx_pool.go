@@ -1448,7 +1448,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) map[common.Address]boo
 					}
 				}
 				reinject = types.TxDifference(discarded, included)
-				collectAffectedAccounts(discarded)
+				collectAffectedAccounts(reinject)
 				collectAffectedAccounts(included)
 			}
 		}

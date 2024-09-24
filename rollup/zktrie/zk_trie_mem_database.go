@@ -11,14 +11,14 @@ type ZktrieDatabase interface {
 	Get(key []byte) ([]byte, error)
 }
 
-type Database struct {
+type MemDatabase struct {
 	db   map[string][]byte
 	lock sync.RWMutex
 }
 
-func (db *Database) UpdatePreimage([]byte, *big.Int) {}
+func (db *MemDatabase) UpdatePreimage([]byte, *big.Int) {}
 
-func (db *Database) Put(k, v []byte) error {
+func (db *MemDatabase) Put(k, v []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -26,7 +26,7 @@ func (db *Database) Put(k, v []byte) error {
 	return nil
 }
 
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *MemDatabase) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -38,12 +38,12 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 }
 
 // Init flush db with batches of k/v without locking
-func (db *Database) Init(k, v []byte) {
+func (db *MemDatabase) Init(k, v []byte) {
 	db.db[string(k)] = v
 }
 
-func NewZkTrieMemoryDb() *Database {
-	return &Database{
+func NewZkTrieMemoryDb() *MemDatabase {
+	return &MemDatabase{
 		db: make(map[string][]byte),
 	}
 }

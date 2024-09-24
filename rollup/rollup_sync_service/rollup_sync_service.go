@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"os"
 	"reflect"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/scroll-tech/da-codec/encoding"
@@ -57,13 +57,14 @@ type RollupSyncService struct {
 	cancel                        context.CancelFunc
 	client                        *L1Client
 	db                            ethdb.Database
-	latestProcessedBlock          atomic.Uint64
+	latestProcessedBlock          uint64
 	scrollChainABI                *abi.ABI
 	l1CommitBatchEventSignature   common.Hash
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 	bc                            *core.BlockChain
 	stack                         *node.Node
+	stateMu                       sync.Mutex
 }
 
 func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, stack *node.Node) (*RollupSyncService, error) {
@@ -107,6 +108,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		cancel:                        cancel,
 		client:                        client,
 		db:                            db,
+		latestProcessedBlock:          latestProcessedBlock,
 		scrollChainABI:                scrollChainABI,
 		l1CommitBatchEventSignature:   scrollChainABI.Events["CommitBatch"].ID,
 		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
@@ -114,8 +116,6 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		bc:                            bc,
 		stack:                         stack,
 	}
-
-	service.latestProcessedBlock.Store(latestProcessedBlock)
 
 	return &service, nil
 }
@@ -125,7 +125,7 @@ func (s *RollupSyncService) Start() {
 		return
 	}
 
-	log.Info("Starting rollup event sync background service", "latest processed block", s.latestProcessedBlock.Load())
+	log.Info("Starting rollup event sync background service", "latest processed block", s.latestProcessedBlock)
 
 	go func() {
 		syncTicker := time.NewTicker(defaultSyncInterval)
@@ -141,7 +141,7 @@ func (s *RollupSyncService) Start() {
 			case <-syncTicker.C:
 				s.fetchRollupEvents()
 			case <-logTicker.C:
-				log.Info("Sync rollup events progress update", "latestProcessedBlock", s.latestProcessedBlock.Load())
+				log.Info("Sync rollup events progress update", "latestProcessedBlock", s.latestProcessedBlock)
 			}
 		}
 	}()
@@ -165,28 +165,27 @@ func (s *RollupSyncService) ResetStartSyncHeight(height uint64) {
 		return
 	}
 
-	s.latestProcessedBlock.Store(height)
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
+	s.latestProcessedBlock = height
 	log.Info("Reset sync service", "height", height)
 }
 
 func (s *RollupSyncService) fetchRollupEvents() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber()
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)
 		return
 	}
 
-	initialProcessedBlock := s.latestProcessedBlock.Load()
-	currentProcessedBlock := initialProcessedBlock
-	// func() ensures using final currentProcessedBlock value when function returns
-	defer func() {
-		s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
-	}()
-
-	log.Trace("Sync service fetch rollup events", "latest processed block", currentProcessedBlock, "latest confirmed", latestConfirmed)
+	log.Trace("Sync service fetch rollup events", "latest processed block", s.latestProcessedBlock, "latest confirmed", latestConfirmed)
 
 	// query in batches
-	for from := currentProcessedBlock + 1; from <= latestConfirmed; from += defaultFetchBlockRange {
+	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += defaultFetchBlockRange {
 		if s.ctx.Err() != nil {
 			log.Info("Context canceled", "reason", s.ctx.Err())
 			return
@@ -208,7 +207,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 			return
 		}
 
-		currentProcessedBlock = to
+		s.latestProcessedBlock = to
 	}
 }
 

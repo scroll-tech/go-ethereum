@@ -166,7 +166,10 @@ func (s *SyncService) fetchMessages() {
 
 	initialProcessedBlock := s.latestProcessedBlock.Load()
 	currentProcessedBlock := initialProcessedBlock
-	defer s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
+	// func() ensures using final currentProcessedBlock value when function returns
+	defer func() {
+		s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
+	}()
 
 	log.Trace("Sync service fetchMessages", "latestProcessedBlock", currentProcessedBlock, "latestConfirmed", latestConfirmed)
 

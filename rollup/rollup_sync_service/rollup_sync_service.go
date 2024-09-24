@@ -176,13 +176,13 @@ func (s *RollupSyncService) fetchRollupEvents() {
 		return
 	}
 
-	log.Trace("Sync service fetch rollup events", "latest processed block", s.latestProcessedBlock.Load(), "latest confirmed", latestConfirmed)
+	initialProcessedBlock := s.latestProcessedBlock.Load()
+	currentProcessedBlock := initialProcessedBlock
 
-	latestProcessedBlock := s.latestProcessedBlock.Load()
-	updatedLatestProcessedBlock := latestProcessedBlock
+	log.Trace("Sync service fetch rollup events", "latest processed block", currentProcessedBlock, "latest confirmed", latestConfirmed)
 
 	// query in batches
-	for from := latestProcessedBlock + 1; from <= latestConfirmed; from += defaultFetchBlockRange {
+	for from := currentProcessedBlock + 1; from <= latestConfirmed; from += defaultFetchBlockRange {
 		if s.ctx.Err() != nil {
 			log.Info("Context canceled", "reason", s.ctx.Err())
 			return
@@ -204,10 +204,10 @@ func (s *RollupSyncService) fetchRollupEvents() {
 			return
 		}
 
-		updatedLatestProcessedBlock = to
+		currentProcessedBlock = to
 	}
 
-	s.latestProcessedBlock.CompareAndSwap(latestProcessedBlock, updatedLatestProcessedBlock)
+	s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
 }
 
 func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlockNumber uint64) error {

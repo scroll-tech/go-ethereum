@@ -164,10 +164,10 @@ func (s *SyncService) fetchMessages() {
 		return
 	}
 
-	latestProcessedBlock := s.latestProcessedBlock.Load()
-	updatedLatestProcessedBlock := latestProcessedBlock
+	initialProcessedBlock := s.latestProcessedBlock.Load()
+	currentProcessedBlock := initialProcessedBlock
 
-	log.Trace("Sync service fetchMessages", "latestProcessedBlock", latestProcessedBlock, "latestConfirmed", latestConfirmed)
+	log.Trace("Sync service fetchMessages", "latestProcessedBlock", currentProcessedBlock, "latestConfirmed", latestConfirmed)
 
 	// keep track of next queue index we're expecting to see
 	queueIndex := rawdb.ReadHighestSyncedQueueIndex(s.db)
@@ -197,7 +197,7 @@ func (s *SyncService) fetchMessages() {
 			numMessagesPendingDbWrite = 0
 		}
 
-		updatedLatestProcessedBlock = lastBlock
+		currentProcessedBlock = lastBlock
 	}
 
 	// ticker for logging progress
@@ -205,7 +205,7 @@ func (s *SyncService) fetchMessages() {
 	numMsgsCollected := 0
 
 	// query in batches
-	for from := updatedLatestProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
+	for from := currentProcessedBlock + 1; from <= latestConfirmed; from += DefaultFetchBlockRange {
 		select {
 		case <-s.ctx.Done():
 			// flush pending writes to database
@@ -214,8 +214,8 @@ func (s *SyncService) fetchMessages() {
 			}
 			return
 		case <-t.C:
-			progress := 100 * float64(updatedLatestProcessedBlock) / float64(latestConfirmed)
-			log.Info("Syncing L1 messages", "processed", updatedLatestProcessedBlock, "confirmed", latestConfirmed, "collected", numMsgsCollected, "progress(%)", progress)
+			progress := 100 * float64(currentProcessedBlock) / float64(latestConfirmed)
+			log.Info("Syncing L1 messages", "processed", currentProcessedBlock, "confirmed", latestConfirmed, "collected", numMsgsCollected, "progress(%)", progress)
 		default:
 		}
 
@@ -260,5 +260,5 @@ func (s *SyncService) fetchMessages() {
 		}
 	}
 
-	s.latestProcessedBlock.CompareAndSwap(latestProcessedBlock, updatedLatestProcessedBlock)
+	s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
 }

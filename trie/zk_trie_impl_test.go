@@ -19,14 +19,14 @@ import (
 
 // we do not need zktrie impl anymore, only made a wrapper for adapting testing
 type zkTrieImplTestWrapper struct {
-	*zktrie.ZkTrieImpl
+	*zktrie.ZkTrie
 }
 
 func newZkTrieImpl(storage *ZktrieDatabase, maxLevels int) (*zkTrieImplTestWrapper, error) {
 	return newZkTrieImplWithRoot(storage, &zkt.HashZero, maxLevels)
 }
 
-// NewZkTrieImplWithRoot loads a new ZkTrieImpl. If in the storage already exists one
+// NewZkTrieImplWithRoot loads a new ZkTrie. If in the storage already exists one
 // will open that one, if not, will create a new one.
 func newZkTrieImplWithRoot(storage *ZktrieDatabase, root *zkt.Hash, maxLevels int) (*zkTrieImplTestWrapper, error) {
 	impl, err := zktrie.NewZkTrieImplWithRoot(storage, root, maxLevels)
@@ -38,7 +38,7 @@ func newZkTrieImplWithRoot(storage *ZktrieDatabase, root *zkt.Hash, maxLevels in
 }
 
 // AddWord
-// Deprecated: Add a Bytes32 kv to ZkTrieImpl, only for testing
+// Deprecated: Add a Bytes32 kv to ZkTrie, only for testing
 func (mt *zkTrieImplTestWrapper) AddWord(kPreimage, vPreimage *zkt.Byte32) error {
 	k, err := kPreimage.Hash()
 	if err != nil {
@@ -49,17 +49,17 @@ func (mt *zkTrieImplTestWrapper) AddWord(kPreimage, vPreimage *zkt.Byte32) error
 		return zktrie.ErrEntryIndexAlreadyExists
 	}
 
-	return mt.ZkTrieImpl.TryUpdate(zkt.NewHashFromBigInt(k), 1, []zkt.Byte32{*vPreimage})
+	return mt.ZkTrie.TryUpdate(zkt.NewHashFromBigInt(k), 1, []zkt.Byte32{*vPreimage})
 }
 
 // GetLeafNodeByWord
-// Deprecated: Get a Bytes32 kv to ZkTrieImpl, only for testing
+// Deprecated: Get a Bytes32 kv to ZkTrie, only for testing
 func (mt *zkTrieImplTestWrapper) GetLeafNodeByWord(kPreimage *zkt.Byte32) (*zktrie.Node, error) {
 	k, err := kPreimage.Hash()
 	if err != nil {
 		return nil, err
 	}
-	return mt.ZkTrieImpl.GetLeafNode(zkt.NewHashFromBigInt(k))
+	return mt.ZkTrie.GetLeafNode(zkt.NewHashFromBigInt(k))
 }
 
 // Deprecated: only for testing
@@ -69,7 +69,7 @@ func (mt *zkTrieImplTestWrapper) UpdateWord(kPreimage, vPreimage *zkt.Byte32) er
 		return err
 	}
 
-	return mt.ZkTrieImpl.TryUpdate(zkt.NewHashFromBigInt(k), 1, []zkt.Byte32{*vPreimage})
+	return mt.ZkTrie.TryUpdate(zkt.NewHashFromBigInt(k), 1, []zkt.Byte32{*vPreimage})
 }
 
 // Deprecated: only for testing
@@ -78,21 +78,21 @@ func (mt *zkTrieImplTestWrapper) DeleteWord(kPreimage *zkt.Byte32) error {
 	if err != nil {
 		return err
 	}
-	return mt.ZkTrieImpl.TryDelete(zkt.NewHashFromBigInt(k))
+	return mt.ZkTrie.TryDelete(zkt.NewHashFromBigInt(k))
 }
 
 func (mt *zkTrieImplTestWrapper) TryGet(key []byte) ([]byte, error) {
-	return mt.ZkTrieImpl.TryGet(zkt.NewHashFromBytes(key))
+	return mt.ZkTrie.TryGet(zkt.NewHashFromBytes(key))
 }
 
 func (mt *zkTrieImplTestWrapper) TryDelete(key []byte) error {
-	return mt.ZkTrieImpl.TryDelete(zkt.NewHashFromBytes(key))
+	return mt.ZkTrie.TryDelete(zkt.NewHashFromBytes(key))
 }
 
 // TryUpdateAccount will abstract the write of an account to the trie
 func (mt *zkTrieImplTestWrapper) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
 	value, flag := acc.MarshalFields()
-	return mt.ZkTrieImpl.TryUpdate(zkt.NewHashFromBytes(key), flag, value)
+	return mt.ZkTrie.TryUpdate(zkt.NewHashFromBytes(key), flag, value)
 }
 
 // NewHashFromHex returns a *Hash representation of the given hex string

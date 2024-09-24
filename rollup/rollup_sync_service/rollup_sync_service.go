@@ -178,6 +178,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 
 	initialProcessedBlock := s.latestProcessedBlock.Load()
 	currentProcessedBlock := initialProcessedBlock
+	defer s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
 
 	log.Trace("Sync service fetch rollup events", "latest processed block", currentProcessedBlock, "latest confirmed", latestConfirmed)
 
@@ -206,8 +207,6 @@ func (s *RollupSyncService) fetchRollupEvents() {
 
 		currentProcessedBlock = to
 	}
-
-	s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
 }
 
 func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlockNumber uint64) error {

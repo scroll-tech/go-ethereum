@@ -166,6 +166,7 @@ func (s *SyncService) fetchMessages() {
 
 	initialProcessedBlock := s.latestProcessedBlock.Load()
 	currentProcessedBlock := initialProcessedBlock
+	defer s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
 
 	log.Trace("Sync service fetchMessages", "latestProcessedBlock", currentProcessedBlock, "latestConfirmed", latestConfirmed)
 
@@ -259,6 +260,4 @@ func (s *SyncService) fetchMessages() {
 			flush(to)
 		}
 	}
-
-	s.latestProcessedBlock.CompareAndSwap(initialProcessedBlock, currentProcessedBlock)
 }

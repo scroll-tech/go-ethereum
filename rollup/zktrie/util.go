@@ -113,12 +113,3 @@ func ToSecureKeyBytes(key []byte) (*Byte32, error) {
 
 	return NewByte32FromBytes(k.Bytes()), nil
 }
-
-// ReverseByteOrder swaps the order of the bytes in the slice.
-func ReverseByteOrder(b []byte) []byte {
-	o := make([]byte, len(b))
-	for i := range b {
-		o[len(b)-1-i] = b[i]
-	}
-	return o
-}

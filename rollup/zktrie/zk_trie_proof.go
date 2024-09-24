@@ -1,28 +1,8 @@
 package zktrie
 
 import (
-	"bytes"
 	"fmt"
 )
-
-var magicSMTBytes []byte
-
-func init() {
-	magicSMTBytes = []byte("THIS IS SOME MAGIC BYTES FOR SMT m1rRXgP2xpDI")
-}
-
-func ProofMagicBytes() []byte { return magicSMTBytes }
-
-// DecodeProof try to decode a node bytes, return can be nil for any non-node data (magic code)
-func DecodeSMTProof(data []byte) (*Node, error) {
-
-	if bytes.Equal(magicSMTBytes, data) {
-		//skip magic bytes node
-		return nil, nil
-	}
-
-	return NewNodeFromBytes(data)
-}
 
 // Prove constructs a merkle proof for SMT, it respect the protocol used by the ethereum-trie
 // but save the node data with a compact form

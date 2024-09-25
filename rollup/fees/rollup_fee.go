@@ -69,7 +69,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 		return nil, err
 	}
 
-	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+	gpoState := ReadGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
 	var l1DataFee *big.Int
 
@@ -133,7 +133,7 @@ func asUnsignedDynamicTx(msg Message, chainID *big.Int) *types.Transaction {
 	})
 }
 
-func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
+func ReadGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	var gpoState gpoState
 	gpoState.l1BaseFee = state.GetState(addr, rcfg.L1BaseFeeSlot).Big()
 	gpoState.overhead = state.GetState(addr, rcfg.OverheadSlot).Big()
@@ -201,7 +201,7 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
-func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int) (*big.Int, error) {
+func CalculateL1DataFeeWithGpoState(tx *types.Transaction, gpoState gpoState, config *params.ChainConfig, blockNumber *big.Int) (*big.Int, error) {
 	if tx.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}
@@ -210,8 +210,6 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	if err != nil {
 		return nil, err
 	}
-
-	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
 	var l1DataFee *big.Int
 
@@ -228,6 +226,11 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	}
 
 	return l1DataFee, nil
+}
+
+func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int) (*big.Int, error) {
+	gpoState := ReadGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
+	return CalculateL1DataFeeWithGpoState(tx, gpoState, config, blockNumber)
 }
 
 func GetL1BaseFee(state StateDB) *big.Int {

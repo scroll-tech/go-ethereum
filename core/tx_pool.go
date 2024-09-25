@@ -38,6 +38,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
 const (
@@ -1546,6 +1547,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 }
 
 func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transaction) bool {
+	gpoState := fees.ReadGPOStorageSlots(rcfg.L1GasPriceOracleAddress, pool.currentState)
 	return func(tx *types.Transaction) bool {
 		if tx.Gas() > pool.currentMaxGas || tx.Cost().Cmp(costLimit) > 0 {
 			return true
@@ -1553,7 +1555,7 @@ func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transa
 
 		if pool.chainconfig.Scroll.FeeVaultEnabled() {
 			// recheck L1 data fee, as the oracle price may have changed
-			l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+			l1DataFee, err := fees.CalculateL1DataFeeWithGpoState(tx, gpoState, pool.chainconfig, pool.currentHead)
 			if err != nil {
 				log.Error("Failed to calculate L1 data fee", "err", err, "tx", tx)
 				return false

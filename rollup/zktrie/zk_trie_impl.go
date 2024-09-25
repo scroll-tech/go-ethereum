@@ -10,6 +10,15 @@ import (
 )
 
 const (
+	// NodeKeyValidBytes is the number of least significant bytes in the node key
+	// that are considered valid to addressing the leaf node, and thus limits the
+	// maximum trie depth to NodeKeyValidBytes * 8.
+	// We need to truncate the node key because the key is the output of Poseidon
+	// hash and the key space doesn't fully occupy the range of power of two. It can
+	// lead to an ambiguous bit representation of the key in the finite field
+	// causing a soundness issue in the zk circuit.
+	NodeKeyValidBytes = 31
+
 	// proofFlagsLen is the byte length of the flags in the proof header
 	// (first 32 bytes).
 	proofFlagsLen = 2
@@ -107,6 +116,16 @@ func (mt *ZkTrieImpl) Root() (*Hash, error) {
 	return mt.rootKey, nil
 }
 
+// Hash returns the root hash of SecureBinaryTrie. It does not write to the
+// database and can be used even if the trie doesn't have one.
+func (mt *ZkTrieImpl) Hash() []byte {
+	root, err := mt.Root()
+	if err != nil {
+		panic("root failed in trie.Hash")
+	}
+	return root.Bytes()
+}
+
 // MaxLevels returns the MT maximum level
 func (mt *ZkTrieImpl) MaxLevels() int {
 	return mt.maxLevels
@@ -114,11 +133,17 @@ func (mt *ZkTrieImpl) MaxLevels() int {
 
 // TryUpdate updates a nodeKey & value into the ZkTrieImpl. Where the `k` determines the
 // path from the Root to the Leaf. This also return the updated leaf node
-func (mt *ZkTrieImpl) TryUpdate(nodeKey *Hash, vFlag uint32, vPreimage []Byte32) error {
+func (mt *ZkTrieImpl) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error {
 	// verify that the ZkTrieImpl is writable
 	if !mt.writable {
 		return ErrNotWritable
 	}
+
+	secureKey, err := ToSecureKey(key)
+	if err != nil {
+		return err
+	}
+	nodeKey := NewHashFromBigInt(secureKey)
 
 	// verify that k are valid and fit inside the Finite Field.
 	if !CheckBigIntInField(nodeKey.BigInt()) {
@@ -130,6 +155,8 @@ func (mt *ZkTrieImpl) TryUpdate(nodeKey *Hash, vFlag uint32, vPreimage []Byte32)
 
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
+
+	mt.db.UpdatePreimage(key, secureKey)
 
 	newRootKey, _, err := mt.addLeaf(newLeafNode, mt.rootKey, 0, path)
 	// sanity check
@@ -400,11 +427,16 @@ func (mt *ZkTrieImpl) tryGet(nodeKey *Hash) (*Node, error) {
 // TryGet returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 // If a node was not found in the database, a MissingNodeError is returned.
-func (mt *ZkTrieImpl) TryGet(nodeKey *Hash) ([]byte, error) {
+func (mt *ZkTrieImpl) TryGet(key []byte) ([]byte, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
-	node, err := mt.tryGet(nodeKey)
+	secureK, err := ToSecureKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := mt.tryGet(NewHashFromBigInt(secureK))
 	if err == ErrKeyNotFound {
 		// according to https://github.com/ethereum/go-ethereum/blob/37f9d25ba027356457953eab5f181c98b46e9988/trie/trie.go#L135
 		return nil, nil
@@ -424,11 +456,18 @@ func (mt *ZkTrieImpl) TryGet(nodeKey *Hash) ([]byte, error) {
 // import them in a new ZkTrieImpl in a new database (using
 // mt.ImportDumpedLeafs), but this will lose all the Root history of the
 // ZkTrieImpl
-func (mt *ZkTrieImpl) TryDelete(nodeKey *Hash) error {
+func (mt *ZkTrieImpl) TryDelete(key []byte) error {
 	// verify that the ZkTrieImpl is writable
 	if !mt.writable {
 		return ErrNotWritable
 	}
+
+	secureKey, err := ToSecureKey(key)
+	if err != nil {
+		return err
+	}
+
+	nodeKey := NewHashFromBigInt(secureKey)
 
 	// verify that k is valid and fit inside the Finite Field.
 	if !CheckBigIntInField(nodeKey.BigInt()) {
@@ -437,6 +476,11 @@ func (mt *ZkTrieImpl) TryDelete(nodeKey *Hash) error {
 
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
+
+	//mitigate the create-delete issue: do not delete unexisted key
+	if r, _ := mt.tryGet(nodeKey); r == nil {
+		return nil
+	}
 
 	newRootKey, _, err := mt.tryDelete(mt.rootKey, nodeKey, getPath(mt.maxLevels, nodeKey[:]))
 	if err != nil {
@@ -516,9 +560,16 @@ func (mt *ZkTrieImpl) tryDelete(rootKey *Hash, nodeKey *Hash, path []bool) (*Has
 
 // GetLeafNode is more underlying method than TryGet, which obtain an leaf node
 // or nil if not exist
-func (mt *ZkTrieImpl) GetLeafNode(nodeKey *Hash) (*Node, error) {
+func (mt *ZkTrieImpl) GetLeafNode(key []byte) (*Node, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
+
+	secureKey, err := ToSecureKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeKey := NewHashFromBigInt(secureKey)
 
 	n, err := mt.tryGet(nodeKey)
 	return n, err
@@ -849,9 +900,86 @@ func (mt *ZkTrieImpl) Copy() *ZkTrieImpl {
 	}
 }
 
+// Prove is a simlified calling of ProveWithDeletion
+func (mt *ZkTrieImpl) Prove(key []byte, fromLevel uint, writeNode func(*Node) error) error {
+	return mt.ProveWithDeletion(key, fromLevel, writeNode, nil)
+}
+
+// ProveWithDeletion constructs a merkle proof for key. The result contains all encoded nodes
+// on the path to the value at key. The value itself is also included in the last
+// node and can be retrieved by verifying the proof.
+//
+// If the trie does not contain a value for key, the returned proof contains all
+// nodes of the longest existing prefix of the key (at least the root node), ending
+// with the node that proves the absence of the key.
+//
+// If the trie contain value for key, the onHit is called BEFORE writeNode being called,
+// both the hitted leaf node and its sibling node is provided as arguments so caller
+// would receive enough information for launch a deletion and calculate the new root
+// base on the proof data
+// Also notice the sibling can be nil if the trie has only one leaf
+func (mt *ZkTrieImpl) ProveWithDeletion(key []byte, fromLevel uint, writeNode func(*Node) error, onHit func(*Node, *Node)) error {
+	secureKey, err := ToSecureKey(key)
+	if err != nil {
+		return err
+	}
+
+	nodeKey := NewHashFromBigInt(secureKey)
+	var prev *Node
+	return mt.prove(nodeKey, fromLevel, func(n *Node) (err error) {
+		defer func() {
+			if err == nil {
+				err = writeNode(n)
+			}
+			prev = n
+		}()
+
+		if prev != nil {
+			switch prev.Type {
+			case NodeTypeBranch_0, NodeTypeBranch_1, NodeTypeBranch_2, NodeTypeBranch_3:
+			default:
+				// sanity check: we should stop after obtain leaf/empty
+				panic("unexpected behavior in prove")
+			}
+		}
+
+		if onHit == nil {
+			return
+		}
+
+		// check and call onhit
+		if n.Type == NodeTypeLeaf_New && bytes.Equal(n.NodeKey.Bytes(), nodeKey.Bytes()) {
+			if prev == nil {
+				// for sole element trie
+				onHit(n, nil)
+			} else {
+				var sibling, nHash *Hash
+				nHash, err = n.NodeHash()
+				if err != nil {
+					return
+				}
+
+				if bytes.Equal(nHash.Bytes(), prev.ChildL.Bytes()) {
+					sibling = prev.ChildR
+				} else {
+					sibling = prev.ChildL
+				}
+
+				if siblingNode, err := mt.getNode(sibling); err == nil {
+					onHit(n, siblingNode)
+				} else {
+					onHit(n, nil)
+				}
+			}
+
+		}
+		return
+	})
+}
+
 // Prove constructs a merkle proof for SMT, it respect the protocol used by the ethereum-trie
 // but save the node data with a compact form
-func (mt *ZkTrieImpl) Prove(kHash *Hash, fromLevel uint, writeNode func(*Node) error) error {
+func (mt *ZkTrieImpl) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) error) error {
 	// force root hash calculation if needed
 	if _, err := mt.Root(); err != nil {
 		return err

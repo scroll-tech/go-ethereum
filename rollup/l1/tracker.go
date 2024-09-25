@@ -22,7 +22,10 @@ type Tracker struct {
 
 	client Client
 
-	headers             *common.ShrinkingMap[uint64, *types.Header]
+	genesis        common.Hash
+	canonicalChain *common.ShrinkingMap[uint64, *types.Header]
+	headers        *common.ShrinkingMap[common.Hash, *types.Header]
+
 	lastSafeHeader      *types.Header
 	lastFinalizedHeader *types.Header
 
@@ -36,14 +39,16 @@ const (
 	defaultSyncInterval = 12 * time.Second
 )
 
-func NewTracker(ctx context.Context, l1Client Client) *Tracker {
+func NewTracker(ctx context.Context, l1Client Client, genesis common.Hash) *Tracker {
 	ctx, cancel := context.WithCancel(ctx)
 	l1Tracker := &Tracker{
-		ctx:           ctx,
-		cancel:        cancel,
-		client:        l1Client,
-		headers:       common.NewShrinkingMap[uint64, *types.Header](1000),
-		subscriptions: make(map[ConfirmationRule][]*subscription),
+		ctx:            ctx,
+		cancel:         cancel,
+		client:         l1Client,
+		genesis:        genesis,
+		canonicalChain: common.NewShrinkingMap[uint64, *types.Header](1000),
+		headers:        common.NewShrinkingMap[common.Hash, *types.Header](1000),
+		subscriptions:  make(map[ConfirmationRule][]*subscription),
 	}
 
 	return l1Tracker
@@ -84,10 +89,18 @@ func (t *Tracker) headerByNumber(number rpc.BlockNumber) (*types.Header, error) 
 		return nil, fmt.Errorf("received unexpected block number in Tracker: %v", newHeader.Number)
 	}
 
+	// Store the header in cache.
+	t.headers.Set(newHeader.Hash(), newHeader)
+
 	return newHeader, nil
 }
 
 func (t *Tracker) headerByHash(hash common.Hash) (*types.Header, error) {
+	// Check if we already have the header in cache.
+	if header, exists := t.headers.Get(hash); exists {
+		return header, nil
+	}
+
 	newHeader, err := t.client.HeaderByHash(t.ctx, hash)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get %s header by hash", hash)
@@ -95,6 +108,9 @@ func (t *Tracker) headerByHash(hash common.Hash) (*types.Header, error) {
 	if !newHeader.Number.IsUint64() {
 		return nil, fmt.Errorf("received unexpected block number in Tracker: %v", newHeader.Number)
 	}
+
+	// Store the header in cache.
+	t.headers.Set(newHeader.Hash(), newHeader)
 
 	return newHeader, nil
 }
@@ -107,7 +123,7 @@ func (t *Tracker) syncLatestHead() error {
 
 	reorged := newReorgedHeaders()
 
-	seenHeader, exists := t.headers.Get(newHeader.Number.Uint64())
+	seenHeader, exists := t.canonicalChain.Get(newHeader.Number.Uint64())
 	if exists {
 		if seenHeader.Hash() == newHeader.Hash() {
 			// We already saw this header, nothing to do.
@@ -121,11 +137,19 @@ func (t *Tracker) syncLatestHead() error {
 	// Make sure that we have a continuous sequence of headers (chain) in the cache.
 	// If there's a gap, we need to fetch the missing headers.
 	// A gap can happen due to a reorg or because the node was offline for a while/the RPC didn't return the headers.
-	// TODO: what about genesis block?
 	current := newHeader
-	for newHeader.Number.Uint64() > 1 {
+	for {
 		prevNumber := current.Number.Uint64() - 1
-		prevHeader, exists := t.headers.Get(prevNumber)
+		prevHeader, exists := t.canonicalChain.Get(prevNumber)
+
+		if prevNumber == 0 {
+			if current.ParentHash != t.genesis {
+				return errors.Errorf("failed to find genesis block in canonical chain")
+			}
+
+			// We reached the genesis block. The chain is complete.
+			break
+		}
 
 		if !exists {
 			// There's a gap. We need to fetch the previous header.
@@ -134,13 +158,13 @@ func (t *Tracker) syncLatestHead() error {
 				return errors.Wrapf(err, "failed to retrieve previous header %d", current.Number.Uint64()-1)
 			}
 
-			t.headers.Set(prev.Number.Uint64(), prev)
+			t.canonicalChain.Set(prev.Number.Uint64(), prev)
 			prevHeader = prev
 		}
 
 		// Make sure that the headers are connected in a chain.
 		if current.ParentHash == prevHeader.Hash() {
-			// We already had this header in cache, this means the chain is complete.
+			// We already had this header in the canonical chain, this means the chain is complete.
 			if exists {
 				break
 			}
@@ -164,8 +188,8 @@ func (t *Tracker) syncLatestHead() error {
 		// we need to store the reorged headers to notify the subscribers about the reorg.
 		reorged.add(prevHeader)
 
-		// update the headers cache with the new chain
-		t.headers.Set(newChainPrev.Number.Uint64(), newChainPrev)
+		// update the canonical chain with the new chain
+		t.canonicalChain.Set(newChainPrev.Number.Uint64(), newChainPrev)
 
 		// continue reconciling the new chain - stops when we reach the forking point
 		current = newChainPrev
@@ -188,7 +212,7 @@ func (t *Tracker) syncLatestHead() error {
 
 func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders) error {
 	// TODO: add mutex for headers, lastSafeHeader, lastFinalizedHeader
-	t.headers.Set(newHeader.Number.Uint64(), newHeader)
+	t.canonicalChain.Set(newHeader.Number.Uint64(), newHeader)
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -205,10 +229,10 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 		// n confirmations == latest block - (n-1)
 		depth := uint64(sub.confirmationRule - 1)
 		headerToNotifyNumber := newHeader.Number.Uint64() - depth
-		headerToNotify, exists := t.headers.Get(headerToNotifyNumber)
+		headerToNotify, exists := t.canonicalChain.Get(headerToNotifyNumber)
 		if !exists {
 			// This should never happen since we're making sure that the headers are continuous.
-			return errors.Errorf("failed to find header %d in cache", headerToNotifyNumber)
+			return errors.Errorf("failed to find header %d in canonical chain", headerToNotifyNumber)
 		}
 
 		var reorg bool
@@ -223,11 +247,11 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 				for _, reorgedHeader := range reorged.headers {
 					fmt.Println("reorged headers", reorgedHeader.Number.Uint64())
 				}
-				fmt.Println("reorged min", reorged.minNumber)
-				fmt.Println("reorged max", reorged.maxNumber)
+				//fmt.Println("reorged min", reorged.minNumber)
+				//fmt.Println("reorged max", reorged.maxNumber)
 				fmt.Println("sub last sent header", sub.lastSentHeader.Number.Uint64())
 
-				if sub.lastSentHeader.Number.Uint64() < reorged.minNumber {
+				if sub.lastSentHeader.Number.Uint64() < reorged.min().Number.Uint64() {
 					// The subscriber is subscribed to a deeper ConfirmationRule than the reorg depth -> this reorg doesn't affect the subscriber.
 					reorg = false
 				} else {
@@ -237,7 +261,22 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 			}
 		}
 
-		sub.callback(sub.lastSentHeader, headerToNotify, reorg)
+		if reorg {
+			fmt.Println("reorged min", reorged.min().Number.Uint64())
+			minReorgedHeader := reorged.min()
+			oldChain := t.chain(minReorgedHeader, sub.lastSentHeader)
+
+			// TODO: we should store both the reorged and new chain in a structure such as reorgedHeaders
+			//   maybe repurpose to headerChain or something similar -> have this for reorged and new chain
+			newChainMin, exists := t.canonicalChain.Get(minReorgedHeader.Number.Uint64() - 1)
+			if !exists {
+				return errors.Errorf("failed to find header %d in canonical chain", minReorgedHeader.Number.Uint64())
+			}
+			newChain := t.chain(newChainMin, headerToNotify)
+			sub.callback(oldChain, newChain)
+		} else {
+			sub.callback(nil, t.chain(sub.lastSentHeader, headerToNotify))
+		}
 		sub.lastSentHeader = headerToNotify
 	}
 
@@ -276,7 +315,10 @@ func (t *Tracker) notifySafeHead(newHeader *types.Header, reorg bool) {
 	defer t.mu.RUnlock()
 
 	for _, sub := range t.subscriptions[SafeChainHead] {
-		sub.callback(sub.lastSentHeader, newHeader, reorg)
+		// TODO: implement handling of old chain -> this is concurrent to the canonical chain, so we might need to handle this differently
+		//  but: think about the use cases of the safe block: usually it's just about marking the safe head, so there's no need for the old chain.
+		//  this could mean that we should have a different type of callback for safe and finalized head.
+		sub.callback(nil, t.chain(sub.lastSentHeader, newHeader))
 		sub.lastSentHeader = newHeader
 	}
 }
@@ -302,7 +344,7 @@ func (t *Tracker) syncFinalizedHead() error {
 
 	t.notifyFinalizedHead(newHeader)
 
-	// TODO: prune old headers
+	// TODO: prune old headers from headers cache and canonical chain
 
 	return nil
 }
@@ -315,9 +357,46 @@ func (t *Tracker) notifyFinalizedHead(newHeader *types.Header) {
 
 	// Notify all subscribers to new FinalizedChainHead.
 	for _, sub := range t.subscriptions[FinalizedChainHead] {
-		sub.callback(sub.lastSentHeader, newHeader, false)
+		newChain := t.chain(sub.lastSentHeader, newHeader)
+
+		sub.callback(nil, newChain)
 		sub.lastSentHeader = newHeader
 	}
+}
+
+func (t *Tracker) chain(start, end *types.Header) []*types.Header {
+	var chain []*types.Header
+	var exists, genesisChain bool
+	current := end
+
+	var startHash common.Hash
+	if start == nil {
+		startHash = t.genesis
+		genesisChain = true
+	} else {
+		startHash = start.Hash()
+	}
+
+	if current.Hash() == startHash {
+		chain = append(chain, current)
+		return chain
+	}
+
+	for current.Hash() != startHash {
+		chain = append(chain, current)
+		parentHash := current.ParentHash
+		if genesisChain && parentHash == t.genesis {
+			break
+		}
+
+		current, exists = t.headers.Get(parentHash)
+		if !exists {
+			// This should never happen since we're making sure that the headers are continuous.
+			panic(fmt.Sprintf("failed to find header %s in cache", parentHash))
+		}
+	}
+
+	return chain
 }
 
 func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback SubscriptionCallback) (unsubscribe func()) {

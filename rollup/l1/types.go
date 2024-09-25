@@ -2,7 +2,6 @@ package l1
 
 import (
 	"context"
-	"math"
 	"math/big"
 
 	"github.com/scroll-tech/go-ethereum"
@@ -22,33 +21,21 @@ type Client interface {
 }
 
 type reorgedHeaders struct {
-	headers   map[common.Hash]*types.Header
-	maxNumber uint64
-	minNumber uint64
+	headers []*types.Header
 }
 
 func newReorgedHeaders() *reorgedHeaders {
 	return &reorgedHeaders{
-		maxNumber: 0,
-		minNumber: math.MaxUint64,
-		headers:   make(map[common.Hash]*types.Header),
+		headers: make([]*types.Header, 0),
 	}
 }
 
 func (r *reorgedHeaders) add(header *types.Header) {
-	r.headers[header.Hash()] = header
-
-	if header.Number.Uint64() > r.maxNumber {
-		r.maxNumber = header.Number.Uint64()
-	}
-	if header.Number.Uint64() < r.minNumber {
-		r.minNumber = header.Number.Uint64()
-	}
+	r.headers = append(r.headers, header)
 }
 
-func (r *reorgedHeaders) contains(hash common.Hash) bool {
-	_, exists := r.headers[hash]
-	return exists
+func (r *reorgedHeaders) min() *types.Header {
+	return r.headers[len(r.headers)-1]
 }
 
 func (r *reorgedHeaders) isEmpty() bool {
@@ -82,4 +69,4 @@ const (
 	LatestChainHead    = ConfirmationRule(1)
 )
 
-type SubscriptionCallback func(last, new *types.Header, reorg bool)
+type SubscriptionCallback func(old, new []*types.Header)

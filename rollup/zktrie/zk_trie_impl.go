@@ -52,10 +52,16 @@ var (
 	dbKeyRootNode = []byte("currentroot")
 )
 
+type Database interface {
+	UpdatePreimage(preimage []byte, hashField *big.Int)
+	Put(k, v []byte) error
+	Get(key []byte) ([]byte, error)
+}
+
 // ZkTrieImpl is the struct with the main elements of the ZkTrieImpl
 type ZkTrieImpl struct {
 	lock      sync.RWMutex
-	db        ZktrieDatabase
+	db        Database
 	rootKey   *Hash
 	writable  bool
 	maxLevels int
@@ -65,13 +71,13 @@ type ZkTrieImpl struct {
 	dirtyStorage map[Hash]*Node
 }
 
-func NewZkTrieImpl(storage ZktrieDatabase, maxLevels int) (*ZkTrieImpl, error) {
+func NewZkTrieImpl(storage Database, maxLevels int) (*ZkTrieImpl, error) {
 	return NewZkTrieImplWithRoot(storage, &HashZero, maxLevels)
 }
 
 // NewZkTrieImplWithRoot loads a new ZkTrieImpl. If in the storage already exists one
 // will open that one, if not, will create a new one.
-func NewZkTrieImplWithRoot(storage ZktrieDatabase, root *Hash, maxLevels int) (*ZkTrieImpl, error) {
+func NewZkTrieImplWithRoot(storage Database, root *Hash, maxLevels int) (*ZkTrieImpl, error) {
 	mt := ZkTrieImpl{
 		db:           storage,
 		maxLevels:    maxLevels,

@@ -5,12 +5,6 @@ import (
 	"sync"
 )
 
-type ZktrieDatabase interface {
-	UpdatePreimage(preimage []byte, hashField *big.Int)
-	Put(k, v []byte) error
-	Get(key []byte) ([]byte, error)
-}
-
 type MemDatabase struct {
 	db   map[string][]byte
 	lock sync.RWMutex

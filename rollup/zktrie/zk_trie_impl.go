@@ -1185,3 +1185,36 @@ func (mt *ZkTrieImpl) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) e
 func (mt *ZkTrieImpl) NodeIterator(start []byte) (trie.NodeIterator, error) {
 	return nil, errors.New("not implemented")
 }
+
+// VerifyProof checks merkle proofs. The given proof must contain the value for
+// key in a trie with the given root hash. VerifyProof returns an error if the
+// proof contains invalid trie nodes or the wrong value.
+func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
+	h := NewHashFromBytes(rootHash.Bytes())
+	k, err := ToSecureKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	proof, n, err := BuildZkTrieProof(h, k, len(key)*8, func(key *Hash) (*Node, error) {
+		buf, _ := proofDb.Get(key[:])
+		if buf == nil {
+			return nil, ErrKeyNotFound
+		}
+		n, err := NewNodeFromBytes(buf)
+		return n, err
+	})
+
+	if err != nil {
+		// do not contain the key
+		return nil, err
+	} else if !proof.Existence {
+		return nil, nil
+	}
+
+	if VerifyProofZkTrie(h, proof, n) {
+		return n.Data(), nil
+	} else {
+		return nil, fmt.Errorf("bad proof node %v", proof)
+	}
+}

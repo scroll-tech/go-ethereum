@@ -6,6 +6,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/iden3/go-iden3-crypto/constants"
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -584,4 +587,191 @@ func TestZkTrie_ProveAndProveWithDeletion(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}
+}
+
+func newHashFromHex(h string) (*Hash, error) {
+	return NewHashFromCheckedBytes(common.FromHex(h))
+}
+
+func TestHashParsers(t *testing.T) {
+	h0 := NewHashFromBigInt(big.NewInt(0))
+	assert.Equal(t, "0", h0.String())
+	h1 := NewHashFromBigInt(big.NewInt(1))
+	assert.Equal(t, "1", h1.String())
+	h10 := NewHashFromBigInt(big.NewInt(10))
+	assert.Equal(t, "10", h10.String())
+
+	h7l := NewHashFromBigInt(big.NewInt(1234567))
+	assert.Equal(t, "1234567", h7l.String())
+	h8l := NewHashFromBigInt(big.NewInt(12345678))
+	assert.Equal(t, "12345678...", h8l.String())
+
+	b, ok := new(big.Int).SetString("4932297968297298434239270129193057052722409868268166443802652458940273154854", 10) //nolint:lll
+	assert.True(t, ok)
+	h := NewHashFromBigInt(b)
+	assert.Equal(t, "4932297968297298434239270129193057052722409868268166443802652458940273154854", h.BigInt().String()) //nolint:lll
+	assert.Equal(t, "49322979...", h.String())
+	assert.Equal(t, "0ae794eb9c3d8bbb9002e993fc2ed301dcbd2af5508ed072c375e861f1aa5b26", h.Hex())
+
+	b1, err := NewBigIntFromHashBytes(b.Bytes())
+	assert.Nil(t, err)
+	assert.Equal(t, new(big.Int).SetBytes(b.Bytes()).String(), b1.String())
+
+	b2, err := NewHashFromCheckedBytes(b.Bytes())
+	assert.Nil(t, err)
+	assert.Equal(t, b.String(), b2.BigInt().String())
+
+	h2, err := newHashFromHex(h.Hex())
+	assert.Nil(t, err)
+	assert.Equal(t, h, h2)
+	_, err = newHashFromHex("0x12")
+	assert.NotNil(t, err)
+
+	// check limits
+	a := new(big.Int).Sub(constants.Q, big.NewInt(1))
+	testHashParsers(t, a)
+	a = big.NewInt(int64(1))
+	testHashParsers(t, a)
+}
+
+func testHashParsers(t *testing.T, a *big.Int) {
+	h := NewHashFromBigInt(a)
+	assert.Equal(t, a, h.BigInt())
+	hFromBytes, err := NewHashFromCheckedBytes(h.Bytes())
+	assert.Nil(t, err)
+	assert.Equal(t, h, hFromBytes)
+	assert.Equal(t, a, hFromBytes.BigInt())
+	assert.Equal(t, a.String(), hFromBytes.BigInt().String())
+	hFromHex, err := newHashFromHex(h.Hex())
+	assert.Nil(t, err)
+	assert.Equal(t, h, hFromHex)
+
+	aBIFromHBytes, err := NewBigIntFromHashBytes(h.Bytes())
+	assert.Nil(t, err)
+	assert.Equal(t, a, aBIFromHBytes)
+	assert.Equal(t, new(big.Int).SetBytes(a.Bytes()).String(), aBIFromHBytes.String())
+}
+
+func TestMerkleTree_AddUpdateGetWord_2(t *testing.T) {
+	mt := newTestingMerkle(t)
+	err := mt.TryUpdate([]byte{1}, 1, []Byte32{{2}})
+	assert.Nil(t, err)
+	err = mt.TryUpdate([]byte{3}, 1, []Byte32{{4}})
+	assert.Nil(t, err)
+	err = mt.TryUpdate([]byte{5}, 1, []Byte32{{6}})
+	assert.Nil(t, err)
+
+	mt.GetLeafNode([]byte{1})
+	node, err := mt.GetLeafNode([]byte{1})
+	assert.Nil(t, err)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&Byte32{2})[:], node.ValuePreimage[0][:])
+	node, err = mt.GetLeafNode([]byte{3})
+	assert.Nil(t, err)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&Byte32{4})[:], node.ValuePreimage[0][:])
+	node, err = mt.GetLeafNode([]byte{5})
+	assert.Nil(t, err)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&Byte32{6})[:], node.ValuePreimage[0][:])
+
+	err = mt.TryUpdate([]byte{1}, 1, []Byte32{{7}})
+	assert.Nil(t, err)
+	err = mt.TryUpdate([]byte{3}, 1, []Byte32{{8}})
+	assert.Nil(t, err)
+	err = mt.TryUpdate([]byte{5}, 1, []Byte32{{9}})
+	assert.Nil(t, err)
+
+	node, err = mt.GetLeafNode([]byte{1})
+	assert.Nil(t, err)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&Byte32{7})[:], node.ValuePreimage[0][:])
+	node, err = mt.GetLeafNode([]byte{3})
+	assert.Nil(t, err)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&Byte32{8})[:], node.ValuePreimage[0][:])
+	node, err = mt.GetLeafNode([]byte{5})
+	assert.Nil(t, err)
+	assert.Equal(t, len(node.ValuePreimage), 1)
+	assert.Equal(t, (&Byte32{9})[:], node.ValuePreimage[0][:])
+	_, err = mt.GetLeafNode([]byte{100})
+	assert.Equal(t, ErrKeyNotFound, err)
+}
+
+func TestMerkleTree_UpdateAccount(t *testing.T) {
+	mt := newTestingMerkle(t)
+
+	acc1 := &types.StateAccount{
+		Nonce:            1,
+		Balance:          big.NewInt(10000000),
+		Root:             common.HexToHash("22fb59aa5410ed465267023713ab42554c250f394901455a3366e223d5f7d147"),
+		KeccakCodeHash:   common.HexToHash("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+		PoseidonCodeHash: common.HexToHash("0c0a77f6e063b4b62eb7d9ed6f427cf687d8d0071d751850cfe5d136bc60d3ab").Bytes(),
+		CodeSize:         0,
+	}
+	value, flag := acc1.MarshalFields()
+	accValue := []Byte32{}
+	for _, v := range value {
+		accValue = append(accValue, *NewByte32FromBytes(v.Bytes()))
+	}
+	err := mt.TryUpdate(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes(), flag, accValue)
+	assert.Nil(t, err)
+
+	acc2 := &types.StateAccount{
+		Nonce:            5,
+		Balance:          big.NewInt(50000000),
+		Root:             common.HexToHash("0"),
+		KeccakCodeHash:   common.HexToHash("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+		PoseidonCodeHash: common.HexToHash("05d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").Bytes(),
+		CodeSize:         5,
+	}
+	value, flag = acc2.MarshalFields()
+	accValue = []Byte32{}
+	for _, v := range value {
+		accValue = append(accValue, *NewByte32FromBytes(v.Bytes()))
+	}
+	err = mt.TryUpdate(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes(), flag, accValue)
+	assert.Nil(t, err)
+
+	bt, err := mt.TryGet(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes())
+	assert.Nil(t, err)
+
+	acc, err := types.UnmarshalStateAccount(bt)
+	assert.Nil(t, err)
+	assert.Equal(t, acc1.Nonce, acc.Nonce)
+	assert.Equal(t, acc1.Balance.Uint64(), acc.Balance.Uint64())
+	assert.Equal(t, acc1.Root.Bytes(), acc.Root.Bytes())
+	assert.Equal(t, acc1.KeccakCodeHash, acc.KeccakCodeHash)
+	assert.Equal(t, acc1.PoseidonCodeHash, acc.PoseidonCodeHash)
+	assert.Equal(t, acc1.CodeSize, acc.CodeSize)
+
+	bt, err = mt.TryGet(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes())
+	assert.Nil(t, err)
+
+	acc, err = types.UnmarshalStateAccount(bt)
+	assert.Nil(t, err)
+	assert.Equal(t, acc2.Nonce, acc.Nonce)
+	assert.Equal(t, acc2.Balance.Uint64(), acc.Balance.Uint64())
+	assert.Equal(t, acc2.Root.Bytes(), acc.Root.Bytes())
+	assert.Equal(t, acc2.KeccakCodeHash, acc.KeccakCodeHash)
+	assert.Equal(t, acc2.PoseidonCodeHash, acc.PoseidonCodeHash)
+	assert.Equal(t, acc2.CodeSize, acc.CodeSize)
+
+	bt, err = mt.TryGet(common.HexToAddress("0x8dE13967F19410A7991D63c2c0179feBFDA0c261").Bytes())
+	assert.Nil(t, err)
+	assert.Nil(t, bt)
+
+	err = mt.TryDelete(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes())
+	assert.Nil(t, err)
+
+	bt, err = mt.TryGet(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes())
+	assert.Nil(t, err)
+	assert.Nil(t, bt)
+
+	err = mt.TryDelete(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes())
+	assert.Nil(t, err)
+
+	bt, err = mt.TryGet(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes())
+	assert.Nil(t, err)
+	assert.Nil(t, bt)
 }

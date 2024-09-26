@@ -7,6 +7,12 @@ import (
 	"io"
 	"math/big"
 	"sync"
+
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/trie/trienode"
 )
 
 const (
@@ -25,6 +31,9 @@ const (
 )
 
 var (
+	magicHash     = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
+	magicSMTBytes = []byte("THIS IS SOME MAGIC BYTES FOR SMT m1rRXgP2xpDI")
+
 	// ErrNodeKeyAlreadyExists is used when a node key already exists.
 	ErrInvalidField = errors.New("Key not inside the Finite Field")
 	// ErrNodeKeyAlreadyExists is used when a node key already exists.
@@ -99,6 +108,10 @@ func NewZkTrieImplWithRoot(storage Database, root *Hash, maxLevels int) (*ZkTrie
 func (mt *ZkTrieImpl) Root() (*Hash, error) {
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
+	return mt.root()
+}
+
+func (mt *ZkTrieImpl) root() (*Hash, error) {
 	// short circuit if there are no nodes to hash
 	if mt.dirtyIndex.Cmp(big.NewInt(0)) == 0 {
 		return mt.rootKey, nil
@@ -124,12 +137,12 @@ func (mt *ZkTrieImpl) Root() (*Hash, error) {
 
 // Hash returns the root hash of SecureBinaryTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
-func (mt *ZkTrieImpl) Hash() []byte {
+func (mt *ZkTrieImpl) Hash() common.Hash {
 	root, err := mt.Root()
 	if err != nil {
 		panic("root failed in trie.Hash")
 	}
-	return root.Bytes()
+	return common.BytesToHash(root.Bytes())
 }
 
 // MaxLevels returns the MT maximum level
@@ -174,6 +187,26 @@ func (mt *ZkTrieImpl) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) er
 	if newRootKey != nil {
 		mt.rootKey = newRootKey
 	}
+	return nil
+}
+
+// UpdateStorage updates the storage with the given key and value
+func (mt *ZkTrieImpl) UpdateStorage(_ common.Address, key, value []byte) error {
+	return mt.TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(value)})
+}
+
+// UpdateAccount updates the account with the given address and account
+func (mt *ZkTrieImpl) UpdateAccount(address common.Address, acc *types.StateAccount) error {
+	value, flag := acc.MarshalFields()
+	accValue := make([]Byte32, 0, len(value))
+	for _, v := range value {
+		accValue = append(accValue, *NewByte32FromBytes(v.Bytes()))
+	}
+	return mt.TryUpdate(address.Bytes(), flag, accValue)
+}
+
+// UpdateContractCode updates the contract code with the given address and code
+func (mt *ZkTrieImpl) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
 	return nil
 }
 
@@ -225,14 +258,27 @@ func (mt *ZkTrieImpl) pushLeaf(newLeaf *Node, oldLeaf *Node, lvl int,
 }
 
 // Commit calculates the root for the entire trie and persist all the dirty nodes
-func (mt *ZkTrieImpl) Commit() error {
-	// force root hash calculation if needed
-	if _, err := mt.Root(); err != nil {
-		return err
-	}
-
+func (mt *ZkTrieImpl) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
+
+	if err := mt.commit(); err != nil {
+		return common.Hash{}, nil, err
+	}
+
+	root, err := mt.root()
+	if err != nil {
+		return common.Hash{}, nil, err
+	}
+	return common.BytesToHash(root.Bytes()), nil, nil
+}
+
+// Commit calculates the root for the entire trie and persist all the dirty nodes
+func (mt *ZkTrieImpl) commit() error {
+	// force root hash calculation if needed
+	if _, err := mt.root(); err != nil {
+		return err
+	}
 
 	for key, node := range mt.dirtyStorage {
 		if err := mt.db.Put(key[:], node.CanonicalValue()); err != nil {
@@ -452,6 +498,33 @@ func (mt *ZkTrieImpl) TryGet(key []byte) ([]byte, error) {
 	return node.Data(), nil
 }
 
+// GetStorage returns the value for key stored in the trie.
+func (mt *ZkTrieImpl) GetStorage(_ common.Address, key []byte) ([]byte, error) {
+	return mt.TryGet(key)
+}
+
+// GetAccount returns the account for the given address.
+func (mt *ZkTrieImpl) GetAccount(address common.Address) (*types.StateAccount, error) {
+	key := address.Bytes()
+	res, err := mt.TryGet(key)
+	if res == nil || err != nil {
+		return nil, err
+	}
+	return types.UnmarshalStateAccount(res)
+}
+
+// GetKey returns the key for the given hash.
+func (mt *ZkTrieImpl) GetKey(hashKey []byte) []byte {
+	mt.lock.RLock()
+	defer mt.lock.RUnlock()
+	return mt.getKey(hashKey)
+}
+
+// GetKey returns the key for the given hash.
+func (mt *ZkTrieImpl) getKey(hashKey []byte) []byte {
+	return nil
+}
+
 // Delete removes the specified Key from the ZkTrieImpl and updates the path
 // from the deleted key to the Root with the new values.  This method removes
 // the key from the ZkTrieImpl, but does not remove the old nodes from the
@@ -562,6 +635,16 @@ func (mt *ZkTrieImpl) tryDelete(rootKey *Hash, nodeKey *Hash, path []bool) (*Has
 	default:
 		panic("encounter unsupported deprecated node type")
 	}
+}
+
+// DeleteAccount removes the account with the given address from the trie.
+func (mt *ZkTrieImpl) DeleteAccount(address common.Address) error {
+	return mt.TryDelete(address.Bytes())
+}
+
+// DeleteStorage removes the key from the trie.
+func (mt *ZkTrieImpl) DeleteStorage(_ common.Address, key []byte) error {
+	return mt.TryDelete(key)
 }
 
 // GetLeafNode is more underlying method than TryGet, which obtain an leaf node
@@ -906,9 +989,49 @@ func (mt *ZkTrieImpl) Copy() *ZkTrieImpl {
 	}
 }
 
-// Prove is a simlified calling of ProveWithDeletion
-func (mt *ZkTrieImpl) Prove(key []byte, fromLevel uint, writeNode func(*Node) error) error {
-	return mt.ProveWithDeletion(key, fromLevel, writeNode, nil)
+// Prove constructs a merkle proof for key. The result contains all encoded nodes
+// on the path to the value at key. The value itself is also included in the last
+// node and can be retrieved by verifying the proof.
+//
+// If the trie does not contain a value for key, the returned proof contains all
+// nodes of the longest existing prefix of the key (at least the root node), ending
+// with the node that proves the absence of the key.
+// func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+func (mt *ZkTrieImpl) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
+	fromLevel := uint(0)
+	err := mt.ProveWithDeletion(key, fromLevel, func(n *Node) error {
+		nodeHash, err := n.NodeHash()
+		if err != nil {
+			return err
+		}
+
+		if n.Type == NodeTypeLeaf_New {
+			preImage := mt.getKey(n.NodeKey.Bytes())
+			if len(preImage) > 0 {
+				n.KeyPreimage = &Byte32{}
+				copy(n.KeyPreimage[:], preImage)
+			}
+		}
+		return proofDb.Put(nodeHash[:], n.Value())
+	}, nil)
+	if err != nil {
+		return err
+	}
+
+	// we put this special kv pair in db so we can distinguish the type and
+	// make suitable Proof
+	return proofDb.Put(magicHash, magicSMTBytes)
+}
+
+// DecodeProof try to decode a node bytes, return can be nil for any non-node data (magic code)
+func DecodeSMTProof(data []byte) (*Node, error) {
+
+	if bytes.Equal(magicSMTBytes, data) {
+		//skip magic bytes node
+		return nil, nil
+	}
+
+	return NewNodeFromBytes(data)
 }
 
 // ProveWithDeletion constructs a merkle proof for key. The result contains all encoded nodes
@@ -1054,4 +1177,11 @@ func (mt *ZkTrieImpl) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) e
 	}
 
 	return nil
+}
+
+// NodeIterator returns an iterator that returns nodes of the trie. Iteration
+// starts at the key after the given start key. And error will be returned
+// if fails to create node iterator.
+func (mt *ZkTrieImpl) NodeIterator(start []byte) (trie.NodeIterator, error) {
+	return nil, errors.New("not implemented")
 }

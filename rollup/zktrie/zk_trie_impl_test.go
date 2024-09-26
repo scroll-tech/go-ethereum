@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"math/big"
 	"os"
+	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/iden3/go-iden3-crypto/constants"
@@ -84,7 +86,8 @@ func TestMerkleTree_Init(t *testing.T) {
 		mt1Root, err = mt1.Root()
 		assert.NoError(t, err)
 		assert.Equal(t, "2bbb5391bce512d6d0e02e2162bf7f0eb8ec6df806f9284ec5c3242193409553", mt1Root.Hex())
-		assert.NoError(t, mt1.Commit())
+		_, _, err = mt1.Commit(false)
+		assert.NoError(t, err)
 
 		mt2, err := NewZkTrieImplWithRoot(db, mt1Root, maxLevels)
 		assert.NoError(t, err)
@@ -480,7 +483,8 @@ func TestMerkleTree_BuildAndVerifyZkTrieProof(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, 1, len(node.ValuePreimage))
 			assert.Equal(t, (&Byte32{td.value})[:], node.ValuePreimage[0][:])
-			assert.NoError(t, zkTrie.Commit())
+			_, _, err = zkTrie.Commit(false)
+			assert.NoError(t, err)
 
 			proof, node, err := BuildZkTrieProof(zkTrie.rootKey, td.key, 10, getNode)
 			assert.NoError(t, err)
@@ -534,11 +538,12 @@ func TestZkTrie_GetUpdateDelete(t *testing.T) {
 	val, err := mt.TryGet([]byte("key"))
 	assert.NoError(t, err)
 	assert.Nil(t, val)
-	assert.Equal(t, HashZero.Bytes(), mt.Hash())
+	assert.Equal(t, common.Hash{}, mt.Hash())
 
 	err = mt.TryUpdate([]byte("key"), 1, []Byte32{{1}})
 	assert.NoError(t, err)
-	assert.Equal(t, []byte{0x23, 0x36, 0x5e, 0xbd, 0x71, 0xa7, 0xad, 0x35, 0x65, 0xdd, 0x24, 0x88, 0x47, 0xca, 0xe8, 0xe8, 0x8, 0x21, 0x15, 0x62, 0xc6, 0x83, 0xdb, 0x8, 0x4f, 0x5a, 0xfb, 0xd1, 0xb0, 0x3d, 0x4c, 0xb5}, mt.Hash())
+	expected := common.BytesToHash([]byte{0x23, 0x36, 0x5e, 0xbd, 0x71, 0xa7, 0xad, 0x35, 0x65, 0xdd, 0x24, 0x88, 0x47, 0xca, 0xe8, 0xe8, 0x8, 0x21, 0x15, 0x62, 0xc6, 0x83, 0xdb, 0x8, 0x4f, 0x5a, 0xfb, 0xd1, 0xb0, 0x3d, 0x4c, 0xb5})
+	assert.Equal(t, expected, mt.Hash())
 
 	val, err = mt.TryGet([]byte("key"))
 	assert.NoError(t, err)
@@ -546,7 +551,7 @@ func TestZkTrie_GetUpdateDelete(t *testing.T) {
 
 	err = mt.TryDelete([]byte("key"))
 	assert.NoError(t, err)
-	assert.Equal(t, HashZero.Bytes(), mt.Hash())
+	assert.Equal(t, common.Hash{}, mt.Hash())
 
 	val, err = mt.TryGet([]byte("key"))
 	assert.NoError(t, err)
@@ -583,7 +588,7 @@ func TestZkTrie_ProveAndProveWithDeletion(t *testing.T) {
 		assert.NoError(t, err)
 
 		for j := 0; j <= i; j++ {
-			err = mt.Prove(NewHashFromBigInt(k).Bytes(), uint(j), writeNode)
+			err = mt.ProveWithDeletion(NewHashFromBigInt(k).Bytes(), uint(j), writeNode, nil)
 			assert.NoError(t, err)
 		}
 	}
@@ -774,4 +779,94 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 	bt, err = mt.TryGet(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes())
 	assert.Nil(t, err)
 	assert.Nil(t, bt)
+}
+
+func TestDecodeSMTProof(t *testing.T) {
+	node, err := DecodeSMTProof(magicSMTBytes)
+	assert.NoError(t, err)
+	assert.Nil(t, node)
+
+	k1 := NewHashFromBytes([]byte{1, 2, 3, 4, 5})
+	k2 := NewHashFromBytes([]byte{6, 7, 8, 9, 0})
+	origNode := NewParentNode(NodeTypeBranch_0, k1, k2)
+	node, err = DecodeSMTProof(origNode.Value())
+	assert.NoError(t, err)
+	assert.Equal(t, origNode.Value(), node.Value())
+}
+
+func TestZktrieGetKey(t *testing.T) {
+	t.Skip("get key is not implemented")
+	trie := newTestingMerkle(t)
+	key := []byte("0a1b2c3d4e5f6g7h8i9j0a1b2c3d4e5f")
+	value := []byte("9j8i7h6g5f4e3d2c1b0a9j8i7h6g5f4e")
+	trie.TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(value)})
+
+	kPreimage := NewByte32FromBytesPaddingZero(key)
+	kHash, err := kPreimage.Hash()
+	assert.Nil(t, err)
+	if k := trie.GetKey(kHash.Bytes()); !bytes.Equal(k, key) {
+		t.Errorf("GetKey returned %q, want %q", k, key)
+	}
+}
+
+func TestZkTrieConcurrency(t *testing.T) {
+	// Create an initial trie and copy if for concurrent access
+	trie := newTestingMerkle(t)
+
+	threads := runtime.NumCPU()
+	tries := make([]*ZkTrieImpl, threads)
+	for i := 0; i < threads; i++ {
+		tries[i] = trie.Copy()
+	}
+	// Start a batch of goroutines interactng with the trie
+	pend := new(sync.WaitGroup)
+	pend.Add(threads)
+	for i := 0; i < threads; i++ {
+		go func(index int) {
+			defer pend.Done()
+
+			for j := byte(0); j < 255; j++ {
+				// Map the same data under multiple keys
+				key, val := common.LeftPadBytes([]byte{byte(index), 1, j}, 32), bytes.Repeat([]byte{j}, 32)
+				tries[index].TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(val)})
+
+				key, val = common.LeftPadBytes([]byte{byte(index), 2, j}, 32), bytes.Repeat([]byte{j}, 32)
+				tries[index].TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(val)})
+
+				// Add some other data to inflate the trie
+				for k := byte(3); k < 13; k++ {
+					key, val = common.LeftPadBytes([]byte{byte(index), k, j}, 32), bytes.Repeat([]byte{k, j}, 16)
+					tries[index].TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(val)})
+				}
+			}
+			tries[index].Commit(false)
+		}(i)
+	}
+	// Wait for all threads to finish
+	pend.Wait()
+}
+
+func TestZkTrieDelete(t *testing.T) {
+	trie1 := newTestingMerkle(t)
+
+	var count int = 6
+	var hashes []common.Hash
+	hashes = append(hashes, trie1.Hash())
+	for i := 0; i < count; i++ {
+		err := trie1.TryUpdate([]byte{byte(i)}, 1, []Byte32{{byte(i)}})
+		assert.NoError(t, err)
+		hashes = append(hashes, trie1.Hash())
+	}
+
+	trie1.Commit(false)
+
+	for i := count - 1; i >= 0; i-- {
+		v, err := trie1.TryGet([]byte{byte(i)})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, v)
+		err = trie1.TryDelete([]byte{byte(i)})
+		assert.NoError(t, err)
+		hash := trie1.Hash()
+		assert.Equal(t, hashes[i].Hex(), hash.Hex())
+	}
 }

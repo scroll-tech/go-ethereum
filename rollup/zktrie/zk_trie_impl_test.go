@@ -46,16 +46,16 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func newTestingMerkle(t *testing.T) (*ZkTrieImpl, *trie.Database) {
+func newTestingMerkle(t *testing.T) (*ZkTrie, *trie.Database) {
 	db := trie.NewDatabase(rawdb.NewMemoryDatabase(), &trie.Config{
 		ChildResolver: ChildResolver{},
 	})
 	return newTestingMerkleWithDb(t, common.Hash{}, db)
 }
 
-func newTestingMerkleWithDb(t *testing.T, root common.Hash, db *trie.Database) (*ZkTrieImpl, *trie.Database) {
+func newTestingMerkleWithDb(t *testing.T, root common.Hash, db *trie.Database) (*ZkTrie, *trie.Database) {
 	maxLevels := NodeKeyValidBytes * 8
-	mt, err := NewZkTrieImplWithRoot(trie.TrieID(root), db)
+	mt, err := NewZkTrie(trie.TrieID(root), db)
 	if err != nil {
 		t.Fatal(err)
 		return nil, nil
@@ -506,7 +506,7 @@ func TestMerkleTree_GraphViz(t *testing.T) {
 	var buffer bytes.Buffer
 	err := mt.GraphViz(&buffer, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, "--------\nGraphViz of the ZkTrieImpl with RootHash 0\ndigraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n}\nEnd of GraphViz of the ZkTrieImpl with RootHash 0\n--------\n", buffer.String())
+	assert.Equal(t, "--------\nGraphViz of the ZkTrie with RootHash 0\ndigraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n}\nEnd of GraphViz of the ZkTrie with RootHash 0\n--------\n", buffer.String())
 	buffer.Reset()
 
 	key1 := []byte{1} //0b1
@@ -518,7 +518,7 @@ func TestMerkleTree_GraphViz(t *testing.T) {
 
 	err = mt.GraphViz(&buffer, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, "--------\nGraphViz of the ZkTrieImpl with RootHash 10951270817330706114198641949214391028137561893123097337637233896895686724291\ndigraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n\"10951270...\" -> {\"16038355...\" \"19780429...\"}\n\"16038355...\" [style=filled];\n\"19780429...\" [style=filled];\n}\nEnd of GraphViz of the ZkTrieImpl with RootHash 10951270817330706114198641949214391028137561893123097337637233896895686724291\n--------\n", buffer.String())
+	assert.Equal(t, "--------\nGraphViz of the ZkTrie with RootHash 10951270817330706114198641949214391028137561893123097337637233896895686724291\ndigraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n\"10951270...\" -> {\"16038355...\" \"19780429...\"}\n\"16038355...\" [style=filled];\n\"19780429...\" [style=filled];\n}\nEnd of GraphViz of the ZkTrie with RootHash 10951270817330706114198641949214391028137561893123097337637233896895686724291\n--------\n", buffer.String())
 	buffer.Reset()
 }
 
@@ -803,7 +803,7 @@ func TestZkTrieConcurrency(t *testing.T) {
 	trie, _ := newTestingMerkle(t)
 
 	threads := runtime.NumCPU()
-	tries := make([]*ZkTrieImpl, threads)
+	tries := make([]*ZkTrie, threads)
 	for i := 0; i < threads; i++ {
 		tries[i] = trie.Copy()
 	}

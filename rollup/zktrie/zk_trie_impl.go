@@ -38,8 +38,8 @@ var (
 	ErrInvalidField = errors.New("Key not inside the Finite Field")
 	// ErrNodeKeyAlreadyExists is used when a node key already exists.
 	ErrNodeKeyAlreadyExists = errors.New("key already exists")
-	// ErrKeyNotFound is used when a key is not found in the ZkTrieImpl.
-	ErrKeyNotFound = errors.New("key not found in ZkTrieImpl")
+	// ErrKeyNotFound is used when a key is not found in the ZkTrie.
+	ErrKeyNotFound = errors.New("key not found in ZkTrie")
 	// ErrNodeBytesBadSize is used when the data of a node has an incorrect
 	// size and can't be parsed.
 	ErrNodeBytesBadSize = errors.New("node data has incorrect size in the DB")
@@ -54,7 +54,7 @@ var (
 	// ErrEntryIndexAlreadyExists is used when the entry index already
 	// exists in the tree.
 	ErrEntryIndexAlreadyExists = errors.New("the entry index already exists in the tree")
-	// ErrNotWritable is used when the ZkTrieImpl is not writable and a
+	// ErrNotWritable is used when the ZkTrie is not writable and a
 	// write function is called
 	ErrNotWritable = errors.New("merkle Tree not writable")
 )
@@ -65,8 +65,8 @@ type Database interface {
 	Get(key []byte) ([]byte, error)
 }
 
-// ZkTrieImpl is the struct with the main elements of the ZkTrieImpl
-type ZkTrieImpl struct {
+// ZkTrie is the struct with the main elements of the ZkTrie
+type ZkTrie struct {
 	lock      sync.RWMutex
 	owner     common.Hash
 	reader    *trie.TrieReader
@@ -79,15 +79,15 @@ type ZkTrieImpl struct {
 	dirtyStorage map[Hash]*Node
 }
 
-// NewZkTrieImplWithRoot loads a new ZkTrieImpl. If in the storage already exists one
+// NewZkTrie loads a new ZkTrie. If in the storage already exists one
 // will open that one, if not, will create a new one.
-func NewZkTrieImplWithRoot(id *trie.ID, db *trie.Database) (*ZkTrieImpl, error) {
+func NewZkTrie(id *trie.ID, db *trie.Database) (*ZkTrie, error) {
 	reader, err := trie.NewTrieReader(id.StateRoot, id.Owner, db)
 	if err != nil {
 		return nil, err
 	}
 
-	mt := ZkTrieImpl{
+	mt := ZkTrie{
 		owner:        id.Owner,
 		reader:       reader,
 		maxLevels:    NodeKeyValidBytes * 8,
@@ -106,13 +106,13 @@ func NewZkTrieImplWithRoot(id *trie.ID, db *trie.Database) (*ZkTrieImpl, error) 
 }
 
 // Root returns the MerkleRoot
-func (mt *ZkTrieImpl) Root() (*Hash, error) {
+func (mt *ZkTrie) Root() (*Hash, error) {
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 	return mt.root()
 }
 
-func (mt *ZkTrieImpl) root() (*Hash, error) {
+func (mt *ZkTrie) root() (*Hash, error) {
 	// short circuit if there are no nodes to hash
 	if mt.dirtyIndex.Cmp(big.NewInt(0)) == 0 {
 		return mt.rootKey, nil
@@ -138,7 +138,7 @@ func (mt *ZkTrieImpl) root() (*Hash, error) {
 
 // Hash returns the root hash of SecureBinaryTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
-func (mt *ZkTrieImpl) Hash() common.Hash {
+func (mt *ZkTrie) Hash() common.Hash {
 	root, err := mt.Root()
 	if err != nil {
 		panic("root failed in trie.Hash")
@@ -147,14 +147,14 @@ func (mt *ZkTrieImpl) Hash() common.Hash {
 }
 
 // MaxLevels returns the MT maximum level
-func (mt *ZkTrieImpl) MaxLevels() int {
+func (mt *ZkTrie) MaxLevels() int {
 	return mt.maxLevels
 }
 
-// TryUpdate updates a nodeKey & value into the ZkTrieImpl. Where the `k` determines the
+// TryUpdate updates a nodeKey & value into the ZkTrie. Where the `k` determines the
 // path from the Root to the Leaf. This also return the updated leaf node
-func (mt *ZkTrieImpl) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error {
-	// verify that the ZkTrieImpl is writable
+func (mt *ZkTrie) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error {
+	// verify that the ZkTrie is writable
 	if !mt.writable {
 		return ErrNotWritable
 	}
@@ -193,12 +193,12 @@ func (mt *ZkTrieImpl) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) er
 }
 
 // UpdateStorage updates the storage with the given key and value
-func (mt *ZkTrieImpl) UpdateStorage(_ common.Address, key, value []byte) error {
+func (mt *ZkTrie) UpdateStorage(_ common.Address, key, value []byte) error {
 	return mt.TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(value)})
 }
 
 // UpdateAccount updates the account with the given address and account
-func (mt *ZkTrieImpl) UpdateAccount(address common.Address, acc *types.StateAccount) error {
+func (mt *ZkTrie) UpdateAccount(address common.Address, acc *types.StateAccount) error {
 	value, flag := acc.MarshalFields()
 	accValue := make([]Byte32, 0, len(value))
 	for _, v := range value {
@@ -208,14 +208,14 @@ func (mt *ZkTrieImpl) UpdateAccount(address common.Address, acc *types.StateAcco
 }
 
 // UpdateContractCode updates the contract code with the given address and code
-func (mt *ZkTrieImpl) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
+func (mt *ZkTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
 	return nil
 }
 
 // pushLeaf recursively pushes an existing oldLeaf down until its path diverges
 // from newLeaf, at which point both leafs are stored, all while updating the
 // path. pushLeaf returns the node hash of the parent of the oldLeaf and newLeaf
-func (mt *ZkTrieImpl) pushLeaf(newLeaf *Node, oldLeaf *Node, lvl int,
+func (mt *ZkTrie) pushLeaf(newLeaf *Node, oldLeaf *Node, lvl int,
 	pathNewLeaf []bool, pathOldLeaf []bool) (*Hash, error) {
 	if lvl > mt.maxLevels-2 {
 		return nil, ErrReachedMaxLevel
@@ -260,7 +260,7 @@ func (mt *ZkTrieImpl) pushLeaf(newLeaf *Node, oldLeaf *Node, lvl int,
 }
 
 // Commit calculates the root for the entire trie and persist all the dirty nodes
-func (mt *ZkTrieImpl) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
+func (mt *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
@@ -277,7 +277,7 @@ func (mt *ZkTrieImpl) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, 
 }
 
 // Commit calculates the root for the entire trie and persist all the dirty nodes
-func (mt *ZkTrieImpl) commit(collectLeaf bool) (*trienode.NodeSet, error) {
+func (mt *ZkTrie) commit(collectLeaf bool) (*trienode.NodeSet, error) {
 	// force root hash calculation if needed
 	if _, err := mt.root(); err != nil {
 		return nil, err
@@ -307,7 +307,7 @@ func (mt *ZkTrieImpl) commit(collectLeaf bool) (*trienode.NodeSet, error) {
 
 // addLeaf recursively adds a newLeaf in the MT while updating the path, and returns the key
 // of the new added leaf.
-func (mt *ZkTrieImpl) addLeaf(newLeaf *Node, currNodeKey *Hash,
+func (mt *ZkTrie) addLeaf(newLeaf *Node, currNodeKey *Hash,
 	lvl int, path []bool) (*Hash, bool, error) {
 	var err error
 	if lvl > mt.maxLevels-1 {
@@ -385,19 +385,19 @@ func (mt *ZkTrieImpl) addLeaf(newLeaf *Node, currNodeKey *Hash,
 }
 
 // newDirtyNodeKey increments the dirtyIndex and creates a new dirty node key
-func (mt *ZkTrieImpl) newDirtyNodeKey() *Hash {
+func (mt *ZkTrie) newDirtyNodeKey() *Hash {
 	mt.dirtyIndex.Add(mt.dirtyIndex, BigOne)
 	return NewHashFromBigInt(mt.dirtyIndex)
 }
 
 // isDirtyNode returns if the node with the given key is dirty or not
-func (mt *ZkTrieImpl) isDirtyNode(nodeKey *Hash) bool {
+func (mt *ZkTrie) isDirtyNode(nodeKey *Hash) bool {
 	_, found := mt.dirtyStorage[*nodeKey]
 	return found
 }
 
 // calcCommitment calculates the commitment for the given sub trie
-func (mt *ZkTrieImpl) calcCommitment(rootKey *Hash, hashedDirtyNodes map[Hash]*Node, commitLock *sync.Mutex) (*Hash, error) {
+func (mt *ZkTrie) calcCommitment(rootKey *Hash, hashedDirtyNodes map[Hash]*Node, commitLock *sync.Mutex) (*Hash, error) {
 	if !mt.isDirtyNode(rootKey) {
 		return rootKey, nil
 	}
@@ -443,7 +443,7 @@ func (mt *ZkTrieImpl) calcCommitment(rootKey *Hash, hashedDirtyNodes map[Hash]*N
 	return rootHash, nil
 }
 
-func (mt *ZkTrieImpl) tryGet(nodeKey *Hash) (*Node, error) {
+func (mt *ZkTrie) tryGet(nodeKey *Hash) (*Node, error) {
 
 	path := getPath(mt.maxLevels, nodeKey[:])
 	var nextKey Hash
@@ -495,7 +495,7 @@ func (mt *ZkTrieImpl) tryGet(nodeKey *Hash) (*Node, error) {
 // TryGet returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 // If a node was not found in the database, a MissingNodeError is returned.
-func (mt *ZkTrieImpl) TryGet(key []byte) ([]byte, error) {
+func (mt *ZkTrie) TryGet(key []byte) ([]byte, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
@@ -515,12 +515,12 @@ func (mt *ZkTrieImpl) TryGet(key []byte) ([]byte, error) {
 }
 
 // GetStorage returns the value for key stored in the trie.
-func (mt *ZkTrieImpl) GetStorage(_ common.Address, key []byte) ([]byte, error) {
+func (mt *ZkTrie) GetStorage(_ common.Address, key []byte) ([]byte, error) {
 	return mt.TryGet(key)
 }
 
 // GetAccount returns the account for the given address.
-func (mt *ZkTrieImpl) GetAccount(address common.Address) (*types.StateAccount, error) {
+func (mt *ZkTrie) GetAccount(address common.Address) (*types.StateAccount, error) {
 	key := address.Bytes()
 	res, err := mt.TryGet(key)
 	if res == nil || err != nil {
@@ -530,29 +530,29 @@ func (mt *ZkTrieImpl) GetAccount(address common.Address) (*types.StateAccount, e
 }
 
 // GetKey returns the key for the given hash.
-func (mt *ZkTrieImpl) GetKey(hashKey []byte) []byte {
+func (mt *ZkTrie) GetKey(hashKey []byte) []byte {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 	return mt.getKey(hashKey)
 }
 
 // GetKey returns the key for the given hash.
-func (mt *ZkTrieImpl) getKey(hashKey []byte) []byte {
+func (mt *ZkTrie) getKey(hashKey []byte) []byte {
 	return nil
 }
 
-// Delete removes the specified Key from the ZkTrieImpl and updates the path
+// Delete removes the specified Key from the ZkTrie and updates the path
 // from the deleted key to the Root with the new values.  This method removes
-// the key from the ZkTrieImpl, but does not remove the old nodes from the
+// the key from the ZkTrie, but does not remove the old nodes from the
 // key-value database; this means that if the tree is accessed by an old Root
 // where the key was not deleted yet, the key will still exist. If is desired
 // to remove the key-values from the database that are not under the current
 // Root, an option could be to dump all the leafs (using mt.DumpLeafs) and
-// import them in a new ZkTrieImpl in a new database (using
+// import them in a new ZkTrie in a new database (using
 // mt.ImportDumpedLeafs), but this will lose all the Root history of the
-// ZkTrieImpl
-func (mt *ZkTrieImpl) TryDelete(key []byte) error {
-	// verify that the ZkTrieImpl is writable
+// ZkTrie
+func (mt *ZkTrie) TryDelete(key []byte) error {
+	// verify that the ZkTrie is writable
 	if !mt.writable {
 		return ErrNotWritable
 	}
@@ -585,7 +585,7 @@ func (mt *ZkTrieImpl) TryDelete(key []byte) error {
 	return nil
 }
 
-func (mt *ZkTrieImpl) tryDelete(rootKey *Hash, nodeKey *Hash, path []bool) (*Hash, bool, error) {
+func (mt *ZkTrie) tryDelete(rootKey *Hash, nodeKey *Hash, path []bool) (*Hash, bool, error) {
 	root, err := mt.getNode(rootKey)
 	if err != nil {
 		return nil, false, err
@@ -654,18 +654,18 @@ func (mt *ZkTrieImpl) tryDelete(rootKey *Hash, nodeKey *Hash, path []bool) (*Has
 }
 
 // DeleteAccount removes the account with the given address from the trie.
-func (mt *ZkTrieImpl) DeleteAccount(address common.Address) error {
+func (mt *ZkTrie) DeleteAccount(address common.Address) error {
 	return mt.TryDelete(address.Bytes())
 }
 
 // DeleteStorage removes the key from the trie.
-func (mt *ZkTrieImpl) DeleteStorage(_ common.Address, key []byte) error {
+func (mt *ZkTrie) DeleteStorage(_ common.Address, key []byte) error {
 	return mt.TryDelete(key)
 }
 
 // GetLeafNode is more underlying method than TryGet, which obtain an leaf node
 // or nil if not exist
-func (mt *ZkTrieImpl) GetLeafNode(key []byte) (*Node, error) {
+func (mt *ZkTrie) GetLeafNode(key []byte) (*Node, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
@@ -683,14 +683,14 @@ func (mt *ZkTrieImpl) GetLeafNode(key []byte) (*Node, error) {
 // GetNode gets a node by node hash from the MT.  Empty nodes are not stored in the
 // tree; they are all the same and assumed to always exist.
 // <del>for non exist key, return (NewEmptyNode(), nil)</del>
-func (mt *ZkTrieImpl) GetNode(nodeHash *Hash) (*Node, error) {
+func (mt *ZkTrie) GetNode(nodeHash *Hash) (*Node, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
 	return mt.getNode(nodeHash)
 }
 
-func (mt *ZkTrieImpl) getNodeTo(nodeHash *Hash, node *Node) error {
+func (mt *ZkTrie) getNodeTo(nodeHash *Hash, node *Node) error {
 	if bytes.Equal(nodeHash[:], HashZero[:]) {
 		*node = *NewEmptyNode()
 		return nil
@@ -709,7 +709,7 @@ func (mt *ZkTrieImpl) getNodeTo(nodeHash *Hash, node *Node) error {
 	return node.SetBytes(nBytes)
 }
 
-func (mt *ZkTrieImpl) getNode(nodeHash *Hash) (*Node, error) {
+func (mt *ZkTrie) getNode(nodeHash *Hash) (*Node, error) {
 	var n Node
 	if err := mt.getNodeTo(nodeHash, &n); err != nil {
 		return nil, err
@@ -886,7 +886,7 @@ func (proof *Proof) rootFromProof(nodeHash, nodeKey *Hash) (*Hash, error) {
 }
 
 // walk is a helper recursive function to iterate over all tree branches
-func (mt *ZkTrieImpl) walk(nodeHash *Hash, f func(*Node)) error {
+func (mt *ZkTrie) walk(nodeHash *Hash, f func(*Node)) error {
 	n, err := mt.getNode(nodeHash)
 	if err != nil {
 		return err
@@ -905,12 +905,12 @@ func (mt *ZkTrieImpl) walk(nodeHash *Hash, f func(*Node)) error {
 	return nil
 }
 
-// Walk iterates over all the branches of a ZkTrieImpl with the given rootHash
+// Walk iterates over all the branches of a ZkTrie with the given rootHash
 // if rootHash is nil, it will get the current RootHash of the current state of
-// the ZkTrieImpl.  For each node, it calls the f function given in the
+// the ZkTrie.  For each node, it calls the f function given in the
 // parameters.  See some examples of the Walk function usage in the
-// ZkTrieImpl.go and merkletree_test.go
-func (mt *ZkTrieImpl) Walk(rootHash *Hash, f func(*Node)) error {
+// ZkTrie.go and merkletree_test.go
+func (mt *ZkTrie) Walk(rootHash *Hash, f func(*Node)) error {
 	var err error
 	if rootHash == nil {
 		rootHash, err = mt.Root()
@@ -927,7 +927,7 @@ func (mt *ZkTrieImpl) Walk(rootHash *Hash, f func(*Node)) error {
 
 // GraphViz uses Walk function to generate a string GraphViz representation of
 // the tree and writes it to w
-func (mt *ZkTrieImpl) GraphViz(w io.Writer, rootHash *Hash) error {
+func (mt *ZkTrie) GraphViz(w io.Writer, rootHash *Hash) error {
 	if rootHash == nil {
 		var err error
 		rootHash, err = mt.Root()
@@ -940,7 +940,7 @@ func (mt *ZkTrieImpl) GraphViz(w io.Writer, rootHash *Hash) error {
 	defer mt.lock.RUnlock()
 
 	fmt.Fprintf(w,
-		"--------\nGraphViz of the ZkTrieImpl with RootHash "+rootHash.BigInt().String()+"\n")
+		"--------\nGraphViz of the ZkTrie with RootHash "+rootHash.BigInt().String()+"\n")
 
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
@@ -976,7 +976,7 @@ node [fontname=Monospace,fontsize=10,shape=box]
 	fmt.Fprintf(w, "}\n")
 
 	fmt.Fprintf(w,
-		"End of GraphViz of the ZkTrieImpl with RootHash "+rootHash.BigInt().String()+"\n--------\n")
+		"End of GraphViz of the ZkTrie with RootHash "+rootHash.BigInt().String()+"\n--------\n")
 
 	if errIn != nil {
 		return errIn
@@ -985,7 +985,7 @@ node [fontname=Monospace,fontsize=10,shape=box]
 }
 
 // Copy creates a new independent zkTrie from the given trie
-func (mt *ZkTrieImpl) Copy() *ZkTrieImpl {
+func (mt *ZkTrie) Copy() *ZkTrie {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
@@ -996,7 +996,7 @@ func (mt *ZkTrieImpl) Copy() *ZkTrieImpl {
 	}
 
 	newRootKey := *mt.rootKey
-	return &ZkTrieImpl{
+	return &ZkTrie{
 		reader:       mt.reader,
 		maxLevels:    mt.maxLevels,
 		writable:     mt.writable,
@@ -1015,7 +1015,7 @@ func (mt *ZkTrieImpl) Copy() *ZkTrieImpl {
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
 // func (t *ZkTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
-func (mt *ZkTrieImpl) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
+func (mt *ZkTrie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 	fromLevel := uint(0)
 	err := mt.ProveWithDeletion(key, fromLevel, func(n *Node) error {
 		nodeHash, err := n.NodeHash()
@@ -1065,7 +1065,7 @@ func DecodeSMTProof(data []byte) (*Node, error) {
 // would receive enough information for launch a deletion and calculate the new root
 // base on the proof data
 // Also notice the sibling can be nil if the trie has only one leaf
-func (mt *ZkTrieImpl) ProveWithDeletion(key []byte, fromLevel uint, writeNode func(*Node) error, onHit func(*Node, *Node)) error {
+func (mt *ZkTrie) ProveWithDeletion(key []byte, fromLevel uint, writeNode func(*Node) error, onHit func(*Node, *Node)) error {
 	secureKey, err := ToSecureKey(key)
 	if err != nil {
 		return err
@@ -1126,7 +1126,7 @@ func (mt *ZkTrieImpl) ProveWithDeletion(key []byte, fromLevel uint, writeNode fu
 
 // Prove constructs a merkle proof for SMT, it respect the protocol used by the ethereum-trie
 // but save the node data with a compact form
-func (mt *ZkTrieImpl) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) error) error {
+func (mt *ZkTrie) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) error) error {
 	// force root hash calculation if needed
 	if _, err := mt.Root(); err != nil {
 		return err
@@ -1200,7 +1200,7 @@ func (mt *ZkTrieImpl) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) e
 // NodeIterator returns an iterator that returns nodes of the trie. Iteration
 // starts at the key after the given start key. And error will be returned
 // if fails to create node iterator.
-func (mt *ZkTrieImpl) NodeIterator(start []byte) (trie.NodeIterator, error) {
+func (mt *ZkTrie) NodeIterator(start []byte) (trie.NodeIterator, error) {
 	return nil, errors.New("not implemented")
 }
 

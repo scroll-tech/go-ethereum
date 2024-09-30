@@ -35,7 +35,7 @@ func init() {
 
 // makeProvers creates Merkle trie provers based on different implementations to
 // test all variations.
-func makeSMTProvers(mt *ZkTrieImpl) []func(key []byte) *memorydb.Database {
+func makeSMTProvers(mt *ZkTrie) []func(key []byte) *memorydb.Database {
 	var provers []func(key []byte) *memorydb.Database
 
 	// Create a direct trie based Merkle prover
@@ -174,7 +174,7 @@ func TestSMTMissingKeyProof(t *testing.T) {
 	}
 }
 
-func randomZktrie(t *testing.T, n int) (*ZkTrieImpl, map[string][]byte) {
+func randomZktrie(t *testing.T, n int) (*ZkTrie, map[string][]byte) {
 	randBytes := func(len int) []byte {
 		buf := make([]byte, len)
 		if n, err := rand.Read(buf); n != len || err != nil {

@@ -8,16 +8,16 @@ import (
 )
 
 type ProofTracer struct {
-	*ZkTrieImpl
+	*ZkTrie
 	deletionTracer map[Hash]struct{}
 	rawPaths       map[string][]*Node
 	emptyTermPaths map[string][]*Node
 }
 
 // NewProofTracer create a proof tracer object
-func (t *ZkTrieImpl) NewProofTracer() *ProofTracer {
+func (t *ZkTrie) NewProofTracer() *ProofTracer {
 	return &ProofTracer{
-		ZkTrieImpl: t,
+		ZkTrie: t,
 		// always consider 0 is "deleted"
 		deletionTracer: map[Hash]struct{}{HashZero: {}},
 		rawPaths:       make(map[string][]*Node),

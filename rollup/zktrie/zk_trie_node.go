@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"slices"
 	"unsafe"
+
+	"github.com/scroll-tech/go-ethereum/common"
 )
 
 // NodeType defines the type of node in the MT.
@@ -381,4 +383,27 @@ func (n *Node) Copy() *Node {
 		panic("failed to copy trie node")
 	}
 	return newNode
+}
+
+type ChildResolver struct{}
+
+// ForEach iterates over the children of a node and calls the given function
+// note: original implementation from geth works recursively, but our Node definition
+// doesn't allow that. So we only iterate over the children of the current node, which
+// should be fine.
+func (r ChildResolver) ForEach(node []byte, onChild func(common.Hash)) {
+	n, err := NewNodeFromBytes(node)
+	if err != nil {
+		panic(fmt.Sprintf("node %x: %v", node, err))
+	}
+
+	var childHash common.Hash
+	if n.ChildL != nil {
+		childHash.SetBytes(n.ChildL.Bytes())
+		onChild(childHash)
+	}
+	if n.ChildR != nil {
+		childHash.SetBytes(n.ChildR.Bytes())
+		onChild(childHash)
+	}
 }

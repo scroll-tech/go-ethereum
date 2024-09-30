@@ -57,8 +57,6 @@ var (
 	// ErrNotWritable is used when the ZkTrieImpl is not writable and a
 	// write function is called
 	ErrNotWritable = errors.New("merkle Tree not writable")
-
-	dbKeyRootNode = []byte("currentroot")
 )
 
 type Database interface {
@@ -70,7 +68,8 @@ type Database interface {
 // ZkTrieImpl is the struct with the main elements of the ZkTrieImpl
 type ZkTrieImpl struct {
 	lock      sync.RWMutex
-	db        Database
+	owner     common.Hash
+	reader    *trie.TrieReader
 	rootKey   *Hash
 	writable  bool
 	maxLevels int
@@ -80,22 +79,24 @@ type ZkTrieImpl struct {
 	dirtyStorage map[Hash]*Node
 }
 
-func NewZkTrieImpl(storage Database, maxLevels int) (*ZkTrieImpl, error) {
-	return NewZkTrieImplWithRoot(storage, &HashZero, maxLevels)
-}
-
 // NewZkTrieImplWithRoot loads a new ZkTrieImpl. If in the storage already exists one
 // will open that one, if not, will create a new one.
-func NewZkTrieImplWithRoot(storage Database, root *Hash, maxLevels int) (*ZkTrieImpl, error) {
+func NewZkTrieImplWithRoot(id *trie.ID, db *trie.Database) (*ZkTrieImpl, error) {
+	reader, err := trie.NewTrieReader(id.StateRoot, id.Owner, db)
+	if err != nil {
+		return nil, err
+	}
+
 	mt := ZkTrieImpl{
-		db:           storage,
-		maxLevels:    maxLevels,
+		owner:        id.Owner,
+		reader:       reader,
+		maxLevels:    NodeKeyValidBytes * 8,
 		writable:     true,
 		dirtyIndex:   big.NewInt(0),
 		dirtyStorage: make(map[Hash]*Node),
 	}
-	mt.rootKey = root
-	if *root != HashZero {
+	mt.rootKey = NewHashFromBytes(id.Root.Bytes())
+	if *mt.rootKey != HashZero {
 		_, err := mt.GetNode(mt.rootKey)
 		if err != nil {
 			return nil, err
@@ -175,7 +176,8 @@ func (mt *ZkTrieImpl) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) er
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
-	mt.db.UpdatePreimage(key, secureKey)
+	// todo: save preimage
+	// mt.db.UpdatePreimage(key, secureKey)
 
 	newRootKey, _, err := mt.addLeaf(newLeafNode, mt.rootKey, 0, path)
 	// sanity check
@@ -262,31 +264,45 @@ func (mt *ZkTrieImpl) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, 
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
-	if err := mt.commit(); err != nil {
-		return common.Hash{}, nil, err
+	nodeset, err := mt.commit(collectLeaf)
+	if err != nil {
+		return common.Hash{}, nodeset, err
 	}
 
 	root, err := mt.root()
 	if err != nil {
 		return common.Hash{}, nil, err
 	}
-	return common.BytesToHash(root.Bytes()), nil, nil
+	return common.BytesToHash(root.Bytes()), nodeset, nil
 }
 
 // Commit calculates the root for the entire trie and persist all the dirty nodes
-func (mt *ZkTrieImpl) commit() error {
+func (mt *ZkTrieImpl) commit(collectLeaf bool) (*trienode.NodeSet, error) {
 	// force root hash calculation if needed
 	if _, err := mt.root(); err != nil {
-		return err
+		return nil, err
 	}
 
+	nodeSet := trienode.NewNodeSet(mt.owner)
 	for key, node := range mt.dirtyStorage {
-		if err := mt.db.Put(key[:], node.CanonicalValue()); err != nil {
-			return err
+		keyBytes := key.Bytes()
+		nodeHash := common.BytesToHash(keyBytes)
+		// todo: use proper path instead of hash
+		nodeSet.AddNode(keyBytes, trienode.New(nodeHash, node.CanonicalValue()))
+		if collectLeaf {
+			collectLeafNode := func(childHash *Hash) {
+				if childHash != nil {
+					if childNode, found := mt.dirtyStorage[*childHash]; found && childNode != nil {
+						nodeSet.AddLeaf(nodeHash, childNode.CanonicalValue())
+					}
+				}
+			}
+			collectLeafNode(node.ChildL)
+			collectLeafNode(node.ChildR)
 		}
 	}
 	mt.dirtyStorage = make(map[Hash]*Node)
-	return mt.db.Put(dbKeyRootNode, append([]byte{byte(DBEntryTypeRoot)}, mt.rootKey[:]...))
+	return nodeSet, nil
 }
 
 // addLeaf recursively adds a newLeaf in the MT while updating the path, and returns the key
@@ -683,11 +699,13 @@ func (mt *ZkTrieImpl) getNodeTo(nodeHash *Hash, node *Node) error {
 		*node = *dirtyNode.Copy()
 		return nil
 	}
-	nBytes, err := mt.db.Get(nodeHash[:])
+
+	var hash common.Hash
+	hash.SetBytes(nodeHash.Bytes())
+	nBytes, err := mt.reader.Node(nil, hash)
 	if err != nil {
 		return err
 	}
-
 	return node.SetBytes(nBytes)
 }
 
@@ -979,7 +997,7 @@ func (mt *ZkTrieImpl) Copy() *ZkTrieImpl {
 
 	newRootKey := *mt.rootKey
 	return &ZkTrieImpl{
-		db:           mt.db,
+		reader:       mt.reader,
 		maxLevels:    mt.maxLevels,
 		writable:     mt.writable,
 		dirtyIndex:   new(big.Int).Set(mt.dirtyIndex),

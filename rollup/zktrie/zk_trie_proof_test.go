@@ -56,7 +56,7 @@ func verifyValue(proveVal []byte, vPreimage []byte) bool {
 }
 
 func TestSMTOneElementProof(t *testing.T) {
-	mt := newTestingMerkle(t)
+	mt, _ := newTestingMerkle(t)
 	err := mt.TryUpdate(
 		NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)).Bytes(),
 		1,
@@ -143,7 +143,7 @@ func TestSMTBadProof(t *testing.T) {
 // Tests that missing keys can also be proven. The test explicitly uses a single
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
-	mt := newTestingMerkle(t)
+	mt, _ := newTestingMerkle(t)
 	err := mt.TryUpdate(
 		NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)).Bytes(),
 		1,
@@ -183,7 +183,7 @@ func randomZktrie(t *testing.T, n int) (*ZkTrieImpl, map[string][]byte) {
 		return buf
 	}
 
-	mt := newTestingMerkle(t)
+	mt, _ := newTestingMerkle(t)
 	vals := make(map[string][]byte)
 	for i := byte(0); i < 100; i++ {
 
@@ -209,7 +209,7 @@ func randomZktrie(t *testing.T, n int) (*ZkTrieImpl, map[string][]byte) {
 
 // Tests that new "proof trace" feature
 func TestProofWithDeletion(t *testing.T) {
-	mt := newTestingMerkle(t)
+	mt, _ := newTestingMerkle(t)
 	key1 := bytes.Repeat([]byte("b"), 32)
 	key2 := bytes.Repeat([]byte("c"), 32)
 	err := mt.TryUpdate(

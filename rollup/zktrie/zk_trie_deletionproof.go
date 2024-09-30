@@ -144,7 +144,6 @@ func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 				// empty node is considered as "unhit" but it should be also being added
 				// into a temporary slot for possibly being marked as deletion later
 				mptPath = append(mptPath, n)
-				fmt.Println("empty", string(key))
 				t.emptyTermPaths[string(key)] = mptPath
 			default:
 				panic(fmt.Errorf("unexpected node type %d", n.Type))
@@ -156,7 +155,6 @@ func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 			// only "hit" path (i.e. the leaf node corresponding the input key can be found)
 			// would be add into tracer
 			mptPath = append(mptPath, n)
-			fmt.Println("hit", string(key))
 			t.rawPaths[string(key)] = mptPath
 		},
 	)

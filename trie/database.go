@@ -36,6 +36,7 @@ type Config struct {
 	PathDB    *pathdb.Config // Configs for experimental path-based scheme
 
 	// zktrie related stuff
+	ChildResolver hashdb.ChildResolver
 	IsUsingZktrie bool
 }
 
@@ -133,7 +134,11 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 	if config.PathDB != nil {
 		db.backend = pathdb.New(diskdb, config.PathDB)
 	} else {
-		db.backend = hashdb.New(diskdb, config.HashDB, mptResolver{})
+		resolver := config.ChildResolver
+		if resolver == nil {
+			resolver = mptResolver{}
+		}
+		db.backend = hashdb.New(diskdb, config.HashDB, resolver)
 	}
 	return db
 }

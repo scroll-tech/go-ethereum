@@ -38,37 +38,37 @@ type Reader interface {
 
 // trieReader is a wrapper of the underlying node reader. It's not safe
 // for concurrent usage.
-type TrieReader struct {
+type trieReader struct {
 	owner  common.Hash
 	reader Reader
 	banned map[string]struct{} // Marker to prevent node from being accessed, for tests
 }
 
 // newTrieReader initializes the trie reader with the given node reader.
-func NewTrieReader(stateRoot, owner common.Hash, db *Database) (*TrieReader, error) {
-	if stateRoot == (common.Hash{}) || stateRoot == types.EmptyRootHash {
+func newTrieReader(stateRoot, owner common.Hash, db *Database) (*trieReader, error) {
+	if stateRoot == (common.Hash{}) || stateRoot == types.EmptyRootHash || stateRoot == types.EmptyZkTrieRootHash {
 		if stateRoot == (common.Hash{}) {
 			log.Error("Zero state root hash!")
 		}
-		return &TrieReader{owner: owner}, nil
+		return &trieReader{owner: owner}, nil
 	}
 	reader, err := db.Reader(stateRoot)
 	if err != nil {
 		return nil, &MissingNodeError{Owner: owner, NodeHash: stateRoot, err: err}
 	}
-	return &TrieReader{owner: owner, reader: reader}, nil
+	return &trieReader{owner: owner, reader: reader}, nil
 }
 
 // newEmptyReader initializes the pure in-memory reader. All read operations
 // should be forbidden and returns the MissingNodeError.
-func newEmptyReader() *TrieReader {
-	return &TrieReader{}
+func newEmptyReader() *trieReader {
+	return &trieReader{}
 }
 
 // node retrieves the rlp-encoded trie node with the provided trie node
 // information. An MissingNodeError will be returned in case the node is
 // not found or any error is encountered.
-func (r *TrieReader) Node(path []byte, hash common.Hash) ([]byte, error) {
+func (r *trieReader) node(path []byte, hash common.Hash) ([]byte, error) {
 	// Perform the logics in tests for preventing trie node access.
 	if r.banned != nil {
 		if _, ok := r.banned[string(path)]; ok {

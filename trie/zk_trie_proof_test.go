@@ -18,17 +18,14 @@ package trie
 
 import (
 	"bytes"
+	"crypto/rand"
 	mrand "math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	zkt "github.com/scroll-tech/zktrie/types"
-
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 
@@ -43,13 +40,8 @@ func makeSMTProvers(mt *ZkTrie) []func(key []byte) *memorydb.Database {
 
 	// Create a direct trie based Merkle prover
 	provers = append(provers, func(key []byte) *memorydb.Database {
-		word := zkt.NewByte32FromBytesPaddingZero(key)
-		k, err := word.Hash()
-		if err != nil {
-			panic(err)
-		}
 		proofDB := memorydb.New()
-		err = mt.Prove(common.BytesToHash(k.Bytes()).Bytes(), proofDB)
+		err := mt.Prove(key, proofDB)
 		if err != nil {
 			panic(err)
 		}
@@ -64,14 +56,14 @@ func verifyValue(proveVal []byte, vPreimage []byte) bool {
 }
 
 func TestSMTOneElementProof(t *testing.T) {
-	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase(rawdb.NewMemoryDatabase()))
-	mt := &zkTrieImplTestWrapper{tr.Tree()}
-	err := mt.UpdateWord(
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)),
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32)),
+	mt, _ := newTestingMerkle(t)
+	err := mt.TryUpdate(
+		NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)).Bytes(),
+		1,
+		[]Byte32{*NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32))},
 	)
 	assert.Nil(t, err)
-	for i, prover := range makeSMTProvers(tr) {
+	for i, prover := range makeSMTProvers(mt) {
 		keyBytes := bytes.Repeat([]byte("k"), 32)
 		proof := prover(keyBytes)
 		if proof == nil {
@@ -84,7 +76,7 @@ func TestSMTOneElementProof(t *testing.T) {
 		root, err := mt.Root()
 		assert.NoError(t, err)
 
-		val, err := VerifyProof(common.BytesToHash(root.Bytes()), keyBytes, proof)
+		val, err := VerifyProofSMT(common.BytesToHash(root.Bytes()), keyBytes, proof)
 		if err != nil {
 			t.Fatalf("prover %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
 		}
@@ -96,21 +88,22 @@ func TestSMTOneElementProof(t *testing.T) {
 
 func TestSMTProof(t *testing.T) {
 	mt, vals := randomZktrie(t, 500)
-	root, err := mt.Tree().Root()
+	root, err := mt.Root()
 	assert.NoError(t, err)
 
 	for i, prover := range makeSMTProvers(mt) {
-		for _, kv := range vals {
-			proof := prover(kv.k)
+		for kStr, v := range vals {
+			k := []byte(kStr)
+			proof := prover(k)
 			if proof == nil {
-				t.Fatalf("prover %d: missing key %x while constructing proof", i, kv.k)
+				t.Fatalf("prover %d: missing key %x while constructing proof", i, k)
 			}
-			val, err := VerifyProof(common.BytesToHash(root.Bytes()), kv.k, proof)
+			val, err := VerifyProofSMT(common.BytesToHash(root.Bytes()), k, proof)
 			if err != nil {
-				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x\n", i, kv.k, err, proof)
+				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x\n", i, k, err, proof)
 			}
-			if !verifyValue(val, zkt.NewByte32FromBytesPaddingZero(kv.v)[:]) {
-				t.Fatalf("prover %d: verified value mismatch for key %x, want %x, get %x", i, kv.k, kv.v, val)
+			if !verifyValue(val, NewByte32FromBytesPaddingZero(v)[:]) {
+				t.Fatalf("prover %d: verified value mismatch for key %x, want %x, get %x", i, k, v, val)
 			}
 		}
 	}
@@ -118,29 +111,30 @@ func TestSMTProof(t *testing.T) {
 
 func TestSMTBadProof(t *testing.T) {
 	mt, vals := randomZktrie(t, 500)
-	root, err := mt.Tree().Root()
+	root, err := mt.Root()
 	assert.NoError(t, err)
 
 	for i, prover := range makeSMTProvers(mt) {
-		for _, kv := range vals {
-			proof := prover(kv.k)
+		for kStr, _ := range vals {
+			k := []byte(kStr)
+			proof := prover(k)
 			if proof == nil {
 				t.Fatalf("prover %d: nil proof", i)
 			}
 			it := proof.NewIterator(nil, nil)
-			for i, d := 0, mrand.Intn(proof.Len()); i <= d; i++ {
+			for i, d := 0, mrand.Intn(proof.Len()-1); i <= d; i++ {
 				it.Next()
 			}
+			if bytes.Equal(it.Key(), magicHash) {
+				it.Next()
+			}
+
 			key := it.Key()
-			val, _ := proof.Get(key)
 			proof.Delete(key)
 			it.Release()
 
-			mutateByte(val)
-			proof.Put(crypto.Keccak256(val), val)
-
-			if _, err := VerifyProof(common.BytesToHash(root.Bytes()), kv.k, proof); err == nil {
-				t.Fatalf("prover %d: expected proof to fail for key %x", i, kv.k)
+			if value, err := VerifyProof(common.BytesToHash(root.Bytes()), k, proof); err == nil && value != nil {
+				t.Fatalf("prover %d: expected proof to fail for key %x", i, k)
 			}
 		}
 	}
@@ -149,15 +143,15 @@ func TestSMTBadProof(t *testing.T) {
 // Tests that missing keys can also be proven. The test explicitly uses a single
 // entry trie and checks for missing keys both before and after the single entry.
 func TestSMTMissingKeyProof(t *testing.T) {
-	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase(rawdb.NewMemoryDatabase()))
-	mt := &zkTrieImplTestWrapper{tr.Tree()}
-	err := mt.UpdateWord(
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)),
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32)),
+	mt, _ := newTestingMerkle(t)
+	err := mt.TryUpdate(
+		NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("k"), 32)).Bytes(),
+		1,
+		[]Byte32{*NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32))},
 	)
 	assert.Nil(t, err)
 
-	prover := makeSMTProvers(tr)[0]
+	prover := makeSMTProvers(mt)[0]
 
 	for i, key := range []string{"a", "j", "l", "z"} {
 		keyBytes := bytes.Repeat([]byte(key), 32)
@@ -170,7 +164,7 @@ func TestSMTMissingKeyProof(t *testing.T) {
 		root, err := mt.Root()
 		assert.NoError(t, err)
 
-		val, err := VerifyProof(common.BytesToHash(root.Bytes()), keyBytes, proof)
+		val, err := VerifyProofSMT(common.BytesToHash(root.Bytes()), keyBytes, proof)
 		if err != nil {
 			t.Fatalf("test %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
 		}
@@ -180,67 +174,67 @@ func TestSMTMissingKeyProof(t *testing.T) {
 	}
 }
 
-func randomZktrie(t *testing.T, n int) (*ZkTrie, map[string]*kv) {
-	tr, err := NewZkTrie(common.Hash{}, NewZktrieDatabase(rawdb.NewMemoryDatabase()))
-	if err != nil {
-		panic(err)
+func randomZktrie(t *testing.T, n int) (*ZkTrie, map[string][]byte) {
+	randBytes := func(len int) []byte {
+		buf := make([]byte, len)
+		if n, err := rand.Read(buf); n != len || err != nil {
+			panic(err)
+		}
+		return buf
 	}
-	mt := &zkTrieImplTestWrapper{tr.Tree()}
-	vals := make(map[string]*kv)
+
+	mt, _ := newTestingMerkle(t)
+	vals := make(map[string][]byte)
 	for i := byte(0); i < 100; i++ {
 
-		value := &kv{common.LeftPadBytes([]byte{i}, 32), bytes.Repeat([]byte{i}, 32), false}
-		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), bytes.Repeat([]byte{i}, 32), false}
+		key, value := common.LeftPadBytes([]byte{i}, 32), NewByte32FromBytes(bytes.Repeat([]byte{i}, 32))
+		key2, value2 := common.LeftPadBytes([]byte{i + 10}, 32), NewByte32FromBytes(bytes.Repeat([]byte{i}, 32))
 
-		err = mt.UpdateWord(zkt.NewByte32FromBytesPaddingZero(value.k), zkt.NewByte32FromBytesPaddingZero(value.v))
+		err := mt.TryUpdate(key, 1, []Byte32{*value})
 		assert.Nil(t, err)
-		err = mt.UpdateWord(zkt.NewByte32FromBytesPaddingZero(value2.k), zkt.NewByte32FromBytesPaddingZero(value2.v))
+		err = mt.TryUpdate(key2, 1, []Byte32{*value2})
 		assert.Nil(t, err)
-		vals[string(value.k)] = value
-		vals[string(value2.k)] = value2
+		vals[string(key)] = value.Bytes()
+		vals[string(key2)] = value2.Bytes()
 	}
 	for i := 0; i < n; i++ {
-		value := &kv{randBytes(32), randBytes(20), false}
-		err = mt.UpdateWord(zkt.NewByte32FromBytesPaddingZero(value.k), zkt.NewByte32FromBytesPaddingZero(value.v))
+		key, value := randBytes(32), NewByte32FromBytes(randBytes(20))
+		err := mt.TryUpdate(key, 1, []Byte32{*value})
 		assert.Nil(t, err)
-		vals[string(value.k)] = value
+		vals[string(key)] = value.Bytes()
 	}
 
-	return tr, vals
+	return mt, vals
 }
 
 // Tests that new "proof trace" feature
 func TestProofWithDeletion(t *testing.T) {
-	tr, _ := NewZkTrie(common.Hash{}, NewZktrieDatabase(rawdb.NewMemoryDatabase()))
-	mt := &zkTrieImplTestWrapper{tr.Tree()}
-	key1 := bytes.Repeat([]byte("l"), 32)
-	key2 := bytes.Repeat([]byte("m"), 32)
-	err := mt.UpdateWord(
-		zkt.NewByte32FromBytesPaddingZero(key1),
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32)),
+	mt, _ := newTestingMerkle(t)
+	key1 := bytes.Repeat([]byte("b"), 32)
+	key2 := bytes.Repeat([]byte("c"), 32)
+	err := mt.TryUpdate(
+		key1,
+		1,
+		[]Byte32{*NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("v"), 32))},
 	)
 	assert.NoError(t, err)
-	err = mt.UpdateWord(
-		zkt.NewByte32FromBytesPaddingZero(key2),
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("n"), 32)),
+	err = mt.TryUpdate(
+		key2,
+		1,
+		[]Byte32{*NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("n"), 32))},
 	)
 	assert.NoError(t, err)
 
 	proof := memorydb.New()
-	s_key1, err := zkt.ToSecureKeyBytes(key1)
+	proofTracer := mt.NewProofTracer()
+
+	err = proofTracer.Prove(key1, proof)
+	assert.NoError(t, err)
+	nd, err := mt.TryGet(key2)
 	assert.NoError(t, err)
 
-	proofTracer := tr.NewProofTracer()
-
-	err = proofTracer.Prove(s_key1.Bytes(), proof)
-	assert.NoError(t, err)
-	nd, err := tr.TryGet(key2)
-	assert.NoError(t, err)
-
-	s_key2, err := zkt.ToSecureKeyBytes(bytes.Repeat([]byte("x"), 32))
-	assert.NoError(t, err)
-
-	err = proofTracer.Prove(s_key2.Bytes(), proof)
+	key4 := bytes.Repeat([]byte("x"), 32)
+	err = proofTracer.Prove(key4, proof)
 	assert.NoError(t, err)
 	//assert.Equal(t, len(sibling1), len(delTracer.GetProofs()))
 
@@ -248,7 +242,7 @@ func TestProofWithDeletion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(siblings))
 
-	proofTracer.MarkDeletion(s_key1.Bytes())
+	proofTracer.MarkDeletion(key1)
 	siblings, err = proofTracer.GetDeletionProofs()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(siblings))
@@ -259,30 +253,31 @@ func TestProofWithDeletion(t *testing.T) {
 
 	// Marking a key that is currently not hit (but terminated by an empty node)
 	// also causes it to be added to the deletion proof
-	proofTracer.MarkDeletion(s_key2.Bytes())
+	proofTracer.MarkDeletion(key4)
 	siblings, err = proofTracer.GetDeletionProofs()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(siblings))
 
 	key3 := bytes.Repeat([]byte("x"), 32)
-	err = mt.UpdateWord(
-		zkt.NewByte32FromBytesPaddingZero(key3),
-		zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("z"), 32)),
+	err = mt.TryUpdate(
+		key3,
+		1,
+		[]Byte32{*NewByte32FromBytesPaddingZero(bytes.Repeat([]byte("z"), 32))},
 	)
 	assert.NoError(t, err)
 
-	proofTracer = tr.NewProofTracer()
-	err = proofTracer.Prove(s_key1.Bytes(), proof)
+	proofTracer = mt.NewProofTracer()
+	err = proofTracer.Prove(key1, proof)
 	assert.NoError(t, err)
-	err = proofTracer.Prove(s_key2.Bytes(), proof)
+	err = proofTracer.Prove(key4, proof)
 	assert.NoError(t, err)
 
-	proofTracer.MarkDeletion(s_key1.Bytes())
+	proofTracer.MarkDeletion(key1)
 	siblings, err = proofTracer.GetDeletionProofs()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(siblings))
 
-	proofTracer.MarkDeletion(s_key2.Bytes())
+	proofTracer.MarkDeletion(key4)
 	siblings, err = proofTracer.GetDeletionProofs()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(siblings))

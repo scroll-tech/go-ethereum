@@ -4,17 +4,14 @@ import (
 	"bytes"
 	"fmt"
 
-	zktrie "github.com/scroll-tech/zktrie/trie"
-	zkt "github.com/scroll-tech/zktrie/types"
-
 	"github.com/scroll-tech/go-ethereum/ethdb"
 )
 
 type ProofTracer struct {
 	*ZkTrie
-	deletionTracer map[zkt.Hash]struct{}
-	rawPaths       map[string][]*zktrie.Node
-	emptyTermPaths map[string][]*zktrie.Node
+	deletionTracer map[Hash]struct{}
+	rawPaths       map[string][]*Node
+	emptyTermPaths map[string][]*Node
 }
 
 // NewProofTracer create a proof tracer object
@@ -22,9 +19,9 @@ func (t *ZkTrie) NewProofTracer() *ProofTracer {
 	return &ProofTracer{
 		ZkTrie: t,
 		// always consider 0 is "deleted"
-		deletionTracer: map[zkt.Hash]struct{}{zkt.HashZero: {}},
-		rawPaths:       make(map[string][]*zktrie.Node),
-		emptyTermPaths: make(map[string][]*zktrie.Node),
+		deletionTracer: map[Hash]struct{}{HashZero: {}},
+		rawPaths:       make(map[string][]*Node),
+		emptyTermPaths: make(map[string][]*Node),
 	}
 }
 
@@ -59,7 +56,7 @@ func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 // always decode the node for its purpose
 func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 
-	retMap := map[zkt.Hash][]byte{}
+	retMap := map[Hash][]byte{}
 
 	// check each path: reversively, skip the final leaf node
 	for _, path := range t.rawPaths {
@@ -73,18 +70,18 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 				nodeHash, _ := n.NodeHash()
 				t.deletionTracer[*nodeHash] = struct{}{}
 			} else {
-				var siblingHash *zkt.Hash
+				var siblingHash *Hash
 				if deletedL {
 					siblingHash = n.ChildR
 				} else if deletedR {
 					siblingHash = n.ChildL
 				}
 				if siblingHash != nil {
-					sibling, err := t.ZkTrie.Tree().GetNode(siblingHash)
+					sibling, err := t.GetNode(siblingHash)
 					if err != nil {
 						return nil, err
 					}
-					if sibling.Type != zktrie.NodeTypeEmpty_New {
+					if sibling.Type != NodeTypeEmpty_New {
 						retMap[*siblingHash] = sibling.Value()
 					}
 				}
@@ -103,7 +100,7 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 }
 
 // MarkDeletion mark a key has been involved into deletion
-func (t *ProofTracer) MarkDeletion(key []byte) {
+func (t *ProofTracer) MarkDeletion(key []byte) error {
 	if path, existed := t.emptyTermPaths[string(key)]; existed {
 		// copy empty node terminated path for final scanning
 		t.rawPaths[string(key)] = path
@@ -111,38 +108,39 @@ func (t *ProofTracer) MarkDeletion(key []byte) {
 		// sanity check
 		leafNode := path[len(path)-1]
 
-		if leafNode.Type != zktrie.NodeTypeLeaf_New {
+		if leafNode.Type != NodeTypeLeaf_New {
 			panic("all path recorded in proofTrace should be ended with leafNode")
 		}
 
 		nodeHash, _ := leafNode.NodeHash()
 		t.deletionTracer[*nodeHash] = struct{}{}
 	}
+	return nil
 }
 
 // Prove act the same as zktrie.Prove, while also collect the raw path
 // for collecting deletion proofs in a post-work
 func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 	fromLevel := uint(0)
-	var mptPath []*zktrie.Node
-	err := t.ZkTrie.ProveWithDeletion(key, fromLevel,
-		func(n *zktrie.Node) error {
+	var mptPath []*Node
+	err := t.ProveWithDeletion(key, fromLevel,
+		func(n *Node) error {
 			nodeHash, err := n.NodeHash()
 			if err != nil {
 				return err
 			}
 
 			switch n.Type {
-			case zktrie.NodeTypeLeaf_New:
+			case NodeTypeLeaf_New:
 				preImage := t.GetKey(n.NodeKey.Bytes())
 				if len(preImage) > 0 {
-					n.KeyPreimage = &zkt.Byte32{}
+					n.KeyPreimage = &Byte32{}
 					copy(n.KeyPreimage[:], preImage)
 				}
-			case zktrie.NodeTypeBranch_0, zktrie.NodeTypeBranch_1,
-				zktrie.NodeTypeBranch_2, zktrie.NodeTypeBranch_3:
+			case NodeTypeBranch_0, NodeTypeBranch_1,
+				NodeTypeBranch_2, NodeTypeBranch_3:
 				mptPath = append(mptPath, n)
-			case zktrie.NodeTypeEmpty_New:
+			case NodeTypeEmpty_New:
 				// empty node is considered as "unhit" but it should be also being added
 				// into a temporary slot for possibly being marked as deletion later
 				mptPath = append(mptPath, n)
@@ -153,7 +151,7 @@ func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 
 			return proofDb.Put(nodeHash[:], n.Value())
 		},
-		func(n *zktrie.Node, _ *zktrie.Node) {
+		func(n *Node, _ *Node) {
 			// only "hit" path (i.e. the leaf node corresponding the input key can be found)
 			// would be add into tracer
 			mptPath = append(mptPath, n)
@@ -163,7 +161,8 @@ func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 	if err != nil {
 		return err
 	}
+
 	// we put this special kv pair in db so we can distinguish the type and
 	// make suitable Proof
-	return proofDb.Put(magicHash, zktrie.ProofMagicBytes())
+	return proofDb.Put(magicHash, magicSMTBytes)
 }

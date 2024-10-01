@@ -1,4 +1,4 @@
-package zktrie
+package trie
 
 import (
 	"math/big"

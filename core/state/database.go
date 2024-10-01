@@ -171,7 +171,7 @@ type cachingDB struct {
 // OpenTrie opens the main account trie at a specific root hash.
 func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
 	if db.triedb.IsUsingZktrie() {
-		tr, err := trie.NewZkTrie(root, trie.NewZktrieDatabaseFromTriedb(db.triedb))
+		tr, err := trie.NewZkTrie(trie.StateTrieID(root), db.triedb)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
 // OpenStorageTrie opens the storage trie of an account.
 func (db *cachingDB) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash) (Trie, error) {
 	if db.triedb.IsUsingZktrie() {
-		tr, err := trie.NewZkTrie(root, trie.NewZktrieDatabaseFromTriedb(db.triedb))
+		tr, err := trie.NewZkTrie(trie.StorageTrieID(stateRoot, crypto.Keccak256Hash(address.Bytes()), root), db.triedb)
 		if err != nil {
 			return nil, err
 		}

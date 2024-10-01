@@ -575,8 +575,7 @@ func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, n
 	// Ensure the parent state is present and signal a warning if not.
 	if parent != types.EmptyRootHash {
 		if blob, _ := db.Node(parent); len(blob) == 0 {
-			// Silence the warning because it is not applicable to zktrie.
-			// log.Error("parent state is not present")
+			log.Error("parent state is not present")
 		}
 	}
 	db.lock.Lock()

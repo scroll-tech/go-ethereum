@@ -27,6 +27,6 @@ func (db *Database) EmptyRoot() common.Hash {
 	if db.IsUsingZktrie() {
 		return types.EmptyZkTrieRootHash
 	} else {
-		return types.EmptyLegacyTrieRootHash
+		return types.EmptyRootHash
 	}
 }

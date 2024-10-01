@@ -195,7 +195,7 @@ func (mt *ZkTrie) UpdateAccount(address common.Address, acc *types.StateAccount)
 	value, flag := acc.MarshalFields()
 	accValue := make([]Byte32, 0, len(value))
 	for _, v := range value {
-		accValue = append(accValue, *NewByte32FromBytes(v.Bytes()))
+		accValue = append(accValue, *NewByte32FromBytes(v[:]))
 	}
 	return mt.TryUpdate(address.Bytes(), flag, accValue)
 }

@@ -1,27 +1,28 @@
-package trie
+package tracing
 
 import (
 	"bytes"
 	"fmt"
 
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 type ProofTracer struct {
-	*ZkTrie
-	deletionTracer map[Hash]struct{}
-	rawPaths       map[string][]*Node
-	emptyTermPaths map[string][]*Node
+	trie           *trie.ZkTrie
+	deletionTracer map[trie.Hash]struct{}
+	rawPaths       map[string][]*trie.Node
+	emptyTermPaths map[string][]*trie.Node
 }
 
 // NewProofTracer create a proof tracer object
-func (t *ZkTrie) NewProofTracer() *ProofTracer {
+func NewProofTracer(t *trie.ZkTrie) *ProofTracer {
 	return &ProofTracer{
-		ZkTrie: t,
+		trie: t,
 		// always consider 0 is "deleted"
-		deletionTracer: map[Hash]struct{}{HashZero: {}},
-		rawPaths:       make(map[string][]*Node),
-		emptyTermPaths: make(map[string][]*Node),
+		deletionTracer: map[trie.Hash]struct{}{trie.HashZero: {}},
+		rawPaths:       make(map[string][]*trie.Node),
+		emptyTermPaths: make(map[string][]*trie.Node),
 	}
 }
 
@@ -29,7 +30,7 @@ func (t *ZkTrie) NewProofTracer() *ProofTracer {
 func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 
 	// sanity checking
-	if !bytes.Equal(t.Hash().Bytes(), another.Hash().Bytes()) {
+	if !bytes.Equal(t.trie.Hash().Bytes(), another.trie.Hash().Bytes()) {
 		panic("can not merge two proof tracer base on different trie")
 	}
 
@@ -56,7 +57,7 @@ func (t *ProofTracer) Merge(another *ProofTracer) *ProofTracer {
 // always decode the node for its purpose
 func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 
-	retMap := map[Hash][]byte{}
+	retMap := map[trie.Hash][]byte{}
 
 	// check each path: reversively, skip the final leaf node
 	for _, path := range t.rawPaths {
@@ -70,18 +71,18 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 				nodeHash, _ := n.NodeHash()
 				t.deletionTracer[*nodeHash] = struct{}{}
 			} else {
-				var siblingHash *Hash
+				var siblingHash *trie.Hash
 				if deletedL {
 					siblingHash = n.ChildR
 				} else if deletedR {
 					siblingHash = n.ChildL
 				}
 				if siblingHash != nil {
-					sibling, err := t.GetNode(siblingHash)
+					sibling, err := t.trie.GetNode(siblingHash)
 					if err != nil {
 						return nil, err
 					}
-					if sibling.Type != NodeTypeEmpty_New {
+					if sibling.Type != trie.NodeTypeEmpty_New {
 						retMap[*siblingHash] = sibling.Value()
 					}
 				}
@@ -108,7 +109,7 @@ func (t *ProofTracer) MarkDeletion(key []byte) error {
 		// sanity check
 		leafNode := path[len(path)-1]
 
-		if leafNode.Type != NodeTypeLeaf_New {
+		if leafNode.Type != trie.NodeTypeLeaf_New {
 			panic("all path recorded in proofTrace should be ended with leafNode")
 		}
 
@@ -122,25 +123,25 @@ func (t *ProofTracer) MarkDeletion(key []byte) error {
 // for collecting deletion proofs in a post-work
 func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 	fromLevel := uint(0)
-	var mptPath []*Node
-	err := t.ProveWithDeletion(key, fromLevel,
-		func(n *Node) error {
+	var mptPath []*trie.Node
+	return t.trie.ProveWithDeletion(key, fromLevel,
+		func(n *trie.Node) error {
 			nodeHash, err := n.NodeHash()
 			if err != nil {
 				return err
 			}
 
 			switch n.Type {
-			case NodeTypeLeaf_New:
-				preImage := t.GetKey(n.NodeKey.Bytes())
+			case trie.NodeTypeLeaf_New:
+				preImage := t.trie.GetKey(n.NodeKey.Bytes())
 				if len(preImage) > 0 {
-					n.KeyPreimage = &Byte32{}
+					n.KeyPreimage = &trie.Byte32{}
 					copy(n.KeyPreimage[:], preImage)
 				}
-			case NodeTypeBranch_0, NodeTypeBranch_1,
-				NodeTypeBranch_2, NodeTypeBranch_3:
+			case trie.NodeTypeBranch_0, trie.NodeTypeBranch_1,
+				trie.NodeTypeBranch_2, trie.NodeTypeBranch_3:
 				mptPath = append(mptPath, n)
-			case NodeTypeEmpty_New:
+			case trie.NodeTypeEmpty_New:
 				// empty node is considered as "unhit" but it should be also being added
 				// into a temporary slot for possibly being marked as deletion later
 				mptPath = append(mptPath, n)
@@ -151,18 +152,11 @@ func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 
 			return proofDb.Put(nodeHash[:], n.Value())
 		},
-		func(n *Node, _ *Node) {
+		func(n *trie.Node, _ *trie.Node) {
 			// only "hit" path (i.e. the leaf node corresponding the input key can be found)
 			// would be add into tracer
 			mptPath = append(mptPath, n)
 			t.rawPaths[string(key)] = mptPath
 		},
 	)
-	if err != nil {
-		return err
-	}
-
-	// we put this special kv pair in db so we can distinguish the type and
-	// make suitable Proof
-	return proofDb.Put(magicHash, magicSMTBytes)
 }

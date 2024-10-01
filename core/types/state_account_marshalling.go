@@ -23,8 +23,6 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/utils"
 
-	zkt "github.com/scroll-tech/zktrie/types"
-
 	"github.com/scroll-tech/go-ethereum/common"
 )
 
@@ -44,8 +42,8 @@ var (
 // [96:128] KeccakCodeHash
 // [128:160] PoseidonCodehash
 // (total 160 bytes)
-func (s *StateAccount) MarshalFields() ([]zkt.Byte32, uint32) {
-	fields := make([]zkt.Byte32, 5)
+func (s *StateAccount) MarshalFields() ([][32]byte, uint32) {
+	fields := make([][32]byte, 5)
 
 	if s.Balance == nil {
 		panic("StateAccount balance nil")

@@ -705,7 +705,7 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 	value, flag := acc1.MarshalFields()
 	accValue := []Byte32{}
 	for _, v := range value {
-		accValue = append(accValue, *NewByte32FromBytes(v.Bytes()))
+		accValue = append(accValue, *NewByte32FromBytes(v[:]))
 	}
 	err := mt.TryUpdate(common.HexToAddress("0x05fDbDfaE180345C6Cff5316c286727CF1a43327").Bytes(), flag, accValue)
 	assert.Nil(t, err)
@@ -721,7 +721,7 @@ func TestMerkleTree_UpdateAccount(t *testing.T) {
 	value, flag = acc2.MarshalFields()
 	accValue = []Byte32{}
 	for _, v := range value {
-		accValue = append(accValue, *NewByte32FromBytes(v.Bytes()))
+		accValue = append(accValue, *NewByte32FromBytes(v[:]))
 	}
 	err = mt.TryUpdate(common.HexToAddress("0x4cb1aB63aF5D8931Ce09673EbD8ae2ce16fD6571").Bytes(), flag, accValue)
 	assert.Nil(t, err)

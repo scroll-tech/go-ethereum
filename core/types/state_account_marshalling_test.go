@@ -38,18 +38,18 @@ func TestMarshalUnmarshalEmptyAccount(t *testing.T) {
 	assert.Equal(t, 5, len(bytes))
 	assert.Equal(t, uint32(8), flag)
 
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[0].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[1].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[2].Bytes())
-	assert.Equal(t, common.Hex2Bytes("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"), bytes[3].Bytes())
-	assert.Equal(t, common.Hex2Bytes("2098f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864"), bytes[4].Bytes())
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[0][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[1][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[2][:])
+	assert.Equal(t, common.Hex2Bytes("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"), bytes[3][:])
+	assert.Equal(t, common.Hex2Bytes("2098f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864"), bytes[4][:])
 
 	// unmarshal account
 
 	flatBytes := []byte("")
 
 	for _, item := range bytes {
-		flatBytes = append(flatBytes, item.Bytes()...)
+		flatBytes = append(flatBytes, item[:]...)
 	}
 
 	acc2, err := UnmarshalStateAccount(flatBytes)
@@ -75,11 +75,11 @@ func TestMarshalUnmarshalZeroAccount(t *testing.T) {
 	assert.Equal(t, 5, len(bytes))
 	assert.Equal(t, uint32(8), flag)
 
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[0].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[1].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[2].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[3].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[4].Bytes())
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[0][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[1][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[2][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[3][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"), bytes[4][:])
 }
 
 func TestMarshalUnmarshalNonEmptyAccount(t *testing.T) {
@@ -99,18 +99,18 @@ func TestMarshalUnmarshalNonEmptyAccount(t *testing.T) {
 	assert.Equal(t, 5, len(bytes))
 	assert.Equal(t, uint32(8), flag)
 
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000222222220000000011111111"), bytes[0].Bytes())
-	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000033333333"), bytes[1].Bytes())
-	assert.Equal(t, common.Hex2Bytes("123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"), bytes[2].Bytes())
-	assert.Equal(t, common.Hex2Bytes("1111111111111111111111111111111111111111111111111111111111111111"), bytes[3].Bytes())
-	assert.Equal(t, common.Hex2Bytes("2222222222222222222222222222222222222222222222222222222222222222"), bytes[4].Bytes())
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000222222220000000011111111"), bytes[0][:])
+	assert.Equal(t, common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000033333333"), bytes[1][:])
+	assert.Equal(t, common.Hex2Bytes("123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"), bytes[2][:])
+	assert.Equal(t, common.Hex2Bytes("1111111111111111111111111111111111111111111111111111111111111111"), bytes[3][:])
+	assert.Equal(t, common.Hex2Bytes("2222222222222222222222222222222222222222222222222222222222222222"), bytes[4][:])
 
 	// unmarshal account
 
 	flatBytes := []byte("")
 
 	for _, item := range bytes {
-		flatBytes = append(flatBytes, item.Bytes()...)
+		flatBytes = append(flatBytes, item[:]...)
 	}
 
 	acc2, err := UnmarshalStateAccount(flatBytes)
@@ -138,18 +138,18 @@ func TestMarshalUnmarshalAccountWithMaxFields(t *testing.T) {
 	assert.Equal(t, 5, len(bytes))
 	assert.Equal(t, uint32(8), flag)
 
-	assert.Equal(t, common.Hex2Bytes("00000000000000000000000000000000ffffffffffffffffffffffffffffffff"), bytes[0].Bytes())
-	assert.Equal(t, common.Hex2Bytes("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000"), bytes[1].Bytes())
-	assert.Equal(t, common.Hex2Bytes("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000"), bytes[2].Bytes())
-	assert.Equal(t, common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), bytes[3].Bytes())
-	assert.Equal(t, common.Hex2Bytes("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000"), bytes[4].Bytes())
+	assert.Equal(t, common.Hex2Bytes("00000000000000000000000000000000ffffffffffffffffffffffffffffffff"), bytes[0][:])
+	assert.Equal(t, common.Hex2Bytes("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000"), bytes[1][:])
+	assert.Equal(t, common.Hex2Bytes("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000"), bytes[2][:])
+	assert.Equal(t, common.Hex2Bytes("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), bytes[3][:])
+	assert.Equal(t, common.Hex2Bytes("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000"), bytes[4][:])
 
 	// unmarshal account
 
 	flatBytes := []byte("")
 
 	for _, item := range bytes {
-		flatBytes = append(flatBytes, item.Bytes()...)
+		flatBytes = append(flatBytes, item[:]...)
 	}
 
 	acc2, err := UnmarshalStateAccount(flatBytes)

@@ -188,7 +188,7 @@ func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txDa
 				AccessList: types.AccessList{
 					types.AccessTuple{
 						Address:     common.Address{0x2},
-						StorageKeys: []common.Hash{types.EmptyLegacyTrieRootHash},
+						StorageKeys: []common.Hash{types.EmptyRootHash},
 					},
 				},
 				V: big.NewInt(32),
@@ -234,7 +234,7 @@ func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txDa
 				AccessList: types.AccessList{
 					types.AccessTuple{
 						Address:     common.Address{0x2},
-						StorageKeys: []common.Hash{types.EmptyLegacyTrieRootHash},
+						StorageKeys: []common.Hash{types.EmptyRootHash},
 					},
 				},
 				V: big.NewInt(32),
@@ -281,7 +281,7 @@ func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txDa
 				AccessList: types.AccessList{
 					types.AccessTuple{
 						Address:     common.Address{0x2},
-						StorageKeys: []common.Hash{types.EmptyLegacyTrieRootHash},
+						StorageKeys: []common.Hash{types.EmptyRootHash},
 					},
 				},
 				V: big.NewInt(32),

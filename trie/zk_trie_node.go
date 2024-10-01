@@ -1,4 +1,4 @@
-package zktrie
+package trie
 
 import (
 	"encoding/binary"
@@ -385,25 +385,21 @@ func (n *Node) Copy() *Node {
 	return newNode
 }
 
-type ChildResolver struct{}
+type ZkChildResolver struct{}
 
 // ForEach iterates over the children of a node and calls the given function
 // note: original implementation from geth works recursively, but our Node definition
 // doesn't allow that. So we only iterate over the children of the current node, which
 // should be fine.
-func (r ChildResolver) ForEach(node []byte, onChild func(common.Hash)) {
-	n, err := NewNodeFromBytes(node)
-	if err != nil {
-		panic(fmt.Sprintf("node %x: %v", node, err))
-	}
+func (r ZkChildResolver) ForEach(node []byte, onChild func(common.Hash)) {
+	switch NodeType(node[0]) {
+	case NodeTypeParent, NodeTypeBranch_0,
+		NodeTypeBranch_1, NodeTypeBranch_2, NodeTypeBranch_3:
 
-	var childHash common.Hash
-	if n.ChildL != nil {
-		childHash.SetBytes(n.ChildL.Bytes())
+		var childHash common.Hash
+		childHash.SetBytes(node[1 : HashByteLen+1])
 		onChild(childHash)
-	}
-	if n.ChildR != nil {
-		childHash.SetBytes(n.ChildR.Bytes())
+		childHash.SetBytes(node[HashByteLen+1 : HashByteLen*2+1])
 		onChild(childHash)
 	}
 }

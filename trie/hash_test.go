@@ -1,4 +1,4 @@
-package zktrie
+package trie
 
 import (
 	"bytes"
@@ -10,12 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestDummyHash(t *testing.T) {
-	result, err := dummyHash([]*big.Int{}, nil)
-	assert.Equal(t, big.NewInt(0), result)
-	assert.Equal(t, hashNotInitErr, err)
-}
 
 func TestCheckBigIntInField(t *testing.T) {
 	bi := big.NewInt(0)

@@ -68,7 +68,7 @@ func (t *Trie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 			// loaded blob will be tracked, while it's not required here since
 			// all loaded nodes won't be linked to trie at all and track nodes
 			// may lead to out-of-memory issue.
-			blob, err := t.reader.Node(prefix, common.BytesToHash(n))
+			blob, err := t.reader.node(prefix, common.BytesToHash(n))
 			if err != nil {
 				log.Error("Unhandled trie error in Trie.Prove", "err", err)
 				return err
@@ -107,7 +107,7 @@ func (t *Trie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *StateTrie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
+func (t *stateTrie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 	return t.trie.Prove(key, proofDb)
 }
 
@@ -115,11 +115,6 @@ func (t *StateTrie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 // key in a trie with the given root hash. VerifyProof returns an error if the
 // proof contains invalid trie nodes or the wrong value.
 func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
-	// test the type of proof (for trie or SMT)
-	if buf, _ := proofDb.Get(magicHash); buf != nil {
-		return VerifyProofSMT(rootHash, key, proofDb)
-	}
-
 	key = keybytesToHex(key)
 	wantHash := rootHash
 	for i := 0; ; i++ {

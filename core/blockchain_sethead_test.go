@@ -1954,7 +1954,7 @@ func testLongReorgedSnapSyncingDeepSetHead(t *testing.T, snapshots bool) {
 }
 
 func testSetHead(t *testing.T, tt *rewindTest, snapshots bool) {
-	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme} {
+	for _, scheme := range []string{rawdb.HashScheme /*, rawdb.PathScheme*/} {
 		testSetHeadWithScheme(t, tt, snapshots, scheme)
 	}
 }

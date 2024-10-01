@@ -1,27 +1,18 @@
-package zktrie
+package trie
 
 import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"slices"
-	"sync"
 )
 
 var Q *big.Int
-var setHashScheme sync.Once
-var hashNotInitErr = fmt.Errorf("hash scheme is not setup yet, call InitHashScheme before using the library")
 
 const (
 	HASH_DOMAIN_ELEMS_BASE = 256
 	HASH_DOMAIN_BYTE32     = 2 * HASH_DOMAIN_ELEMS_BASE
 )
-
-func dummyHash([]*big.Int, *big.Int) (*big.Int, error) {
-	return big.NewInt(0), hashNotInitErr
-}
-
-var hashScheme func([]*big.Int, *big.Int) (*big.Int, error) = dummyHash
 
 func init() {
 	qString := "21888242871839275222246405745257275088548364400416034343698204186575808495617"
@@ -30,12 +21,6 @@ func init() {
 	if !ok {
 		panic(fmt.Sprintf("Bad base 10 string %s", qString))
 	}
-}
-
-func InitHashScheme(f func([]*big.Int, *big.Int) (*big.Int, error)) {
-	setHashScheme.Do(func() {
-		hashScheme = f
-	})
 }
 
 // CheckBigIntInField checks if given *big.Int fits in a Field Q element

@@ -1,7 +1,9 @@
-package zktrie
+package trie
 
 import (
 	"math/big"
+
+	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
 )
 
 // HashElemsWithDomain performs a recursive poseidon hash over the array of ElemBytes, each hash
@@ -10,7 +12,7 @@ import (
 func HashElemsWithDomain(domain, fst, snd *big.Int, elems ...*big.Int) (*Hash, error) {
 
 	l := len(elems)
-	baseH, err := hashScheme([]*big.Int{fst, snd}, domain)
+	baseH, err := poseidon.HashFixedWithDomain([]*big.Int{fst, snd}, domain)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +27,7 @@ func HashElemsWithDomain(domain, fst, snd *big.Int, elems ...*big.Int) (*Hash, e
 		if (i+1)*2 > l {
 			tmp[i] = elems[i*2]
 		} else {
-			h, err := hashScheme(elems[i*2:(i+1)*2], domain)
+			h, err := poseidon.HashFixedWithDomain(elems[i*2:(i+1)*2], domain)
 			if err != nil {
 				return nil, err
 			}

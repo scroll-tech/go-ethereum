@@ -30,7 +30,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
-	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/trie/trienode"
 	"github.com/scroll-tech/go-ethereum/trie/triestate"
 )
@@ -610,8 +609,8 @@ func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, n
 	// to an account trie leaf.
 	if set, present := nodes.Sets[common.Hash{}]; present {
 		for _, n := range set.Leaves {
-			var account types.StateAccount
-			if err := rlp.DecodeBytes(n.Blob, &account); err != nil {
+			account, err := types.UnmarshalStateAccount(n.Blob)
+			if err != nil {
 				return err
 			}
 			if account.Root != types.EmptyRootHash {

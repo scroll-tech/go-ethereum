@@ -1,4 +1,4 @@
-package zktrie
+package trie
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ func TestNewNode(t *testing.T) {
 	})
 
 	t.Run("Test NewLeafNode", func(t *testing.T) {
-		k := NewHashFromBytes(bytes.Repeat([]byte("a"), 32))
+		k := NewHashFromBytes(bytes.Repeat([]byte("0"), 32))
 		vp := []Byte32{*NewByte32FromBytes(bytes.Repeat([]byte("b"), 32))}
 		node := NewLeafNode(k, 1, vp)
 		assert.Equal(t, NodeTypeLeaf_New, node.Type)
@@ -32,7 +32,7 @@ func TestNewNode(t *testing.T) {
 
 		hash, err := node.NodeHash()
 		assert.NoError(t, err)
-		assert.Equal(t, "11b483a69ab36a33af13fb95a51a5788fe9936de933595ba30be0a435cba3df1", hash.Hex())
+		assert.Equal(t, "2536e274d373c4ca79bc85c6aa140fe911eb7fe04939e1311004bbaf3c13c32a", hash.Hex())
 
 		hash, err = node.ValueHash()
 		assert.NoError(t, err)
@@ -42,7 +42,7 @@ func TestNewNode(t *testing.T) {
 	})
 
 	t.Run("Test NewParentNode", func(t *testing.T) {
-		k := NewHashFromBytes(bytes.Repeat([]byte("a"), 32))
+		k := NewHashFromBytes(bytes.Repeat([]byte("0"), 32))
 		node := NewParentNode(NodeTypeBranch_3, k, k)
 		assert.Equal(t, NodeTypeBranch_3, node.Type)
 		assert.Equal(t, k, node.ChildL)
@@ -50,7 +50,7 @@ func TestNewNode(t *testing.T) {
 
 		hash, err := node.NodeHash()
 		assert.NoError(t, err)
-		assert.Equal(t, "11391717288411fe4c995d6e5793713939e0f59550cd4da96b419905f41d9b80", hash.Hex())
+		assert.Equal(t, "242d3e8a6a7683f9858a08cdf1db2a4448638c168e32168ef4e5e9e2e8794629", hash.Hex())
 
 		hash, err = node.ValueHash()
 		assert.NoError(t, err)
@@ -58,7 +58,7 @@ func TestNewNode(t *testing.T) {
 	})
 
 	t.Run("Test NewParentNodeWithEmptyChild", func(t *testing.T) {
-		k := NewHashFromBytes(bytes.Repeat([]byte("a"), 32))
+		k := NewHashFromBytes(bytes.Repeat([]byte("0"), 32))
 		r, err := NewEmptyNode().NodeHash()
 		assert.NoError(t, err)
 		node := NewParentNode(NodeTypeBranch_2, k, r)
@@ -69,7 +69,7 @@ func TestNewNode(t *testing.T) {
 
 		hash, err := node.NodeHash()
 		assert.NoError(t, err)
-		assert.Equal(t, "1cde45e680e99be8b276837124884739ca8dadf216e18b65228948fd74edaa7c", hash.Hex())
+		assert.Equal(t, "005bc4e8f3b3f2ff0b980d4f3c32973de6a01f89ddacb08b0e7903d1f1f0c50f", hash.Hex())
 
 		hash, err = node.ValueHash()
 		assert.NoError(t, err)
@@ -87,8 +87,8 @@ func TestNewNode(t *testing.T) {
 
 func TestNewNodeFromBytes(t *testing.T) {
 	t.Run("ParentNode", func(t *testing.T) {
-		k1 := NewHashFromBytes(bytes.Repeat([]byte("a"), 32))
-		k2 := NewHashFromBytes(bytes.Repeat([]byte("b"), 32))
+		k1 := NewHashFromBytes(bytes.Repeat([]byte("0"), 32))
+		k2 := NewHashFromBytes(bytes.Repeat([]byte("0"), 32))
 		node := NewParentNode(NodeTypeBranch_0, k1, k2)
 		b := node.Value()
 
@@ -101,7 +101,7 @@ func TestNewNodeFromBytes(t *testing.T) {
 
 		hash, err := node.NodeHash()
 		assert.NoError(t, err)
-		assert.Equal(t, "187b8e3ca6b878c71b04a312333ed0e9a82e1354cd814f2c576046ed95dd894c", hash.Hex())
+		assert.Equal(t, "12b90fefb7b19131d25980a38ca92edb66bb91828d305836e4ab7e961165c83f", hash.Hex())
 
 		hash, err = node.ValueHash()
 		assert.NoError(t, err)
@@ -109,7 +109,7 @@ func TestNewNodeFromBytes(t *testing.T) {
 	})
 
 	t.Run("LeafNode", func(t *testing.T) {
-		k := NewHashFromBytes(bytes.Repeat([]byte("a"), 32))
+		k := NewHashFromBytes(bytes.Repeat([]byte("0"), 32))
 		vp := make([]Byte32, 1)
 		node := NewLeafNode(k, 1, vp)
 
@@ -126,7 +126,7 @@ func TestNewNodeFromBytes(t *testing.T) {
 
 		hash, err := node.NodeHash()
 		assert.NoError(t, err)
-		assert.Equal(t, "0409b2168569a5af12877689ac08263274fe6cb522898f6964647fed88b861b2", hash.Hex())
+		assert.Equal(t, "2f7094f04ed1592909311471ba67d84d7d11e2438c055f4d5d43189390c5cf5a", hash.Hex())
 
 		hash, err = node.ValueHash()
 		assert.NoError(t, err)

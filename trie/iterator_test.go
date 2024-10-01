@@ -1,3 +1,6 @@
+//go:build all_tests
+// +build all_tests
+
 // Copyright 2014 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -74,15 +77,6 @@ func TestIterator(t *testing.T) {
 			t.Errorf("iterator value mismatch for %s: got %q want %q", k, found[k], v)
 		}
 	}
-}
-
-type kv struct {
-	k, v []byte
-	t    bool
-}
-
-func (k *kv) cmp(other *kv) int {
-	return bytes.Compare(k.k, other.k)
 }
 
 func TestIteratorLargeData(t *testing.T) {

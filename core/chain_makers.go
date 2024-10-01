@@ -354,11 +354,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		return nil, nil
 	}
 	// Forcibly use hash-based state scheme for retaining all nodes in disk.
-	trieConfig := trie.HashDefaults
-	if config.Scroll.ZktrieEnabled() {
-		trieConfig = trie.HashDefaultsWithZktrie
-	}
-	triedb := trie.NewDatabase(db, trieConfig)
+	triedb := trie.NewDatabase(db, trie.HashDefaults)
 	defer triedb.Close()
 
 	for i := 0; i < n; i++ {
@@ -379,11 +375,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 // then generate chain on top.
 func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, gen func(int, *BlockGen)) (ethdb.Database, []*types.Block, []types.Receipts) {
 	db := rawdb.NewMemoryDatabase()
-	trieConfig := trie.HashDefaults
-	if genesis.Config != nil && genesis.Config.Scroll.ZktrieEnabled() {
-		trieConfig = trie.HashDefaultsWithZktrie
-	}
-	triedb := trie.NewDatabase(db, trieConfig)
+	triedb := trie.NewDatabase(db, trie.HashDefaults)
 	defer triedb.Close()
 	_, err := genesis.Commit(db, triedb)
 	if err != nil {

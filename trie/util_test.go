@@ -1,4 +1,4 @@
-package zktrie
+package trie
 
 import (
 	"math/big"
@@ -56,13 +56,13 @@ func TestBigEndianBitsToBigInt(t *testing.T) {
 func TestToSecureKey(t *testing.T) {
 	secureKey, err := ToSecureKey([]byte("testKey"))
 	assert.NoError(t, err)
-	assert.Equal(t, "3998087801436302712617435196225481036627874106324392591598072448097460358227", secureKey.String())
+	assert.Equal(t, "10380846131134096261855654117842104248915214759620570252072028416245925344412", secureKey.String())
 }
 
 func TestToSecureKeyBytes(t *testing.T) {
 	secureKeyBytes, err := ToSecureKeyBytes([]byte("testKey"))
 	assert.NoError(t, err)
-	assert.Equal(t, []byte{0x8, 0xd6, 0xd6, 0x66, 0xa4, 0x8, 0xc5, 0x72, 0xa0, 0xc3, 0x71, 0x50, 0x89, 0xa0, 0x2b, 0xe7, 0x59, 0x97, 0x39, 0x5d, 0x2c, 0x37, 0x38, 0x5d, 0x67, 0x22, 0x84, 0xe5, 0xc8, 0xbf, 0xc, 0x53}, secureKeyBytes.Bytes())
+	assert.Equal(t, []byte{0x16, 0xf3, 0x59, 0xc7, 0x30, 0x7e, 0x8, 0x97, 0xdc, 0x7c, 0x6b, 0x99, 0x53, 0xd1, 0xe1, 0xd8, 0x3, 0x6d, 0xc3, 0x83, 0xd4, 0xa, 0x0, 0x19, 0x9e, 0xda, 0xf0, 0x65, 0x27, 0xda, 0xf4, 0x9c}, secureKeyBytes.Bytes())
 }
 
 func TestHashElems(t *testing.T) {
@@ -75,7 +75,7 @@ func TestHashElems(t *testing.T) {
 
 	result, err := HashElems(fst, snd, elems...)
 	assert.NoError(t, err)
-	assert.Equal(t, "1613b67f0a90f864bafa14df215f89e0c5a1c128e54561f0d730d112678e981d", result.Hex())
+	assert.Equal(t, "0746c424799ef6ad7916511016a5b8e30688fa6d62664eeb97d9f2ba07685ed8", result.Hex())
 }
 
 func TestPreHandlingElems(t *testing.T) {
@@ -87,7 +87,7 @@ func TestPreHandlingElems(t *testing.T) {
 
 	result, err := HandlingElemsAndByte32(flagArray, elems)
 	assert.NoError(t, err)
-	assert.Equal(t, "259503a5495e5e7e83d7e8e3f22b214092f921b7cadba00526aea7485c1997e7", result.Hex())
+	assert.Equal(t, "0c36a6406e35e1fec2a5602fcd80ab04ec24d727676a953673c0850d205f9378", result.Hex())
 
 	elems = elems[:1]
 	result, err = HandlingElemsAndByte32(flagArray, elems)

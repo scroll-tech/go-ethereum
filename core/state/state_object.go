@@ -143,7 +143,7 @@ func (s *stateObject) touch() {
 func (s *stateObject) getTrie() (Trie, error) {
 	if s.trie == nil {
 		// Try fetching from prefetcher first
-		if s.data.Root != s.db.db.TrieDB().EmptyRoot() && s.db.prefetcher != nil {
+		if s.data.Root != types.EmptyRootHash && s.db.prefetcher != nil {
 			// When the miner is creating the pending state, there is no prefetcher
 			s.trie = s.db.prefetcher.trie(s.addrHash, s.data.Root)
 		}
@@ -199,15 +199,7 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 		if metrics.EnabledExpensive {
 			s.db.SnapshotStorageReads += time.Since(start)
 		}
-		if s.db.db.TrieDB().IsUsingZktrie() {
-			value = common.BytesToHash(enc)
-		} else if len(enc) > 0 {
-			_, content, _, err := rlp.Split(enc)
-			if err != nil {
-				s.db.setError(err)
-			}
-			value.SetBytes(content)
-		}
+		value = common.BytesToHash(enc)
 	}
 	// If the snapshot is unavailable or reading from it fails, load from the database.
 	if s.db.snap == nil || err != nil {
@@ -261,7 +253,7 @@ func (s *stateObject) finalise(prefetch bool) {
 			slotsToPrefetch = append(slotsToPrefetch, common.CopyBytes(key[:])) // Copy needed for closure
 		}
 	}
-	if s.db.prefetcher != nil && prefetch && len(slotsToPrefetch) > 0 && s.data.Root != s.db.db.TrieDB().EmptyRoot() {
+	if s.db.prefetcher != nil && prefetch && len(slotsToPrefetch) > 0 && s.data.Root != types.EmptyRootHash {
 		s.db.prefetcher.prefetch(s.addrHash, s.data.Root, s.address, slotsToPrefetch)
 	}
 	if len(s.dirtyStorage) > 0 {
@@ -316,12 +308,7 @@ func (s *stateObject) updateTrie() (Trie, error) {
 			s.db.StorageDeleted += 1
 		} else {
 			trimmed := common.TrimLeftZeroes(value[:])
-			if s.db.db.TrieDB().IsUsingZktrie() {
-				encoded = common.CopyBytes(value[:])
-			} else {
-				// Encoding []byte cannot fail, ok to ignore the error.
-				encoded, _ = rlp.EncodeToBytes(trimmed)
-			}
+			encoded = common.CopyBytes(value[:])
 			if err := tr.UpdateStorage(s.address, key[:], trimmed); err != nil {
 				s.db.setError(err)
 				return nil, err

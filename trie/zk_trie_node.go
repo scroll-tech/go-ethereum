@@ -385,13 +385,13 @@ func (n *Node) Copy() *Node {
 	return newNode
 }
 
-type ChildResolver struct{}
+type ZkChildResolver struct{}
 
 // ForEach iterates over the children of a node and calls the given function
 // note: original implementation from geth works recursively, but our Node definition
 // doesn't allow that. So we only iterate over the children of the current node, which
 // should be fine.
-func (r ChildResolver) ForEach(node []byte, onChild func(common.Hash)) {
+func (r ZkChildResolver) ForEach(node []byte, onChild func(common.Hash)) {
 	n, err := NewNodeFromBytes(node)
 	if err != nil {
 		panic(fmt.Sprintf("node %x: %v", node, err))

@@ -58,6 +58,9 @@ var (
 	ErrNotWritable = errors.New("merkle Tree not writable")
 )
 
+// StateTrie is just an alias for ZkTrie now
+type StateTrie = ZkTrie
+
 // ZkTrie is the struct with the main elements of the ZkTrie
 type ZkTrie struct {
 	lock      sync.RWMutex
@@ -71,6 +74,9 @@ type ZkTrie struct {
 	dirtyIndex   *big.Int
 	dirtyStorage map[Hash]*Node
 }
+
+// NewStateTrie is just an alias for NewZkTrie now
+var NewStateTrie = NewZkTrie
 
 // NewZkTrie loads a new ZkTrie. If in the storage already exists one
 // will open that one, if not, will create a new one.

@@ -38,7 +38,7 @@ func makeTestTrie(scheme string) (ethdb.Database, *Database, *StateTrie, map[str
 	// Create an empty trie
 	db := rawdb.NewMemoryDatabase()
 	triedb := newTestDatabase(db, scheme)
-	trie, _ := NewStateTrie(TrieID(types.EmptyRootHash), triedb)
+	trie, _ := NewStateTrie(TrieID(types.EmptyStateRootHash), triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)
@@ -60,7 +60,7 @@ func makeTestTrie(scheme string) (ethdb.Database, *Database, *StateTrie, map[str
 		}
 	}
 	root, nodes, _ := trie.Commit(false)
-	if err := triedb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
+	if err := triedb.Update(root, types.EmptyStateRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
 		panic(fmt.Errorf("failed to commit db %v", err))
 	}
 	if err := triedb.Commit(root, false); err != nil {

@@ -34,7 +34,7 @@ import (
 )
 
 func newEmptySecure() *StateTrie {
-	trie, _ := NewStateTrie(TrieID(types.EmptyRootHash), NewDatabase(rawdb.NewMemoryDatabase(), nil))
+	trie, _ := NewStateTrie(TrieID(types.EmptyStateRootHash), NewDatabase(rawdb.NewMemoryDatabase(), nil))
 	return trie
 }
 
@@ -42,7 +42,7 @@ func newEmptySecure() *StateTrie {
 func makeTestStateTrie() (*Database, *StateTrie, map[string][]byte) {
 	// Create an empty trie
 	triedb := NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	trie, _ := NewStateTrie(TrieID(types.EmptyRootHash), triedb)
+	trie, _ := NewStateTrie(TrieID(types.EmptyStateRootHash), triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)
@@ -64,7 +64,7 @@ func makeTestStateTrie() (*Database, *StateTrie, map[string][]byte) {
 		}
 	}
 	root, nodes, _ := trie.Commit(false)
-	if err := triedb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
+	if err := triedb.Update(root, types.EmptyStateRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
 		panic(fmt.Errorf("failed to commit db %v", err))
 	}
 	// Re-create the trie based on the new state

@@ -33,10 +33,6 @@ type Config struct {
 	Preimages bool           // Flag whether the preimage of node key is recorded
 	HashDB    *hashdb.Config // Configs for hash-based scheme
 	PathDB    *pathdb.Config // Configs for experimental path-based scheme
-
-	// zktrie related stuff
-	ChildResolver hashdb.ChildResolver
-	IsUsingZktrie bool
 }
 
 // HashDefaults represents a config for using hash-based scheme with
@@ -44,13 +40,6 @@ type Config struct {
 var HashDefaults = &Config{
 	Preimages: false,
 	HashDB:    hashdb.Defaults,
-}
-
-// HashDefaultsWithZktrie represents a config based on HashDefaults but with zktrie enabled.
-var HashDefaultsWithZktrie = &Config{
-	Preimages:     false,
-	HashDB:        hashdb.Defaults,
-	IsUsingZktrie: true,
 }
 
 // HashDefaultsWithPreimages represents a config based on HashDefaults but with Preimages enabled.
@@ -124,26 +113,9 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 	if config.PathDB != nil {
 		db.backend = pathdb.New(diskdb, config.PathDB)
 	} else {
-		resolver := config.ChildResolver
-		if resolver == nil {
-			resolver = mptResolver{}
-		}
-		db.backend = hashdb.New(diskdb, config.HashDB, resolver)
+		db.backend = hashdb.New(diskdb, config.HashDB, ZkChildResolver{})
 	}
 	return db
-}
-
-func (db *Database) IsUsingZktrie() bool {
-	// compatible logic for light mode
-	if db == nil || db.config == nil {
-		return false
-	}
-	return db.config.IsUsingZktrie
-}
-
-func (db *Database) SetIsUsingZktrie(isUsingZktrie bool) {
-	// config must not be nil
-	db.config.IsUsingZktrie = isUsingZktrie
 }
 
 // Reader returns a reader for accessing all trie nodes with provided state root.

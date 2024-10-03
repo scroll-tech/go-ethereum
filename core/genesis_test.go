@@ -189,11 +189,7 @@ func TestGenesisHashes(t *testing.T) {
 	} {
 		// Test via MustCommit
 		db := rawdb.NewMemoryDatabase()
-		trieConfig := trie.HashDefaults
-		if c.genesis.Config.Scroll.ZktrieEnabled() {
-			trieConfig = trie.HashDefaultsWithZktrie
-		}
-		if have := c.genesis.MustCommit(db, trie.NewDatabase(db, trieConfig)).Hash(); have != c.want {
+		if have := c.genesis.MustCommit(db, trie.NewDatabase(db, trie.HashDefaults)).Hash(); have != c.want {
 			t.Errorf("case: %d a), want: %s, got: %s", i, c.want.Hex(), have.Hex())
 		}
 		// Test via ToBlock

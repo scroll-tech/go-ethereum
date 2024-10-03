@@ -421,6 +421,15 @@ func buildPartialTree(entries []*kv, t *testing.T) map[string]common.Hash {
 	return nodes
 }
 
+type kv struct {
+	k, v []byte
+	t    bool
+}
+
+func (k *kv) cmp(other *kv) int {
+	return bytes.Compare(k.k, other.k)
+}
+
 func TestPartialStackTrie(t *testing.T) {
 	for round := 0; round < 100; round++ {
 		var (

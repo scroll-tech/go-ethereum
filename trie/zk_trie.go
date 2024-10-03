@@ -285,8 +285,9 @@ func (mt *ZkTrie) commit(collectLeaf bool) (*trienode.NodeSet, error) {
 		if collectLeaf {
 			collectLeafNode := func(childHash *Hash) {
 				if childHash != nil {
-					if childNode, found := mt.dirtyStorage[*childHash]; found && childNode != nil {
-						nodeSet.AddLeaf(nodeHash, childNode.CanonicalValue())
+					childNode, found := mt.dirtyStorage[*childHash]
+					if found && childNode != nil && childNode.Type == NodeTypeLeaf_New {
+						nodeSet.AddLeaf(nodeHash, childNode.Data())
 					}
 				}
 			}
@@ -1228,4 +1229,36 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 	} else {
 		return nil, fmt.Errorf("bad proof node %v", proof)
 	}
+}
+
+// MustDelete deletes the key from the trie and panics if it fails.
+func (mt *ZkTrie) MustDelete(key []byte) {
+	if err := mt.TryDelete(key); err != nil {
+		panic(err)
+	}
+}
+
+// MustUpdate updates the key with the given value and panics if it fails.
+func (mt *ZkTrie) MustUpdate(key, value []byte) {
+	if err := mt.TryUpdate(key, 1, []Byte32{*NewByte32FromBytes(value)}); err != nil {
+		panic(err)
+	}
+}
+
+// MustGet returns the value for key stored in the trie and panics if it fails.
+func (mt *ZkTrie) MustGet(key []byte) []byte {
+	v, err := mt.TryGet(key)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// MustNodeIterator returns an iterator that returns nodes of the trie and panics if it fails.
+func (mt *ZkTrie) MustNodeIterator(start []byte) NodeIterator {
+	itr, err := mt.NodeIterator(start)
+	if err != nil {
+		panic(err)
+	}
+	return itr
 }

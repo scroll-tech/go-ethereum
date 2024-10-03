@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 
 func newTestingMerkle(t *testing.T) (*ZkTrie, *Database) {
 	db := NewDatabase(rawdb.NewMemoryDatabase(), &Config{
-		ChildResolver: ChildResolver{},
+		ChildResolver: ZkChildResolver{},
 	})
 	return newTestingMerkleWithDb(t, common.Hash{}, db)
 }

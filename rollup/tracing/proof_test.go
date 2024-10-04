@@ -2,8 +2,6 @@ package tracing
 
 import (
 	"bytes"
-	"math/big"
-	"os"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -12,21 +10,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestMain(m *testing.M) {
-	trie.InitHashScheme(func(arr []*big.Int, domain *big.Int) (*big.Int, error) {
-		lcEff := big.NewInt(65536)
-		sum := domain
-		for _, bi := range arr {
-			nbi := new(big.Int).Mul(bi, bi)
-			sum = sum.Mul(sum, sum)
-			sum = sum.Mul(sum, lcEff)
-			sum = sum.Add(sum, nbi)
-		}
-		return sum.Mod(sum, trie.Q), nil
-	})
-	os.Exit(m.Run())
-}
 
 func newTestingMerkle(t *testing.T) (*trie.ZkTrie, *trie.Database) {
 	db := trie.NewDatabase(rawdb.NewMemoryDatabase(), &trie.Config{})

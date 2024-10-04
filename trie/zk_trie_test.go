@@ -3,7 +3,6 @@ package trie
 import (
 	"bytes"
 	"math/big"
-	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -15,35 +14,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie/trienode"
 	"github.com/stretchr/testify/assert"
 )
-
-func setupENV() {
-	InitHashScheme(func(arr []*big.Int, domain *big.Int) (*big.Int, error) {
-		lcEff := big.NewInt(65536)
-		sum := domain
-		for _, bi := range arr {
-			nbi := new(big.Int).Mul(bi, bi)
-			sum = sum.Mul(sum, sum)
-			sum = sum.Mul(sum, lcEff)
-			sum = sum.Add(sum, nbi)
-		}
-		return sum.Mod(sum, Q), nil
-	})
-}
-
-func TestMain(m *testing.M) {
-	InitHashScheme(func(arr []*big.Int, domain *big.Int) (*big.Int, error) {
-		lcEff := big.NewInt(65536)
-		sum := domain
-		for _, bi := range arr {
-			nbi := new(big.Int).Mul(bi, bi)
-			sum = sum.Mul(sum, sum)
-			sum = sum.Mul(sum, lcEff)
-			sum = sum.Add(sum, nbi)
-		}
-		return sum.Mod(sum, Q), nil
-	})
-	os.Exit(m.Run())
-}
 
 func newTestingMerkle(t *testing.T) (*ZkTrie, *Database) {
 	db := NewDatabase(rawdb.NewMemoryDatabase(), HashDefaults)
@@ -87,7 +57,7 @@ func TestMerkleTree_Init(t *testing.T) {
 		assert.NoError(t, err)
 		mt1Root, err = mt1.Root()
 		assert.NoError(t, err)
-		assert.Equal(t, "2bbb5391bce512d6d0e02e2162bf7f0eb8ec6df806f9284ec5c3242193409553", mt1Root.Hex())
+		assert.Equal(t, "1525946038598ec48c663db06fa4f0b68ba40b80d7b1ddce3206d4857ac4a47c", mt1Root.Hex())
 		rootHash, nodeSet, err := mt1.Commit(false)
 		assert.NoError(t, err)
 		assert.NoError(t, db.Update(rootHash, common.Hash{}, 0, trienode.NewWithNodeSet(nodeSet), nil))
@@ -97,7 +67,7 @@ func TestMerkleTree_Init(t *testing.T) {
 		assert.Equal(t, maxLevels, mt2.maxLevels)
 		mt2Root, err := mt2.Root()
 		assert.NoError(t, err)
-		assert.Equal(t, "2bbb5391bce512d6d0e02e2162bf7f0eb8ec6df806f9284ec5c3242193409553", mt2Root.Hex())
+		assert.Equal(t, "1525946038598ec48c663db06fa4f0b68ba40b80d7b1ddce3206d4857ac4a47c", mt2Root.Hex())
 	})
 }
 
@@ -193,7 +163,7 @@ func TestZkTrieImpl_Add(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		assert.Equal(t, "23f0807c95a8a6be167ca512f850b0b9f7349b033ae0be8e7caf0553c13eee16", roots[0].Hex())
+		assert.Equal(t, "254d2db0dc83bbd21708e2af65597e14bce405b38867cedea74a5e3b3be4271a", roots[0].Hex())
 		assert.Equal(t, roots[0], roots[1])
 	})
 
@@ -221,7 +191,7 @@ func TestZkTrieImpl_Add(t *testing.T) {
 		}
 
 		for i := 1; i < len(roots); i++ {
-			assert.Equal(t, "17927c39184cb91ef9b105e42c8cdda845daf7f936309f665c7cc1beabbec191", roots[0].Hex())
+			assert.Equal(t, "0274b9caacecfaaaffa25a00c1c17bd91b9a0fc590aedc06ef22c8d2ba7c76a7", roots[0].Hex())
 			assert.Equal(t, roots[0], roots[i])
 		}
 	})
@@ -515,7 +485,7 @@ func TestMerkleTree_GraphViz(t *testing.T) {
 
 	err = mt.GraphViz(&buffer, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, "--------\nGraphViz of the ZkTrie with RootHash 10951270817330706114198641949214391028137561893123097337637233896895686724291\ndigraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n\"10951270...\" -> {\"16038355...\" \"19780429...\"}\n\"16038355...\" [style=filled];\n\"19780429...\" [style=filled];\n}\nEnd of GraphViz of the ZkTrie with RootHash 10951270817330706114198641949214391028137561893123097337637233896895686724291\n--------\n", buffer.String())
+	assert.Equal(t, "--------\nGraphViz of the ZkTrie with RootHash 1210085283654691963881487672127167617844540538182653450104829037534096200821\ndigraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n\"12100852...\" -> {\"95649672...\" \"20807384...\"}\n\"95649672...\" [style=filled];\n\"20807384...\" [style=filled];\n}\nEnd of GraphViz of the ZkTrie with RootHash 1210085283654691963881487672127167617844540538182653450104829037534096200821\n--------\n", buffer.String())
 	buffer.Reset()
 }
 
@@ -528,7 +498,7 @@ func TestZkTrie_GetUpdateDelete(t *testing.T) {
 
 	err = mt.TryUpdate([]byte("key"), 1, []Byte32{{1}})
 	assert.NoError(t, err)
-	expected := common.BytesToHash([]byte{0x23, 0x36, 0x5e, 0xbd, 0x71, 0xa7, 0xad, 0x35, 0x65, 0xdd, 0x24, 0x88, 0x47, 0xca, 0xe8, 0xe8, 0x8, 0x21, 0x15, 0x62, 0xc6, 0x83, 0xdb, 0x8, 0x4f, 0x5a, 0xfb, 0xd1, 0xb0, 0x3d, 0x4c, 0xb5})
+	expected := common.HexToHash("0x0b9402772b5bfa4c7caaaeb14f489ae201d536c430c3fc29abb0fde923cd1df4")
 	assert.Equal(t, expected, mt.Hash())
 
 	val, err = mt.TryGet([]byte("key"))

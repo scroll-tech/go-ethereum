@@ -585,21 +585,20 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 		return nil, fmt.Errorf("failed to get codec: %w", err)
 	}
 
-	daChunks, err := codec.DecodeDAChunks(chunks)
+	daChunksRawTx, err := codec.DecodeDAChunksRawTx(chunks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode DA chunks: %w", err)
 	}
 
 	var chunkBlockRanges []*rawdb.ChunkBlockRange
-	for _, daChunk := range daChunks {
-		startBlockNumber, endBlockNumber, err := daChunk.BlockRange()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get start block number: %w", err)
+	for _, daChunkRawTx := range daChunksRawTx {
+		if len(daChunkRawTx.Blocks) == 0 {
+			return nil, fmt.Errorf("no blocks found in DA chunk")
 		}
 
 		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
-			StartBlockNumber: startBlockNumber,
-			EndBlockNumber:   endBlockNumber,
+			StartBlockNumber: daChunkRawTx.Blocks[0].Number(),
+			EndBlockNumber:   daChunkRawTx.Blocks[len(daChunkRawTx.Blocks)-1].Number(),
 		})
 	}
 

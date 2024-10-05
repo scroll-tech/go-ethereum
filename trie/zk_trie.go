@@ -71,6 +71,9 @@ type ZkTrie struct {
 	maxLevels int
 	Debug     bool
 
+	// Flag whether the commit operation is already performed. If so the
+	// trie is not usable(latest states is invisible).
+	committed    bool
 	dirtyIndex   *big.Int
 	dirtyStorage map[Hash]*Node
 }
@@ -156,6 +159,10 @@ func (mt *ZkTrie) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error 
 	// verify that the ZkTrie is writable
 	if !mt.writable {
 		return ErrNotWritable
+	}
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return ErrCommitted
 	}
 
 	secureKey, err := ToSecureKey(key)
@@ -263,6 +270,11 @@ func (mt *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, erro
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return common.Hash{}, nil, ErrCommitted
+	}
+
 	nodeset, err := mt.commit(collectLeaf)
 	if err != nil {
 		return common.Hash{}, nodeset, err
@@ -302,6 +314,7 @@ func (mt *ZkTrie) commit(collectLeaf bool) (*trienode.NodeSet, error) {
 		}
 	}
 	mt.dirtyStorage = make(map[Hash]*Node)
+	mt.committed = true
 	return nodeSet, nil
 }
 
@@ -499,6 +512,11 @@ func (mt *ZkTrie) TryGet(key []byte) ([]byte, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return nil, ErrCommitted
+	}
+
 	secureK, err := ToSecureKey(key)
 	if err != nil {
 		return nil, err
@@ -571,6 +589,11 @@ func (mt *ZkTrie) TryDelete(key []byte) error {
 
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
+
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return ErrCommitted
+	}
 
 	//mitigate the create-delete issue: do not delete unexisted key
 	if r, _ := mt.tryGet(nodeKey); r == nil {
@@ -669,6 +692,11 @@ func (mt *ZkTrie) GetLeafNode(key []byte) (*Node, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return nil, ErrCommitted
+	}
+
 	secureKey, err := ToSecureKey(key)
 	if err != nil {
 		return nil, err
@@ -687,6 +715,10 @@ func (mt *ZkTrie) GetNode(nodeHash *Hash) (*Node, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return nil, ErrCommitted
+	}
 	return mt.getNode(nodeHash)
 }
 
@@ -1003,6 +1035,7 @@ func (mt *ZkTrie) Copy() *ZkTrie {
 		dirtyIndex:   new(big.Int).Set(mt.dirtyIndex),
 		dirtyStorage: newDirtyStorage,
 		rootKey:      &newRootKey,
+		committed:    mt.committed,
 		Debug:        mt.Debug,
 	}
 }
@@ -1135,6 +1168,11 @@ func (mt *ZkTrie) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) error
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return ErrCommitted
+	}
+
 	path := getPath(mt.maxLevels, kHash[:])
 	var nodes []*Node
 	var lastN *Node
@@ -1201,6 +1239,10 @@ func (mt *ZkTrie) prove(kHash *Hash, fromLevel uint, writeNode func(*Node) error
 // starts at the key after the given start key. And error will be returned
 // if fails to create node iterator.
 func (mt *ZkTrie) NodeIterator(start []byte) (NodeIterator, error) {
+	// Short circuit if the trie is already committed and not usable.
+	if mt.committed {
+		return nil, ErrCommitted
+	}
 	return nil, errors.New("not implemented")
 }
 

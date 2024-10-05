@@ -27,7 +27,6 @@ func newTestingMerkleWithDb(t *testing.T, root common.Hash, db *Database) (*ZkTr
 		t.Fatal(err)
 		return nil, nil
 	}
-	mt.Debug = true
 	assert.Equal(t, maxLevels, mt.MaxLevels())
 	return mt, db
 }

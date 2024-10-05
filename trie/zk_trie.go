@@ -67,9 +67,7 @@ type ZkTrie struct {
 	owner     common.Hash
 	reader    *trieReader
 	rootKey   *Hash
-	writable  bool
 	maxLevels int
-	Debug     bool
 
 	// Flag whether the commit operation is already performed. If so the
 	// trie is not usable(latest states is invisible).
@@ -93,7 +91,6 @@ func NewZkTrie(id *ID, db *Database) (*ZkTrie, error) {
 		owner:        id.Owner,
 		reader:       reader,
 		maxLevels:    NodeKeyValidBytes * 8,
-		writable:     true,
 		dirtyIndex:   big.NewInt(0),
 		dirtyStorage: make(map[Hash]*Node),
 	}
@@ -129,12 +126,6 @@ func (mt *ZkTrie) root() (*Hash, error) {
 	mt.rootKey = rootKey
 	mt.dirtyIndex = big.NewInt(0)
 	mt.dirtyStorage = hashedDirtyStorage
-	if mt.Debug {
-		_, err := mt.getNode(mt.rootKey)
-		if err != nil {
-			panic(fmt.Errorf("load trie root failed hash %v", mt.rootKey.Bytes()))
-		}
-	}
 	return mt.rootKey, nil
 }
 
@@ -156,10 +147,6 @@ func (mt *ZkTrie) MaxLevels() int {
 // TryUpdate updates a nodeKey & value into the ZkTrie. Where the `k` determines the
 // path from the Root to the Leaf. This also return the updated leaf node
 func (mt *ZkTrie) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error {
-	// verify that the ZkTrie is writable
-	if !mt.writable {
-		return ErrNotWritable
-	}
 	// Short circuit if the trie is already committed and not usable.
 	if mt.committed {
 		return ErrCommitted
@@ -570,11 +557,6 @@ func (mt *ZkTrie) getKey(hashKey []byte) []byte {
 // mt.ImportDumpedLeafs), but this will lose all the Root history of the
 // ZkTrie
 func (mt *ZkTrie) TryDelete(key []byte) error {
-	// verify that the ZkTrie is writable
-	if !mt.writable {
-		return ErrNotWritable
-	}
-
 	secureKey, err := ToSecureKey(key)
 	if err != nil {
 		return err
@@ -1031,12 +1013,10 @@ func (mt *ZkTrie) Copy() *ZkTrie {
 	return &ZkTrie{
 		reader:       mt.reader,
 		maxLevels:    mt.maxLevels,
-		writable:     mt.writable,
 		dirtyIndex:   new(big.Int).Set(mt.dirtyIndex),
 		dirtyStorage: newDirtyStorage,
 		rootKey:      &newRootKey,
 		committed:    mt.committed,
-		Debug:        mt.Debug,
 	}
 }
 

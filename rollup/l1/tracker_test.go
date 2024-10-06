@@ -282,6 +282,7 @@ func TestTracker_HappyCases(t *testing.T) {
 	}
 	// Block 3 again (there's no new chain head) - nothing should happen
 	{
+		client.setLatestBlock(3)
 		require.NoError(t, tracker.syncLatestHead())
 		subs.requireAll(t)
 	}
@@ -542,17 +543,18 @@ func TestTracker_LatestChainHead_Reorg(t *testing.T) {
 
 	// Block 99 - reorg of depth 4, subs 1-3 affected
 	// TODO: we need to make sure that we notify the subscribers correctly about the reorged headers
-	beforeReorg99 := client.Headers(95, 99)
-	beforeReorg97 := client.Headers(95, 97)
+	beforeReorg99 := client.Headers(96, 99)
+	beforeReorg97 := client.Headers(96, 97)
 	{
 		client.createFork(95)
 		client.setLatestBlock(99)
 
 		require.NoError(t, tracker.syncLatestHead())
+		fmt.Println("len", len(beforeReorg99))
 
-		sub1.addExpected(beforeReorg99, client.Headers(95, 99))
-		sub2.addExpected(beforeReorg97, client.Headers(95, 97))
-		sub3.addExpected(beforeReorg97, client.Headers(95, 97))
+		sub1.addExpected(beforeReorg99, client.Headers(96, 99))
+		sub2.addExpected(beforeReorg97, client.Headers(96, 97))
+		sub3.addExpected(beforeReorg97, client.Headers(96, 97))
 
 		subs.requireAll(t)
 	}

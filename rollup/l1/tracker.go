@@ -36,7 +36,8 @@ type Tracker struct {
 
 const (
 	// defaultSyncInterval is the frequency at which we query for new chain head
-	defaultSyncInterval = 12 * time.Second
+	defaultSyncInterval  = 12 * time.Second
+	defaultPruneInterval = 60 * time.Second
 )
 
 func NewTracker(ctx context.Context, l1Client Client, genesis common.Hash) *Tracker {
@@ -76,6 +77,7 @@ func (t *Tracker) Start() {
 					log.Warn("Tracker: failed to sync latest head", "err", err)
 				}
 			}
+
 		}
 	}()
 }
@@ -264,18 +266,18 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 		if reorg {
 			fmt.Println("reorged min", reorged.min().Number.Uint64())
 			minReorgedHeader := reorged.min()
-			oldChain := t.chain(minReorgedHeader, sub.lastSentHeader)
+			oldChain := t.chain(minReorgedHeader, sub.lastSentHeader, true)
 
 			// TODO: we should store both the reorged and new chain in a structure such as reorgedHeaders
 			//   maybe repurpose to headerChain or something similar -> have this for reorged and new chain
-			newChainMin, exists := t.canonicalChain.Get(minReorgedHeader.Number.Uint64() - 1)
+			newChainMin, exists := t.canonicalChain.Get(minReorgedHeader.Number.Uint64() - 1) // new chain min -1 because t.chain() excludes start header
 			if !exists {
 				return errors.Errorf("failed to find header %d in canonical chain", minReorgedHeader.Number.Uint64())
 			}
-			newChain := t.chain(newChainMin, headerToNotify)
+			newChain := t.chain(newChainMin, headerToNotify, false)
 			sub.callback(oldChain, newChain)
 		} else {
-			sub.callback(nil, t.chain(sub.lastSentHeader, headerToNotify))
+			sub.callback(nil, t.chain(sub.lastSentHeader, headerToNotify, false))
 		}
 		sub.lastSentHeader = headerToNotify
 	}
@@ -318,7 +320,7 @@ func (t *Tracker) notifySafeHead(newHeader *types.Header, reorg bool) {
 		// TODO: implement handling of old chain -> this is concurrent to the canonical chain, so we might need to handle this differently
 		//  but: think about the use cases of the safe block: usually it's just about marking the safe head, so there's no need for the old chain.
 		//  this could mean that we should have a different type of callback for safe and finalized head.
-		sub.callback(nil, t.chain(sub.lastSentHeader, newHeader))
+		sub.callback(nil, t.chain(sub.lastSentHeader, newHeader, false))
 		sub.lastSentHeader = newHeader
 	}
 }
@@ -357,14 +359,15 @@ func (t *Tracker) notifyFinalizedHead(newHeader *types.Header) {
 
 	// Notify all subscribers to new FinalizedChainHead.
 	for _, sub := range t.subscriptions[FinalizedChainHead] {
-		newChain := t.chain(sub.lastSentHeader, newHeader)
+		newChain := t.chain(sub.lastSentHeader, newHeader, false)
 
 		sub.callback(nil, newChain)
 		sub.lastSentHeader = newHeader
 	}
 }
 
-func (t *Tracker) chain(start, end *types.Header) []*types.Header {
+// generates the chain limited by start and end headers. Star may be included or not depending on includeStart
+func (t *Tracker) chain(start, end *types.Header, includeStart bool) []*types.Header {
 	var chain []*types.Header
 	var exists, genesisChain bool
 	current := end
@@ -394,6 +397,9 @@ func (t *Tracker) chain(start, end *types.Header) []*types.Header {
 			// This should never happen since we're making sure that the headers are continuous.
 			panic(fmt.Sprintf("failed to find header %s in cache", parentHash))
 		}
+	}
+	if includeStart && start != nil {
+		chain = append(chain, start)
 	}
 
 	return chain

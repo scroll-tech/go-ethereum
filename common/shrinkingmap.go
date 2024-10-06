@@ -32,6 +32,22 @@ func (s *ShrinkingMap[K, V]) Has(key K) bool {
 	return exists
 }
 
+func (s *ShrinkingMap[K, V]) Keys() []K {
+	var keys []K
+	for k := range s.m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (s *ShrinkingMap[K, V]) Values() []V {
+	var values []V
+	for _, v := range s.m {
+		values = append(values, v)
+	}
+	return values
+}
+
 func (s *ShrinkingMap[K, V]) Delete(key K) (deleted bool) {
 	if _, exists := s.m[key]; !exists {
 		return false

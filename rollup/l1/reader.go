@@ -144,9 +144,8 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 	return r.processLogsToRollupEvents(logs)
 }
 
-func (r *Reader) FetchL1MessagesInRange(fromBlock, toBlock uint64) ([]types.L1MessageTx, error) {
-	var msgs []types.L1MessageTx
-
+func (r *Reader) FetchL1MessageEventsInRange(fromBlock, toBlock uint64) ([]*L1MessageQueueQueueTransaction, error) {
+	var events []*L1MessageQueueQueueTransaction
 	err := r.queryInBatches(fromBlock, toBlock, defaultL1MsgFetchBlockRange, func(from, to uint64) error {
 		it, err := r.filterer.FilterQueueTransaction(&bind.FilterOpts{
 			Start:   from,
@@ -163,22 +162,14 @@ func (r *Reader) FetchL1MessagesInRange(fromBlock, toBlock uint64) ([]types.L1Me
 			if !event.GasLimit.IsUint64() {
 				return fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
 			}
-
-			msgs = append(msgs, types.L1MessageTx{
-				QueueIndex: event.QueueIndex,
-				Gas:        event.GasLimit.Uint64(),
-				To:         &event.Target,
-				Value:      event.Value,
-				Data:       event.Data,
-				Sender:     event.Sender,
-			})
+			events = append(events, event)
 		}
 		return it.Error()
 	})
 	if err != nil {
 		return nil, err
 	}
-	return msgs, nil
+	return events, nil
 }
 
 func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, error) {

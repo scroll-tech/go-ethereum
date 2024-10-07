@@ -60,7 +60,8 @@ func (t *Tracker) Start() {
 	go func() {
 		syncTicker := time.NewTicker(defaultSyncInterval)
 		defer syncTicker.Stop()
-
+		pruneTicker := time.NewTicker(defaultPruneInterval)
+		defer pruneTicker.Stop()
 		for {
 			select {
 			case <-t.ctx.Done():
@@ -76,6 +77,8 @@ func (t *Tracker) Start() {
 				if err != nil {
 					log.Warn("Tracker: failed to sync latest head", "err", err)
 				}
+			case <-pruneTicker.C:
+				t.pruneOldHeaders()
 			}
 
 		}
@@ -456,6 +459,47 @@ func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback Subscrip
 			}
 		}
 		t.subscriptions[confirmationRule] = subscriptionsByType
+	}
+}
+
+func (t *Tracker) pruneOldHeaders() {
+	// can prune all headers that are older than last sent header - 2 epochs (reorg deeper than that can't happen)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var minNumber *big.Int
+	for _, confRule := range []ConfirmationRule{LatestChainHead, SafeChainHead, FinalizedChainHead} {
+		for _, sub := range t.subscriptions[confRule] {
+			if sub.lastSentHeader == nil { // did not sent anything to this subscriber, so it's impossible to determine no, which headers could be pruned
+				return
+			}
+			if minNumber == nil {
+				minNumber = big.NewInt(0).Set(sub.lastSentHeader.Number)
+				continue
+			}
+			if sub.lastSentHeader.Number.Cmp(minNumber) < 0 {
+				minNumber.Set(sub.lastSentHeader.Number)
+			}
+		}
+	}
+	if minNumber == nil {
+		return
+	}
+	minNumber.Sub(minNumber, big.NewInt(int64(maxConfirmationRule)))
+
+	// prune from canonical chain
+	keys := t.canonicalChain.Keys()
+	for _, key := range keys {
+		if key <= minNumber.Uint64() {
+			t.canonicalChain.Delete(key)
+		}
+	}
+
+	// prune from all headers
+	headers := t.headers.Values()
+	for _, header := range headers {
+		if header.Number.Cmp(minNumber) <= 0 {
+			t.headers.Delete(header.Hash())
+		}
 	}
 }
 

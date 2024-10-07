@@ -176,8 +176,8 @@ var defaultCacheConfig = &CacheConfig{
 	TrieCleanLimit: 256,
 	TrieDirtyLimit: 256,
 	TrieTimeLimit:  5 * time.Minute,
-	SnapshotLimit:  256,
-	SnapshotWait:   true,
+	SnapshotLimit:  0, // Snapshots don't support zkTrie yet
+	SnapshotWait:   false,
 	StateScheme:    rawdb.HashScheme,
 }
 

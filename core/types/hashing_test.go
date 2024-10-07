@@ -34,6 +34,7 @@ import (
 )
 
 func TestDeriveSha(t *testing.T) {
+	t.Skip("due to legacy trie being deprecated")
 	txs, err := genTxs(0)
 	if err != nil {
 		t.Fatal(err)

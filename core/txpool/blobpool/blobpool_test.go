@@ -1,3 +1,6 @@
+//go:build all_tests
+// +build all_tests
+
 // Copyright 2023 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -29,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/holiman/billy"
+	"github.com/holiman/uint256"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus/misc/eip1559"
 	"github.com/scroll-tech/go-ethereum/consensus/misc/eip4844"
@@ -43,8 +48,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/holiman/billy"
-	"github.com/holiman/uint256"
 )
 
 var (

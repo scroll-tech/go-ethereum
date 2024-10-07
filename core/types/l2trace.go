@@ -45,9 +45,35 @@ type StorageTrace struct {
 	// All storage proofs BEFORE execution
 	StorageProofs map[string]map[string][]hexutil.Bytes `json:"storageProofs,omitempty"`
 
+	// The "flatten" db nodes
+	FlattenProofs map[common.Hash]hexutil.Bytes `json:"flattenProofs,omitempty"`
+
+	// The hash of secured addresses
+	AddressHashes map[common.Address]common.Hash `json:"addressHashes,omitempty"`
+	// The hash of secured store key
+	StoreKeyHashes map[common.Hash]common.Hash `json:"storeKeyHashes,omitempty"`
+
 	// Node entries for deletion, no need to distinguish what it is from, just read them
 	// into the partial db
 	DeletionProofs []hexutil.Bytes `json:"deletionProofs,omitempty"`
+}
+
+func (tr *StorageTrace) ApplyFilter(legacy bool) {
+	if legacy {
+		tr.FlattenProofs = nil
+		tr.AddressHashes = nil
+		tr.StoreKeyHashes = nil
+	} else {
+		for k := range tr.Proofs {
+			tr.Proofs[k] = []hexutil.Bytes{}
+		}
+		for _, st := range tr.StorageProofs {
+			for k := range st {
+				st[k] = []hexutil.Bytes{}
+			}
+		}
+		tr.DeletionProofs = []hexutil.Bytes{}
+	}
 }
 
 // ExecutionResult groups all structured logs emitted by the EVM

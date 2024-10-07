@@ -243,12 +243,12 @@ func TestProofWithDeletion(t *testing.T) {
 	assert.NoError(t, err)
 	//assert.Equal(t, len(sibling1), len(delTracer.GetProofs()))
 
-	siblings, err := proofTracer.GetDeletionProofs()
+	siblings, err := proofTracer.GetDeletionProofNodes()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(siblings))
 
 	proofTracer.MarkDeletion(s_key1.Bytes())
-	siblings, err = proofTracer.GetDeletionProofs()
+	siblings, err = proofTracer.GetDeletionProofNodes()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(siblings))
 	l := len(siblings[0])
@@ -259,7 +259,7 @@ func TestProofWithDeletion(t *testing.T) {
 	// Marking a key that is currently not hit (but terminated by an empty node)
 	// also causes it to be added to the deletion proof
 	proofTracer.MarkDeletion(s_key2.Bytes())
-	siblings, err = proofTracer.GetDeletionProofs()
+	siblings, err = proofTracer.GetDeletionProofNodes()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(siblings))
 
@@ -277,12 +277,12 @@ func TestProofWithDeletion(t *testing.T) {
 	assert.NoError(t, err)
 
 	proofTracer.MarkDeletion(s_key1.Bytes())
-	siblings, err = proofTracer.GetDeletionProofs()
+	siblings, err = proofTracer.GetDeletionProofNodes()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(siblings))
 
 	proofTracer.MarkDeletion(s_key2.Bytes())
-	siblings, err = proofTracer.GetDeletionProofs()
+	siblings, err = proofTracer.GetDeletionProofNodes()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(siblings))
 

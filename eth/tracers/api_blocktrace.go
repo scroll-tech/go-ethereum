@@ -145,6 +145,8 @@ func (api *API) GetTxByTxBlockTrace(ctx context.Context, blockNrOrHash rpc.Block
 
 // Make trace environment for current block, and then get the trace for the block.
 func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *TraceConfig, block *types.Block) (*types.BlockTrace, error) {
+	legacyStorageTrace := true
+	unionStorageTrace := false
 	if config == nil {
 		config = &TraceConfig{
 			LogConfig: &vm.LogConfig{
@@ -157,6 +159,14 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	} else if config.Tracer != nil {
 		config.Tracer = nil
 		log.Warn("Tracer params is unsupported")
+	}
+
+	if config.LogConfig != nil && config.StorageProofFormat != nil {
+		if *config.StorageProofFormat == "flatten" {
+			legacyStorageTrace = false
+		} else if *config.StorageProofFormat == "union" {
+			unionStorageTrace = true
+		}
 	}
 
 	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
@@ -173,5 +183,15 @@ func (api *API) createTraceEnvAndGetBlockTrace(ctx context.Context, config *Trac
 	}
 
 	chaindb := api.backend.ChainDb()
-	return api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	l2Trace, err := api.scrollTracerWrapper.CreateTraceEnvAndGetBlockTrace(api.backend.ChainConfig(), api.chainContext(ctx), api.backend.Engine(), chaindb, statedb, parent, block, true)
+	if err != nil {
+		return nil, err
+	}
+	if !unionStorageTrace {
+		l2Trace.StorageTrace.ApplyFilter(legacyStorageTrace)
+		for _, st := range l2Trace.TxStorageTraces {
+			st.ApplyFilter(legacyStorageTrace)
+		}
+	}
+	return l2Trace, nil
 }

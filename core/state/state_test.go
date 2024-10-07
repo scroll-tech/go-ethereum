@@ -41,6 +41,7 @@ func newStateEnv() *stateEnv {
 }
 
 func TestDump(t *testing.T) {
+	t.Skip("Due to ZkTrie not supporting iterators")
 	db := rawdb.NewMemoryDatabase()
 	tdb := NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
 	sdb, _ := New(types.EmptyRootHash, tdb, nil)
@@ -101,6 +102,7 @@ func TestDump(t *testing.T) {
 }
 
 func TestIterativeDump(t *testing.T) {
+	t.Skip("Due to ZkTrie not supporting iterators")
 	db := rawdb.NewMemoryDatabase()
 	tdb := NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
 	sdb, _ := New(types.EmptyRootHash, tdb, nil)

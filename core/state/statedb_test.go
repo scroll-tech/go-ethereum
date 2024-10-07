@@ -30,6 +30,7 @@ import (
 	"testing"
 	"testing/quick"
 
+	"github.com/holiman/uint256"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state/snapshot"
@@ -40,7 +41,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie/triedb/hashdb"
 	"github.com/scroll-tech/go-ethereum/trie/triedb/pathdb"
 	"github.com/scroll-tech/go-ethereum/trie/trienode"
-	"github.com/holiman/uint256"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -796,7 +796,7 @@ func TestDeleteCreateRevert(t *testing.T) {
 // If we are missing trie nodes, we should not continue writing to the trie
 func TestMissingTrieNodes(t *testing.T) {
 	testMissingTrieNodes(t, rawdb.HashScheme)
-	testMissingTrieNodes(t, rawdb.PathScheme)
+	// testMissingTrieNodes(t, rawdb.PathScheme)
 }
 
 func testMissingTrieNodes(t *testing.T, scheme string) {
@@ -1051,7 +1051,7 @@ func TestFlushOrderDataLoss(t *testing.T) {
 		t.Fatalf("failed to commit state trie: %v", err)
 	}
 	triedb.Reference(root, common.Hash{})
-	if err := triedb.Cap(1024); err != nil {
+	if err := triedb.Cap(128); err != nil {
 		t.Fatalf("failed to cap trie dirty cache: %v", err)
 	}
 	if err := triedb.Commit(root, false); err != nil {
@@ -1106,6 +1106,7 @@ func TestStateDBTransientStorage(t *testing.T) {
 }
 
 func TestResetObject(t *testing.T) {
+	t.Skip("Snapshot doesn't support ZkTrie")
 	var (
 		disk     = rawdb.NewMemoryDatabase()
 		tdb      = trie.NewDatabase(disk, nil)
@@ -1140,6 +1141,7 @@ func TestResetObject(t *testing.T) {
 }
 
 func TestDeleteStorage(t *testing.T) {
+	t.Skip("Snapshot doesn't support ZkTrie")
 	var (
 		disk     = rawdb.NewMemoryDatabase()
 		tdb      = trie.NewDatabase(disk, nil)

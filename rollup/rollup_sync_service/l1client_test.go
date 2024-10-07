@@ -57,6 +57,12 @@ func (m *mockEthClient) HeaderByNumber(ctx context.Context, number *big.Int) (*t
 	}, nil
 }
 
+func (m *mockEthClient) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	return &types.Header{
+		Number: big.NewInt(100 - 64),
+	}, nil
+}
+
 func (m *mockEthClient) SubscribeFilterLogs(ctx context.Context, query ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
 	return nil, nil
 }

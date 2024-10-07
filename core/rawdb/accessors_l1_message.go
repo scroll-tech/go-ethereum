@@ -275,3 +275,22 @@ func ReadFirstQueueIndexNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *
 	queueIndex := binary.BigEndian.Uint64(data)
 	return &queueIndex
 }
+
+// WriteL1MsgStorageState writes the L1MsgStorage state
+func WriteL1MsgStorageState(db ethdb.KeyValueWriter, state []byte) {
+	if err := db.Put(l1MsgStorageStateKey, state); err != nil {
+		log.Crit("Failed to update L1MsgStorage state", "err", err)
+	}
+}
+
+// ReadL1MsgStorageState retrieves the L1MsgStorage state
+func ReadL1MsgStorageState(db ethdb.Reader) []byte {
+	data, err := db.Get(l1MsgStorageStateKey)
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("Failed to read highest synced L1 message queue index from database", "err", err)
+	}
+	return data
+}

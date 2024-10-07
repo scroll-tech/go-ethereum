@@ -147,6 +147,8 @@ var (
 	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
 	highestSyncedQueueIndexKey        = []byte("HighestSyncedQueueIndex")
 
+	l1MsgStorageStateKey = []byte("L1MsgStorageState")
+
 	// Scroll rollup event store
 	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")
 	batchChunkRangesPrefix            = []byte("R-bcr")

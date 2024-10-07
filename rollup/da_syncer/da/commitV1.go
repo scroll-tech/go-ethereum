@@ -9,10 +9,9 @@ import (
 	"github.com/scroll-tech/da-codec/encoding/codecv1"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
-	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
+	"github.com/scroll-tech/go-ethereum/rollup/l1"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 )
@@ -22,22 +21,22 @@ type CommitBatchDAV1 struct {
 }
 
 func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
-	l1Client *rollup_sync_service.L1Client,
+	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
-	vLog *types.Log,
+	commitEvent *l1.CommitBatchEvent,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
 ) (*CommitBatchDAV1, error) {
-	return NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Client, blobClient, vLog, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv1.DecodeTxsFromBlob)
+	return NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Reader, blobClient, commitEvent, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv1.DecodeTxsFromBlob)
 }
 
 func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database,
-	l1Client *rollup_sync_service.L1Client,
+	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
-	vLog *types.Log,
+	commitEvent *l1.CommitBatchEvent,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
@@ -50,12 +49,16 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
 
-	versionedHash, err := l1Client.FetchTxBlobHash(vLog)
+	versionedHash, err := l1Reader.FetchTxBlobHash(commitEvent.TxHash(), commitEvent.BlockHash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
 	}
 
-	blob, err := blobClient.GetBlobByVersionedHashAndBlockNumber(ctx, versionedHash, vLog.BlockNumber)
+	header, err := l1Reader.FetchBlockHeaderByNumber(commitEvent.BlockNumber())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header by number, err: %w", err)
+	}
+	blob, err := blobClient.GetBlobByVersionedHashAndBlockTime(ctx, versionedHash, header.Time)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)
 	}
@@ -79,7 +82,7 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, vLog.BlockNumber)
+	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
 	if err != nil {
 		return nil, err
 	}

@@ -401,13 +401,13 @@ func TestZkTrieImpl_Delete(t *testing.T) {
 		err = mt.TryDelete(k1)
 		assert.NoError(t, err)
 		err = mt.TryDelete(k1)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("Test deletion of non-existent node", func(t *testing.T) {
 		mt, _ := newTestingMerkle(t)
 		err := mt.TryDelete(k1)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.NoError(t, err)
 	})
 }
 

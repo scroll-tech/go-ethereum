@@ -583,10 +583,12 @@ func (mt *ZkTrie) TryDelete(key []byte) error {
 	}
 
 	newRootKey, _, err := mt.tryDelete(mt.rootKey, nodeKey, getPath(mt.maxLevels, nodeKey[:]))
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrKeyNotFound) {
 		return err
 	}
-	mt.rootKey = newRootKey
+	if newRootKey != nil {
+		mt.rootKey = newRootKey
+	}
 	return nil
 }
 

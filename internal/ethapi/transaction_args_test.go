@@ -362,3 +362,5 @@ func (b *backendMock) Engine() consensus.Engine { return nil }
 func (b *backendMock) StateAt(root common.Hash) (*state.StateDB, error) {
 	return nil, nil
 }
+
+func (b *backendMock) RemoveTx(txHash common.Hash) {}

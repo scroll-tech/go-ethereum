@@ -268,7 +268,7 @@ func (mt *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, erro
 	}
 
 	nodeSet := trienode.NewNodeSet(mt.owner)
-	if err := mt.commit(root, nil, nil, nodeSet, collectLeaf); err != nil {
+	if err := mt.commit(root, nil, nodeSet, collectLeaf); err != nil {
 		return common.Hash{}, nil, err
 	}
 
@@ -279,27 +279,23 @@ func (mt *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, erro
 }
 
 // Commit calculates the root for the entire trie and persist all the dirty nodes
-func (mt *ZkTrie) commit(nodeHash, parentHash *Hash, path []byte, nodeSet *trienode.NodeSet, collectLeaf bool) error {
+func (mt *ZkTrie) commit(nodeHash *Hash, path []byte, nodeSet *trienode.NodeSet, collectLeaf bool) error {
 	node := mt.dirtyStorage[*nodeHash]
 	if node == nil {
 		return nil
 	}
 
 	if node.Type == NodeTypeLeaf_New && collectLeaf {
-		parent := common.Hash{}
-		if parentHash != nil {
-			parent = common.BytesToHash(parentHash.Bytes())
-		}
-		nodeSet.AddLeaf(parent, node.Data())
+		nodeSet.AddLeaf(common.BytesToHash(nodeHash.Bytes()), node.Data())
 	}
 
 	if node.ChildL != nil {
-		if err := mt.commit(node.ChildL, nodeHash, append(path, byte(0)), nodeSet, collectLeaf); err != nil {
+		if err := mt.commit(node.ChildL, append(path, byte(0)), nodeSet, collectLeaf); err != nil {
 			return err
 		}
 	}
 	if node.ChildR != nil {
-		if err := mt.commit(node.ChildR, nodeHash, append(path, byte(1)), nodeSet, collectLeaf); err != nil {
+		if err := mt.commit(node.ChildR, append(path, byte(1)), nodeSet, collectLeaf); err != nil {
 			return err
 		}
 	}

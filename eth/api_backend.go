@@ -315,7 +315,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 }
 
 func (b *EthAPIBackend) RemoveTx(txHash common.Hash) {
-	b.eth.txPool.RemoveTx(txHash, true)
+	b.eth.txPool.RemoveTx(txHash, true, true)
 }
 
 func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {

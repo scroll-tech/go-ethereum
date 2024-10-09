@@ -238,7 +238,7 @@ func (s *TxPoolAPI) Status() map[string]hexutil.Uint {
 }
 
 // RemoveTransactionByHash evicts a transaction from the pool.
-func (s *PublicTxPoolAPI) RemoveTransactionByHash(ctx context.Context, hash common.Hash) {
+func (s *TxPoolAPI) RemoveTransactionByHash(ctx context.Context, hash common.Hash) {
 	s.b.RemoveTx(hash)
 }
 

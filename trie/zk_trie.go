@@ -262,47 +262,49 @@ func (mt *ZkTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, erro
 		return common.Hash{}, nil, ErrCommitted
 	}
 
-	nodeset, err := mt.commit(collectLeaf)
-	if err != nil {
-		return common.Hash{}, nodeset, err
-	}
-
 	root, err := mt.root()
 	if err != nil {
 		return common.Hash{}, nil, err
 	}
-	return common.BytesToHash(root.Bytes()), nodeset, nil
+
+	nodeSet := trienode.NewNodeSet(mt.owner)
+	if err := mt.commit(root, nil, nil, nodeSet, collectLeaf); err != nil {
+		return common.Hash{}, nil, err
+	}
+
+	mt.dirtyStorage = make(map[Hash]*Node)
+	mt.committed = true
+
+	return common.BytesToHash(root.Bytes()), nodeSet, nil
 }
 
 // Commit calculates the root for the entire trie and persist all the dirty nodes
-func (mt *ZkTrie) commit(collectLeaf bool) (*trienode.NodeSet, error) {
-	// force root hash calculation if needed
-	if _, err := mt.root(); err != nil {
-		return nil, err
+func (mt *ZkTrie) commit(nodeHash, parentHash *Hash, path []byte, nodeSet *trienode.NodeSet, collectLeaf bool) error {
+	node := mt.dirtyStorage[*nodeHash]
+	if node == nil {
+		return nil
 	}
 
-	nodeSet := trienode.NewNodeSet(mt.owner)
-	for key, node := range mt.dirtyStorage {
-		keyBytes := key.Bytes()
-		nodeHash := common.BytesToHash(keyBytes)
-		// todo: use proper path instead of hash
-		nodeSet.AddNode(keyBytes, trienode.New(nodeHash, node.CanonicalValue()))
-		if collectLeaf {
-			collectLeafNode := func(childHash *Hash) {
-				if childHash != nil {
-					childNode, found := mt.dirtyStorage[*childHash]
-					if found && childNode != nil && childNode.Type == NodeTypeLeaf_New {
-						nodeSet.AddLeaf(nodeHash, childNode.Data())
-					}
-				}
-			}
-			collectLeafNode(node.ChildL)
-			collectLeafNode(node.ChildR)
+	if node.Type == NodeTypeLeaf_New && collectLeaf {
+		parent := common.Hash{}
+		if parentHash != nil {
+			parent = common.BytesToHash(parentHash.Bytes())
+		}
+		nodeSet.AddLeaf(parent, node.Data())
+	}
+
+	if node.ChildL != nil {
+		if err := mt.commit(node.ChildL, nodeHash, append(path, byte(0)), nodeSet, collectLeaf); err != nil {
+			return err
 		}
 	}
-	mt.dirtyStorage = make(map[Hash]*Node)
-	mt.committed = true
-	return nodeSet, nil
+	if node.ChildR != nil {
+		if err := mt.commit(node.ChildR, nodeHash, append(path, byte(1)), nodeSet, collectLeaf); err != nil {
+			return err
+		}
+	}
+	nodeSet.AddNode(path, trienode.New(common.BytesToHash(nodeHash.Bytes()), node.CanonicalValue()))
+	return nil
 }
 
 // addLeaf recursively adds a newLeaf in the MT while updating the path, and returns the key

@@ -57,6 +57,10 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if tx.Size() > opts.MaxSize {
 		return fmt.Errorf("%w: transaction size %v, limit %v", ErrOversizedData, tx.Size(), opts.MaxSize)
 	}
+	// Reject transactions that cannot fit into a block even as a single transaction
+	if !opts.Config.Scroll.IsValidBlockSize(tx.Size()) {
+		return ErrOversizedData
+	}
 	// Ensure only transactions that have been enabled are accepted
 	if !opts.Config.IsCurie(head.Number) && tx.Type() != types.LegacyTxType {
 		return fmt.Errorf("%w: type %d rejected, pool not yet in Curie", core.ErrTxTypeNotSupported, tx.Type())

@@ -2,6 +2,7 @@ package blob_client
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 )
 
@@ -65,6 +67,18 @@ func (c *BlobScanClient) GetBlobByVersionedHashAndBlockNumber(ctx context.Contex
 		return nil, fmt.Errorf("len of blob data is not correct, expected: %d, got: %d", lenBlobBytes, len(blobBytes))
 	}
 	blob := kzg4844.Blob(blobBytes)
+
+	// sanity check that retrieved blob matches versioned hash
+	commitment, err := kzg4844.BlobToCommitment(&blob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert blob to commitment, err: %w", err)
+	}
+
+	blobVersionedHash := kzg4844.CalcBlobHashV1(sha256.New(), &commitment)
+	if blobVersionedHash != versionedHash {
+		return nil, fmt.Errorf("blob versioned hash mismatch, expected: %s, got: %s", versionedHash.String(), hexutil.Encode(blobVersionedHash[:]))
+	}
+
 	return &blob, nil
 }
 

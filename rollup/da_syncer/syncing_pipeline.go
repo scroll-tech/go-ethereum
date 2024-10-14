@@ -55,7 +55,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		return nil, err
 	}
 
-	blobClientList := blob_client.NewBlobClientList()
+	blobClientList := blob_client.NewBlobClients()
 	if config.BeaconNodeAPIEndpoint != "" {
 		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint, l1Client)
 		if err != nil {
@@ -71,7 +71,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
 	}
 	if blobClientList.Size() == 0 {
-		log.Crit("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag.")
+		return nil, errors.New("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag")
 	}
 
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClientList, db)

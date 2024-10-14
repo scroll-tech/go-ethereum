@@ -23,7 +23,7 @@ const (
 	commitBatchMethodName                     = "commitBatch"
 	commitBatchWithBlobProofMethodName        = "commitBatchWithBlobProof"
 
-	// the length og method ID at the beginning of transaction data
+	// the length of method ID at the beginning of transaction data
 	methodIDLength = 4
 )
 

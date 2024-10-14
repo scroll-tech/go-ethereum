@@ -1025,11 +1025,10 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
 	}
-	defaultDA  = ethconfig.Defaults.DA.FetcherMode
 	DAModeFlag = &flags.TextMarshalerFlag{
 		Name:  "da.mode",
 		Usage: `DA sync mode ("l1rpc" or "snapshot")`,
-		Value: &defaultDA,
+		Value: &ethconfig.Defaults.DA.FetcherMode,
 	}
 	DASnapshotFileFlag = &cli.StringFlag{
 		Name:  "da.snapshot.file",

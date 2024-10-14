@@ -38,6 +38,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/txpool"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -96,6 +97,10 @@ func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
 
 func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return bc.chainHeadFeed.Subscribe(ch)
+}
+
+func (bc *testBlockChain) Database() ethdb.Database {
+	return nil
 }
 
 func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
@@ -2723,5 +2728,36 @@ func TestStatsWithMinBaseFee(t *testing.T) {
 		if queued != 1 {
 			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
 		}
+	}
+}
+
+func TestValidateTxBlockSize(t *testing.T) {
+	// Create the pool to test the pricing enforcement with
+	pool, _ := setupPoolWithConfig(params.ScrollMainnetChainConfig)
+	defer pool.Close()
+
+	key, _ := crypto.GenerateKey()
+	account := crypto.PubkeyToAddress(key.PublicKey)
+	testAddBalance(pool, account, big.NewInt(1000000000000000000))
+
+	validTx := pricedDataTransaction(1, 2100000, big.NewInt(1), key, uint64(*pool.chainconfig.Scroll.MaxTxPayloadBytesPerBlock)-128)
+	oversizedTx := pricedDataTransaction(2, 2100000, big.NewInt(1), key, uint64(*pool.chainconfig.Scroll.MaxTxPayloadBytesPerBlock))
+
+	tests := []struct {
+		name string
+		tx   *types.Transaction
+		want error
+	}{
+		{"Valid transaction", validTx, nil},
+		{"Oversized transaction", oversizedTx, txpool.ErrOversizedData},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := pool.validateTxBasics(tt.tx, false)
+			if err != tt.want {
+				t.Errorf("validateTx() error = %v, want %v", err, tt.want)
+			}
+		})
 	}
 }

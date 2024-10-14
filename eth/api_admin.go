@@ -26,6 +26,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
@@ -140,4 +141,30 @@ func (api *AdminAPI) ImportChain(file string) (bool, error) {
 		blocks = blocks[:0]
 	}
 	return true, nil
+}
+
+// SetRollupEventSyncedL1Height sets the synced L1 height for rollup event synchronization
+func (api *AdminAPI) SetRollupEventSyncedL1Height(height uint64) error {
+	rollupSyncService := api.eth.GetRollupSyncService()
+	if rollupSyncService == nil {
+		return errors.New("RollupSyncService is not available")
+	}
+
+	log.Info("Setting rollup event synced L1 height", "height", height)
+	rollupSyncService.ResetStartSyncHeight(height)
+
+	return nil
+}
+
+// SetL1MessageSyncedL1Height sets the synced L1 height for L1 message synchronization
+func (api *AdminAPI) SetL1MessageSyncedL1Height(height uint64) error {
+	syncService := api.eth.GetSyncService()
+	if syncService == nil {
+		return errors.New("SyncService is not available")
+	}
+
+	log.Info("Setting L1 message synced L1 height", "height", height)
+	syncService.ResetStartSyncHeight(height)
+
+	return nil
 }

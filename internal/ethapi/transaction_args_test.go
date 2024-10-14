@@ -234,11 +234,14 @@ func newBackendMock() *backendMock {
 	config.CurieBlock = config.LondonBlock
 	config.ShanghaiTime = nil
 	config.DarwinTime = nil
+	config.DarwinV2Time = nil
 	if config.LondonBlock != nil {
 		shanghaiTime := config.LondonBlock.Uint64() * 12
 		config.ShanghaiTime = &shanghaiTime
 		darwinTime := config.LondonBlock.Uint64() * 12
 		config.DarwinTime = &darwinTime
+		darwinV2Time := config.LondonBlock.Uint64() * 12
+		config.DarwinV2Time = &darwinV2Time
 	}
 
 	return &backendMock{
@@ -359,3 +362,5 @@ func (b *backendMock) Engine() consensus.Engine { return nil }
 func (b *backendMock) StateAt(root common.Hash) (*state.StateDB, error) {
 	return nil, nil
 }
+
+func (b *backendMock) RemoveTx(txHash common.Hash) {}

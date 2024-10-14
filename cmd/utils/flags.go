@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	godebug "runtime/debug"
 	"strconv"
 	"strings"
@@ -1002,6 +1003,12 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage: "Enable circuit capacity check during block validation",
 	}
 
+	CircuitCapacityCheckWorkersFlag = &cli.UintFlag{
+		Name:  "ccc.numworkers",
+		Usage: "Set the number of workers that will be used for background CCC tasks",
+		Value: uint(runtime.GOMAXPROCS(0)),
+	}
+
 	// Rollup verify service settings
 	RollupVerifyEnabledFlag = &cli.BoolFlag{
 		Name:  "rollup.verify",
@@ -1741,6 +1748,10 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	if ctx.IsSet(MinerMaxAccountsNumFlag.Name) {
 		cfg.MaxAccountsNum = ctx.Int(MinerMaxAccountsNumFlag.Name)
 	}
+	cfg.CCCMaxWorkers = runtime.GOMAXPROCS(0)
+	if ctx.IsSet(CircuitCapacityCheckWorkersFlag.Name) {
+		cfg.CCCMaxWorkers = int(ctx.Uint(CircuitCapacityCheckWorkersFlag.Name))
+	}
 }
 
 func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -1774,6 +1785,10 @@ func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
 func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.IsSet(CircuitCapacityCheckEnabledFlag.Name) {
 		cfg.CheckCircuitCapacity = ctx.Bool(CircuitCapacityCheckEnabledFlag.Name)
+		cfg.CCCMaxWorkers = runtime.GOMAXPROCS(0)
+		if ctx.IsSet(CircuitCapacityCheckWorkersFlag.Name) {
+			cfg.CCCMaxWorkers = int(ctx.Uint(CircuitCapacityCheckWorkersFlag.Name))
+		}
 	}
 }
 

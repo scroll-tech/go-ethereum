@@ -8,6 +8,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/txpool"
@@ -306,7 +307,7 @@ func (p *Pipeline) traceAndApplyStage(txsIn <-chan *txpool.LazyTransaction) (<-c
 				continue
 			}
 
-			if !tx.IsL1MessageTx() && !p.chain.Config().Scroll.IsValidBlockSizeForMining(p.blockSize+tx.Size()) {
+			if !tx.IsL1MessageTx() && !p.chain.Config().Scroll.IsValidBlockSizeForMining(common.StorageSize(p.blockSize+tx.Size())) {
 				// can't fit this txn in this block, silently ignore and continue looking for more txns
 				sendCancellable(resCh, nil, p.ctx.Done())
 				continue

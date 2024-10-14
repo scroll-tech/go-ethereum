@@ -58,7 +58,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return fmt.Errorf("%w: transaction size %v, limit %v", ErrOversizedData, tx.Size(), opts.MaxSize)
 	}
 	// Reject transactions that cannot fit into a block even as a single transaction
-	if !opts.Config.Scroll.IsValidBlockSize(tx.Size()) {
+	if !opts.Config.Scroll.IsValidBlockSizeForMining(common.StorageSize(tx.Size())) {
 		return ErrOversizedData
 	}
 	// Ensure only transactions that have been enabled are accepted

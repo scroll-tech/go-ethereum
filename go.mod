@@ -60,6 +60,7 @@ require (
 	github.com/scroll-tech/da-codec v0.1.1-0.20240902151734-41c648646967
 	github.com/scroll-tech/zktrie v0.8.4
 	github.com/shirou/gopsutil v3.21.11+incompatible
+	github.com/sourcegraph/conc v0.3.0
 	github.com/status-im/keycard-go v0.2.0
 	github.com/stretchr/testify v1.9.0
 	github.com/supranational/blst v0.3.11
@@ -136,11 +137,12 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

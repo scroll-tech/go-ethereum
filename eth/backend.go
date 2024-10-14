@@ -543,7 +543,6 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 func (s *Ethereum) Protocols() []p2p.Protocol {
 	// if DA syncing enabled then we don't create handler
 	if s.config.EnableDASyncing {
-		fmt.Println(">>>>>> DA syncing enabled, do not start protocols")
 		return nil
 	}
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -77,7 +78,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		return consensus.ErrInvalidTxCount
 	}
 	// Check if block payload size is smaller than the max size
-	if !v.config.Scroll.IsValidBlockSize(block.PayloadSize()) {
+	if !v.config.Scroll.IsValidBlockSize(common.StorageSize(block.PayloadSize())) {
 		return ErrInvalidBlockPayloadSize
 	}
 

@@ -479,7 +479,8 @@ func (s *RollupSyncService) decodeBatchVersionAndChunkBlockRanges(txData []byte)
 //   - batchIndex: batch index of the validated batch
 //   - event: L1 finalize batch event data
 //   - parentFinalizedBatchMeta: metadata of the finalized parent batch
-//   - committedBatchMeta: committed batch metadata stored in the database.
+//   - committedBatchMeta: committed batch metadata stored in the database
+//   - chunks: slice of chunk data for the current batch
 //   - stack: node stack to terminate the node in case of inconsistency
 //
 // Returns:

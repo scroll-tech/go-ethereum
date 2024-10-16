@@ -26,6 +26,11 @@ type Config struct {
 	BlobScanAPIEndpoint    string      // BlobScan blob api endpoint
 	BlockNativeAPIEndpoint string      // BlockNative blob api endpoint
 	BeaconNodeAPIEndpoint  string      // Beacon node api endpoint
+
+	RecoveryMode   bool   // Recovery mode is used to override existing blocks with the blocks read from the pipeline and start from a specific L1 block and batch
+	InitialL1Block uint64 // L1 block in which the InitialBatch was committed (or any earlier L1 block but requires more RPC requests)
+	InitialBatch   uint64 // Batch number from which to start syncing and overriding blocks
+	SignBlocks     bool   // Whether to sign the blocks after reading them from the pipeline
 }
 
 // SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
@@ -36,7 +41,7 @@ type SyncingPipeline struct {
 	wg         sync.WaitGroup
 	expBackoff *backoff.Exponential
 
-	l1DeploymentBlock uint64
+	config Config
 
 	db         ethdb.Database
 	blockchain *core.BlockChain
@@ -75,28 +80,37 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}
 
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Client, blobClientList, db)
-	syncedL1Height := l1DeploymentBlock - 1
-	from := rawdb.ReadDASyncedL1BlockNumber(db)
-	if from != nil {
-		syncedL1Height = *from
+
+	var initialL1Block uint64
+	if config.RecoveryMode {
+		initialL1Block = config.InitialL1Block
+		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", initialL1Block, "initialBatch", config.InitialBatch)
+	} else {
+		initialL1Block = l1DeploymentBlock - 1
+		config.InitialL1Block = initialL1Block
+		from := rawdb.ReadDASyncedL1BlockNumber(db)
+		if from != nil {
+			initialL1Block = *from
+		}
+		log.Info("sync from DA: initializing pipeline", "initialL1Block", initialL1Block)
 	}
 
-	daQueue := NewDAQueue(syncedL1Height, dataSourceFactory)
+	daQueue := NewDAQueue(initialL1Block, config.InitialBatch, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
 	daSyncer := NewDASyncer(blockchain)
 
 	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{
-		ctx:               ctx,
-		cancel:            cancel,
-		expBackoff:        backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
-		wg:                sync.WaitGroup{},
-		l1DeploymentBlock: l1DeploymentBlock,
-		db:                db,
-		blockchain:        blockchain,
-		blockQueue:        blockQueue,
-		daSyncer:          daSyncer,
+		ctx:        ctx,
+		cancel:     cancel,
+		expBackoff: backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
+		wg:         sync.WaitGroup{},
+		config:     config,
+		db:         db,
+		blockchain: blockchain,
+		blockQueue: blockQueue,
+		daSyncer:   daSyncer,
 	}, nil
 }
 
@@ -105,7 +119,10 @@ func (s *SyncingPipeline) Step() error {
 	if err != nil {
 		return err
 	}
-	err = s.daSyncer.SyncOneBlock(block)
+
+	// in recovery mode, we override already existing blocks with whatever we read from the pipeline
+	err = s.daSyncer.SyncOneBlock(block, s.config.RecoveryMode, s.config.SignBlocks)
+
 	return err
 }
 
@@ -222,7 +239,7 @@ func (s *SyncingPipeline) Stop() {
 
 func (s *SyncingPipeline) reset(resetCounter int) {
 	amount := 100 * uint64(resetCounter)
-	syncedL1Height := s.l1DeploymentBlock - 1
+	syncedL1Height := s.config.InitialL1Block
 	from := rawdb.ReadDASyncedL1BlockNumber(s.db)
 	if from != nil && *from+amount > syncedL1Height {
 		syncedL1Height = *from - amount

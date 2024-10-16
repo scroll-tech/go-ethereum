@@ -6,6 +6,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 )
 
 var (
@@ -14,11 +15,13 @@ var (
 )
 
 type DASyncer struct {
+	l2EndBlock uint64
 	blockchain *core.BlockChain
 }
 
-func NewDASyncer(blockchain *core.BlockChain) *DASyncer {
+func NewDASyncer(blockchain *core.BlockChain, l2EndBlock uint64) *DASyncer {
 	return &DASyncer{
+		l2EndBlock: l2EndBlock,
 		blockchain: blockchain,
 	}
 }
@@ -58,6 +61,12 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock, override bool, sign bool
 		log.Info("L1 sync progress", "blockhain height", currentBlock.Number.Uint64(), "block hash", currentBlock.Hash(), "root", currentBlock.Root)
 	} else if currentBlock.Number.Uint64()%100 == 0 {
 		log.Info("L1 sync progress", "blockhain height", currentBlock.Number.Uint64(), "block hash", currentBlock.Hash(), "root", currentBlock.Root)
+	}
+
+	if s.l2EndBlock > 0 && s.l2EndBlock == block.PartialHeader.Number {
+		newBlock := s.blockchain.GetHeaderByNumber(block.PartialHeader.Number)
+		log.Warn("L1 sync reached L2EndBlock: you can terminate recovery mode now", "L2EndBlock", newBlock.Number.Uint64(), "block hash", newBlock.Hash(), "root", newBlock.Root)
+		return serrors.Terminated
 	}
 
 	return nil

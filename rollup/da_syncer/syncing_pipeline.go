@@ -30,7 +30,8 @@ type Config struct {
 	RecoveryMode   bool   // Recovery mode is used to override existing blocks with the blocks read from the pipeline and start from a specific L1 block and batch
 	InitialL1Block uint64 // L1 block in which the InitialBatch was committed (or any earlier L1 block but requires more RPC requests)
 	InitialBatch   uint64 // Batch number from which to start syncing and overriding blocks
-	SignBlocks     bool   // Whether to sign the blocks after reading them from the pipeline
+	SignBlocks     bool   // Whether to sign the blocks after reading them from the pipeline (requires correct Clique signer key) and history of blocks with Clique signatures
+	L2EndBlock     uint64 // L2 block number to sync until
 }
 
 // SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
@@ -98,7 +99,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	daQueue := NewDAQueue(initialL1Block, config.InitialBatch, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
-	daSyncer := NewDASyncer(blockchain)
+	daSyncer := NewDASyncer(blockchain, config.L2EndBlock)
 
 	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{
@@ -221,6 +222,9 @@ func (s *SyncingPipeline) mainLoop() {
 				continue
 			} else if errors.Is(err, context.Canceled) {
 				log.Info("syncing pipeline stopped due to cancelled context", "err", err)
+				return
+			} else if errors.Is(err, serrors.Terminated) {
+				log.Info("syncing pipeline stopped due to terminated state", "err", err)
 				return
 			}
 

@@ -2025,7 +2025,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool) (int, error)
 	return it.index, err
 }
 
-func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types.Header, txs types.Transactions) (WriteStatus, error) {
+func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types.Header, txs types.Transactions, sign bool) (WriteStatus, error) {
 	if !bc.chainmu.TryLock() {
 		return NonStatTy, errInsertionInterrupted
 	}
@@ -2044,17 +2044,50 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
 	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
 	if err != nil {
-		return NonStatTy, fmt.Errorf("error processing block: %w", err)
+		return NonStatTy, fmt.Errorf("error processing block %d: %w", header.Number.Uint64(), err)
 	}
 
 	// TODO: once we have the extra and difficulty we need to verify the signature of the block with Clique
 	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
 
-	// finalize and assemble block as fullBlock
+	if sign {
+		// remember the time as Clique will override it
+		originalTime := header.Time
+
+		err = bc.engine.Prepare(bc, header)
+		if err != nil {
+			return NonStatTy, fmt.Errorf("error preparing block %d: %w", tempBlock.Number().Uint64(), err)
+		}
+
+		// we want to re-sign the block: set time to original value again.
+		header.Time = originalTime
+	}
+
+	// finalize and assemble block as fullBlock: replicates consensus.FinalizeAndAssemble()
 	header.GasUsed = gasUsed
 	header.Root = statedb.IntermediateRoot(bc.chainConfig.IsEIP158(header.Number))
 
 	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+
+	// Sign the block if requested
+	if sign {
+		resultCh, stopCh := make(chan *types.Block), make(chan struct{})
+		if err = bc.engine.Seal(bc, fullBlock, resultCh, stopCh); err != nil {
+			return NonStatTy, fmt.Errorf("error sealing block %d: %w", fullBlock.Number().Uint64(), err)
+		}
+		// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
+		// or a call that blocks between the call to Seal and the line below. Seal might introduce some delay, so we keep track of
+		// that artificially added delay and subtract it from overall runtime of commit().
+		fullBlock = <-resultCh
+		if fullBlock == nil {
+			return NonStatTy, fmt.Errorf("sealing block failed %d: block is nil", header.Number.Uint64())
+		}
+
+		// verify the generated block with local consensus engine to make sure everything is as expected
+		if err = bc.engine.VerifyHeader(bc, fullBlock.Header()); err != nil {
+			return NonStatTy, fmt.Errorf("error verifying signed block %d: %w", fullBlock.Number().Uint64(), err)
+		}
+	}
 
 	blockHash := fullBlock.Hash()
 	// manually replace the block hash in the receipts

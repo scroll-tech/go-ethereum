@@ -51,7 +51,7 @@ func TestRollupSyncServiceStartAndStop(t *testing.T) {
 }
 
 func TestDecodeBatchVersionAndChunkBlockRangesCodecv0(t *testing.T) {
-	scrollChainABI, err := scrollChainMetaData.GetAbi()
+	scrollChainABI, err := ScrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
 	service := &RollupSyncService{
@@ -110,7 +110,7 @@ func TestDecodeBatchVersionAndChunkBlockRangesCodecv0(t *testing.T) {
 }
 
 func TestDecodeBatchVersionAndChunkBlockRangesCodecv1(t *testing.T) {
-	scrollChainABI, err := scrollChainMetaData.GetAbi()
+	scrollChainABI, err := ScrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
 	service := &RollupSyncService{
@@ -163,7 +163,7 @@ func TestDecodeBatchVersionAndChunkBlockRangesCodecv1(t *testing.T) {
 }
 
 func TestDecodeBatchVersionAndChunkBlockRangesCodecv2(t *testing.T) {
-	scrollChainABI, err := scrollChainMetaData.GetAbi()
+	scrollChainABI, err := ScrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
 	service := &RollupSyncService{
@@ -216,7 +216,7 @@ func TestDecodeBatchVersionAndChunkBlockRangesCodecv2(t *testing.T) {
 }
 
 func TestDecodeBatchVersionAndChunkBlockRangesCodecv3(t *testing.T) {
-	scrollChainABI, err := scrollChainMetaData.GetAbi()
+	scrollChainABI, err := ScrollChainMetaData.GetAbi()
 	require.NoError(t, err)
 
 	service := &RollupSyncService{

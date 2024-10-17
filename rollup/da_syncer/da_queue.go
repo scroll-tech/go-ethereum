@@ -10,14 +10,17 @@ import (
 
 // DAQueue is a pipeline stage that reads DA entries from a DataSource and provides them to the next stage.
 type DAQueue struct {
-	l1height          uint64
+	initialBatch uint64
+	l1height     uint64
+
 	dataSourceFactory *DataSourceFactory
 	dataSource        DataSource
 	da                da.Entries
 }
 
-func NewDAQueue(l1height uint64, dataSourceFactory *DataSourceFactory) *DAQueue {
+func NewDAQueue(l1height uint64, initialBatch uint64, dataSourceFactory *DataSourceFactory) *DAQueue {
 	return &DAQueue{
+		initialBatch:      initialBatch,
 		l1height:          l1height,
 		dataSourceFactory: dataSourceFactory,
 		dataSource:        nil,
@@ -26,15 +29,23 @@ func NewDAQueue(l1height uint64, dataSourceFactory *DataSourceFactory) *DAQueue 
 }
 
 func (dq *DAQueue) NextDA(ctx context.Context) (da.Entry, error) {
-	for len(dq.da) == 0 {
-		err := dq.getNextData(ctx)
-		if err != nil {
-			return nil, err
+	for {
+		for len(dq.da) == 0 {
+			err := dq.getNextData(ctx)
+			if err != nil {
+				return nil, err
+			}
 		}
+
+		daEntry := dq.da[0]
+		dq.da = dq.da[1:]
+
+		if daEntry.BatchIndex() < dq.initialBatch {
+			continue
+		}
+
+		return daEntry, nil
 	}
-	daEntry := dq.da[0]
-	dq.da = dq.da[1:]
-	return daEntry, nil
 }
 
 func (dq *DAQueue) getNextData(ctx context.Context) error {

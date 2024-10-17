@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/automaxprocs/maxprocs"
+
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/accounts/keystore"
 	"github.com/scroll-tech/go-ethereum/cmd/utils"
@@ -39,7 +41,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
-	"go.uber.org/automaxprocs/maxprocs"
 
 	// Force-load the tracer engines to trigger registration
 	_ "github.com/scroll-tech/go-ethereum/eth/tracers/js"
@@ -160,6 +161,11 @@ var (
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,
 		utils.DABeaconNodeAPIEndpointFlag,
+		utils.DARecoveryModeFlag,
+		utils.DARecoveryInitialL1BlockFlag,
+		utils.DARecoveryInitialBatchFlag,
+		utils.DARecoverySignBlocksFlag,
+		utils.DARecoveryL2EndBlockFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{

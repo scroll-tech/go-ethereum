@@ -426,6 +426,10 @@ func (p *Peer) RequestTxs(hashes []common.Hash) error {
 	id := rand.Uint64()
 
 	log.Debug("Requesting transactions", "RequestId", id, "Peer.id", p.id, "count", len(hashes))
+	for _, hash := range hashes {
+		log.Info("Requesting transaction", "RequestId", id, "Peer.id", p.id, "count", len(hashes), "hash", hash)
+	}
+
 	peerRequestTxsCntGauge.Update(int64(len(hashes)))
 
 	requestTracker.Track(p.id, p.version, GetPooledTransactionsMsg, PooledTransactionsMsg, id)

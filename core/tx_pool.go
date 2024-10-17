@@ -817,6 +817,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		// do too many replacements between reorg-runs, so we cap the number of
 		// replacements to 25% of the slots
 		if pool.changesSinceReorg > int(pool.config.GlobalSlots/4) {
+			log.Error("Discarding transaction due to too many changes since reorg", "hash", hash)
 			throttleTxMeter.Mark(1)
 			return false, ErrTxPoolOverflow
 		}
@@ -843,20 +844,32 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	}
 	// Try to replace an existing transaction in the pending pool
 	from, _ := types.Sender(pool.signer, tx) // already validated
+
+	log.Info("already validated", "hash", hash, "from", from, "to", tx.To())
+
 	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
+
+		log.Info("already pending", "hash", hash, "from", from, "to", tx.To())
+
 		// Nonce already pending, check if required price bump is met
 		inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+
+		log.Info("already pending", "hash", hash, "inserted", inserted, "old", old.Hash().Hex())
+
 		if !inserted {
+			log.Error("already pending, ErrReplaceUnderpriced", "hash", hash)
 			pendingDiscardMeter.Mark(1)
 			return false, ErrReplaceUnderpriced
 		}
 		// New transaction is better, replace old one
 		if old != nil {
+			log.Info("already pending, new transaction is better, replace old one", "hash", hash, "old", old.Hash().Hex())
 			pool.all.Remove(old.Hash())
 			pool.calculateTxsLifecycle(types.Transactions{old}, time.Now())
 			pool.priced.Removed(1)
 			pendingReplaceMeter.Mark(1)
 		}
+		log.Info("already pending 1", "hash", hash)
 		pool.all.Add(tx, isLocal)
 		pool.priced.Put(tx, isLocal)
 		pool.journalTx(from, tx)
@@ -868,12 +881,15 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		return old != nil, nil
 	}
 	// New transaction isn't replacing a pending one, push into queue
+	log.Info("new transaction isn't replacing a pending one, push into queue", "hash", hash, "from", from, "to", tx.To())
 	replaced, err = pool.enqueueTx(hash, tx, isLocal, true)
 	if err != nil {
 		return false, err
 	}
 	// Mark local addresses and journal local transactions
+	log.Info("mark local addresses and journal local transactions", "hash", hash, "from", from, "to", tx.To())
 	if local && !pool.locals.contains(from) {
+		log.Info("Setting new local account", "hash", hash, "from", from, "to", tx.To())
 		log.Info("Setting new local account", "address", from)
 		pool.locals.add(from)
 		pool.priced.Removed(pool.all.RemoteToLocals(pool.locals)) // Migrate the remotes if it's marked as local first time.
@@ -1084,6 +1100,7 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) ([]error,
 		replaced, err := pool.add(tx, local)
 		errs[i] = err
 		if err == nil && !replaced {
+			log.Info("dirty.addTx", "hash", tx.Hash())
 			dirty.addTx(tx)
 		}
 	}
@@ -1262,6 +1279,7 @@ func (pool *TxPool) scheduleReorgLoop() {
 			} else {
 				dirtyAccounts.merge(req)
 			}
+			// TODO: print dirtyAccounts related in reorg
 			launchNextRun = true
 			pool.reorgDoneCh <- nextDone
 

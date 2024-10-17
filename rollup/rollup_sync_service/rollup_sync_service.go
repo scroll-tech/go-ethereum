@@ -587,13 +587,13 @@ func decodeBlockRangesFromEncodedChunks(codecVersion encoding.CodecVersion, chun
 
 	daChunksRawTx, err := codec.DecodeDAChunksRawTx(chunks)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DA chunks: %w", err)
+		return nil, fmt.Errorf("failed to decode DA chunks, version: %v, err: %w", codecVersion, err)
 	}
 
 	var chunkBlockRanges []*rawdb.ChunkBlockRange
 	for _, daChunkRawTx := range daChunksRawTx {
 		if len(daChunkRawTx.Blocks) == 0 {
-			return nil, fmt.Errorf("no blocks found in DA chunk")
+			return nil, fmt.Errorf("no blocks found in DA chunk, version: %v", codecVersion)
 		}
 
 		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{

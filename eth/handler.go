@@ -519,12 +519,18 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		directCount += len(hashes)
 		peer.AsyncSendTransactions(hashes)
 		log.Debug("Transactions being broadcasted to", "peer", peer.String(), "len", len(hashes))
+		for _, hash := range hashes {
+			log.Info("Transactions being broadcasted to", "peer", peer.String(), "len", len(hashes), "hash", hash)
+		}
 	}
 	for peer, hashes := range annos {
 		annoPeers++
 		annoCount += len(hashes)
 		peer.AsyncSendPooledTransactionHashes(hashes)
 		log.Debug("Transactions being announced to", "peer", peer.String(), "len", len(hashes))
+		for _, hash := range hashes {
+			log.Info("Transactions being announced to", "peer", peer.String(), "len", len(hashes), "hash", hash)
+		}
 	}
 	log.Debug("Transaction broadcast", "txs", len(txs),
 		"announce packs", annoPeers, "announced hashes", annoCount,

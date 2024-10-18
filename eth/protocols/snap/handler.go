@@ -414,15 +414,14 @@ func ServiceGetStorageRangesQuery(chain *core.BlockChain, req *GetStorageRangesP
 		if origin != (common.Hash{}) || (abort && len(storage) > 0) {
 			// Request started at a non-zero hash or was capped prematurely, add
 			// the endpoint Merkle proofs
-			_, err := trie.NewStateTrie(trie.StateTrieID(req.Root), chain.TrieDB())
+			accTrie, err := trie.NewStateTrie(trie.StateTrieID(req.Root), chain.TrieDB())
 			if err != nil {
 				return nil, nil
 			}
-			var acc types.StateAccount
-			/*			acc, err := accTrie.GetAccountByHash(account)
-						if err != nil || acc == nil {
-							return nil, nil
-						}*/
+			acc, err := accTrie.GetAccountByHash(account)
+			if err != nil || acc == nil {
+				return nil, nil
+			}
 			id := trie.StorageTrieID(req.Root, account, acc.Root)
 			stTrie, err := trie.NewStateTrie(id, chain.TrieDB())
 			if err != nil {
@@ -490,7 +489,7 @@ func ServiceGetTrieNodesQuery(chain *core.BlockChain, req *GetTrieNodesPacket, s
 	// Make sure we have the state associated with the request
 	triedb := chain.TrieDB()
 
-	_, err := trie.NewStateTrie(trie.StateTrieID(req.Root), triedb)
+	accTrie, err := trie.NewStateTrie(trie.StateTrieID(req.Root), triedb)
 	if err != nil {
 		// We don't have the requested state available, bail out
 		return nil, nil
@@ -509,28 +508,28 @@ func ServiceGetTrieNodesQuery(chain *core.BlockChain, req *GetTrieNodesPacket, s
 			// Ensure we penalize invalid requests
 			return nil, fmt.Errorf("%w: zero-item pathset requested", errBadRequest)
 
-		// case 1:
-		// 	// If we're only retrieving an account trie node, fetch it directly
-		// 	blob, resolved, err := accTrie.GetNode(pathset[0])
-		// 	loads += resolved // always account database reads, even for failures
-		// 	if err != nil {
-		// 		break
-		// 	}
-		// 	nodes = append(nodes, blob)
-		// 	bytes += uint64(len(blob))
+		case 1:
+			// If we're only retrieving an account trie node, fetch it directly
+			blob, resolved, err := accTrie.GetNode(pathset[0])
+			loads += resolved // always account database reads, even for failures
+			if err != nil {
+				break
+			}
+			nodes = append(nodes, blob)
+			bytes += uint64(len(blob))
 
 		default:
 			var stRoot common.Hash
 			// Storage slots requested, open the storage trie and retrieve from there
 			if snap == nil {
-				// // We don't have the requested state snapshotted yet (or it is stale),
-				// // but can look up the account via the trie instead.
-				// account, err := accTrie.GetAccountByHash(common.BytesToHash(pathset[0]))
-				// loads += 8 // We don't know the exact cost of lookup, this is an estimate
-				// if err != nil || account == nil {
-				// 	break
-				// }
-				// stRoot = account.Root
+				// We don't have the requested state snapshotted yet (or it is stale),
+				// but can look up the account via the trie instead.
+				account, err := accTrie.GetAccountByHash(common.BytesToHash(pathset[0]))
+				loads += 8 // We don't know the exact cost of lookup, this is an estimate
+				if err != nil || account == nil {
+					break
+				}
+				stRoot = account.Root
 			} else {
 				account, err := snap.Account(common.BytesToHash(pathset[0]))
 				loads++ // always account database reads, even for failures
@@ -540,25 +539,25 @@ func ServiceGetTrieNodesQuery(chain *core.BlockChain, req *GetTrieNodesPacket, s
 				stRoot = common.BytesToHash(account.Root)
 			}
 			id := trie.StorageTrieID(req.Root, common.BytesToHash(pathset[0]), stRoot)
-			_, err := trie.NewStateTrie(id, triedb)
+			stTrie, err := trie.NewStateTrie(id, triedb)
 			loads++ // always account database reads, even for failures
 			if err != nil {
 				break
 			}
-			// for _, path := range pathset[1:] {
-			// 	blob, resolved, err := stTrie.GetNode(path)
-			// 	loads += resolved // always account database reads, even for failures
-			// 	if err != nil {
-			// 		break
-			// 	}
-			// 	nodes = append(nodes, blob)
-			// 	bytes += uint64(len(blob))
+			for _, path := range pathset[1:] {
+				blob, resolved, err := stTrie.GetNode(path)
+				loads += resolved // always account database reads, even for failures
+				if err != nil {
+					break
+				}
+				nodes = append(nodes, blob)
+				bytes += uint64(len(blob))
 
-			// 	// Sanity check limits to avoid DoS on the store trie loads
-			// 	if bytes > req.Bytes || loads > maxTrieNodeLookups || time.Since(start) > maxTrieNodeTimeSpent {
-			// 		break
-			// 	}
-			// }
+				// Sanity check limits to avoid DoS on the store trie loads
+				if bytes > req.Bytes || loads > maxTrieNodeLookups || time.Since(start) > maxTrieNodeTimeSpent {
+					break
+				}
+			}
 		}
 		// Abort request processing if we've exceeded our limits
 		if bytes > req.Bytes || loads > maxTrieNodeLookups || time.Since(start) > maxTrieNodeTimeSpent {

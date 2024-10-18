@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/big"
 	"sync"
 
@@ -69,6 +70,10 @@ type ZkTrie struct {
 	rootKey   *Hash
 	maxLevels int
 
+	// Preimage store
+	preimages   *preimageStore
+	secKeyCache map[string][]byte
+
 	// Flag whether the commit operation is already performed. If so the
 	// trie is not usable(latest states is invisible).
 	committed    bool
@@ -93,6 +98,8 @@ func NewZkTrie(id *ID, db *Database) (*ZkTrie, error) {
 		maxLevels:    NodeKeyValidBytes * 8,
 		dirtyIndex:   big.NewInt(0),
 		dirtyStorage: make(map[Hash]*Node),
+		preimages:    db.preimages,
+		secKeyCache:  make(map[string][]byte),
 	}
 	mt.rootKey = NewHashFromBytes(id.Root.Bytes())
 	if *mt.rootKey != HashZero {
@@ -169,8 +176,7 @@ func (mt *ZkTrie) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error 
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
-	// todo: save preimage
-	// mt.db.UpdatePreimage(key, secureKey)
+	mt.secKeyCache[string(nodeKey.Bytes())] = key
 
 	newRootKey, _, err := mt.addLeaf(newLeafNode, mt.rootKey, 0, path)
 	// sanity check
@@ -285,10 +291,16 @@ func (mt *ZkTrie) commit(nodeHash *Hash, path []byte, nodeSet *trienode.NodeSet,
 		return nil
 	}
 
-	if node.Type == NodeTypeLeaf_New && collectLeaf {
-		nodeSet.AddLeaf(common.BytesToHash(nodeHash.Bytes()), node.Data())
+	if node.Type == NodeTypeLeaf_New {
+		if mt.preimages != nil {
+			mt.preimages.insertPreimage(map[common.Hash][]byte{
+				common.BytesToHash(nodeHash.Bytes()): node.NodeKey.Bytes(),
+			})
+		}
+		if collectLeaf {
+			nodeSet.AddLeaf(common.BytesToHash(nodeHash.Bytes()), node.Data())
+		}
 	}
-
 	if node.ChildL != nil {
 		if err := mt.commit(node.ChildL, append(path, byte(0)), nodeSet, collectLeaf); err != nil {
 			return err
@@ -541,7 +553,13 @@ func (mt *ZkTrie) GetKey(hashKey []byte) []byte {
 
 // GetKey returns the key for the given hash.
 func (mt *ZkTrie) getKey(hashKey []byte) []byte {
-	return nil
+	if key, ok := mt.secKeyCache[string(hashKey)]; ok {
+		return key
+	}
+	if mt.preimages == nil {
+		return nil
+	}
+	return mt.preimages.preimage(common.BytesToHash(hashKey))
 }
 
 // Delete removes the specified Key from the ZkTrie and updates the path
@@ -1017,6 +1035,8 @@ func (mt *ZkTrie) Copy() *ZkTrie {
 		dirtyStorage: newDirtyStorage,
 		rootKey:      &newRootKey,
 		committed:    mt.committed,
+		preimages:    mt.preimages,
+		secKeyCache:  maps.Clone(mt.secKeyCache),
 	}
 }
 

@@ -78,7 +78,7 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 					siblingHash = n.ChildL
 				}
 				if siblingHash != nil {
-					sibling, err := t.trie.GetNode(siblingHash)
+					sibling, err := t.trie.GetNodeByHash(siblingHash)
 					if err != nil {
 						return nil, err
 					}

@@ -441,7 +441,7 @@ func TestMerkleTree_BuildAndVerifyZkTrieProof(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, 1, len(node.ValuePreimage))
 			assert.Equal(t, (&Byte32{td.value})[:], node.ValuePreimage[0][:])
-			proof, node, err := BuildZkTrieProof(zkTrie.rootKey, td.key, 10, zkTrie.GetNode)
+			proof, node, err := BuildZkTrieProof(zkTrie.rootKey, td.key, 10, zkTrie.GetNodeByHash)
 			assert.NoError(t, err)
 
 			valid := VerifyProofZkTrie(zkTrie.rootKey, proof, node)
@@ -450,7 +450,7 @@ func TestMerkleTree_BuildAndVerifyZkTrieProof(t *testing.T) {
 	})
 
 	t.Run("Test with non-existent key", func(t *testing.T) {
-		proof, node, err := BuildZkTrieProof(zkTrie.rootKey, nonExistentKey, 10, zkTrie.GetNode)
+		proof, node, err := BuildZkTrieProof(zkTrie.rootKey, nonExistentKey, 10, zkTrie.GetNodeByHash)
 		assert.NoError(t, err)
 		assert.False(t, proof.Existence)
 		valid := VerifyProofZkTrie(zkTrie.rootKey, proof, node)

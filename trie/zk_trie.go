@@ -96,7 +96,7 @@ func NewZkTrie(id *ID, db *Database) (*ZkTrie, error) {
 	}
 	mt.rootKey = NewHashFromBytes(id.Root.Bytes())
 	if *mt.rootKey != HashZero {
-		_, err := mt.GetNode(mt.rootKey)
+		_, err := mt.GetNodeByHash(mt.rootKey)
 		if err != nil {
 			return nil, err
 		}
@@ -690,10 +690,10 @@ func (mt *ZkTrie) GetLeafNode(key []byte) (*Node, error) {
 	return n, err
 }
 
-// GetNode gets a node by node hash from the MT.  Empty nodes are not stored in the
+// GetNodeByHash gets a node by node hash from the MT.  Empty nodes are not stored in the
 // tree; they are all the same and assumed to always exist.
 // <del>for non exist key, return (NewEmptyNode(), nil)</del>
-func (mt *ZkTrie) GetNode(nodeHash *Hash) (*Node, error) {
+func (mt *ZkTrie) GetNodeByHash(nodeHash *Hash) (*Node, error) {
 	mt.lock.RLock()
 	defer mt.lock.RUnlock()
 
@@ -1289,4 +1289,19 @@ func (mt *ZkTrie) MustNodeIterator(start []byte) NodeIterator {
 		panic(err)
 	}
 	return itr
+}
+
+// GetAccountByHash does the same thing as GetAccount, however it expects an
+// account hash that is the hash of address. This constitutes an abstraction
+// leak, since the client code needs to know the key format.
+func (mt *ZkTrie) GetAccountByHash(addrHash common.Hash) (*types.StateAccount, error) {
+	return nil, errors.New("not implemented")
+}
+
+// GetNode attempts to retrieve a trie node by compact-encoded path. It is not
+// possible to use keybyte-encoding as the path might contain odd nibbles.
+// If the specified trie node is not in the trie, nil will be returned.
+// If a trie node is not found in the database, a MissingNodeError is returned.
+func (mt *ZkTrie) GetNode(path []byte) ([]byte, int, error) {
+	return nil, 0, errors.New("not implemented")
 }

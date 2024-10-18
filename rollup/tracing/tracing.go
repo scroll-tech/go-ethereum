@@ -27,6 +27,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/fees"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/withdrawtrie"
+	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
 var (
@@ -78,7 +80,7 @@ type TraceEnv struct {
 	TxStorageTraces []*types.StorageTrace
 	Codes           map[common.Hash]logger.CodeInfo
 	// zktrie tracer is used for zktrie storage to build additional deletion proof
-	ZkTrieTracer map[string]state.ZktrieProofTracer
+	ZkTrieTracer map[string]*ProofTracer
 
 	// StartL1QueueIndex is the next L1 message queue index that this block can process.
 	// Example: If the parent block included QueueIndex=9, then StartL1QueueIndex will
@@ -117,7 +119,7 @@ func CreateTraceEnvHelper(chainConfig *params.ChainConfig, logConfig *logger.Con
 		},
 		TxStorageTraces:   make([]*types.StorageTrace, block.Transactions().Len()),
 		Codes:             make(map[common.Hash]logger.CodeInfo),
-		ZkTrieTracer:      make(map[string]state.ZktrieProofTracer),
+		ZkTrieTracer:      make(map[string]*ProofTracer),
 		StartL1QueueIndex: startL1QueueIndex,
 	}
 }
@@ -435,14 +437,15 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 		}
 
 		env.sMu.Lock()
-		trie, err := state.GetStorageTrieForProof(addr)
-		if err != nil {
+		storageTrie, err := state.Database().OpenStorageTrie(state.GetRootHash(), addr, state.GetOrNewStateObject(addr).Root())
+		zkStorageTrie, isZk := storageTrie.(*trie.ZkTrie)
+		if err != nil || !isZk {
 			// but we still continue to next address
 			log.Error("Storage trie not available", "error", err, "address", addr)
 			env.sMu.Unlock()
 			continue
 		}
-		zktrieTracer := state.NewProofTracer(trie)
+		zktrieTracer := NewProofTracer(zkStorageTrie)
 		env.sMu.Unlock()
 
 		for key := range keys {
@@ -458,29 +461,23 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 				m = make(map[string][]hexutil.Bytes)
 				env.StorageProofs[addrStr] = m
 			}
-			if zktrieTracer.Available() && !env.ZkTrieTracer[addrStr].Available() {
-				env.ZkTrieTracer[addrStr] = state.NewProofTracer(trie)
+			if _, exists := env.ZkTrieTracer[addrStr]; !exists {
+				env.ZkTrieTracer[addrStr] = zktrieTracer
 			}
 
 			if proof, existed := m[keyStr]; existed {
 				txm[keyStr] = proof
 				// still need to touch tracer for deletion
-				if isDelete && zktrieTracer.Available() {
-					env.ZkTrieTracer[addrStr].MarkDeletion(key)
+				if isDelete {
+					env.ZkTrieTracer[addrStr].MarkDeletion(key.Bytes())
 				}
 				env.sMu.Unlock()
 				continue
 			}
 			env.sMu.Unlock()
 
-			var proof [][]byte
-			var err error
-			if zktrieTracer.Available() {
-				proof, err = state.GetSecureTrieProof(zktrieTracer, key)
-			} else {
-				proof, err = state.GetSecureTrieProof(trie, key)
-			}
-			if err != nil {
+			var proof zkproof.ProofList
+			if err = zkStorageTrie.Prove(key.Bytes(), &proof); err != nil {
 				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 				// but we still mark the proofs map with nil array
 			}
@@ -488,12 +485,10 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			env.sMu.Lock()
 			txm[keyStr] = wrappedProof
 			m[keyStr] = wrappedProof
-			if zktrieTracer.Available() {
-				if isDelete {
-					zktrieTracer.MarkDeletion(key)
-				}
-				env.ZkTrieTracer[addrStr].Merge(zktrieTracer)
+			if isDelete {
+				zktrieTracer.MarkDeletion(key.Bytes())
 			}
+			env.ZkTrieTracer[addrStr].Merge(zktrieTracer)
 			env.sMu.Unlock()
 		}
 	}
@@ -564,9 +559,13 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 
 		for _, slot := range storages {
 			if _, existed := env.StorageProofs[addr.String()][slot.String()]; !existed {
-				if trie, err := statedb.GetStorageTrieForProof(addr); err != nil {
-					log.Error("Storage proof for intrinstic address not available", "error", err, "address", addr)
-				} else if proof, err := statedb.GetSecureTrieProof(trie, slot); err != nil {
+				var proof zkproof.ProofList
+				storageTrie, err := statedb.Database().OpenStorageTrie(statedb.GetRootHash(), addr, statedb.GetOrNewStateObject(addr).Root())
+				zkStorageTrie, isZk := storageTrie.(*trie.ZkTrie)
+				if err != nil || !isZk {
+					// but we still continue to next address
+					log.Error("Storage trie not available", "error", err, "address", addr)
+				} else if err := zkStorageTrie.Prove(slot.Bytes(), &proof); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
 				} else {
 					env.StorageProofs[addr.String()][slot.String()] = types.WrapProof(proof)

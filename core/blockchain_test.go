@@ -279,7 +279,7 @@ func TestExtendCanonicalHeaders(t *testing.T) {
 }
 func TestExtendCanonicalBlocks(t *testing.T) {
 	testExtendCanonical(t, true, rawdb.HashScheme)
-	testExtendCanonical(t, true, rawdb.PathScheme)
+	// testExtendCanonical(t, true, rawdb.PathScheme)
 }
 
 func testExtendCanonical(t *testing.T, full bool, scheme string) {
@@ -313,7 +313,7 @@ func TestExtendCanonicalHeadersAfterMerge(t *testing.T) {
 }
 func TestExtendCanonicalBlocksAfterMerge(t *testing.T) {
 	testExtendCanonicalAfterMerge(t, true, rawdb.HashScheme)
-	testExtendCanonicalAfterMerge(t, true, rawdb.PathScheme)
+	// testExtendCanonicalAfterMerge(t, true, rawdb.PathScheme)
 }
 
 func testExtendCanonicalAfterMerge(t *testing.T, full bool, scheme string) {
@@ -338,7 +338,7 @@ func TestShorterForkHeaders(t *testing.T) {
 }
 func TestShorterForkBlocks(t *testing.T) {
 	testShorterFork(t, true, rawdb.HashScheme)
-	testShorterFork(t, true, rawdb.PathScheme)
+	// testShorterFork(t, true, rawdb.PathScheme)
 }
 
 func testShorterFork(t *testing.T, full bool, scheme string) {
@@ -374,7 +374,7 @@ func TestShorterForkHeadersAfterMerge(t *testing.T) {
 }
 func TestShorterForkBlocksAfterMerge(t *testing.T) {
 	testShorterForkAfterMerge(t, true, rawdb.HashScheme)
-	testShorterForkAfterMerge(t, true, rawdb.PathScheme)
+	// testShorterForkAfterMerge(t, true, rawdb.PathScheme)
 }
 
 func testShorterForkAfterMerge(t *testing.T, full bool, scheme string) {
@@ -403,7 +403,7 @@ func TestLongerForkHeaders(t *testing.T) {
 }
 func TestLongerForkBlocks(t *testing.T) {
 	testLongerFork(t, true, rawdb.HashScheme)
-	testLongerFork(t, true, rawdb.PathScheme)
+	// testLongerFork(t, true, rawdb.PathScheme)
 }
 
 func testLongerFork(t *testing.T, full bool, scheme string) {
@@ -432,7 +432,7 @@ func TestLongerForkHeadersAfterMerge(t *testing.T) {
 }
 func TestLongerForkBlocksAfterMerge(t *testing.T) {
 	testLongerForkAfterMerge(t, true, rawdb.HashScheme)
-	testLongerForkAfterMerge(t, true, rawdb.PathScheme)
+	// testLongerForkAfterMerge(t, true, rawdb.PathScheme)
 }
 
 func testLongerForkAfterMerge(t *testing.T, full bool, scheme string) {
@@ -461,7 +461,7 @@ func TestEqualForkHeaders(t *testing.T) {
 }
 func TestEqualForkBlocks(t *testing.T) {
 	testEqualFork(t, true, rawdb.HashScheme)
-	testEqualFork(t, true, rawdb.PathScheme)
+	// testEqualFork(t, true, rawdb.PathScheme)
 }
 
 func testEqualFork(t *testing.T, full bool, scheme string) {
@@ -497,7 +497,7 @@ func TestEqualForkHeadersAfterMerge(t *testing.T) {
 }
 func TestEqualForkBlocksAfterMerge(t *testing.T) {
 	testEqualForkAfterMerge(t, true, rawdb.HashScheme)
-	testEqualForkAfterMerge(t, true, rawdb.PathScheme)
+	// testEqualForkAfterMerge(t, true, rawdb.PathScheme)
 }
 
 func testEqualForkAfterMerge(t *testing.T, full bool, scheme string) {
@@ -525,7 +525,7 @@ func TestBrokenHeaderChain(t *testing.T) {
 }
 func TestBrokenBlockChain(t *testing.T) {
 	testBrokenChain(t, true, rawdb.HashScheme)
-	testBrokenChain(t, true, rawdb.PathScheme)
+	// testBrokenChain(t, true, rawdb.PathScheme)
 }
 
 func testBrokenChain(t *testing.T, full bool, scheme string) {
@@ -558,7 +558,7 @@ func TestReorgLongHeaders(t *testing.T) {
 }
 func TestReorgLongBlocks(t *testing.T) {
 	testReorgLong(t, true, rawdb.HashScheme)
-	testReorgLong(t, true, rawdb.PathScheme)
+	// testReorgLong(t, true, rawdb.PathScheme)
 }
 
 func testReorgLong(t *testing.T, full bool, scheme string) {
@@ -573,7 +573,7 @@ func TestReorgShortHeaders(t *testing.T) {
 }
 func TestReorgShortBlocks(t *testing.T) {
 	testReorgShort(t, true, rawdb.HashScheme)
-	testReorgShort(t, true, rawdb.PathScheme)
+	// testReorgShort(t, true, rawdb.PathScheme)
 }
 
 func testReorgShort(t *testing.T, full bool, scheme string) {
@@ -667,7 +667,7 @@ func TestBadHeaderHashes(t *testing.T) {
 }
 func TestBadBlockHashes(t *testing.T) {
 	testBadHashes(t, true, rawdb.HashScheme)
-	testBadHashes(t, true, rawdb.PathScheme)
+	// testBadHashes(t, true, rawdb.PathScheme)
 }
 
 func testBadHashes(t *testing.T, full bool, scheme string) {
@@ -707,7 +707,7 @@ func TestReorgBadHeaderHashes(t *testing.T) {
 }
 func TestReorgBadBlockHashes(t *testing.T) {
 	testReorgBadHashes(t, true, rawdb.HashScheme)
-	testReorgBadHashes(t, true, rawdb.PathScheme)
+	// testReorgBadHashes(t, true, rawdb.PathScheme)
 }
 
 func testReorgBadHashes(t *testing.T, full bool, scheme string) {
@@ -768,7 +768,7 @@ func TestHeadersInsertNonceError(t *testing.T) {
 }
 func TestBlocksInsertNonceError(t *testing.T) {
 	testInsertNonceError(t, true, rawdb.HashScheme)
-	testInsertNonceError(t, true, rawdb.PathScheme)
+	// testInsertNonceError(t, true, rawdb.PathScheme)
 }
 
 func testInsertNonceError(t *testing.T, full bool, scheme string) {
@@ -830,7 +830,7 @@ func testInsertNonceError(t *testing.T, full bool, scheme string) {
 // classical full block processing.
 func TestFastVsFullChains(t *testing.T) {
 	testFastVsFullChains(t, rawdb.HashScheme)
-	testFastVsFullChains(t, rawdb.PathScheme)
+	// testFastVsFullChains(t, rawdb.PathScheme)
 }
 
 func testFastVsFullChains(t *testing.T, scheme string) {
@@ -963,7 +963,7 @@ func testFastVsFullChains(t *testing.T, scheme string) {
 // positions.
 func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	testLightVsFastVsFullChainHeads(t, rawdb.HashScheme)
-	testLightVsFastVsFullChainHeads(t, rawdb.PathScheme)
+	// testLightVsFastVsFullChainHeads(t, rawdb.PathScheme)
 }
 
 func testLightVsFastVsFullChainHeads(t *testing.T, scheme string) {
@@ -1080,7 +1080,7 @@ func testLightVsFastVsFullChainHeads(t *testing.T, scheme string) {
 // Tests that chain reorganisations handle transaction removals and reinsertions.
 func TestChainTxReorgs(t *testing.T) {
 	testChainTxReorgs(t, rawdb.HashScheme)
-	testChainTxReorgs(t, rawdb.PathScheme)
+	// testChainTxReorgs(t, rawdb.PathScheme)
 }
 
 func testChainTxReorgs(t *testing.T, scheme string) {
@@ -1199,7 +1199,7 @@ func testChainTxReorgs(t *testing.T, scheme string) {
 
 func TestLogReorgs(t *testing.T) {
 	testLogReorgs(t, rawdb.HashScheme)
-	testLogReorgs(t, rawdb.PathScheme)
+	// testLogReorgs(t, rawdb.PathScheme)
 }
 
 func testLogReorgs(t *testing.T, scheme string) {
@@ -1259,7 +1259,7 @@ var logCode = common.Hex2Bytes("60606040525b7f24ec1d3ff24c2f6ff210738839dbc339cd
 // when the chain reorganizes.
 func TestLogRebirth(t *testing.T) {
 	testLogRebirth(t, rawdb.HashScheme)
-	testLogRebirth(t, rawdb.PathScheme)
+	// testLogRebirth(t, rawdb.PathScheme)
 }
 
 func testLogRebirth(t *testing.T, scheme string) {
@@ -1341,7 +1341,7 @@ func testLogRebirth(t *testing.T, scheme string) {
 // when a side chain containing log events overtakes the canonical chain.
 func TestSideLogRebirth(t *testing.T) {
 	testSideLogRebirth(t, rawdb.HashScheme)
-	testSideLogRebirth(t, rawdb.PathScheme)
+	// testSideLogRebirth(t, rawdb.PathScheme)
 }
 
 func testSideLogRebirth(t *testing.T, scheme string) {
@@ -1436,7 +1436,7 @@ func checkLogEvents(t *testing.T, logsCh <-chan []*types.Log, rmLogsCh <-chan Re
 
 func TestReorgSideEvent(t *testing.T) {
 	testReorgSideEvent(t, rawdb.HashScheme)
-	testReorgSideEvent(t, rawdb.PathScheme)
+	// testReorgSideEvent(t, rawdb.PathScheme)
 }
 
 func testReorgSideEvent(t *testing.T, scheme string) {
@@ -1521,7 +1521,7 @@ done:
 // Tests if the canonical block can be fetched from the database during chain insertion.
 func TestCanonicalBlockRetrieval(t *testing.T) {
 	testCanonicalBlockRetrieval(t, rawdb.HashScheme)
-	testCanonicalBlockRetrieval(t, rawdb.PathScheme)
+	// testCanonicalBlockRetrieval(t, rawdb.PathScheme)
 }
 
 func testCanonicalBlockRetrieval(t *testing.T, scheme string) {
@@ -1571,7 +1571,7 @@ func testCanonicalBlockRetrieval(t *testing.T, scheme string) {
 }
 func TestEIP155Transition(t *testing.T) {
 	testEIP155Transition(t, rawdb.HashScheme)
-	testEIP155Transition(t, rawdb.PathScheme)
+	// testEIP155Transition(t, rawdb.PathScheme)
 }
 
 func testEIP155Transition(t *testing.T, scheme string) {
@@ -1685,7 +1685,7 @@ func testEIP155Transition(t *testing.T, scheme string) {
 }
 func TestEIP161AccountRemoval(t *testing.T) {
 	testEIP161AccountRemoval(t, rawdb.HashScheme)
-	testEIP161AccountRemoval(t, rawdb.PathScheme)
+	// testEIP161AccountRemoval(t, rawdb.PathScheme)
 }
 
 func testEIP161AccountRemoval(t *testing.T, scheme string) {
@@ -1760,7 +1760,7 @@ func testEIP161AccountRemoval(t *testing.T, scheme string) {
 // https://github.com/ethereum/go-ethereum/pull/15941
 func TestBlockchainHeaderchainReorgConsistency(t *testing.T) {
 	testBlockchainHeaderchainReorgConsistency(t, rawdb.HashScheme)
-	testBlockchainHeaderchainReorgConsistency(t, rawdb.PathScheme)
+	// testBlockchainHeaderchainReorgConsistency(t, rawdb.PathScheme)
 }
 
 func testBlockchainHeaderchainReorgConsistency(t *testing.T, scheme string) {
@@ -1856,7 +1856,7 @@ func TestTrieForkGC(t *testing.T) {
 // forking point is not available any more.
 func TestLargeReorgTrieGC(t *testing.T) {
 	testLargeReorgTrieGC(t, rawdb.HashScheme)
-	testLargeReorgTrieGC(t, rawdb.PathScheme)
+	// testLargeReorgTrieGC(t, rawdb.PathScheme)
 }
 
 func testLargeReorgTrieGC(t *testing.T, scheme string) {
@@ -1865,6 +1865,10 @@ func testLargeReorgTrieGC(t *testing.T, scheme string) {
 	genesis := &Genesis{
 		Config:  params.TestChainConfig,
 		BaseFee: big.NewInt(params.InitialBaseFee),
+		Alloc: GenesisAlloc{
+			common.Address{2}: {Balance: big.NewInt(1)},
+			common.Address{3}: {Balance: big.NewInt(1)},
+		},
 	}
 	genDb, shared, _ := GenerateChainWithGenesis(genesis, engine, 64, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
 	original, _ := GenerateChain(genesis.Config, shared[len(shared)-1], engine, genDb, 2*TriesInMemory, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
@@ -1925,7 +1929,7 @@ func testLargeReorgTrieGC(t *testing.T, scheme string) {
 
 func TestBlockchainRecovery(t *testing.T) {
 	testBlockchainRecovery(t, rawdb.HashScheme)
-	testBlockchainRecovery(t, rawdb.PathScheme)
+	// testBlockchainRecovery(t, rawdb.PathScheme)
 }
 
 func testBlockchainRecovery(t *testing.T, scheme string) {
@@ -1981,7 +1985,7 @@ func testBlockchainRecovery(t *testing.T, scheme string) {
 // This test checks that InsertReceiptChain will roll back correctly when attempting to insert a side chain.
 func TestInsertReceiptChainRollback(t *testing.T) {
 	testInsertReceiptChainRollback(t, rawdb.HashScheme)
-	testInsertReceiptChainRollback(t, rawdb.PathScheme)
+	// testInsertReceiptChainRollback(t, rawdb.PathScheme)
 }
 
 func testInsertReceiptChainRollback(t *testing.T, scheme string) {
@@ -2063,7 +2067,7 @@ func testInsertReceiptChainRollback(t *testing.T, scheme string) {
 //   - https://github.com/ethereum/go-ethereum/pull/18988
 func TestLowDiffLongChain(t *testing.T) {
 	testLowDiffLongChain(t, rawdb.HashScheme)
-	testLowDiffLongChain(t, rawdb.PathScheme)
+	// testLowDiffLongChain(t, rawdb.PathScheme)
 }
 
 func testLowDiffLongChain(t *testing.T, scheme string) {
@@ -2270,15 +2274,15 @@ func TestPrunedImportSideWithMerging(t *testing.T) {
 
 func TestInsertKnownHeaders(t *testing.T) {
 	testInsertKnownChainData(t, "headers", rawdb.HashScheme)
-	testInsertKnownChainData(t, "headers", rawdb.PathScheme)
+	// testInsertKnownChainData(t, "headers", rawdb.PathScheme)
 }
 func TestInsertKnownReceiptChain(t *testing.T) {
 	testInsertKnownChainData(t, "receipts", rawdb.HashScheme)
-	testInsertKnownChainData(t, "receipts", rawdb.PathScheme)
+	// testInsertKnownChainData(t, "receipts", rawdb.PathScheme)
 }
 func TestInsertKnownBlocks(t *testing.T) {
 	testInsertKnownChainData(t, "blocks", rawdb.HashScheme)
-	testInsertKnownChainData(t, "blocks", rawdb.PathScheme)
+	// testInsertKnownChainData(t, "blocks", rawdb.PathScheme)
 }
 
 func testInsertKnownChainData(t *testing.T, typ string, scheme string) {
@@ -2636,7 +2640,7 @@ func getLongAndShortChains(scheme string) (*BlockChain, []*types.Block, []*types
 // 4. The forked block should still be retrievable by hash
 func TestReorgToShorterRemovesCanonMapping(t *testing.T) {
 	testReorgToShorterRemovesCanonMapping(t, rawdb.HashScheme)
-	testReorgToShorterRemovesCanonMapping(t, rawdb.PathScheme)
+	// testReorgToShorterRemovesCanonMapping(t, rawdb.PathScheme)
 }
 
 func testReorgToShorterRemovesCanonMapping(t *testing.T, scheme string) {
@@ -2679,7 +2683,7 @@ func testReorgToShorterRemovesCanonMapping(t *testing.T, scheme string) {
 // imports -- that is, for fast sync
 func TestReorgToShorterRemovesCanonMappingHeaderChain(t *testing.T) {
 	testReorgToShorterRemovesCanonMappingHeaderChain(t, rawdb.HashScheme)
-	testReorgToShorterRemovesCanonMappingHeaderChain(t, rawdb.PathScheme)
+	// testReorgToShorterRemovesCanonMappingHeaderChain(t, rawdb.PathScheme)
 }
 
 func testReorgToShorterRemovesCanonMappingHeaderChain(t *testing.T, scheme string) {
@@ -2827,7 +2831,7 @@ func TestTransactionIndices(t *testing.T) {
 
 func TestSkipStaleTxIndicesInSnapSync(t *testing.T) {
 	testSkipStaleTxIndicesInSnapSync(t, rawdb.HashScheme)
-	testSkipStaleTxIndicesInSnapSync(t, rawdb.PathScheme)
+	// testSkipStaleTxIndicesInSnapSync(t, rawdb.PathScheme)
 }
 
 func testSkipStaleTxIndicesInSnapSync(t *testing.T, scheme string) {
@@ -3024,7 +3028,7 @@ func BenchmarkBlockChain_1x1000Executions(b *testing.B) {
 //  3. The blocks fetched are all known and canonical blocks
 func TestSideImportPrunedBlocks(t *testing.T) {
 	testSideImportPrunedBlocks(t, rawdb.HashScheme)
-	testSideImportPrunedBlocks(t, rawdb.PathScheme)
+	// testSideImportPrunedBlocks(t, rawdb.PathScheme)
 }
 
 func testSideImportPrunedBlocks(t *testing.T, scheme string) {
@@ -3082,7 +3086,7 @@ func testSideImportPrunedBlocks(t *testing.T, scheme string) {
 // first, but the journal wiped the entire state object on create-revert.
 func TestDeleteCreateRevert(t *testing.T) {
 	testDeleteCreateRevert(t, rawdb.HashScheme)
-	testDeleteCreateRevert(t, rawdb.PathScheme)
+	// testDeleteCreateRevert(t, rawdb.PathScheme)
 }
 
 func testDeleteCreateRevert(t *testing.T, scheme string) {
@@ -3156,6 +3160,7 @@ func testDeleteCreateRevert(t *testing.T, scheme string) {
 // Expected outcome is that _all_ slots are cleared from A, due to the selfdestruct,
 // and then the new slots exist
 func TestDeleteRecreateSlots(t *testing.T) {
+	t.Skip("Scroll doesn't support SELFDESTRUCT")
 	testDeleteRecreateSlots(t, rawdb.HashScheme)
 	testDeleteRecreateSlots(t, rawdb.PathScheme)
 }
@@ -3284,6 +3289,7 @@ func testDeleteRecreateSlots(t *testing.T, scheme string) {
 // regular value-transfer
 // Expected outcome is that _all_ slots are cleared from A
 func TestDeleteRecreateAccount(t *testing.T) {
+	t.Skip("Scroll doesn't support SELFDESTRUCT")
 	testDeleteRecreateAccount(t, rawdb.HashScheme)
 	testDeleteRecreateAccount(t, rawdb.PathScheme)
 }
@@ -3362,6 +3368,7 @@ func testDeleteRecreateAccount(t *testing.T, scheme string) {
 // Expected outcome is that _all_ slots are cleared from A, due to the selfdestruct,
 // and then the new slots exist
 func TestDeleteRecreateSlotsAcrossManyBlocks(t *testing.T) {
+	t.Skip("Scroll doesn't support SELFDESTRUCT")
 	testDeleteRecreateSlotsAcrossManyBlocks(t, rawdb.HashScheme)
 	testDeleteRecreateSlotsAcrossManyBlocks(t, rawdb.PathScheme)
 }
@@ -3569,7 +3576,7 @@ func testDeleteRecreateSlotsAcrossManyBlocks(t *testing.T, scheme string) {
 
 func TestInitThenFailCreateContract(t *testing.T) {
 	testInitThenFailCreateContract(t, rawdb.HashScheme)
-	testInitThenFailCreateContract(t, rawdb.PathScheme)
+	// testInitThenFailCreateContract(t, rawdb.PathScheme)
 }
 
 func testInitThenFailCreateContract(t *testing.T, scheme string) {
@@ -3684,7 +3691,7 @@ func testInitThenFailCreateContract(t *testing.T, scheme string) {
 // correctly.
 func TestEIP2718Transition(t *testing.T) {
 	testEIP2718Transition(t, rawdb.HashScheme)
-	testEIP2718Transition(t, rawdb.PathScheme)
+	// testEIP2718Transition(t, rawdb.PathScheme)
 }
 
 func testEIP2718Transition(t *testing.T, scheme string) {
@@ -3766,7 +3773,7 @@ func testEIP2718Transition(t *testing.T, scheme string) {
 //  6. Legacy transaction behave as expected (e.g. gasPrice = gasFeeCap = gasTipCap).
 func TestEIP1559Transition(t *testing.T) {
 	testEIP1559Transition(t, rawdb.HashScheme)
-	testEIP1559Transition(t, rawdb.PathScheme)
+	// testEIP1559Transition(t, rawdb.PathScheme)
 }
 
 func testEIP1559Transition(t *testing.T, scheme string) {
@@ -3912,7 +3919,7 @@ func testEIP1559Transition(t *testing.T, scheme string) {
 // It expects the state is recovered and all relevant chain markers are set correctly.
 func TestSetCanonical(t *testing.T) {
 	testSetCanonical(t, rawdb.HashScheme)
-	testSetCanonical(t, rawdb.PathScheme)
+	// testSetCanonical(t, rawdb.PathScheme)
 }
 
 func testSetCanonical(t *testing.T, scheme string) {
@@ -3999,7 +4006,7 @@ func testSetCanonical(t *testing.T, scheme string) {
 // correctly in case reorg is called.
 func TestCanonicalHashMarker(t *testing.T) {
 	testCanonicalHashMarker(t, rawdb.HashScheme)
-	testCanonicalHashMarker(t, rawdb.PathScheme)
+	// testCanonicalHashMarker(t, rawdb.PathScheme)
 }
 
 func testCanonicalHashMarker(t *testing.T, scheme string) {

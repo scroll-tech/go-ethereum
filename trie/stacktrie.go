@@ -344,15 +344,16 @@ func (t *StackTrie) insert(st *stNode, key, value []byte, path []byte) {
 // This method also sets 'st.type' to hashedNode, and clears 'st.key'.
 func (t *StackTrie) hash(st *stNode, path []byte) {
 	var (
-		blob     []byte   // RLP-encoded node blob
-		internal [][]byte // List of node paths covered by the extension node
+		emptyHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+		blob      []byte   // RLP-encoded node blob
+		internal  [][]byte // List of node paths covered by the extension node
 	)
 	switch st.typ {
 	case hashedNode:
 		return
 
 	case emptyNode:
-		st.val = types.EmptyLegacyTrieRootHash.Bytes()
+		st.val = emptyHash.Bytes()
 		st.key = st.key[:0]
 		st.typ = hashedNode
 		return

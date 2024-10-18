@@ -48,12 +48,12 @@ func NewSecure(stateRoot common.Hash, owner common.Hash, root common.Hash, db *D
 // the preimage of each key if preimage recording is enabled.
 //
 // StateTrie is not safe for concurrent use.
-type StateTrie struct {
+type stateTrie struct {
 	trie             Trie
 	preimages        *preimageStore
 	hashKeyBuf       [common.HashLength]byte
 	secKeyCache      map[string][]byte
-	secKeyCacheOwner *StateTrie // Pointer to self, replace the key cache on mismatch
+	secKeyCacheOwner *stateTrie // Pointer to self, replace the key cache on mismatch
 }
 
 // NewStateTrie creates a trie with an existing root node from a backing database.
@@ -61,7 +61,7 @@ type StateTrie struct {
 // If root is the zero hash or the sha3 hash of an empty string, the
 // trie is initially empty. Otherwise, New will panic if db is nil
 // and returns MissingNodeError if the root node cannot be found.
-func NewStateTrie(id *ID, db *Database) (*StateTrie, error) {
+func newStateTrie(id *ID, db *Database) (*stateTrie, error) {
 	if db == nil {
 		panic("trie.NewStateTrie called without a database")
 	}
@@ -69,7 +69,7 @@ func NewStateTrie(id *ID, db *Database) (*StateTrie, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StateTrie{trie: *trie, preimages: db.preimages}, nil
+	return &stateTrie{trie: *trie, preimages: db.preimages}, nil
 }
 
 // MustGet returns the value for key stored in the trie.
@@ -77,7 +77,7 @@ func NewStateTrie(id *ID, db *Database) (*StateTrie, error) {
 //
 // This function will omit any encountered error but just
 // print out an error message.
-func (t *StateTrie) MustGet(key []byte) []byte {
+func (t *stateTrie) MustGet(key []byte) []byte {
 	return t.trie.MustGet(t.hashKey(key))
 }
 
@@ -85,7 +85,7 @@ func (t *StateTrie) MustGet(key []byte) []byte {
 // and slot key. The value bytes must not be modified by the caller.
 // If the specified storage slot is not in the trie, nil will be returned.
 // If a trie node is not found in the database, a MissingNodeError is returned.
-func (t *StateTrie) GetStorage(_ common.Address, key []byte) ([]byte, error) {
+func (t *stateTrie) GetStorage(_ common.Address, key []byte) ([]byte, error) {
 	enc, err := t.trie.Get(t.hashKey(key))
 	if err != nil || len(enc) == 0 {
 		return nil, err
@@ -97,7 +97,7 @@ func (t *StateTrie) GetStorage(_ common.Address, key []byte) ([]byte, error) {
 // GetAccount attempts to retrieve an account with provided account address.
 // If the specified account is not in the trie, nil will be returned.
 // If a trie node is not found in the database, a MissingNodeError is returned.
-func (t *StateTrie) GetAccount(address common.Address) (*types.StateAccount, error) {
+func (t *stateTrie) GetAccount(address common.Address) (*types.StateAccount, error) {
 	res, err := t.trie.Get(t.hashKey(address.Bytes()))
 	if res == nil || err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (t *StateTrie) GetAccount(address common.Address) (*types.StateAccount, err
 // GetAccountByHash does the same thing as GetAccount, however it expects an
 // account hash that is the hash of address. This constitutes an abstraction
 // leak, since the client code needs to know the key format.
-func (t *StateTrie) GetAccountByHash(addrHash common.Hash) (*types.StateAccount, error) {
+func (t *stateTrie) GetAccountByHash(addrHash common.Hash) (*types.StateAccount, error) {
 	res, err := t.trie.Get(addrHash.Bytes())
 	if res == nil || err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (t *StateTrie) GetAccountByHash(addrHash common.Hash) (*types.StateAccount,
 // possible to use keybyte-encoding as the path might contain odd nibbles.
 // If the specified trie node is not in the trie, nil will be returned.
 // If a trie node is not found in the database, a MissingNodeError is returned.
-func (t *StateTrie) GetNode(path []byte) ([]byte, int, error) {
+func (t *stateTrie) GetNode(path []byte) ([]byte, int, error) {
 	return t.trie.GetNode(path)
 }
 
@@ -137,7 +137,7 @@ func (t *StateTrie) GetNode(path []byte) ([]byte, int, error) {
 //
 // This function will omit any encountered error but just print out an
 // error message.
-func (t *StateTrie) MustUpdate(key, value []byte) {
+func (t *stateTrie) MustUpdate(key, value []byte) {
 	hk := t.hashKey(key)
 	t.trie.MustUpdate(hk, value)
 	t.getSecKeyCache()[string(hk)] = common.CopyBytes(key)
@@ -151,7 +151,7 @@ func (t *StateTrie) MustUpdate(key, value []byte) {
 // stored in the trie.
 //
 // If a node is not found in the database, a MissingNodeError is returned.
-func (t *StateTrie) UpdateStorage(_ common.Address, key, value []byte) error {
+func (t *stateTrie) UpdateStorage(_ common.Address, key, value []byte) error {
 	hk := t.hashKey(key)
 	v, _ := rlp.EncodeToBytes(value)
 	err := t.trie.Update(hk, v)
@@ -163,7 +163,7 @@ func (t *StateTrie) UpdateStorage(_ common.Address, key, value []byte) error {
 }
 
 // UpdateAccount will abstract the write of an account to the secure trie.
-func (t *StateTrie) UpdateAccount(address common.Address, acc *types.StateAccount) error {
+func (t *stateTrie) UpdateAccount(address common.Address, acc *types.StateAccount) error {
 	hk := t.hashKey(address.Bytes())
 	data, err := rlp.EncodeToBytes(acc)
 	if err != nil {
@@ -176,13 +176,13 @@ func (t *StateTrie) UpdateAccount(address common.Address, acc *types.StateAccoun
 	return nil
 }
 
-func (t *StateTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
+func (t *stateTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
 	return nil
 }
 
 // MustDelete removes any existing value for key from the trie. This function
 // will omit any encountered error but just print out an error message.
-func (t *StateTrie) MustDelete(key []byte) {
+func (t *stateTrie) MustDelete(key []byte) {
 	hk := t.hashKey(key)
 	delete(t.getSecKeyCache(), string(hk))
 	t.trie.MustDelete(hk)
@@ -191,14 +191,14 @@ func (t *StateTrie) MustDelete(key []byte) {
 // DeleteStorage removes any existing storage slot from the trie.
 // If the specified trie node is not in the trie, nothing will be changed.
 // If a node is not found in the database, a MissingNodeError is returned.
-func (t *StateTrie) DeleteStorage(_ common.Address, key []byte) error {
+func (t *stateTrie) DeleteStorage(_ common.Address, key []byte) error {
 	hk := t.hashKey(key)
 	delete(t.getSecKeyCache(), string(hk))
 	return t.trie.Delete(hk)
 }
 
 // DeleteAccount abstracts an account deletion from the trie.
-func (t *StateTrie) DeleteAccount(address common.Address) error {
+func (t *stateTrie) DeleteAccount(address common.Address) error {
 	hk := t.hashKey(address.Bytes())
 	delete(t.getSecKeyCache(), string(hk))
 	return t.trie.Delete(hk)
@@ -206,7 +206,7 @@ func (t *StateTrie) DeleteAccount(address common.Address) error {
 
 // GetKey returns the sha3 preimage of a hashed key that was
 // previously used to store a value.
-func (t *StateTrie) GetKey(shaKey []byte) []byte {
+func (t *stateTrie) GetKey(shaKey []byte) []byte {
 	if key, ok := t.getSecKeyCache()[string(shaKey)]; ok {
 		return key
 	}
@@ -223,7 +223,7 @@ func (t *StateTrie) GetKey(shaKey []byte) []byte {
 // All cached preimages will be also flushed if preimages recording is enabled.
 // Once the trie is committed, it's not usable anymore. A new trie must
 // be created with new root and updated trie database for following usage
-func (t *StateTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
+func (t *stateTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
 	// Write all the pre-images to the actual disk database
 	if len(t.getSecKeyCache()) > 0 {
 		if t.preimages != nil {
@@ -241,13 +241,13 @@ func (t *StateTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, er
 
 // Hash returns the root hash of StateTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
-func (t *StateTrie) Hash() common.Hash {
+func (t *stateTrie) Hash() common.Hash {
 	return t.trie.Hash()
 }
 
 // Copy returns a copy of StateTrie.
-func (t *StateTrie) Copy() *StateTrie {
-	return &StateTrie{
+func (t *stateTrie) Copy() *stateTrie {
+	return &stateTrie{
 		trie:        *t.trie.Copy(),
 		preimages:   t.preimages,
 		secKeyCache: t.secKeyCache,
@@ -256,20 +256,20 @@ func (t *StateTrie) Copy() *StateTrie {
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie.
 // Iteration starts at the key after the given start key.
-func (t *StateTrie) NodeIterator(start []byte) (NodeIterator, error) {
+func (t *stateTrie) NodeIterator(start []byte) (NodeIterator, error) {
 	return t.trie.NodeIterator(start)
 }
 
 // MustNodeIterator is a wrapper of NodeIterator and will omit any encountered
 // error but just print out an error message.
-func (t *StateTrie) MustNodeIterator(start []byte) NodeIterator {
+func (t *stateTrie) MustNodeIterator(start []byte) NodeIterator {
 	return t.trie.MustNodeIterator(start)
 }
 
 // hashKey returns the hash of key as an ephemeral buffer.
 // The caller must not hold onto the return value because it will become
 // invalid on the next call to hashKey or secKey.
-func (t *StateTrie) hashKey(key []byte) []byte {
+func (t *stateTrie) hashKey(key []byte) []byte {
 	h := newHasher(false)
 	h.sha.Reset()
 	h.sha.Write(key)
@@ -281,7 +281,7 @@ func (t *StateTrie) hashKey(key []byte) []byte {
 // getSecKeyCache returns the current secure key cache, creating a new one if
 // ownership changed (i.e. the current secure trie is a copy of another owning
 // the actual cache).
-func (t *StateTrie) getSecKeyCache() map[string][]byte {
+func (t *stateTrie) getSecKeyCache() map[string][]byte {
 	if t != t.secKeyCacheOwner {
 		t.secKeyCacheOwner = t
 		t.secKeyCache = make(map[string][]byte)

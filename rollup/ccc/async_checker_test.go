@@ -30,7 +30,7 @@ func TestAsyncChecker(t *testing.T) {
 		Config: params.TestChainConfig,
 		Alloc:  core.GenesisAlloc{testAddr: {Balance: new(big.Int).Mul(big.NewInt(1000), big.NewInt(params.Ether))}},
 	}
-	gspec.MustCommit(db, trie.NewDatabase(db, trie.HashDefaultsWithZktrie))
+	gspec.MustCommit(db, trie.NewDatabase(db, trie.HashDefaults))
 
 	chain, _ := core.NewBlockChain(db, nil, gspec, nil, ethash.NewFaker(), vm.Config{}, nil, nil)
 	asyncChecker := NewAsyncChecker(chain, 1, false)

@@ -23,8 +23,6 @@ import (
 	"sort"
 	"time"
 
-	zkt "github.com/scroll-tech/zktrie/types"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state/snapshot"
@@ -209,10 +207,6 @@ func (s *StateDB) Error() error {
 	return s.dbErr
 }
 
-func (s *StateDB) IsUsingZktrie() bool {
-	return s.db.TrieDB().IsUsingZktrie()
-}
-
 func (s *StateDB) AddLog(log *types.Log) {
 	s.journal.append(addLogChange{txhash: s.thash})
 
@@ -363,11 +357,7 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
-	if s.IsUsingZktrie() {
-		addr_s, _ := zkt.ToSecureKeyBytes(addr.Bytes())
-		return s.GetProofByHash(common.BytesToHash(addr_s.Bytes()))
-	}
-	return s.GetProofByHash(crypto.Keccak256Hash(addr.Bytes()))
+	return s.GetProofByHash(common.BytesToHash(addr.Bytes()))
 }
 
 // GetProofByHash returns the Merkle proof for a given account.

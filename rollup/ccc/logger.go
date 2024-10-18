@@ -260,10 +260,6 @@ func (l *Logger) CaptureTxStart(gasLimit uint64) {
 func (l *Logger) CaptureTxEnd(restGas uint64) {
 }
 
-func (l *Logger) IsDebug() bool {
-	return true
-}
-
 // Error returns an error if executed txns triggered an overflow
 // Caller should revert some transactions and close the block
 func (l *Logger) Error() error {

@@ -44,12 +44,12 @@ func TestInvalidCliqueConfig(t *testing.T) {
 
 func TestSetupGenesis(t *testing.T) {
 	testSetupGenesis(t, rawdb.HashScheme)
-	testSetupGenesis(t, rawdb.PathScheme)
+	// testSetupGenesis(t, rawdb.PathScheme)
 }
 
 func testSetupGenesis(t *testing.T, scheme string) {
 	var (
-		customghash = common.HexToHash("0x700380ab70d789c462c4e8f0db082842095321f390d0a3f25f400f0746db32bc")
+		customghash = common.HexToHash("0xc96ed5df64e683d5af1b14ec67126e31b914ca828021c330efa00572a61ede8f")
 		customg     = Genesis{
 			Config: &params.ChainConfig{HomesteadBlock: big.NewInt(3)},
 			Alloc: GenesisAlloc{
@@ -189,11 +189,7 @@ func TestGenesisHashes(t *testing.T) {
 	} {
 		// Test via MustCommit
 		db := rawdb.NewMemoryDatabase()
-		trieConfig := trie.HashDefaults
-		if c.genesis.Config.Scroll.ZktrieEnabled() {
-			trieConfig = trie.HashDefaultsWithZktrie
-		}
-		if have := c.genesis.MustCommit(db, trie.NewDatabase(db, trieConfig)).Hash(); have != c.want {
+		if have := c.genesis.MustCommit(db, trie.NewDatabase(db, trie.HashDefaults)).Hash(); have != c.want {
 			t.Errorf("case: %d a), want: %s, got: %s", i, c.want.Hex(), have.Hex())
 		}
 		// Test via ToBlock

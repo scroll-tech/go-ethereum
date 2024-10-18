@@ -58,7 +58,6 @@ require (
 	github.com/protolambda/bls12-381-util v0.0.0-20220416220906-d8552aa452c7
 	github.com/rs/cors v1.7.0
 	github.com/scroll-tech/da-codec v0.1.1-0.20240902151734-41c648646967
-	github.com/scroll-tech/zktrie v0.8.4
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sourcegraph/conc v0.3.0
 	github.com/status-im/keycard-go v0.2.0

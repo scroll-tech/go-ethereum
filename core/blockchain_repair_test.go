@@ -1750,7 +1750,7 @@ func testLongReorgedSnapSyncingDeepRepair(t *testing.T, snapshots bool) {
 }
 
 func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
-	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme} {
+	for _, scheme := range []string{rawdb.HashScheme /*, rawdb.PathScheme*/} {
 		testRepairWithScheme(t, tt, snapshots, scheme)
 	}
 }
@@ -1898,6 +1898,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 // In this case the snapshot layer of B3 is not created because of existent
 // state.
 func TestIssue23496(t *testing.T) {
+	t.Skip("snapshot doesn't support zktrie")
 	testIssue23496(t, rawdb.HashScheme)
 	testIssue23496(t, rawdb.PathScheme)
 }

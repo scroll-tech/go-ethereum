@@ -1541,17 +1541,17 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 
 		// Drop all transactions over the allowed limit
 		var caps types.Transactions
-		if !pool.locals.contains(addr) {
-			caps = list.Cap(int(pool.config.AccountQueue))
-			for _, tx := range caps {
-				hash := tx.Hash()
-				log.Error("Drop all transactions over the allowed limit", "hash", hash)
-				pool.all.Remove(hash)
-				pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
-				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
-			}
-			queuedRateLimitMeter.Mark(int64(len(caps)))
-		}
+		// if !pool.locals.contains(addr) {
+		// 	caps = list.Cap(int(pool.config.AccountQueue))
+		// 	for _, tx := range caps {
+		// 		hash := tx.Hash()
+		// 		log.Error("Drop all transactions over the allowed limit", "hash", hash)
+		// 		pool.all.Remove(hash)
+		// 		pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
+		// 		log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
+		// 	}
+		// 	queuedRateLimitMeter.Mark(int64(len(caps)))
+		// }
 		// Mark all the items dropped as removed
 		pool.priced.Removed(len(forwards) + len(drops) + len(caps))
 		queuedGauge.Dec(int64(len(forwards) + len(drops) + len(caps)))

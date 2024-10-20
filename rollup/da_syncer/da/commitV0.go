@@ -116,9 +116,9 @@ func (c *CommitBatchDAV0) Blocks() []*PartialBlock {
 			block := NewPartialBlock(
 				&PartialHeader{
 					Number:     daBlock.Number(),
-					// Time:       daBlock.Timestamp(),
-					// BaseFee:    daBlock.BaseFee(),
-					// GasLimit:   daBlock.GasLimit(),
+					Time:       daBlock.Timestamp(),
+					BaseFee:    daBlock.BaseFee(),
+					GasLimit:   daBlock.GasLimit(),
 					Difficulty: 10,                             // TODO: replace with real difficulty
 					ExtraData:  []byte{1, 2, 3, 4, 5, 6, 7, 8}, // TODO: replace with real extra data
 				},
@@ -142,8 +142,7 @@ func getTotalMessagesPoppedFromChunks(decodedChunks []*encoding.DAChunkRawTx) in
 
 func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skippedBitmap []byte, totalL1MessagePopped int) ([]*types.L1MessageTx, error) {
 	var txs []*types.L1MessageTx
-	// decodedSkippedBitmap, err := encoding.DecodeBitmap(skippedBitmap, totalL1MessagePopped)
-	decodedSkippedBitmap, err := []*big.Int{}, error(nil)
+	decodedSkippedBitmap, err := encoding.DecodeBitmap(skippedBitmap, totalL1MessagePopped)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode skipped message bitmap: err: %w", err)
 	}

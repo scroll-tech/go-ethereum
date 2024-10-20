@@ -213,7 +213,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, vLog *types.Lo
 		}
 		codecVersion := encoding.CodecVersion(args.Version)
 		codec, err := encoding.CodecFromVersion(codecVersion)
-		if err!= nil {
+		if err != nil {
 			return nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)
 		}
 		switch args.Version {
@@ -231,7 +231,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, vLog *types.Lo
 		}
 		codecVersion := encoding.CodecVersion(args.Version)
 		codec, err := encoding.CodecFromVersion(codecVersion)
-		if err!= nil {
+		if err != nil {
 			return nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", codecVersion, batchIndex, err)
 		}
 		switch args.Version {

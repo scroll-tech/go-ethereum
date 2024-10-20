@@ -106,9 +106,12 @@ func (p *Peer) broadcastTransactions() {
 				done = make(chan struct{})
 				go func() {
 					log.Debug("Sending transactions", "count", len(txs))
+					for _, tx := range txs {
+						log.Info("Sending transactions", "count", len(txs), "tx", tx.Hash().Hex())
+					}
 					broadcastSendTxsLenGauge.Update(int64(len(txs)))
 					if err := p.SendTransactions(txs); err != nil {
-						log.Debug("Sending transactions", "count", len(txs), "err", err)
+						log.Error("Sending transactions", "count", len(txs), "err", err)
 						broadcastSendTxsFailMeter.Mark(1)
 						fail <- err
 						return
@@ -181,9 +184,12 @@ func (p *Peer) announceTransactions() {
 				done = make(chan struct{})
 				go func() {
 					log.Debug("Sending transaction announcements", "count", len(pending))
+					for _, tx := range pending {
+						log.Info("Sending transaction announcements", "count", len(pending), "tx", tx.Hex())
+					}
 					broadcastAnnoTxsLenGauge.Update(int64(len(pending)))
 					if err := p.sendPooledTransactionHashes(pending); err != nil {
-						log.Debug("Sending transaction announcements", "count", len(pending), "err", err)
+						log.Error("Sending transaction announcements", "count", len(pending), "err", err)
 						broadcastAnnoTxsFailMeter.Mark(1)
 						fail <- err
 						return

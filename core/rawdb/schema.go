@@ -154,6 +154,9 @@ var (
 	lastFinalizedBatchIndexKey        = []byte("R-finalizedBatchIndex")
 	committedBatchMetaPrefix          = []byte("R-cbm")
 
+	// Scroll da syncer store
+	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")
+
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
 

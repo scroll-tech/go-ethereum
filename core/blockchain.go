@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/lru"
 	"github.com/scroll-tech/go-ethereum/common/mclock"
@@ -50,7 +52,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 	"github.com/scroll-tech/go-ethereum/trie/triedb/hashdb"
 	"github.com/scroll-tech/go-ethereum/trie/triedb/pathdb"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -2022,6 +2023,56 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool) (int, error)
 	stats.ignored += it.remaining()
 
 	return it.index, err
+}
+
+func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types.Header, txs types.Transactions) (WriteStatus, error) {
+	if !bc.chainmu.TryLock() {
+		return NonStatTy, errInsertionInterrupted
+	}
+	defer bc.chainmu.Unlock()
+
+	statedb, err := state.New(parentBlock.Root(), bc.stateCache, bc.snaps)
+	if err != nil {
+		return NonStatTy, err
+	}
+
+	statedb.StartPrefetcher("l1sync")
+	defer statedb.StopPrefetcher()
+
+	header.ParentHash = parentBlock.Hash()
+
+	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
+	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
+	if err != nil {
+		return NonStatTy, fmt.Errorf("error processing block: %w", err)
+	}
+
+	// TODO: once we have the extra and difficulty we need to verify the signature of the block with Clique
+	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
+
+	// finalize and assemble block as fullBlock
+	header.GasUsed = gasUsed
+	header.Root = statedb.IntermediateRoot(bc.chainConfig.IsEIP158(header.Number))
+
+	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+
+	blockHash := fullBlock.Hash()
+	// manually replace the block hash in the receipts
+	for i, receipt := range receipts {
+		// add block location fields
+		receipt.BlockHash = blockHash
+		receipt.BlockNumber = tempBlock.Number()
+		receipt.TransactionIndex = uint(i)
+
+		for _, l := range receipt.Logs {
+			l.BlockHash = blockHash
+		}
+	}
+	for _, l := range logs {
+		l.BlockHash = blockHash
+	}
+
+	return bc.writeBlockAndSetHead(fullBlock, receipts, logs, statedb, false)
 }
 
 // insertSideChain is called when an import batch hits upon a pruned ancestor

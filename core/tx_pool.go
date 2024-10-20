@@ -493,6 +493,7 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 		// pool.priced is sorted by GasFeeCap, so we have to iterate through pool.all instead
 		drop := pool.all.RemotesBelowTip(price)
 		for _, tx := range drop {
+			log.Error("Dropping transactions below price threshold", "tx", tx.Hash(), "price", price)
 			pool.removeTx(tx.Hash(), false)
 		}
 		pool.priced.Removed(len(drop))
@@ -922,6 +923,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 	// Discard any previous transaction and mark this
 	if old != nil {
 		pool.all.Remove(old.Hash())
+		log.Error("enqueueTx: Discarding any previous transaction", "hash", old.Hash())
 		pool.priced.Removed(1)
 		pool.calculateTxsLifecycle(types.Transactions{old}, time.Now())
 		queuedReplaceMeter.Mark(1)
@@ -971,6 +973,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
 	if !inserted {
 		// An older transaction was better, discard this
+		log.Error("promoteTx: Discarding this transaction, an older transaction was better", "hash", hash)
 		pool.all.Remove(hash)
 		pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		pool.priced.Removed(1)
@@ -979,6 +982,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	}
 	// Otherwise discard any previous transaction and mark this
 	if old != nil {
+		log.Error("promoteTx: Discarding any previous transaction and mark this", "old.Hash()", old.Hash())
 		pool.all.Remove(old.Hash())
 		pool.calculateTxsLifecycle(types.Transactions{old}, time.Now())
 		pool.priced.Removed(1)
@@ -1162,6 +1166,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
 
 	// Remove it from the list of known transactions
+	log.Error("removeTx: Remove it from the list of known transactions", "hash", hash)
 	pool.all.Remove(hash)
 	pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 	if outofbound {
@@ -1505,6 +1510,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 		forwards := list.Forward(pool.currentState.GetNonce(addr))
 		for _, tx := range forwards {
 			hash := tx.Hash()
+			log.Error("Drop all transactions that are deemed too old (low nonce)", "hash", hash)
 			pool.all.Remove(hash)
 			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		}
@@ -1515,6 +1521,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 		drops, _ := list.FilterF(costLimit, pool.currentMaxGas, pool.executableTxFilter(costLimit))
 		for _, tx := range drops {
 			hash := tx.Hash()
+			log.Error("Drop all transactions that are too costly (low balance or out of gas)", "hash", hash)
 			pool.all.Remove(hash)
 			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		}
@@ -1538,6 +1545,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 			caps = list.Cap(int(pool.config.AccountQueue))
 			for _, tx := range caps {
 				hash := tx.Hash()
+				log.Error("Drop all transactions over the allowed limit", "hash", hash)
 				pool.all.Remove(hash)
 				pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
@@ -1621,6 +1629,7 @@ func (pool *TxPool) truncatePending() {
 					for _, tx := range caps {
 						// Drop the transaction from the global pools too
 						hash := tx.Hash()
+						log.Error("Drop the transaction from the global pools too 1", "hash", hash)
 						pool.all.Remove(hash)
 						pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 
@@ -1649,6 +1658,7 @@ func (pool *TxPool) truncatePending() {
 				for _, tx := range caps {
 					// Drop the transaction from the global pools too
 					hash := tx.Hash()
+					log.Error("Drop the transaction from the global pools too 2", "hash", hash)
 					pool.all.Remove(hash)
 					pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 
@@ -1731,14 +1741,14 @@ func (pool *TxPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
-			log.Trace("Removed old pending transaction", "hash", hash)
+			log.Error("Removed old pending transaction", "hash", hash)
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
 		costLimit := pool.currentState.GetBalance(addr)
 		drops, invalids := list.FilterF(costLimit, pool.currentMaxGas, pool.executableTxFilter(costLimit))
 		for _, tx := range drops {
 			hash := tx.Hash()
-			log.Trace("Removed unpayable pending transaction", "hash", hash)
+			log.Error("Removed unpayable pending transaction", "hash", hash)
 			pool.all.Remove(hash)
 			pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
 		}

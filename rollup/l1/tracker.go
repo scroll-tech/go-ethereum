@@ -408,7 +408,7 @@ func (t *Tracker) chain(start, end *types.Header, includeStart bool) []*types.He
 	return chain
 }
 
-func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback SubscriptionCallback) (unsubscribe func()) {
+func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback SubscriptionCallback, maxHeadersSent int) (unsubscribe func()) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -425,7 +425,7 @@ func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback Subscrip
 		panic(fmt.Sprintf("invalid confirmation rule %d", confirmationRule))
 	}
 
-	sub := newSubscription(t.subscriptionCounter, confirmationRule, callback)
+	sub := newSubscription(t.subscriptionCounter, confirmationRule, callback, maxHeadersSent)
 
 	subscriptionsByType := t.subscriptions[confirmationType]
 	subscriptionsByType = append(subscriptionsByType, sub)

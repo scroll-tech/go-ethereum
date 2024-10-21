@@ -13,14 +13,13 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
-	"github.com/scroll-tech/go-ethereum/ethdb"
 )
 
 type CommitBatchDAV1 struct {
 	*CommitBatchDAV0
 }
 
-func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
+func NewCommitBatchDAV1(ctx context.Context, msgStorage *l1.MsgStorage,
 	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
 	commitEvent *l1.CommitBatchEvent,
@@ -30,10 +29,10 @@ func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
 ) (*CommitBatchDAV1, error) {
-	return NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Reader, blobClient, commitEvent, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv1.DecodeTxsFromBlob)
+	return NewCommitBatchDAV1WithBlobDecodeFunc(ctx, msgStorage, l1Reader, blobClient, commitEvent, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv1.DecodeTxsFromBlob)
 }
 
-func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database,
+func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, msgStorage *l1.MsgStorage,
 	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
 	commitEvent *l1.CommitBatchEvent,
@@ -82,7 +81,7 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
+	v0, err := NewCommitBatchDAV0WithChunks(msgStorage, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
 	if err != nil {
 		return nil, err
 	}

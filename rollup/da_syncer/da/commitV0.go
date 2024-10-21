@@ -7,10 +7,9 @@ import (
 	"github.com/scroll-tech/da-codec/encoding"
 	"github.com/scroll-tech/da-codec/encoding/codecv0"
 
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
+	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
 
 type CommitBatchDAV0 struct {
@@ -24,7 +23,7 @@ type CommitBatchDAV0 struct {
 	l1BlockNumber uint64
 }
 
-func NewCommitBatchDAV0(db ethdb.Database,
+func NewCommitBatchDAV0(msgStorage *l1.MsgStorage,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
@@ -37,10 +36,10 @@ func NewCommitBatchDAV0(db ethdb.Database,
 		return nil, fmt.Errorf("failed to unpack chunks: %d, err: %w", batchIndex, err)
 	}
 
-	return NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, l1BlockNumber)
+	return NewCommitBatchDAV0WithChunks(msgStorage, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, l1BlockNumber)
 }
 
-func NewCommitBatchDAV0WithChunks(db ethdb.Database,
+func NewCommitBatchDAV0WithChunks(msgStorage *l1.MsgStorage,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
@@ -49,7 +48,7 @@ func NewCommitBatchDAV0WithChunks(db ethdb.Database,
 	l1BlockNumber uint64,
 ) (*CommitBatchDAV0, error) {
 	parentTotalL1MessagePopped := getBatchTotalL1MessagePopped(parentBatchHeader)
-	l1Txs, err := getL1Messages(db, parentTotalL1MessagePopped, skippedL1MessageBitmap, getTotalMessagesPoppedFromChunks(decodedChunks))
+	l1Txs, err := getL1Messages(msgStorage, parentTotalL1MessagePopped, skippedL1MessageBitmap, getTotalMessagesPoppedFromChunks(decodedChunks))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get L1 messages for v0 batch %d: %w", batchIndex, err)
 	}
@@ -139,7 +138,7 @@ func getTotalMessagesPoppedFromChunks(decodedChunks []*codecv0.DAChunkRawTx) int
 	return totalL1MessagePopped
 }
 
-func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skippedBitmap []byte, totalL1MessagePopped int) ([]*types.L1MessageTx, error) {
+func getL1Messages(msgStorage *l1.MsgStorage, parentTotalL1MessagePopped uint64, skippedBitmap []byte, totalL1MessagePopped int) ([]*types.L1MessageTx, error) {
 	var txs []*types.L1MessageTx
 
 	decodedSkippedBitmap, err := encoding.DecodeBitmap(skippedBitmap, totalL1MessagePopped)
@@ -154,7 +153,7 @@ func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skipped
 			currentIndex++
 			continue
 		}
-		l1Tx := rawdb.ReadL1Message(db, currentIndex)
+		l1Tx := msgStorage.ReadL1Message(currentIndex)
 		if l1Tx == nil {
 			// message not yet available
 			// we return serrors.EOFError as this will be handled in the syncing pipeline with a backoff and retry

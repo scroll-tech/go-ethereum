@@ -11,12 +11,8 @@ type Type int
 const (
 	// CommitBatchV0Type contains data of event of CommitBatchV0Type
 	CommitBatchV0Type Type = iota
-	// CommitBatchV1Type contains data of event of CommitBatchV1Type
-	CommitBatchV1Type
-	// CommitBatchV2Type contains data of event of CommitBatchV2Type
-	CommitBatchV2Type
-	// CommitBatchV4Type contains data of event of CommitBatchV2Type
-	CommitBatchV4Type
+	// CommitBatchWithBlobType contains data of event of CommitBatchWithBlobType (v1, v2, v3, v4)
+	CommitBatchWithBlobType
 	// RevertBatchType contains data of event of RevertBatchType
 	RevertBatchType
 	// FinalizeBatchType contains data of event of FinalizeBatchType

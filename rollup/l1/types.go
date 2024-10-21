@@ -47,13 +47,15 @@ type subscription struct {
 	confirmationRule ConfirmationRule
 	callback         SubscriptionCallback
 	lastSentHeader   *types.Header
+	maxHeadersSent   int // number of headers that could be sent at the time
 }
 
-func newSubscription(id int, confirmationRule ConfirmationRule, callback SubscriptionCallback) *subscription {
+func newSubscription(id int, confirmationRule ConfirmationRule, callback SubscriptionCallback, maxHeadersSent int) *subscription {
 	return &subscription{
 		id:               id,
 		confirmationRule: confirmationRule,
 		callback:         callback,
+		maxHeadersSent:   maxHeadersSent,
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 
 	"github.com/scroll-tech/da-codec/encoding/codecv2"
 
-	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
@@ -14,7 +13,7 @@ type CommitBatchDAV2 struct {
 	*CommitBatchDAV1
 }
 
-func NewCommitBatchDAV2(ctx context.Context, db ethdb.Database,
+func NewCommitBatchDAV2(ctx context.Context, msgStorage *l1.MsgStorage,
 	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
 	commitEvent *l1.CommitBatchEvent,
@@ -25,7 +24,7 @@ func NewCommitBatchDAV2(ctx context.Context, db ethdb.Database,
 	skippedL1MessageBitmap []byte,
 ) (*CommitBatchDAV2, error) {
 
-	v1, err := NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Reader, blobClient, commitEvent, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv2.DecodeTxsFromBlob)
+	v1, err := NewCommitBatchDAV1WithBlobDecodeFunc(ctx, msgStorage, l1Reader, blobClient, commitEvent, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv2.DecodeTxsFromBlob)
 	if err != nil {
 		return nil, err
 	}

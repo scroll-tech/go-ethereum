@@ -36,6 +36,8 @@ type SyncingPipeline struct {
 	expBackoff *backoff.Exponential
 
 	l1DeploymentBlock uint64
+	l1Tracker         *l1.Tracker
+	msgStorage        *l1.MsgStorage
 
 	db         ethdb.Database
 	blockchain *core.BlockChain
@@ -50,6 +52,12 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize l1.Reader, err = %w", err)
+	}
+	l1Tracker := l1.NewTracker(ctx, ethClient, blockchain.Genesis().Hash())
+
+	msgStorage, err := l1.NewMsgStorage(ctx, l1Tracker, l1Reader, l1.LatestChainHead)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize msg storage, err = %w", err)
 	}
 
 	blobClientList := blob_client.NewBlobClientList()
@@ -71,7 +79,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		log.Crit("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag.")
 	}
 
-	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Reader, blobClientList, db)
+	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Reader, msgStorage, blobClientList)
 	syncedL1Height := l1DeploymentBlock - 1
 	from := rawdb.ReadDASyncedL1BlockNumber(db)
 	if from != nil {
@@ -90,6 +98,8 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		expBackoff:        backoff.NewExponential(100*time.Millisecond, 10*time.Second, 100*time.Millisecond),
 		wg:                sync.WaitGroup{},
 		l1DeploymentBlock: l1DeploymentBlock,
+		l1Tracker:         l1Tracker,
+		msgStorage:        msgStorage,
 		db:                db,
 		blockchain:        blockchain,
 		blockQueue:        blockQueue,
@@ -108,6 +118,9 @@ func (s *SyncingPipeline) Step() error {
 
 func (s *SyncingPipeline) Start() {
 	log.Info("sync from DA: starting pipeline")
+
+	s.msgStorage.Start()
+	s.l1Tracker.Start()
 
 	s.wg.Add(1)
 	go func() {
@@ -213,6 +226,8 @@ func (s *SyncingPipeline) mainLoop() {
 func (s *SyncingPipeline) Stop() {
 	log.Info("sync from DA: stopping pipeline...")
 	s.cancel()
+	s.msgStorage.Stop()
+	s.l1Tracker.Stop()
 	s.wg.Wait()
 	log.Info("sync from DA: stopping pipeline... done")
 }

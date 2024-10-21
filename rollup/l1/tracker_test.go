@@ -171,7 +171,7 @@ func newSubscriptionCalls(tracker *Tracker, alias string, rule ConfirmationRule)
 
 	unsubscribe := tracker.Subscribe(rule, func(old, new []*types.Header) {
 		s.addActual(old, new)
-	})
+	}, 0)
 
 	return s, unsubscribe
 }

@@ -28,36 +28,36 @@ type MsgStorage struct {
 
 	msgs                  *common.ShrinkingMap[uint64, storedL1Message]
 	reader                *Reader
+	tracker               *Tracker
+	confirmationRule      ConfirmationRule
 	unsubscribeTracker    func()
-	newChainNotifications []newChainNotification
+	newChainNotifications chan newChainNotification
 
-	msgsMu   sync.RWMutex
-	notifsMu sync.Mutex
+	msgsMu sync.RWMutex
 }
 
-func NewMsgStorage(ctx context.Context, tracker *Tracker, reader *Reader) (*MsgStorage, error) {
+func NewMsgStorage(ctx context.Context, tracker *Tracker, reader *Reader, confirmationRule ConfirmationRule) (*MsgStorage, error) {
 	if tracker == nil || reader == nil {
 		return nil, fmt.Errorf("failed to create MsgStorage, reader or tracker is nil")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	msgStorage := &MsgStorage{
-		ctx:    ctx,
-		cancel: cancel,
-		msgs:   common.NewShrinkingMap[uint64, storedL1Message](1000),
-		reader: reader,
+		ctx:                   ctx,
+		cancel:                cancel,
+		msgs:                  common.NewShrinkingMap[uint64, storedL1Message](1000),
+		reader:                reader,
+		tracker:               tracker,
+		confirmationRule:      confirmationRule,
+		newChainNotifications: make(chan newChainNotification, 10),
 	}
-	msgStorage.unsubscribeTracker = tracker.Subscribe(LatestChainHead, func(old, new []*types.Header) {
-		msgStorage.notifsMu.Lock()
-		defer msgStorage.notifsMu.Unlock()
-		msgStorage.newChainNotifications = append(msgStorage.newChainNotifications, newChainNotification{old, new})
-	})
-
-	msgStorage.Start()
 	return msgStorage, nil
 }
 
 func (ms *MsgStorage) Start() {
 	log.Info("starting MsgStorage")
+	ms.unsubscribeTracker = ms.tracker.Subscribe(ms.confirmationRule, func(old, new []*types.Header) {
+		ms.newChainNotifications <- newChainNotification{old, new}
+	}, 64)
 	go func() {
 		fetchTicker := time.NewTicker(defaultFetchInterval)
 		defer fetchTicker.Stop()
@@ -106,16 +106,18 @@ func (ms *MsgStorage) IterateL1MessagesFrom(fromQueueIndex uint64) L1MessageIter
 
 // ReadL1MessagesFrom retrieves up to `maxCount` L1 messages starting at `startIndex`.
 func (ms *MsgStorage) ReadL1MessagesFrom(startIndex, maxCount uint64) []types.L1MessageTx {
+	if maxCount == 0 {
+		return []types.L1MessageTx{}
+	}
 	msgs := make([]types.L1MessageTx, 0, maxCount)
 
-	index := startIndex
-	count := maxCount
-
-	storedL1Msg, exists := ms.msgs.Get(index)
-	for count > 0 && exists {
+	for index := startIndex; len(msgs) < int(maxCount); index++ {
+		storedL1Msg, exists := ms.msgs.Get(index)
+		if !exists {
+			break // No more messages to read
+		}
 		msg := storedL1Msg.l1msg
-
-		// sanity check
+		// Sanity check for QueueIndex
 		if msg.QueueIndex != index {
 			log.Crit(
 				"Unexpected QueueIndex in ReadL1MessagesFrom",
@@ -125,21 +127,22 @@ func (ms *MsgStorage) ReadL1MessagesFrom(startIndex, maxCount uint64) []types.L1
 				"maxCount", maxCount,
 			)
 		}
-
 		msgs = append(msgs, *msg)
-		index += 1
-		count -= 1
-		storedL1Msg, exists = ms.msgs.Get(index)
 	}
-
 	return msgs
 }
 
 func (ms *MsgStorage) fetchMessages() error {
-	ms.notifsMu.Lock()
-	notifs := ms.newChainNotifications
-	ms.newChainNotifications = nil
-	ms.notifsMu.Unlock()
+	var notifs []newChainNotification
+out:
+	for {
+		select {
+		case msg := <-ms.newChainNotifications:
+			notifs = append(notifs, msg)
+		default:
+			break out
+		}
+	}
 
 	// go through all chain notifications and process
 	for _, newChainNotification := range notifs {

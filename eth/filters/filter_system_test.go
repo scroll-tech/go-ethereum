@@ -468,7 +468,7 @@ func TestGetLogsRange(t *testing.T) {
 	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 	}
-	_, err := gspec.Commit(db, trie.NewDatabase(db, &trie.Config{IsUsingZktrie: true}))
+	_, err := gspec.Commit(db, trie.NewDatabase(db, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

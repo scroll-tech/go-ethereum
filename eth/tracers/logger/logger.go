@@ -420,8 +420,6 @@ func (l *StructLogger) UpdatedStorages() map[common.Address]Storage {
 // CreatedAccount return the account data in case it is a create tx
 func (l *StructLogger) CreatedAccount() *types.AccountWrapper { return l.createdAccount }
 
-func (l *StructLogger) IsDebug() bool { return l.cfg.Debug }
-
 // WriteTrace writes a formatted trace to the given writer
 func WriteTrace(writer io.Writer, logs []StructLog) {
 	for _, log := range logs {
@@ -544,8 +542,6 @@ func (t *mdLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
 func (*mdLogger) CaptureTxStart(gasLimit uint64) {}
 
 func (*mdLogger) CaptureTxEnd(restGas uint64) {}
-
-func (t *mdLogger) IsDebug() bool { return t.cfg.Debug }
 
 // FormatLogs formats EVM returned structured logs for json output
 func FormatLogs(logs []StructLog) []types.StructLogRes {

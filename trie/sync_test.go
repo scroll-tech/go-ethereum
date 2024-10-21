@@ -1,3 +1,6 @@
+//go:build all_tests
+// +build all_tests
+
 // Copyright 2015 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -35,7 +38,7 @@ func makeTestTrie(scheme string) (ethdb.Database, *Database, *StateTrie, map[str
 	// Create an empty trie
 	db := rawdb.NewMemoryDatabase()
 	triedb := newTestDatabase(db, scheme)
-	trie, _ := NewStateTrie(TrieID(types.EmptyZkTrieRootHash), triedb)
+	trie, _ := NewStateTrie(TrieID(types.EmptyStateRootHash), triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)
@@ -57,7 +60,7 @@ func makeTestTrie(scheme string) (ethdb.Database, *Database, *StateTrie, map[str
 		}
 	}
 	root, nodes, _ := trie.Commit(false)
-	if err := triedb.Update(root, types.EmptyLegacyTrieRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
+	if err := triedb.Update(root, types.EmptyStateRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
 		panic(fmt.Errorf("failed to commit db %v", err))
 	}
 	if err := triedb.Commit(root, false); err != nil {
@@ -137,9 +140,9 @@ func TestEmptySync(t *testing.T) {
 	// dbD := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.PathScheme)
 
 	emptyA := NewEmpty(dbA)
-	emptyB, _ := New(TrieID(types.EmptyZkTrieRootHash), dbB)
+	emptyB, _ := New(TrieID(types.EmptyRootHash), dbB)
 	// emptyC := NewEmpty(dbC)
-	// emptyD, _ := New(TrieID(types.EmptyLegacyTrieRootHash), dbD)
+	// emptyD, _ := New(TrieID(types.EmptyRootHash), dbD)
 
 	// for i, trie := range []*Trie{emptyA, emptyB, emptyC, emptyD} {
 	// sync := NewSync(trie.Hash(), memorydb.New(), nil, []*Database{dbA, dbB, dbC, dbD}[i].Scheme())
@@ -811,7 +814,7 @@ func testPivotMove(t *testing.T, scheme string, tiny bool) {
 	var (
 		srcDisk    = rawdb.NewMemoryDatabase()
 		srcTrieDB  = newTestDatabase(srcDisk, scheme)
-		srcTrie, _ = New(TrieID(types.EmptyZkTrieRootHash), srcTrieDB)
+		srcTrie, _ = New(TrieID(types.EmptyRootHash), srcTrieDB)
 
 		deleteFn = func(key []byte, tr *Trie, states map[string][]byte) {
 			tr.Delete(key)
@@ -845,7 +848,7 @@ func testPivotMove(t *testing.T, scheme string, tiny bool) {
 	writeFn([]byte{0x13, 0x44}, nil, srcTrie, stateA)
 
 	rootA, nodesA, _ := srcTrie.Commit(false)
-	if err := srcTrieDB.Update(rootA, types.EmptyLegacyTrieRootHash, 0, trienode.NewWithNodeSet(nodesA), nil); err != nil {
+	if err := srcTrieDB.Update(rootA, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesA), nil); err != nil {
 		panic(err)
 	}
 	if err := srcTrieDB.Commit(rootA, false); err != nil {

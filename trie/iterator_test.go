@@ -1,3 +1,6 @@
+//go:build all_tests
+// +build all_tests
+
 // Copyright 2014 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -60,7 +63,7 @@ func TestIterator(t *testing.T) {
 		trie.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	root, nodes, _ := trie.Commit(false)
-	db.Update(root, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
+	db.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 
 	trie, _ = New(TrieID(root), db)
 	found := make(map[string]string)
@@ -74,15 +77,6 @@ func TestIterator(t *testing.T) {
 			t.Errorf("iterator value mismatch for %s: got %q want %q", k, found[k], v)
 		}
 	}
-}
-
-type kv struct {
-	k, v []byte
-	t    bool
-}
-
-func (k *kv) cmp(other *kv) int {
-	return bytes.Compare(k.k, other.k)
 }
 
 func TestIteratorLargeData(t *testing.T) {
@@ -252,7 +246,7 @@ func TestDifferenceIterator(t *testing.T) {
 		triea.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootA, nodesA, _ := triea.Commit(false)
-	dba.Update(rootA, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodesA), nil)
+	dba.Update(rootA, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesA), nil)
 	triea, _ = New(TrieID(rootA), dba)
 
 	dbb := NewDatabase(rawdb.NewMemoryDatabase(), nil)
@@ -261,7 +255,7 @@ func TestDifferenceIterator(t *testing.T) {
 		trieb.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootB, nodesB, _ := trieb.Commit(false)
-	dbb.Update(rootB, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodesB), nil)
+	dbb.Update(rootB, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesB), nil)
 	trieb, _ = New(TrieID(rootB), dbb)
 
 	found := make(map[string]string)
@@ -294,7 +288,7 @@ func TestUnionIterator(t *testing.T) {
 		triea.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootA, nodesA, _ := triea.Commit(false)
-	dba.Update(rootA, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodesA), nil)
+	dba.Update(rootA, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesA), nil)
 	triea, _ = New(TrieID(rootA), dba)
 
 	dbb := NewDatabase(rawdb.NewMemoryDatabase(), nil)
@@ -303,7 +297,7 @@ func TestUnionIterator(t *testing.T) {
 		trieb.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootB, nodesB, _ := trieb.Commit(false)
-	dbb.Update(rootB, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodesB), nil)
+	dbb.Update(rootB, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesB), nil)
 	trieb, _ = New(TrieID(rootB), dbb)
 
 	di, _ := NewUnionIterator([]NodeIterator{triea.MustNodeIterator(nil), trieb.MustNodeIterator(nil)})
@@ -365,7 +359,7 @@ func testIteratorContinueAfterError(t *testing.T, memonly bool, scheme string) {
 		tr.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	root, nodes, _ := tr.Commit(false)
-	tdb.Update(root, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
+	tdb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 	if !memonly {
 		tdb.Commit(root, false)
 	}
@@ -481,7 +475,7 @@ func testIteratorContinueAfterSeekError(t *testing.T, memonly bool, scheme strin
 			break
 		}
 	}
-	triedb.Update(root, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
+	triedb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 	if !memonly {
 		triedb.Commit(root, false)
 	}
@@ -555,7 +549,7 @@ func testIteratorNodeBlob(t *testing.T, scheme string) {
 		trie.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	root, nodes, _ := trie.Commit(false)
-	triedb.Update(root, types.EmptyZkTrieRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
+	triedb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 	triedb.Commit(root, false)
 
 	var found = make(map[common.Hash][]byte)

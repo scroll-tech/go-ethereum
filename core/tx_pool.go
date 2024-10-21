@@ -1774,7 +1774,7 @@ func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 		if tx.Time().Before(t) {
 			txLifecycle := t.Sub(tx.Time())
 			if txLifecycle >= time.Minute*30 {
-				log.Warn("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String())
+				log.Warn("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String(), "txLifecycle(s)", txLifecycle.Seconds())
 			}
 			txLifecycleTimer.Update(txLifecycle)
 		}

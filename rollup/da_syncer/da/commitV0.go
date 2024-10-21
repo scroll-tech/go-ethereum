@@ -3,9 +3,9 @@ package da
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
 
 	"github.com/scroll-tech/da-codec/encoding"
-	"github.com/scroll-tech/da-codec/encoding/codecv0"
 
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -18,13 +18,14 @@ type CommitBatchDAV0 struct {
 	batchIndex                 uint64
 	parentTotalL1MessagePopped uint64
 	skippedL1MessageBitmap     []byte
-	chunks                     []*codecv0.DAChunkRawTx
+	chunks                     []*encoding.DAChunkRawTx
 	l1Txs                      []*types.L1MessageTx
 
 	l1BlockNumber uint64
 }
 
 func NewCommitBatchDAV0(db ethdb.Database,
+	codec encoding.Codec,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
@@ -32,7 +33,7 @@ func NewCommitBatchDAV0(db ethdb.Database,
 	skippedL1MessageBitmap []byte,
 	l1BlockNumber uint64,
 ) (*CommitBatchDAV0, error) {
-	decodedChunks, err := codecv0.DecodeDAChunksRawTx(chunks)
+	decodedChunks, err := codec.DecodeDAChunksRawTx(chunks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack chunks: %d, err: %w", batchIndex, err)
 	}
@@ -44,7 +45,7 @@ func NewCommitBatchDAV0WithChunks(db ethdb.Database,
 	version uint8,
 	batchIndex uint64,
 	parentBatchHeader []byte,
-	decodedChunks []*codecv0.DAChunkRawTx,
+	decodedChunks []*encoding.DAChunkRawTx,
 	skippedL1MessageBitmap []byte,
 	l1BlockNumber uint64,
 ) (*CommitBatchDAV0, error) {
@@ -100,24 +101,24 @@ func (c *CommitBatchDAV0) Blocks() []*PartialBlock {
 	for _, chunk := range c.chunks {
 		for blockId, daBlock := range chunk.Blocks {
 			// create txs
-			txs := make(types.Transactions, 0, daBlock.NumTransactions)
+			txs := make(types.Transactions, 0, daBlock.NumTransactions())
 			// insert l1 msgs
-			for l1TxPointer < len(c.l1Txs) && c.l1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages) {
+			for l1TxPointer < len(c.l1Txs) && c.l1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages()) {
 				l1Tx := types.NewTx(c.l1Txs[l1TxPointer])
 				txs = append(txs, l1Tx)
 				l1TxPointer++
 			}
-			curL1TxIndex += uint64(daBlock.NumL1Messages)
+			curL1TxIndex += uint64(daBlock.NumL1Messages())
 
 			// insert l2 txs
 			txs = append(txs, chunk.Transactions[blockId]...)
 
 			block := NewPartialBlock(
 				&PartialHeader{
-					Number:     daBlock.BlockNumber,
-					Time:       daBlock.Timestamp,
-					BaseFee:    daBlock.BaseFee,
-					GasLimit:   daBlock.GasLimit,
+					Number:     daBlock.Number(),
+					Time:       daBlock.Timestamp(),
+					BaseFee:    daBlock.BaseFee(),
+					GasLimit:   daBlock.GasLimit(),
 					Difficulty: 10,                             // TODO: replace with real difficulty
 					ExtraData:  []byte{1, 2, 3, 4, 5, 6, 7, 8}, // TODO: replace with real extra data
 				},
@@ -129,11 +130,11 @@ func (c *CommitBatchDAV0) Blocks() []*PartialBlock {
 	return blocks
 }
 
-func getTotalMessagesPoppedFromChunks(decodedChunks []*codecv0.DAChunkRawTx) int {
+func getTotalMessagesPoppedFromChunks(decodedChunks []*encoding.DAChunkRawTx) int {
 	totalL1MessagePopped := 0
 	for _, chunk := range decodedChunks {
 		for _, block := range chunk.Blocks {
-			totalL1MessagePopped += int(block.NumL1Messages)
+			totalL1MessagePopped += int(block.NumL1Messages())
 		}
 	}
 	return totalL1MessagePopped
@@ -141,16 +142,24 @@ func getTotalMessagesPoppedFromChunks(decodedChunks []*codecv0.DAChunkRawTx) int
 
 func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skippedBitmap []byte, totalL1MessagePopped int) ([]*types.L1MessageTx, error) {
 	var txs []*types.L1MessageTx
-
 	decodedSkippedBitmap, err := encoding.DecodeBitmap(skippedBitmap, totalL1MessagePopped)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode skipped message bitmap: err: %w", err)
 	}
 
+	isL1MessageSkipped := func(skippedBitmap []*big.Int, index uint64) bool {
+		if index >= uint64(len(skippedBitmap))*256 {
+			return false
+		}
+		quo := index / 256
+		rem := index % 256
+		return skippedBitmap[quo].Bit(int(rem)) == 1
+	}
+
 	// get all necessary l1 messages without skipped
 	currentIndex := parentTotalL1MessagePopped
 	for index := 0; index < totalL1MessagePopped; index++ {
-		if encoding.IsL1MessageSkipped(decodedSkippedBitmap, currentIndex-parentTotalL1MessagePopped) {
+		if isL1MessageSkipped(decodedSkippedBitmap, currentIndex-parentTotalL1MessagePopped) {
 			currentIndex++
 			continue
 		}

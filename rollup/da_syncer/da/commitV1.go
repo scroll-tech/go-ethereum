@@ -65,6 +65,10 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
 
+	if decodedChunks == nil {
+		return nil, fmt.Errorf("decodedChunks is nil after decoding")
+	}
+
 	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, vLog.BlockNumber)
 	if err != nil {
 		return nil, err

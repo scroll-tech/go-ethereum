@@ -3,7 +3,6 @@ package da
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
 
 	"github.com/scroll-tech/da-codec/encoding"
 
@@ -147,19 +146,10 @@ func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skipped
 		return nil, fmt.Errorf("failed to decode skipped message bitmap: err: %w", err)
 	}
 
-	isL1MessageSkipped := func(skippedBitmap []*big.Int, index uint64) bool {
-		if index >= uint64(len(skippedBitmap))*256 {
-			return false
-		}
-		quo := index / 256
-		rem := index % 256
-		return skippedBitmap[quo].Bit(int(rem)) == 1
-	}
-
 	// get all necessary l1 messages without skipped
 	currentIndex := parentTotalL1MessagePopped
 	for index := 0; index < totalL1MessagePopped; index++ {
-		if isL1MessageSkipped(decodedSkippedBitmap, currentIndex-parentTotalL1MessagePopped) {
+		if encoding.IsL1MessageSkipped(decodedSkippedBitmap, currentIndex-parentTotalL1MessagePopped) {
 			currentIndex++
 			continue
 		}

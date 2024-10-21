@@ -866,7 +866,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		pool.priced.Put(tx, isLocal)
 		pool.journalTx(from, tx)
 		pool.queueTxEvent(tx)
-		log.Info("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
+		log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
 
 		// Successful promotion, bump the heartbeat
 		pool.beats[from] = time.Now()
@@ -888,7 +888,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	}
 	pool.journalTx(from, tx)
 
-	log.Info("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
+	log.Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
 	return replaced, nil
 }
 
@@ -923,7 +923,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 	if pool.all.Get(hash) == nil && !addAll {
 		log.Error("Missing transaction in lookup set, please report the issue", "hash", hash)
 	}
-	log.Info("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "new tx", !addAll)
+	log.Trace("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "new tx", !addAll)
 	if addAll {
 		pool.all.Add(tx, local)
 		pool.priced.Put(tx, local)
@@ -977,7 +977,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		// Nothing was replaced, bump the pending counter
 		pendingGauge.Inc(1)
 	}
-	log.Info("Promoted transaction from queue to pending", "hash", hash.String(), "from", addr, "to", tx.To())
+	log.Trace("Promoted transaction from queue to pending", "hash", hash.String(), "from", addr, "to", tx.To())
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.pendingNonces.set(addr, tx.Nonce()+1)
 
@@ -1150,7 +1150,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 		return
 	}
 
-	log.Info("remove tx", "hash", hash, "outofbound", outofbound)
+	log.Trace("remove tx", "hash", hash, "outofbound", outofbound)
 
 	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
 
@@ -1378,7 +1378,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		log.Debug("runReorg", "len(txs)", len(txs))
 		if len(txs) > dumpReorgTxHashThreshold {
 			for _, txs := range txs {
-				log.Info("dumping runReorg tx hashes", "txHash", txs.Hash().Hex())
+				log.Debug("dumping runReorg tx hashes", "txHash", txs.Hash().Hex())
 			}
 		}
 	}
@@ -1532,7 +1532,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 				hash := tx.Hash()
 				pool.all.Remove(hash)
 				pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
-				log.Info("Removed cap-exceeding queued transaction", "hash", hash)
+				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
 			}
 			queuedRateLimitMeter.Mark(int64(len(caps)))
 		}
@@ -1774,7 +1774,7 @@ func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 		if tx.Time().Before(t) {
 			txLifecycle := t.Sub(tx.Time())
 			if txLifecycle >= time.Minute*30 {
-				log.Warn("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String(), "txLifecycle(s)", txLifecycle.Seconds())
+				log.Debug("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String(), "txLifecycle(s)", txLifecycle.Seconds())
 			}
 			txLifecycleTimer.Update(txLifecycle)
 		}

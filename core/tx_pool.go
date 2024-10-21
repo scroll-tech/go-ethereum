@@ -707,7 +707,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrOversizedData
 	}
 	// Reject transactions that cannot fit into a block even as a single transaction
-	if !pool.chainconfig.Scroll.IsValidBlockSize(tx.Size()) {
+	if !pool.chainconfig.Scroll.IsValidBlockSizeForMining(tx.Size()) {
 		return ErrOversizedData
 	}
 	// Check whether the init code size has been exceeded.
@@ -1378,7 +1378,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		log.Debug("runReorg", "len(txs)", len(txs))
 		if len(txs) > dumpReorgTxHashThreshold {
 			for _, txs := range txs {
-				log.Debug("dumping runReorg tx hashes", "txHash", txs.Hash().Hex())
+				log.Info("dumping runReorg tx hashes", "txHash", txs.Hash().Hex())
 			}
 		}
 	}
@@ -1532,7 +1532,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Trans
 				hash := tx.Hash()
 				pool.all.Remove(hash)
 				pool.calculateTxsLifecycle(types.Transactions{tx}, time.Now())
-				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
+				log.Info("Removed cap-exceeding queued transaction", "hash", hash)
 			}
 			queuedRateLimitMeter.Mark(int64(len(caps)))
 		}

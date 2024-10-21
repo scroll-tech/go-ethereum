@@ -414,6 +414,7 @@ func (pool *LegacyPool) loop() {
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					list := pool.queue[addr].Flatten()
 					for _, tx := range list {
+						log.Debug("evict queue tx for timeout", "tx", tx.Hash().String())
 						pool.removeTx(tx.Hash(), true, true)
 					}
 					queuedEvictionMeter.Mark(int64(len(list)))
@@ -962,6 +963,9 @@ func (pool *LegacyPool) enqueueTx(hash common.Hash, tx *types.Transaction, local
 	if pool.all.Get(hash) == nil && !addAll {
 		log.Error("Missing transaction in lookup set, please report the issue", "hash", hash)
 	}
+
+	log.Debug("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "new tx", !addAll)
+
 	if addAll {
 		pool.all.Add(tx, local)
 		pool.priced.Put(tx, local)
@@ -1015,6 +1019,9 @@ func (pool *LegacyPool) promoteTx(addr common.Address, hash common.Hash, tx *typ
 		// Nothing was replaced, bump the pending counter
 		pendingGauge.Inc(1)
 	}
+
+	log.Debug("Promoted transaction from queue to pending", "hash", hash.String(), "from", addr, "to", tx.To())
+
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.pendingNonces.set(addr, tx.Nonce()+1)
 
@@ -1199,6 +1206,9 @@ func (pool *LegacyPool) removeTx(hash common.Hash, outofbound bool, unreserve bo
 	if tx == nil {
 		return 0
 	}
+
+	log.Debug("remove tx", "hash", hash, "outofbound", outofbound)
+
 	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
 
 	// If after deletion there are no more transactions belonging to this account,
@@ -1859,6 +1869,9 @@ func (pool *LegacyPool) calculateTxsLifecycle(txs types.Transactions, t time.Tim
 	for _, tx := range txs {
 		if tx.Time().Before(t) {
 			txLifecycle := t.Sub(tx.Time())
+			if txLifecycle >= time.Minute*30 {
+				log.Debug("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String(), "txLifecycle(s)", txLifecycle.Seconds())
+			}
 			txLifecycleTimer.Update(txLifecycle)
 		}
 	}

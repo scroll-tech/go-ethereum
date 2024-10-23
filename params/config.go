@@ -205,6 +205,7 @@ var (
 		BernoulliBlock:      big.NewInt(3747132),
 		CurieBlock:          big.NewInt(4740239),
 		DarwinTime:          newUint64(1723622400),
+		DarwinV2Time:        newUint64(1724832000),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -245,6 +246,7 @@ var (
 		BernoulliBlock:      big.NewInt(5220340),
 		CurieBlock:          big.NewInt(7096836),
 		DarwinTime:          newUint64(1724227200),
+		DarwinV2Time:        newUint64(1725264000),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -579,8 +581,13 @@ func (s ScrollConfig) IsValidTxCount(count int) bool {
 }
 
 // IsValidBlockSize returns whether the given block's transaction payload size is below the limit.
-func (s ScrollConfig) IsValidBlockSize(size uint64) bool {
-	return s.MaxTxPayloadBytesPerBlock == nil || size <= uint64(*s.MaxTxPayloadBytesPerBlock)
+func (s ScrollConfig) IsValidBlockSize(size common.StorageSize) bool {
+	return s.MaxTxPayloadBytesPerBlock == nil || size <= common.StorageSize(*s.MaxTxPayloadBytesPerBlock)
+}
+
+// IsValidBlockSizeForMining is similar to IsValidBlockSize, but it accounts for the confidence factor in Rust CCC
+func (s ScrollConfig) IsValidBlockSizeForMining(size common.StorageSize) bool {
+	return s.IsValidBlockSize(size * (1.0 / 0.95))
 }
 
 func (s ScrollConfig) String() string {

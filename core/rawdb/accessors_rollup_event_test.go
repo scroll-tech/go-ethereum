@@ -147,66 +147,130 @@ func TestFinalizedBatchMeta(t *testing.T) {
 	}
 }
 
-func TestBatchChunkRanges(t *testing.T) {
-	chunks := [][]*ChunkBlockRange{
-		{
-			{StartBlockNumber: 1, EndBlockNumber: 100},
-			{StartBlockNumber: 101, EndBlockNumber: 200},
-		},
-		{
-			{StartBlockNumber: 201, EndBlockNumber: 300},
-			{StartBlockNumber: 301, EndBlockNumber: 400},
-		},
-		{
-			{StartBlockNumber: 401, EndBlockNumber: 500},
-		},
-	}
-
+func TestWriteReadDeleteCommittedBatchMeta(t *testing.T) {
 	db := NewMemoryDatabase()
 
-	for i, chunkRange := range chunks {
-		batchIndex := uint64(i)
-		WriteBatchChunkRanges(db, batchIndex, chunkRange)
+	testCases := []struct {
+		batchIndex uint64
+		meta       *CommittedBatchMeta
+	}{
+		{
+			batchIndex: 0,
+			meta: &CommittedBatchMeta{
+				Version:             0,
+				BlobVersionedHashes: []common.Hash{},
+				ChunkBlockRanges:    []*ChunkBlockRange{},
+			},
+		},
+		{
+			batchIndex: 1,
+			meta: &CommittedBatchMeta{
+				Version:             1,
+				BlobVersionedHashes: []common.Hash{common.HexToHash("0x1234")},
+				ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 10}},
+			},
+		},
+		{
+			batchIndex: 255,
+			meta: &CommittedBatchMeta{
+				Version:             255,
+				BlobVersionedHashes: []common.Hash{common.HexToHash("0xabcd"), common.HexToHash("0xef01")},
+				ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 10}, {StartBlockNumber: 11, EndBlockNumber: 20}},
+			},
+		},
 	}
 
-	for i, chunkRange := range chunks {
-		batchIndex := uint64(i)
-		readChunkRange := ReadBatchChunkRanges(db, batchIndex)
-		if len(readChunkRange) != len(chunkRange) {
-			t.Fatal("Mismatch in number of chunk ranges", "expected", len(chunkRange), "got", len(readChunkRange))
+	for _, tc := range testCases {
+		WriteCommittedBatchMeta(db, tc.batchIndex, tc.meta)
+		got := ReadCommittedBatchMeta(db, tc.batchIndex)
+
+		if got == nil {
+			t.Fatalf("Expected non-nil value for batch index %d", tc.batchIndex)
 		}
 
-		for j, cr := range readChunkRange {
-			if cr.StartBlockNumber != chunkRange[j].StartBlockNumber || cr.EndBlockNumber != chunkRange[j].EndBlockNumber {
-				t.Fatal("Mismatch in chunk range", "batch index", batchIndex, "expected", chunkRange[j], "got", cr)
-			}
+		if !compareCommittedBatchMeta(tc.meta, got) {
+			t.Fatalf("CommittedBatchMeta mismatch for batch index %d, expected %+v, got %+v", tc.batchIndex, tc.meta, got)
 		}
 	}
 
-	// over-write
-	newRange := []*ChunkBlockRange{{StartBlockNumber: 1001, EndBlockNumber: 1100}}
-	WriteBatchChunkRanges(db, 0, newRange)
-	readChunkRange := ReadBatchChunkRanges(db, 0)
-	if len(readChunkRange) != 1 || readChunkRange[0].StartBlockNumber != 1001 || readChunkRange[0].EndBlockNumber != 1100 {
-		t.Fatal("Over-write failed for chunk range", "expected", newRange, "got", readChunkRange)
-	}
-
-	// read non-existing value
-	if readChunkRange = ReadBatchChunkRanges(db, uint64(len(chunks)+1)); readChunkRange != nil {
-		t.Fatal("Expected nil for non-existing value", "got", readChunkRange)
+	// reading a non-existing value
+	if got := ReadCommittedBatchMeta(db, 256); got != nil {
+		t.Fatalf("Expected nil for non-existing value, got %+v", got)
 	}
 
 	// delete: revert batch
-	for i := range chunks {
-		batchIndex := uint64(i)
-		DeleteBatchChunkRanges(db, batchIndex)
+	for _, tc := range testCases {
+		DeleteCommittedBatchMeta(db, tc.batchIndex)
 
-		readChunkRange := ReadBatchChunkRanges(db, batchIndex)
+		readChunkRange := ReadCommittedBatchMeta(db, tc.batchIndex)
 		if readChunkRange != nil {
-			t.Fatal("Chunk range was not deleted", "batch index", batchIndex)
+			t.Fatal("Committed batch metadata was not deleted", "batch index", tc.batchIndex)
 		}
 	}
 
 	// delete non-existing value: ensure the delete operation handles non-existing values without errors.
-	DeleteBatchChunkRanges(db, uint64(len(chunks)+1))
+	DeleteCommittedBatchMeta(db, 256)
+}
+
+func TestOverwriteCommittedBatchMeta(t *testing.T) {
+	db := NewMemoryDatabase()
+
+	batchIndex := uint64(42)
+	initialMeta := &CommittedBatchMeta{
+		Version:             1,
+		BlobVersionedHashes: []common.Hash{common.HexToHash("0x1234")},
+		ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 10}},
+	}
+	newMeta := &CommittedBatchMeta{
+		Version:             2,
+		BlobVersionedHashes: []common.Hash{common.HexToHash("0x5678"), common.HexToHash("0x9abc")},
+		ChunkBlockRanges:    []*ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 20}, {StartBlockNumber: 21, EndBlockNumber: 30}},
+	}
+
+	// write initial meta
+	WriteCommittedBatchMeta(db, batchIndex, initialMeta)
+	got := ReadCommittedBatchMeta(db, batchIndex)
+
+	if !compareCommittedBatchMeta(initialMeta, got) {
+		t.Fatalf("Initial write failed, expected %+v, got %+v", initialMeta, got)
+	}
+
+	// overwrite with new meta
+	WriteCommittedBatchMeta(db, batchIndex, newMeta)
+	got = ReadCommittedBatchMeta(db, batchIndex)
+
+	if !compareCommittedBatchMeta(newMeta, got) {
+		t.Fatalf("Overwrite failed, expected %+v, got %+v", newMeta, got)
+	}
+
+	// read non-existing batch index
+	nonExistingIndex := uint64(999)
+	got = ReadCommittedBatchMeta(db, nonExistingIndex)
+
+	if got != nil {
+		t.Fatalf("Expected nil for non-existing batch index, got %+v", got)
+	}
+}
+
+func compareCommittedBatchMeta(a, b *CommittedBatchMeta) bool {
+	if a.Version != b.Version {
+		return false
+	}
+	if len(a.BlobVersionedHashes) != len(b.BlobVersionedHashes) {
+		return false
+	}
+	for i := range a.BlobVersionedHashes {
+		if a.BlobVersionedHashes[i] != b.BlobVersionedHashes[i] {
+			return false
+		}
+	}
+	if len(a.ChunkBlockRanges) != len(b.ChunkBlockRanges) {
+		return false
+	}
+	for i := range a.ChunkBlockRanges {
+		if a.ChunkBlockRanges[i].StartBlockNumber != b.ChunkBlockRanges[i].StartBlockNumber || a.ChunkBlockRanges[i].EndBlockNumber != b.ChunkBlockRanges[i].EndBlockNumber {
+			return false
+		}
+	}
+	return true
 }

@@ -41,7 +41,7 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.Entry, error) {
 			return nil, err
 		}
 		switch daEntry.Type() {
-		case da.CommitBatchV0Type, da.CommitBatchV1Type, da.CommitBatchV2Type:
+		case da.CommitBatchV0Type, da.CommitBatchWithBlobType:
 			bq.addBatch(daEntry)
 		case da.RevertBatchType:
 			bq.deleteBatch(daEntry)

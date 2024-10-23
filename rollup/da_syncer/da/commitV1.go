@@ -20,19 +20,17 @@ type CommitBatchDAV1 struct {
 }
 
 func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
-	codec encoding.Codec,
 	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
+	codec encoding.Codec,
 	commitEvent *l1.CommitBatchEvent,
-	version uint8,
-	batchIndex uint64,
 	parentBatchHeader []byte,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
 ) (*CommitBatchDAV1, error) {
 	decodedChunks, err := codec.DecodeDAChunksRawTx(chunks)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
+		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", commitEvent.BatchIndex().Uint64(), err)
 	}
 
 	versionedHash, err := l1Reader.FetchTxBlobHash(commitEvent.TxHash(), commitEvent.BlockHash())
@@ -49,7 +47,7 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)
 	}
 	if blob == nil {
-		return nil, fmt.Errorf("unexpected, blob == nil and err != nil, batch index: %d, versionedHash: %s, blobClient: %T", batchIndex, versionedHash.String(), blobClient)
+		return nil, fmt.Errorf("unexpected, blob == nil and err != nil, batch index: %d, versionedHash: %s, blobClient: %T", commitEvent.BatchIndex().Uint64(), versionedHash.String(), blobClient)
 	}
 
 	// compute blob versioned hash and compare with one from tx
@@ -72,7 +70,7 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 		return nil, fmt.Errorf("decodedChunks is nil after decoding")
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
+	v0, err := NewCommitBatchDAV0WithChunks(db, uint8(codec.Version()), commitEvent.BatchIndex().Uint64(), parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
 	if err != nil {
 		return nil, err
 	}

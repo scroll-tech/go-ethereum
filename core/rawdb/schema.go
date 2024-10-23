@@ -157,9 +157,6 @@ var (
 	// Scroll da syncer store
 	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")
 
-	// Scroll da syncer store
-	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")
-
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
 

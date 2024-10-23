@@ -6,15 +6,11 @@ import (
 	"fmt"
 
 	"github.com/scroll-tech/da-codec/encoding"
-	"github.com/scroll-tech/da-codec/encoding/codecv0"
-	"github.com/scroll-tech/da-codec/encoding/codecv1"
 
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
-	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto/kzg4844"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 )
@@ -23,21 +19,8 @@ type CommitBatchDAV1 struct {
 	*CommitBatchDAV0
 }
 
-func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
+func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 	codec encoding.Codec,
-	l1Reader *l1.Reader,
-	blobClient blob_client.BlobClient,
-	commitEvent *l1.CommitBatchEvent,
-	version uint8,
-	batchIndex uint64,
-	parentBatchHeader []byte,
-	chunks [][]byte,
-	skippedL1MessageBitmap []byte,
-) (*CommitBatchDAV1, error) {
-	return NewCommitBatchDAV1WithBlobDecodeFunc(ctx, db, l1Reader, blobClient, commitEvent, version, batchIndex, parentBatchHeader, chunks, skippedL1MessageBitmap, codecv1.DecodeTxsFromBlob)
-}
-
-func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database,
 	l1Reader *l1.Reader,
 	blobClient blob_client.BlobClient,
 	commitEvent *l1.CommitBatchEvent,
@@ -89,7 +72,7 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, db ethdb.Database
 		return nil, fmt.Errorf("decodedChunks is nil after decoding")
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, vLog.BlockNumber)
+	v0, err := NewCommitBatchDAV0WithChunks(db, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
 	if err != nil {
 		return nil, err
 	}

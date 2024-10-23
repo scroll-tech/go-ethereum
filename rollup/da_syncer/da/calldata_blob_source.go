@@ -6,14 +6,12 @@ import (
 	"fmt"
 
 	"github.com/scroll-tech/da-codec/encoding"
+
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
-	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
 
@@ -35,7 +33,7 @@ var (
 
 type CalldataBlobSource struct {
 	ctx                           context.Context
-	l1Reader       *l1.Reader
+	l1Reader                      *l1.Reader
 	blobClient                    blob_client.BlobClient
 	l1height                      uint64
 	scrollChainABI                *abi.ABI
@@ -54,7 +52,7 @@ func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Reader *l1.Re
 	}
 	return &CalldataBlobSource{
 		ctx:                           ctx,
-		l1Reader:       l1Reader,
+		l1Reader:                      l1Reader,
 		blobClient:                    blobClient,
 		l1height:                      l1height,
 		scrollChainABI:                scrollChainABI,
@@ -89,7 +87,7 @@ func (ds *CalldataBlobSource) NextData() (Entries, error) {
 	if err != nil {
 		return nil, serrors.NewTemporaryError(fmt.Errorf("cannot get rollup events, l1height: %d, error: %v", ds.l1height, err))
 	}
-	da, err := ds.processLogsToDA(logs)
+	da, err := ds.processRollupEventsToDA(rollupEvents)
 	if err != nil {
 		return nil, serrors.NewTemporaryError(fmt.Errorf("failed to process rollup events to DA, error: %v", err))
 	}
@@ -175,7 +173,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, commitEvent *l
 
 	txData, err := ds.l1Reader.FetchTxData(commitEvent.TxHash(), commitEvent.BlockHash())
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tx data, tx hash: %v, err: %w", vLog.TxHash.Hex(), err)
+		return nil, fmt.Errorf("failed to fetch tx data, tx hash: %v, err: %w", commitEvent.TxHash().Hex(), err)
 	}
 	if len(txData) < methodIDLength {
 		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)
@@ -202,9 +200,9 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, commitEvent *l
 		}
 		switch args.Version {
 		case 0:
-			return NewCommitBatchDAV0(ds.db, codec, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, vLog.BlockNumber)
+			return NewCommitBatchDAV0(ds.db, codec, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, commitEvent.BlockNumber())
 		case 1, 2:
-			return NewCommitBatchDAWithBlob(ds.ctx, ds.db, codec, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+			return NewCommitBatchDAWithBlob(ds.ctx, ds.db, codec, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
 		default:
 			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 		}
@@ -220,7 +218,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, commitEvent *l
 		}
 		switch args.Version {
 		case 3, 4:
-			return NewCommitBatchDAWithBlob(ds.ctx, ds.db, codec, ds.l1Client, ds.blobClient, vLog, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+			return NewCommitBatchDAWithBlob(ds.ctx, ds.db, codec, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
 		default:
 			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 		}

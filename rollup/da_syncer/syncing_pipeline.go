@@ -15,8 +15,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
-	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
 
@@ -54,7 +52,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		return nil, fmt.Errorf("failed to initialize l1.Reader, err = %w", err)
 	}
 
-	blobClientList := blob_client.NewBlobClientList()
+	blobClientList := blob_client.NewBlobClients()
 	if config.BeaconNodeAPIEndpoint != "" {
 		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint)
 		if err != nil {

@@ -19,7 +19,7 @@ var (
 
 func init() {
 	ScrollChainABI, _ = ScrollChainMetaData.GetAbi()
-	L1MessageQueueABImanual, _ = L1MessageQueueMetaData.GetAbi()
+	L1MessageQueueABImanual, _ = L1MessageQueueMetaDataManual.GetAbi()
 }
 
 // ScrollChainMetaData contains ABI of the ScrollChain contract.

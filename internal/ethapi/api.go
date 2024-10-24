@@ -68,8 +68,13 @@ func (s *PublicEthereumAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) 
 	if err != nil {
 		return nil, err
 	}
-	if head := s.b.CurrentHeader(); head.BaseFee != nil {
-		tipcap.Add(tipcap, head.BaseFee)
+	bNrOrHash := rpc.BlockNumberOrHashWithNumber(rpc.PendingBlockNumber)
+	block, err := s.b.BlockByNumberOrHash(ctx, bNrOrHash)
+	if err != nil {
+		return &hexutil.Big{}, err
+	}
+	if block.BaseFee() != nil {
+		tipcap.Add(tipcap, block.BaseFee())
 	}
 	return (*hexutil.Big)(tipcap), err
 }

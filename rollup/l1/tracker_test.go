@@ -151,6 +151,11 @@ func (m *mockETHClient) BlockByHash(ctx context.Context, hash common.Hash) (*typ
 	panic("implement me")
 }
 
+func (m *mockETHClient) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 type subscriptionCallTrace struct {
 	old []*types.Header
 	new []*types.Header

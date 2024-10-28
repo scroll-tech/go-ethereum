@@ -157,7 +157,7 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 	var logs []types.Log
 
-	err := r.queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
+	err := queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(from)), // inclusive
 			ToBlock:   big.NewInt(int64(to)),   // inclusive
@@ -188,7 +188,7 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 func (r *Reader) FetchRollupEventsInRangeWithCallback(from, to uint64, callback func(event RollupEvent) bool) error {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 
-	err := r.queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
+	err := queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(from)), // inclusive
 			ToBlock:   big.NewInt(int64(to)),   // inclusive
@@ -287,15 +287,16 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 	return rollupEvents, nil
 }
 
-func (r *Reader) queryInBatches(fromBlock, toBlock uint64, batchSize int, queryFunc func(from, to uint64) (bool, error)) error {
-	for from := fromBlock; from <= toBlock; from += uint64(batchSize) {
-		to := from + defaultL1MsgFetchBlockRange - 1
+// TODO: add context to allow for cancellation
+func queryInBatches(fromBlock, toBlock uint64, batchSize uint64, queryFunc func(from, to uint64) (bool, error)) error {
+	for from := fromBlock; from <= toBlock; from += batchSize {
+		to := from + batchSize - 1
 		if to > toBlock {
 			to = toBlock
 		}
 		cont, err := queryFunc(from, to)
 		if err != nil {
-			return err
+			return fmt.Errorf("error querying blocks %d to %d: %w", from, to, err)
 		}
 		if !cont {
 			break

@@ -98,6 +98,10 @@ func (c *CommitBatchEvent) BlockNumber() uint64 {
 	return c.blockNumber
 }
 
+func (c *CommitBatchEvent) CompareTo(other *CommitBatchEvent) int {
+	return c.batchIndex.Cmp(other.batchIndex)
+}
+
 type RevertBatchEventUnpacked struct {
 	BatchIndex *big.Int
 	BatchHash  common.Hash

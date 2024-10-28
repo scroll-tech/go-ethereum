@@ -19,6 +19,7 @@ const (
 	revertBatchEventName      = "RevertBatch"
 	finalizeBatchEventName    = "FinalizeBatch"
 	nextUnfinalizedQueueIndex = "nextUnfinalizedQueueIndex"
+	lastFinalizedBatchIndex   = "lastFinalizedBatchIndex"
 
 	defaultL1MsgFetchBlockRange        = 500
 	defaultRollupEventsFetchBlockRange = 100
@@ -88,6 +89,28 @@ func (r *Reader) FinalizedL1MessageQueueIndex(blockNumber uint64) (uint64, error
 	}
 
 	return next - 1, nil
+}
+
+func (r *Reader) LatestFinalizedBatch(blockNumber uint64) (uint64, error) {
+	data, err := r.scrollChainABI.Pack(lastFinalizedBatchIndex)
+	if err != nil {
+		return 0, fmt.Errorf("failed to pack %s: %w", lastFinalizedBatchIndex, err)
+	}
+
+	result, err := r.client.CallContract(r.ctx, ethereum.CallMsg{
+		To:   &r.config.ScrollChainAddress,
+		Data: data,
+	}, new(big.Int).SetUint64(blockNumber))
+	if err != nil {
+		return 0, fmt.Errorf("failed to call %s: %w", lastFinalizedBatchIndex, err)
+	}
+
+	var parsedResult *big.Int
+	if err = r.scrollChainABI.UnpackIntoInterface(&parsedResult, lastFinalizedBatchIndex, result); err != nil {
+		return 0, fmt.Errorf("failed to unpack result: %w", err)
+	}
+
+	return parsedResult.Uint64(), nil
 }
 
 // GetLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.

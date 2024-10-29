@@ -166,6 +166,7 @@ var (
 		utils.DARecoveryInitialBatchFlag,
 		utils.DARecoverySignBlocksFlag,
 		utils.DARecoveryL2EndBlockFlag,
+		utils.DARecoveryProduceBlocksFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{

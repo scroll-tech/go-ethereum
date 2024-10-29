@@ -255,7 +255,10 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
 		}
-		eth.syncingPipeline.Start()
+		// Do not start syncing pipeline if we are producing blocks.
+		if !config.DA.ProduceBlocks {
+			eth.syncingPipeline.Start()
+		}
 	}
 
 	// initialize and start L1 message sync service
@@ -291,7 +294,8 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 
-	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing)
+	config.Miner.SigningDisabled = config.DA.ProduceBlocks
+	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing && !config.DA.ProduceBlocks)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}

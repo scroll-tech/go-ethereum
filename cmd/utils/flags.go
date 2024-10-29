@@ -1073,6 +1073,10 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Name:  "da.recovery.l2endblock",
 		Usage: "End L2 block to recover to",
 	}
+	DARecoveryProduceBlocksFlag = &cli.BoolFlag{
+		Name:  "da.recovery.produceblocks",
+		Usage: "Produce unsigned blocks after L1 recovery for permissionless batch submission",
+	}
 )
 
 var (
@@ -1850,6 +1854,9 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 		}
 		if ctx.IsSet(DARecoveryL2EndBlockFlag.Name) {
 			cfg.DA.L2EndBlock = ctx.Uint64(DARecoveryL2EndBlockFlag.Name)
+		}
+		if ctx.IsSet(DARecoveryProduceBlocksFlag.Name) {
+			cfg.DA.ProduceBlocks = ctx.Bool(DARecoveryProduceBlocksFlag.Name)
 		}
 	}
 }

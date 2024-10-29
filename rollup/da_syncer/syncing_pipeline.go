@@ -32,6 +32,7 @@ type Config struct {
 	InitialBatch   uint64 // Batch number from which to start syncing and overriding blocks
 	SignBlocks     bool   // Whether to sign the blocks after reading them from the pipeline (requires correct Clique signer key) and history of blocks with Clique signatures
 	L2EndBlock     uint64 // L2 block number to sync until
+	ProduceBlocks  bool
 }
 
 // SyncingPipeline is a derivation pipeline for syncing data from L1 and DA and transform it into
@@ -86,6 +87,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	if config.RecoveryMode {
 		initialL1Block = config.InitialL1Block
 		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", initialL1Block, "initialBatch", config.InitialBatch)
+		// TODO: do some sanity checks for the config values
 	} else {
 		initialL1Block = l1DeploymentBlock - 1
 		config.InitialL1Block = initialL1Block

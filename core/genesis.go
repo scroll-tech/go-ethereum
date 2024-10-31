@@ -125,11 +125,7 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 func (ga *GenesisAlloc) hash(isUsingZktrie bool) (common.Hash, error) {
 	// Create an ephemeral in-memory database for computing hash,
 	// all the derived states will be discarded to not pollute disk.
-	trieConfig := trie.HashDefaults
-	if isUsingZktrie {
-		trieConfig = trie.HashDefaultsWithZktrie
-	}
-	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), trieConfig)
+	db := state.NewDatabase(rawdb.NewMemoryDatabase())
 	statedb, err := state.New(types.EmptyRootHash, db, nil)
 	if err != nil {
 		return common.Hash{}, err
@@ -309,13 +305,6 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 	// in this case.
 	header := rawdb.ReadHeader(db, stored, 0)
 	storedcfg := rawdb.ReadChainConfig(db, stored)
-	if genesis != nil { // genesis.Config must be not nil atm
-		// overwrite triedb IsUsingZktrie config to be safe
-		triedb.SetIsUsingZktrie(genesis.Config.Scroll.ZktrieEnabled())
-	} else if storedcfg != nil && storedcfg.Scroll.ZktrieEnabled() {
-		// overwrite triedb IsUsingZktrie config to be safe
-		triedb.SetIsUsingZktrie(storedcfg.Scroll.ZktrieEnabled())
-	}
 	// if header.Root != types.EmptyRootHash && !triedb.Initialized(header.Hash()) {
 	if _, err := state.New(header.Root, state.NewDatabaseWithNodeDB(db, triedb), nil); err != nil {
 		if genesis == nil {
@@ -496,9 +485,6 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *trie.Database) (*types.Block
 	config := g.Config
 	if config == nil {
 		config = params.AllEthashProtocolChanges
-	}
-	if config.Scroll.ZktrieEnabled() != triedb.IsUsingZktrie() {
-		return nil, fmt.Errorf("ZktrieEnabled mismatch. genesis: %v, triedb: %v", g.Config.Scroll.ZktrieEnabled(), triedb.IsUsingZktrie())
 	}
 
 	block := g.ToBlock()

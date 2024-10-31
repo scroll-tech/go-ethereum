@@ -104,7 +104,3 @@ func (l *JSONLogger) CaptureExit(output []byte, gasUsed uint64, err error) {}
 func (l *JSONLogger) CaptureTxStart(gasLimit uint64) {}
 
 func (l *JSONLogger) CaptureTxEnd(restGas uint64) {}
-
-func (l *JSONLogger) IsDebug() bool {
-	return l.cfg.Debug
-}

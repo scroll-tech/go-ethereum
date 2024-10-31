@@ -288,10 +288,6 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 		} else {
 			log.Info("Writing custom genesis block")
 		}
-		if genesis.Config.Scroll.ZktrieEnabled() { // genesis.Config must be not nil atm
-			// overwrite triedb IsUsingZktrie config to be safe
-			triedb.SetIsUsingZktrie(genesis.Config.Scroll.ZktrieEnabled())
-		}
 		applyOverrides(genesis.Config)
 		block, err := genesis.Commit(db, triedb)
 		if err != nil {

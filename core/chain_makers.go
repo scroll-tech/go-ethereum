@@ -98,7 +98,7 @@ func (b *BlockGen) Difficulty() *big.Int {
 func (b *BlockGen) SetParentBeaconRoot(root common.Hash) {
 	b.header.ParentBeaconRoot = &root
 	var (
-		blockContext = NewEVMBlockContext(b.header, b.cm, b.config, &b.header.Coinbase)
+		blockContext = NewEVMBlockContext(b.header, b.cm, b.cm.config, &b.header.Coinbase)
 		vmenv        = vm.NewEVM(blockContext, vm.TxContext{}, b.statedb, b.cm.config, vm.Config{})
 	)
 	ProcessBeaconBlockRoot(root, vmenv, b.statedb)
@@ -233,9 +233,9 @@ func (b *BlockGen) AddUncle(h *types.Header) {
 
 	// The gas limit and price should be derived from the parent
 	h.GasLimit = parent.GasLimit
-	if b.config.IsCurie(h.Number) {
+	if b.cm.config.IsCurie(h.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(b.statedb)
-		h.BaseFee = eip1559.CalcBaseFee(b.config, parent, parentL1BaseFee)
+		h.BaseFee = eip1559.CalcBaseFee(b.cm.config, parent, parentL1BaseFee)
 	}
 	b.uncles = append(b.uncles, h)
 }
@@ -432,9 +432,9 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
 	}
-	if chain.Config().IsCurie(header.Number) {
+	if cm.Config().IsCurie(header.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(state)
-		header.BaseFee = eip1559.CalcBaseFee(chain.Config(), parent.Header(), parentL1BaseFee)
+		header.BaseFee = eip1559.CalcBaseFee(cm.Config(), parent.Header(), parentL1BaseFee)
 	}
 	if cm.config.IsCancun(header.Number, header.Time) {
 		var (

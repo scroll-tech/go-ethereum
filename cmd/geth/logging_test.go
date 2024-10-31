@@ -29,7 +29,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/internal/reexec"
+	"github.com/scroll-tech/go-ethereum/internal/reexec"
 )
 
 func runSelf(args ...string) ([]byte, error) {

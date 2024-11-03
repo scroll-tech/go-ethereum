@@ -102,15 +102,15 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 			if !ok {
 				return nil, fmt.Errorf("unexpected type of rollup event: %T", rollupEvent)
 			}
-			if entry, err = ds.getCommitBatchDA(rollupEvent.BatchIndex().Uint64(), commitEvent); err != nil {
-				return nil, fmt.Errorf("failed to get commit batch da: %v, err: %w", rollupEvent.BatchIndex().Uint64(), err)
+			if entry, err = ds.getCommitBatchDA(rollupEvent.GetBatchIndex().Uint64(), commitEvent); err != nil {
+				return nil, fmt.Errorf("failed to get commit batch da: %v, err: %w", rollupEvent.GetBatchIndex().Uint64(), err)
 			}
 
 		case l1.RevertEventType:
-			entry = NewRevertBatch(rollupEvent.BatchIndex().Uint64())
+			entry = NewRevertBatch(rollupEvent.GetBatchIndex().Uint64())
 
 		case l1.FinalizeEventType:
-			entry = NewFinalizeBatch(rollupEvent.BatchIndex().Uint64())
+			entry = NewFinalizeBatch(rollupEvent.GetBatchIndex().Uint64())
 
 		default:
 			return nil, fmt.Errorf("unknown rollup event, type: %v", rollupEvent.Type())
@@ -160,7 +160,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, commitEvent *l
 		return NewCommitBatchDAV0Empty(), nil
 	}
 
-	txData, err := ds.l1Reader.FetchTxData(commitEvent.TxHash(), commitEvent.BlockHash())
+	txData, err := ds.l1Reader.FetchTxData(commitEvent.TxHash, commitEvent.BlockHash)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, commitEvent *l
 		}
 		switch args.Version {
 		case 0:
-			return NewCommitBatchDAV0(ds.msgStorage, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, commitEvent.BlockNumber())
+			return NewCommitBatchDAV0(ds.msgStorage, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, commitEvent.BlockNumber)
 		case 1:
 			return NewCommitBatchDAV1(ds.ctx, ds.msgStorage, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
 		case 2:

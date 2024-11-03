@@ -44,7 +44,7 @@ func TestUnpackLog(t *testing.T) {
 				Data:   []byte{},
 				Topics: []common.Hash{scrollChainABI.Events["CommitBatch"].ID, common.BigToHash(mockBatchIndex), mockBatchHash},
 			},
-			&CommitBatchEvent{batchIndex: mockBatchIndex, batchHash: mockBatchHash},
+			&CommitBatchEvent{BatchIndex: mockBatchIndex, BatchHash: mockBatchHash},
 			&CommitBatchEvent{},
 		},
 		{
@@ -53,7 +53,7 @@ func TestUnpackLog(t *testing.T) {
 				Data:   []byte{},
 				Topics: []common.Hash{scrollChainABI.Events["RevertBatch"].ID, common.BigToHash(mockBatchIndex), mockBatchHash},
 			},
-			&RevertBatchEvent{batchIndex: mockBatchIndex, batchHash: mockBatchHash},
+			&RevertBatchEvent{BatchIndex: mockBatchIndex, BatchHash: mockBatchHash},
 			&RevertBatchEvent{},
 		},
 		{
@@ -63,10 +63,10 @@ func TestUnpackLog(t *testing.T) {
 				Topics: []common.Hash{scrollChainABI.Events["FinalizeBatch"].ID, common.BigToHash(mockBatchIndex), mockBatchHash},
 			},
 			&FinalizeBatchEvent{
-				batchIndex:   mockBatchIndex,
-				batchHash:    mockBatchHash,
-				stateRoot:    mockStateRoot,
-				withdrawRoot: mockWithdrawRoot,
+				BatchIndex:   mockBatchIndex,
+				BatchHash:    mockBatchHash,
+				StateRoot:    mockStateRoot,
+				WithdrawRoot: mockWithdrawRoot,
 			},
 			&FinalizeBatchEvent{},
 		},

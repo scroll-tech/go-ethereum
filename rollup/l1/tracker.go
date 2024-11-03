@@ -26,8 +26,8 @@ type Tracker struct {
 	canonicalChain *common.ShrinkingMap[uint64, *types.Header]
 	headers        *common.ShrinkingMap[common.Hash, *types.Header]
 
-	lastSafeHeader      *types.Header
-	lastFinalizedHeader *types.Header
+	// lastSafeHeader      *types.Header
+	// lastFinalizedHeader *types.Header
 
 	subscriptionCounter int                                  // used to assign unique IDs to subscriptions
 	subscriptions       map[ConfirmationRule][]*subscription // sorted by confirmationRule ascending
@@ -36,7 +36,7 @@ type Tracker struct {
 
 const (
 	// defaultSyncInterval is the frequency at which we query for new chain head
-	defaultSyncInterval  = 12 * time.Second
+	defaultSyncInterval  = 3 * time.Second
 	defaultPruneInterval = 60 * time.Second
 )
 
@@ -145,6 +145,9 @@ func (t *Tracker) syncLatestHead() error {
 	current := newHeader
 	for {
 		prevNumber := current.Number.Uint64() - 1
+		if prevNumber+uint64(maxConfirmationRule) < newHeader.Number.Uint64() { // don't need to store headers older then last finalized
+			break
+		}
 		prevHeader, exists := t.canonicalChain.Get(prevNumber)
 
 		if prevNumber == 0 {
@@ -222,9 +225,36 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
+	var (
+		latestFinalizedHeader *types.Header
+		exists                bool
+		latestFinalizedNumber uint64
+	)
+	if newHeader.Number.Uint64() >= uint64(maxConfirmationRule) {
+		latestFinalizedNumber = newHeader.Number.Uint64() - uint64(maxConfirmationRule)
+		latestFinalizedHeader, exists = t.canonicalChain.Get(latestFinalizedNumber)
+	}
+
 	for _, sub := range t.subscriptions[LatestChainHead] {
 		// Ignore subscriptions with deeper ConfirmationRule than the new block.
 		if newHeader.Number.Uint64() < uint64(sub.confirmationRule) {
+			continue
+		}
+
+		// if subscription is offline, just return latest finalized block and skip
+		if !sub.isOnline {
+			if exists {
+				sub.isOnline = sub.callback(false, nil, []*types.Header{latestFinalizedHeader})
+				sub.lastSentHeader = latestFinalizedHeader
+				continue
+			} else { // if not exists then probably chain just started and can convert subscriber into online
+				sub.isOnline = true
+			}
+		}
+
+		if sub.lastSentHeader != nil && sub.lastSentHeader.Number.Uint64()+1 < latestFinalizedNumber {
+			sub.isOnline = sub.callback(false, nil, []*types.Header{latestFinalizedHeader})
+			sub.lastSentHeader = latestFinalizedHeader
 			continue
 		}
 
@@ -273,14 +303,14 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 
 			// TODO: we should store both the reorged and new chain in a structure such as reorgedHeaders
 			//   maybe repurpose to headerChain or something similar -> have this for reorged and new chain
-			newChainMin, exists := t.canonicalChain.Get(minReorgedHeader.Number.Uint64() - 1) // new chain min -1 because t.chain() excludes start header
+			newChainMin, exists := t.canonicalChain.Get(minReorgedHeader.Number.Uint64())
 			if !exists {
 				return errors.Errorf("failed to find header %d in canonical chain", minReorgedHeader.Number.Uint64())
 			}
-			newChain := t.chain(newChainMin, headerToNotify, false)
-			sub.callback(oldChain, newChain)
+			newChain := t.chain(newChainMin, headerToNotify, true)
+			sub.isOnline = sub.callback(true, oldChain, newChain)
 		} else {
-			sub.callback(nil, t.chain(sub.lastSentHeader, headerToNotify, false))
+			sub.isOnline = sub.callback(true, nil, t.chain(sub.lastSentHeader, headerToNotify, false))
 		}
 		sub.lastSentHeader = headerToNotify
 	}
@@ -288,86 +318,86 @@ func (t *Tracker) notifyLatest(newHeader *types.Header, reorged *reorgedHeaders)
 	return nil
 }
 
-func (t *Tracker) syncSafeHead() error {
-	newHeader, err := t.headerByNumber(rpc.SafeBlockNumber)
-	if err != nil {
-		return errors.Wrapf(err, "failed to retrieve safe header")
-	}
+// func (t *Tracker) syncSafeHead() error {
+// 	newHeader, err := t.headerByNumber(rpc.SafeBlockNumber)
+// 	if err != nil {
+// 		return errors.Wrapf(err, "failed to retrieve safe header")
+// 	}
 
-	if t.lastSafeHeader != nil {
-		// We already saw this header, nothing to do.
-		if t.lastSafeHeader.Hash() == newHeader.Hash() {
-			return nil
-		}
+// 	if t.lastSafeHeader != nil {
+// 		// We already saw this header, nothing to do.
+// 		if t.lastSafeHeader.Hash() == newHeader.Hash() {
+// 			return nil
+// 		}
 
-		// This means there was a L1 reorg and the safe block changed. While this is possible, it should be very rare.
-		if t.lastSafeHeader.Number.Uint64() >= newHeader.Number.Uint64() {
-			t.notifySafeHead(newHeader, true)
-			return nil
-		}
-	}
+// 		// This means there was a L1 reorg and the safe block changed. While this is possible, it should be very rare.
+// 		if t.lastSafeHeader.Number.Uint64() >= newHeader.Number.Uint64() {
+// 			t.notifySafeHead(newHeader, true)
+// 			return nil
+// 		}
+// 	}
 
-	// Notify all subscribers to new SafeChainHead.
-	t.notifySafeHead(newHeader, false)
+// 	// Notify all subscribers to new SafeChainHead.
+// 	t.notifySafeHead(newHeader, false)
 
-	return nil
-}
+// 	return nil
+// }
 
-func (t *Tracker) notifySafeHead(newHeader *types.Header, reorg bool) {
-	t.lastSafeHeader = newHeader
+// func (t *Tracker) notifySafeHead(newHeader *types.Header, reorg bool) {
+// 	t.lastSafeHeader = newHeader
 
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+// 	t.mu.RLock()
+// 	defer t.mu.RUnlock()
 
-	for _, sub := range t.subscriptions[SafeChainHead] {
-		// TODO: implement handling of old chain -> this is concurrent to the canonical chain, so we might need to handle this differently
-		//  but: think about the use cases of the safe block: usually it's just about marking the safe head, so there's no need for the old chain.
-		//  this could mean that we should have a different type of callback for safe and finalized head.
-		sub.callback(nil, t.chain(sub.lastSentHeader, newHeader, false))
-		sub.lastSentHeader = newHeader
-	}
-}
+// 	for _, sub := range t.subscriptions[SafeChainHead] {
+// 		// TODO: implement handling of old chain -> this is concurrent to the canonical chain, so we might need to handle this differently
+// 		//  but: think about the use cases of the safe block: usually it's just about marking the safe head, so there's no need for the old chain.
+// 		//  this could mean that we should have a different type of callback for safe and finalized head.
+// 		sub.callback(nil, t.chain(sub.lastSentHeader, newHeader, false))
+// 		sub.lastSentHeader = newHeader
+// 	}
+// }
 
-func (t *Tracker) syncFinalizedHead() error {
-	newHeader, err := t.headerByNumber(rpc.FinalizedBlockNumber)
-	if err != nil {
-		return errors.Wrapf(err, "failed to retrieve safe header")
-	}
+// func (t *Tracker) syncFinalizedHead() error {
+// 	newHeader, err := t.headerByNumber(rpc.FinalizedBlockNumber)
+// 	if err != nil {
+// 		return errors.Wrapf(err, "failed to retrieve safe header")
+// 	}
 
-	if t.lastFinalizedHeader != nil {
-		// We already saw this header, nothing to do.
-		if t.lastFinalizedHeader.Hash() == newHeader.Hash() {
-			return nil
-		}
+// 	if t.lastFinalizedHeader != nil {
+// 		// We already saw this header, nothing to do.
+// 		if t.lastFinalizedHeader.Hash() == newHeader.Hash() {
+// 			return nil
+// 		}
 
-		// This means the finalized block changed as read from L1. The Ethereum protocol guarantees that this can never
-		// happen. Must be some issue with the RPC node.
-		if t.lastFinalizedHeader.Number.Uint64() >= newHeader.Number.Uint64() {
-			return errors.Errorf("RPC node faulty: finalized block number decreased from %d to %d", t.lastFinalizedHeader.Number.Uint64(), newHeader.Number.Uint64())
-		}
-	}
+// 		// This means the finalized block changed as read from L1. The Ethereum protocol guarantees that this can never
+// 		// happen. Must be some issue with the RPC node.
+// 		if t.lastFinalizedHeader.Number.Uint64() >= newHeader.Number.Uint64() {
+// 			return errors.Errorf("RPC node faulty: finalized block number decreased from %d to %d", t.lastFinalizedHeader.Number.Uint64(), newHeader.Number.Uint64())
+// 		}
+// 	}
 
-	t.notifyFinalizedHead(newHeader)
+// 	t.notifyFinalizedHead(newHeader)
 
-	// TODO: prune old headers from headers cache and canonical chain
+// 	// TODO: prune old headers from headers cache and canonical chain
 
-	return nil
-}
+// 	return nil
+// }
 
-func (t *Tracker) notifyFinalizedHead(newHeader *types.Header) {
-	t.lastFinalizedHeader = newHeader
+// func (t *Tracker) notifyFinalizedHead(newHeader *types.Header) {
+// 	t.lastFinalizedHeader = newHeader
 
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+// 	t.mu.RLock()
+// 	defer t.mu.RUnlock()
 
-	// Notify all subscribers to new FinalizedChainHead.
-	for _, sub := range t.subscriptions[FinalizedChainHead] {
-		newChain := t.chain(sub.lastSentHeader, newHeader, false)
+// 	// Notify all subscribers to new FinalizedChainHead.
+// 	for _, sub := range t.subscriptions[FinalizedChainHead] {
+// 		newChain := t.chain(sub.lastSentHeader, newHeader, false)
 
-		sub.callback(nil, newChain)
-		sub.lastSentHeader = newHeader
-	}
-}
+// 		sub.callback(nil, newChain)
+// 		sub.lastSentHeader = newHeader
+// 	}
+// }
 
 // generates the chain limited by start and end headers. Star may be included or not depending on includeStart
 func (t *Tracker) chain(start, end *types.Header, includeStart bool) []*types.Header {
@@ -408,7 +438,7 @@ func (t *Tracker) chain(start, end *types.Header, includeStart bool) []*types.He
 	return chain
 }
 
-func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback SubscriptionCallback, maxHeadersSent int) (unsubscribe func()) {
+func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback SubscriptionCallback) (unsubscribe func()) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -425,7 +455,7 @@ func (t *Tracker) Subscribe(confirmationRule ConfirmationRule, callback Subscrip
 		panic(fmt.Sprintf("invalid confirmation rule %d", confirmationRule))
 	}
 
-	sub := newSubscription(t.subscriptionCounter, confirmationRule, callback, maxHeadersSent)
+	sub := newSubscription(t.subscriptionCounter, confirmationRule, callback)
 
 	subscriptionsByType := t.subscriptions[confirmationType]
 	subscriptionsByType = append(subscriptionsByType, sub)
@@ -469,7 +499,7 @@ func (t *Tracker) pruneOldHeaders() {
 	var minNumber *big.Int
 	for _, confRule := range []ConfirmationRule{LatestChainHead, SafeChainHead, FinalizedChainHead} {
 		for _, sub := range t.subscriptions[confRule] {
-			if sub.lastSentHeader == nil { // did not sent anything to this subscriber, so it's impossible to determine no, which headers could be pruned
+			if sub.isOnline && sub.lastSentHeader == nil { // did not sent anything to this subscriber, so it's impossible to determine now, which headers could be pruned
 				return
 			}
 			if minNumber == nil {

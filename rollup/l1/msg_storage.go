@@ -1,18 +1,24 @@
 package l1
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 const (
-	defaultFetchInterval = 5 * time.Second
+	defaultFetchInterval   = 5 * time.Second
+	maxMsgsStored          = 2000
+	defaultFetchBlockRange = uint64(500)
 )
 
 type MsgStorageState struct {
@@ -26,17 +32,19 @@ type MsgStorage struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	db                    ethdb.Database
 	msgs                  *common.ShrinkingMap[uint64, storedL1Message]
 	reader                *Reader
 	tracker               *Tracker
 	confirmationRule      ConfirmationRule
 	unsubscribeTracker    func()
 	newChainNotifications chan newChainNotification
+	latestFinalized       *types.Header
 
 	msgsMu sync.RWMutex
 }
 
-func NewMsgStorage(ctx context.Context, tracker *Tracker, reader *Reader, confirmationRule ConfirmationRule) (*MsgStorage, error) {
+func NewMsgStorage(ctx context.Context, tracker *Tracker, reader *Reader, db ethdb.Database, confirmationRule ConfirmationRule, l1DeploymentBlockHeader *types.Header) (*MsgStorage, error) {
 	if tracker == nil || reader == nil {
 		return nil, fmt.Errorf("failed to create MsgStorage, reader or tracker is nil")
 	}
@@ -44,20 +52,43 @@ func NewMsgStorage(ctx context.Context, tracker *Tracker, reader *Reader, confir
 	msgStorage := &MsgStorage{
 		ctx:                   ctx,
 		cancel:                cancel,
-		msgs:                  common.NewShrinkingMap[uint64, storedL1Message](1000),
+		db:                    db,
+		msgs:                  common.NewShrinkingMap[uint64, storedL1Message](maxMsgsStored),
 		reader:                reader,
 		tracker:               tracker,
 		confirmationRule:      confirmationRule,
 		newChainNotifications: make(chan newChainNotification, 10),
+		state: MsgStorageState{
+			StartBlockHeader: l1DeploymentBlockHeader,
+			EndBlockHeader:   l1DeploymentBlockHeader,
+		},
+		latestFinalized: l1DeploymentBlockHeader,
 	}
 	return msgStorage, nil
 }
 
 func (ms *MsgStorage) Start() {
 	log.Info("starting MsgStorage")
-	ms.unsubscribeTracker = ms.tracker.Subscribe(ms.confirmationRule, func(old, new []*types.Header) {
-		ms.newChainNotifications <- newChainNotification{old, new}
-	}, 64)
+
+	data := rawdb.ReadL1MsgStorageState(ms.db)
+	state := &MsgStorageState{}
+	if err := rlp.Decode(bytes.NewReader(data), state); err == nil {
+		ms.state = *state
+		ms.resyncToState()
+	}
+	ms.unsubscribeTracker = ms.tracker.Subscribe(ms.confirmationRule, func(isOnline bool, old, new []*types.Header) bool {
+		if isOnline {
+			ms.newChainNotifications <- newChainNotification{old, new}
+			return true
+		} else {
+			ms.latestFinalized = new[0]
+			// check if latest synced block is already finalized or later -> can become an online subscriber
+			if ms.state.EndBlockHeader.Number.Uint64() >= new[0].Number.Uint64() {
+				return true
+			}
+		}
+		return false
+	})
 	go func() {
 		fetchTicker := time.NewTicker(defaultFetchInterval)
 		defer fetchTicker.Stop()
@@ -72,8 +103,13 @@ func (ms *MsgStorage) Start() {
 			case <-ms.ctx.Done():
 				return
 			case <-fetchTicker.C:
-				if len(ms.newChainNotifications) != 0 {
-					err := ms.fetchMessages()
+				if ms.state.EndBlockHeader.Number.Uint64() < ms.latestFinalized.Number.Uint64() {
+					err := ms.syncToTheFinalizedOrLimit()
+					if err != nil {
+						log.Warn("MsgStorage: failed to fetch messages", "err", err)
+					}
+				} else if len(ms.newChainNotifications) != 0 {
+					err := ms.syncRecentNotifs()
 					if err != nil {
 						log.Warn("MsgStorage: failed to fetch messages", "err", err)
 					}
@@ -132,7 +168,81 @@ func (ms *MsgStorage) ReadL1MessagesFrom(startIndex, maxCount uint64) []types.L1
 	return msgs
 }
 
-func (ms *MsgStorage) fetchMessages() error {
+func (ms *MsgStorage) syncRange(from, to uint64) error {
+	events, err := ms.reader.FetchL1MessageEventsInRange(from, to)
+	if err != nil {
+		return fmt.Errorf("failed to fetch l1 messages in range, start: %d, end: %d, err: %w", from, to, err)
+	}
+	msgsToStore := make([]storedL1Message, 0, len(events))
+	for _, event := range events {
+		msg := &types.L1MessageTx{
+			QueueIndex: event.QueueIndex,
+			Gas:        event.GasLimit.Uint64(),
+			To:         &event.Target,
+			Value:      event.Value,
+			Data:       event.Data,
+			Sender:     event.Sender,
+		}
+		msgsToStore = append(msgsToStore, storedL1Message{
+			l1msg:      msg,
+			headerHash: event.Raw.BlockHash,
+		})
+	}
+	ms.msgsMu.Lock()
+	for _, msg := range msgsToStore {
+		ms.msgs.Set(msg.l1msg.QueueIndex, msg)
+	}
+	ms.msgsMu.Unlock()
+	return nil
+}
+
+func (ms *MsgStorage) resyncToState() error {
+	log.Info("MsgStorage: resync to state", "start block number", ms.state.StartBlockHeader.Number.Uint64(), "endBlockNumber", ms.state.EndBlockHeader.Number.Uint64())
+	endBlockNumber := ms.state.EndBlockHeader.Number.Uint64()
+	for from := ms.state.StartBlockHeader.Number.Uint64(); from <= endBlockNumber; from += defaultFetchBlockRange {
+		to := from + defaultFetchBlockRange - 1
+		if to > endBlockNumber {
+			to = endBlockNumber
+		}
+		if err := ms.syncRange(from, to); err != nil {
+			return err
+		}
+	}
+	log.Info("MsgStorage: resync to state finished", "number of messages", ms.msgs.Size())
+
+	// don't need to update state here, because we are syncing to match defined state
+	return nil
+}
+
+func (ms *MsgStorage) syncToTheFinalizedOrLimit() error {
+	if ms.msgs.Size() >= maxMsgsStored {
+		return nil
+	}
+	for {
+		from := ms.state.EndBlockHeader.Number.Uint64() + 1
+		if from > ms.latestFinalized.Number.Uint64() {
+			break
+		}
+		to := from + defaultFetchBlockRange
+		if err := ms.syncRange(from, to); err != nil {
+			return err
+		}
+		// update storage state
+		toHeader, err := ms.reader.FetchBlockHeaderByNumber(to)
+		if err != nil {
+			return fmt.Errorf("failed to fetch block header by number %d, err: %w", to, err)
+		}
+		ms.state.EndBlockHeader = toHeader
+		ms.updateStorageState()
+		// if the number of stored l1 msgs exceeded the limit stop syncing. It will remain when some of the old messages pruned
+		if ms.msgs.Size() >= maxMsgsStored {
+			break
+		}
+	}
+	return nil
+}
+
+func (ms *MsgStorage) syncRecentNotifs() error {
 	var notifs []newChainNotification
 out:
 	for {
@@ -179,45 +289,41 @@ out:
 		// load messages from new chain
 		start := new[len(new)-1].Number.Uint64()
 		end := new[0].Number.Uint64()
-		events, err := ms.reader.FetchL1MessageEventsInRange(start, end)
-		if err != nil {
-			return fmt.Errorf("failed to fetch l1 messages in range, start: %d, end: %d, err: %w", start, end, err)
+		if err := ms.syncRange(start, end); err != nil {
+			return err
 		}
-		msgsToStore := make([]storedL1Message, len(events))
-		for _, event := range events {
-			msg := &types.L1MessageTx{
-				QueueIndex: event.QueueIndex,
-				Gas:        event.GasLimit.Uint64(),
-				To:         &event.Target,
-				Value:      event.Value,
-				Data:       event.Data,
-				Sender:     event.Sender,
-			}
-			msgsToStore = append(msgsToStore, storedL1Message{
-				l1msg:      msg,
-				headerHash: event.Raw.BlockHash,
-			})
-		}
-		ms.msgsMu.Lock()
-		for _, msg := range msgsToStore {
-			ms.msgs.Set(msg.l1msg.QueueIndex, msg)
-		}
-		ms.msgsMu.Unlock()
 		// update storage state
 		ms.state.EndBlockHeader = new[0]
-		if ms.state.StartBlockHeader == nil {
-			ms.state.StartBlockHeader = new[len(new)-1]
-		}
+		ms.updateStorageState()
 	}
 	return nil
 }
 
+func (ms *MsgStorage) updateStorageState() {
+	bytes, err := rlp.EncodeToBytes(ms.state)
+	if err != nil {
+		log.Crit("Failed to RLP encode message storage state", "err", err)
+	}
+	rawdb.WriteL1MsgStorageState(ms.db, bytes)
+}
+
 // PruneMessages deletes all messages that are older or equal to provided index
 func (ms *MsgStorage) PruneMessages(lastIndex uint64) {
+	log.Info("PruneMessages", "size", ms.msgs.Size(), "lastIndex", lastIndex)
 	ms.msgsMu.Lock()
 	defer ms.msgsMu.Unlock()
 
-	// todo: update state for graceful restart
+	// update storage state
+	lastBlock, exists := ms.msgs.Get(lastIndex)
+	fmt.Println(lastBlock, exists)
+	if exists {
+		header, err := ms.reader.FetchBlockHeaderByHash(lastBlock.headerHash)
+		if err == nil {
+			ms.state.StartBlockHeader = header
+			ms.updateStorageState()
+		}
+	}
+
 	deleted := ms.msgs.Delete(lastIndex)
 	for deleted {
 		lastIndex--
@@ -227,6 +333,7 @@ func (ms *MsgStorage) PruneMessages(lastIndex uint64) {
 
 func (ms *MsgStorage) Stop() {
 	log.Info("stopping MsgStorage")
+	ms.unsubscribeTracker()
 	ms.cancel()
 	log.Info("MsgStorage stopped")
 }

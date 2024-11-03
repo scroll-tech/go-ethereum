@@ -18,6 +18,10 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
 
+const (
+	defaultPruneInterval = 30 * time.Second
+)
+
 // Config is the configuration parameters of data availability syncing.
 type Config struct {
 	FetcherMode            FetcherMode // mode of fetcher
@@ -53,9 +57,13 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize l1.Reader, err = %w", err)
 	}
+	l1DeploymentBlockHeader, err := l1Reader.FetchBlockHeaderByNumber(l1DeploymentBlock)
+	if err != nil {
+		return nil, fmt.Errorf("reader failed to fetch block header by number, err = %w", err)
+	}
 	l1Tracker := l1.NewTracker(ctx, ethClient, blockchain.Genesis().Hash())
 
-	msgStorage, err := l1.NewMsgStorage(ctx, l1Tracker, l1Reader, l1.LatestChainHead)
+	msgStorage, err := l1.NewMsgStorage(ctx, l1Tracker, l1Reader, db, l1.LatestChainHead, l1DeploymentBlockHeader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize msg storage, err = %w", err)
 	}
@@ -135,6 +143,9 @@ func (s *SyncingPipeline) mainLoop() {
 	var resetCounter int
 	var tempErrorCounter int
 
+	l1msgPruneTicker := time.NewTicker(defaultPruneInterval)
+	defer l1msgPruneTicker.Stop()
+
 	// reqStep is a helper function to request a step to be executed.
 	// If delay is true, it will request a delayed step with exponential backoff, otherwise it will request an immediate step.
 	reqStep := func(delay bool) {
@@ -161,6 +172,21 @@ func (s *SyncingPipeline) mainLoop() {
 		select {
 		case <-s.ctx.Done():
 			return
+		default:
+		}
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-l1msgPruneTicker.C:
+			nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(s.db, s.blockchain.CurrentBlock().Hash())
+			if nextQueueIndex == nil {
+				// should not happen
+				log.Warn("FirstQueueIndexNotInL2Block is nil for block", "hash", s.blockchain.CurrentBlock().Hash())
+				continue
+			}
+			if *nextQueueIndex > 0 {
+				s.msgStorage.PruneMessages(*nextQueueIndex - 1)
+			}
 		default:
 		}
 

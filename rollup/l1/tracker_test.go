@@ -152,8 +152,9 @@ func (m *mockETHClient) BlockByHash(ctx context.Context, hash common.Hash) (*typ
 }
 
 type subscriptionCallTrace struct {
-	old []*types.Header
-	new []*types.Header
+	isOnline bool
+	old      []*types.Header
+	new      []*types.Header
 }
 
 type subscriptionCalls struct {
@@ -169,19 +170,20 @@ func newSubscriptionCalls(tracker *Tracker, alias string, rule ConfirmationRule)
 		expected: []subscriptionCallTrace{},
 	}
 
-	unsubscribe := tracker.Subscribe(rule, func(old, new []*types.Header) {
-		s.addActual(old, new)
-	}, 0)
+	unsubscribe := tracker.Subscribe(rule, func(isOnline bool, old, new []*types.Header) bool {
+		s.addActual(isOnline, old, new)
+		return true
+	},)
 
 	return s, unsubscribe
 }
 
-func (s *subscriptionCalls) addActual(last, new []*types.Header) {
-	s.actual = append(s.actual, subscriptionCallTrace{last, new})
+func (s *subscriptionCalls) addActual(isOnline bool, last, new []*types.Header) {
+	s.actual = append(s.actual, subscriptionCallTrace{isOnline, last, new})
 }
 
-func (s *subscriptionCalls) addExpected(last, new []*types.Header) {
-	s.expected = append(s.expected, subscriptionCallTrace{last, new})
+func (s *subscriptionCalls) addExpected(isOnline bool, last, new []*types.Header) {
+	s.expected = append(s.expected, subscriptionCallTrace{isOnline, last, new})
 }
 
 func (s *subscriptionCalls) requireExpectedCalls(t *testing.T) {
@@ -243,8 +245,8 @@ func TestTracker_HappyCases(t *testing.T) {
 	{
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(1, 1))
-		sub5.addExpected(nil, client.Headers(1, 1))
+		sub1.addExpected(true, nil, client.Headers(1, 1))
+		sub5.addExpected(true, nil, client.Headers(1, 1))
 
 		subs.requireAll(t)
 	}
@@ -254,8 +256,8 @@ func TestTracker_HappyCases(t *testing.T) {
 		client.setLatestBlock(2)
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(2, 2))
-		sub5.addExpected(nil, client.Headers(2, 2))
+		sub1.addExpected(true, nil, client.Headers(2, 2))
+		sub5.addExpected(true, nil, client.Headers(2, 2))
 
 		subs.requireAll(t)
 	}
@@ -268,8 +270,8 @@ func TestTracker_HappyCases(t *testing.T) {
 		client.setLatestBlock(3)
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(3, 3))
-		sub2.addExpected(nil, client.Headers(1, 1))
+		sub1.addExpected(true, nil, client.Headers(3, 3))
+		sub2.addExpected(true, nil, client.Headers(1, 1))
 
 		subs.requireAll(t)
 	}
@@ -289,11 +291,21 @@ func TestTracker_HappyCases(t *testing.T) {
 
 	// Block 70 - we skip a bunch of blocks
 	{
+		// range of skipped blocks is too much so tracker marks subscribers as offline and returns latest finalized block
 		client.setLatestBlock(70)
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(4, 70))
-		sub2.addExpected(nil, client.Headers(2, 68))
+		sub1.addExpected(false, nil, client.Headers(6, 6))
+		sub2.addExpected(false, nil, client.Headers(6, 6))
+
+		subs.requireAll(t)
+
+		// after subscribers caught up tracker continues to return ranges of headers
+		client.setLatestBlock(71)
+		require.NoError(t, tracker.syncLatestHead())
+
+		sub1.addExpected(true, nil, client.Headers(7, 71))
+		sub2.addExpected(true, nil, client.Headers(7, 69))
 
 		subs.requireAll(t)
 	}
@@ -321,13 +333,13 @@ func TestTracker_HappyCases(t *testing.T) {
 	//	subs.requireAll(t)
 	//}
 	//
-	// Block 72 - we skip again 1 block
+	// Block 73 - we skip again 1 block
 	{
-		client.setLatestBlock(72)
+		client.setLatestBlock(73)
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(71, 72))
-		sub2.addExpected(nil, client.Headers(69, 70))
+		sub1.addExpected(true, nil, client.Headers(72, 73))
+		sub2.addExpected(true, nil, client.Headers(70, 71))
 
 		subs.requireAll(t)
 	}
@@ -478,83 +490,83 @@ func TestTracker_LatestChainHead_Reorg(t *testing.T) {
 	{
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(1, 1))
+		sub1.addExpected(true, nil, client.Headers(1, 1))
 
 		subs.requireAll(t)
 	}
 
-	// Block 90 - we skip a bunch of blocks
+	// Block 50 - we skip a bunch of blocks
 	{
-		client.setLatestBlock(90)
+		client.setLatestBlock(50)
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(2, 90))
-		sub2.addExpected(nil, client.Headers(1, 88))
-		sub3.addExpected(nil, client.Headers(1, 88))
-		sub4.addExpected(nil, client.Headers(1, 86))
+		sub1.addExpected(true, nil, client.Headers(2, 50))
+		sub2.addExpected(true, nil, client.Headers(1, 48))
+		sub3.addExpected(true, nil, client.Headers(1, 48))
+		sub4.addExpected(true, nil, client.Headers(1, 46))
 
 		subs.requireAll(t)
 	}
 
-	// Block 90 - reorg of depth 1 - only sub1 affected
-	beforeReorg90 := client.Headers(90, 90)
+	// Block 50 - reorg of depth 1 - only sub1 affected
+	beforeReorg50 := client.Headers(50, 50)
 	//beforeReorg88 := client.Header(88)
 	//beforeReorg86 := client.Header(86)
 	{
-		client.createFork(89)
-		client.setLatestBlock(90)
+		client.createFork(49)
+		client.setLatestBlock(50)
 
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(beforeReorg90, client.Headers(90, 90))
+		sub1.addExpected(true, beforeReorg50, client.Headers(50, 50))
 
 		subs.requireAll(t)
 	}
 
-	//// Block 98 - gap - since subs 2-4 were not affected by the reorg they should not be notified about the reorg (form their PoV it's just a gap)
+	//// Block 58 - gap - since subs 2-4 were not affected by the reorg they should not be notified about the reorg (form their PoV it's just a gap)
 	{
-		client.setLatestBlock(98)
+		client.setLatestBlock(58)
 
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(nil, client.Headers(91, 98))
-		sub2.addExpected(nil, client.Headers(89, 96))
-		sub3.addExpected(nil, client.Headers(89, 96))
-		sub4.addExpected(nil, client.Headers(87, 94))
+		sub1.addExpected(true, nil, client.Headers(51, 58))
+		sub2.addExpected(true, nil, client.Headers(49, 56))
+		sub3.addExpected(true, nil, client.Headers(49, 56))
+		sub4.addExpected(true, nil, client.Headers(47, 54))
 
 		subs.requireAll(t)
 	}
 
 	// reorg of depth 1 + new block
-	beforeReorg98 := client.Headers(98, 98)
+	beforeReorg58 := client.Headers(58, 58)
 	{
-		client.createFork(97)
-		client.setLatestBlock(99)
+		client.createFork(57)
+		client.setLatestBlock(59)
 
 		require.NoError(t, tracker.syncLatestHead())
 
-		sub1.addExpected(beforeReorg98, client.Headers(98, 99))
-		sub2.addExpected(nil, client.Headers(97, 97))
-		sub3.addExpected(nil, client.Headers(97, 97))
-		sub4.addExpected(nil, client.Headers(95, 95))
+		sub1.addExpected(true, beforeReorg58, client.Headers(58, 59))
+		sub2.addExpected(true, nil, client.Headers(57, 57))
+		sub3.addExpected(true, nil, client.Headers(57, 57))
+		sub4.addExpected(true, nil, client.Headers(55, 55))
 
 		subs.requireAll(t)
 	}
 
-	// Block 99 - reorg of depth 4, subs 1-3 affected
+	// Block 59 - reorg of depth 4, subs 1-3 affected
 	// TODO: we need to make sure that we notify the subscribers correctly about the reorged headers
-	beforeReorg99 := client.Headers(96, 99)
-	beforeReorg97 := client.Headers(96, 97)
+	beforeReorg59 := client.Headers(56, 59)
+	beforeReorg57 := client.Headers(56, 57)
 	{
-		client.createFork(95)
-		client.setLatestBlock(99)
+		client.createFork(55)
+		client.setLatestBlock(59)
 
 		require.NoError(t, tracker.syncLatestHead())
-		fmt.Println("len", len(beforeReorg99))
+		fmt.Println("len", len(beforeReorg59))
 
-		sub1.addExpected(beforeReorg99, client.Headers(96, 99))
-		sub2.addExpected(beforeReorg97, client.Headers(96, 97))
-		sub3.addExpected(beforeReorg97, client.Headers(96, 97))
+		sub1.addExpected(true, beforeReorg59, client.Headers(56, 59))
+		sub2.addExpected(true, beforeReorg57, client.Headers(56, 57))
+		sub3.addExpected(true, beforeReorg57, client.Headers(56, 57))
 
 		subs.requireAll(t)
 	}

@@ -30,6 +30,7 @@ func NewDataSourceFactory(blockchain *core.BlockChain, genesisConfig *params.Cha
 		genesisConfig: genesisConfig,
 		l1Reader:      l1Reader,
 		blobClient:    blobClient,
+		msgStorage: msgStorage,
 	}
 }
 

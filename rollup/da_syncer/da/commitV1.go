@@ -48,12 +48,12 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, msgStorage *l1.Ms
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", batchIndex, err)
 	}
 
-	versionedHash, err := l1Reader.FetchTxBlobHash(commitEvent.TxHash(), commitEvent.BlockHash())
+	versionedHash, err := l1Reader.FetchTxBlobHash(commitEvent.TxHash, commitEvent.BlockHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
 	}
 
-	header, err := l1Reader.FetchBlockHeaderByNumber(commitEvent.BlockNumber())
+	header, err := l1Reader.FetchBlockHeaderByNumber(commitEvent.BlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get header by number, err: %w", err)
 	}
@@ -81,7 +81,7 @@ func NewCommitBatchDAV1WithBlobDecodeFunc(ctx context.Context, msgStorage *l1.Ms
 		return nil, fmt.Errorf("failed to decode txs from blob: %w", err)
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(msgStorage, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber())
+	v0, err := NewCommitBatchDAV0WithChunks(msgStorage, version, batchIndex, parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent.BlockNumber)
 	if err != nil {
 		return nil, err
 	}

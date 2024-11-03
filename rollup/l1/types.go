@@ -47,15 +47,15 @@ type subscription struct {
 	confirmationRule ConfirmationRule
 	callback         SubscriptionCallback
 	lastSentHeader   *types.Header
-	maxHeadersSent   int // number of headers that could be sent at the time
+	isOnline         bool // isOnline marks whether subscriber now wants to receive most recent data or still sync to the top, false by default and may be changed by callback later
 }
 
-func newSubscription(id int, confirmationRule ConfirmationRule, callback SubscriptionCallback, maxHeadersSent int) *subscription {
+func newSubscription(id int, confirmationRule ConfirmationRule, callback SubscriptionCallback) *subscription {
 	return &subscription{
 		id:               id,
 		confirmationRule: confirmationRule,
 		callback:         callback,
-		maxHeadersSent:   maxHeadersSent,
+		isOnline:         false,
 	}
 }
 
@@ -71,4 +71,7 @@ const (
 	LatestChainHead    = ConfirmationRule(1)
 )
 
-type SubscriptionCallback func(old, new []*types.Header)
+// SubscriptionCallback returns true if subscriber is synced to the top of chain now
+// and ready to receive most recent data from chain
+// otherwise, if subscriber still syncs from the some old block to the most recent, it returns false
+type SubscriptionCallback func(isOnline bool, old, new []*types.Header) bool

@@ -21,7 +21,7 @@ const (
 	finalizeBatchEventName = "FinalizeBatch"
 
 	defaultL1MsgFetchBlockRange        = 500
-	defaultRollupEventsFetchBlockRange = 100
+	defaultRollupEventsFetchBlockRange = 500
 )
 
 type Reader struct {
@@ -88,6 +88,11 @@ func (r *Reader) GetLatestFinalizedBlockNumber() (uint64, error) {
 // FetchBlockHeaderByNumber fetches the block header by number
 func (r *Reader) FetchBlockHeaderByNumber(blockNumber uint64) (*types.Header, error) {
 	return r.client.HeaderByNumber(r.ctx, big.NewInt(int64(blockNumber)))
+}
+
+// FetchBlockHeaderByNumber fetches the block header by number
+func (r *Reader) FetchBlockHeaderByHash(hash common.Hash) (*types.Header, error) {
+	return r.client.HeaderByHash(r.ctx, hash)
 }
 
 // FetchTxData fetches tx data corresponding to given event log
@@ -184,13 +189,13 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 			if err = UnpackLog(r.scrollChainABI, event, commitBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
-			log.Trace("found new CommitBatch event", "batch index", event.batchIndex.Uint64())
+			log.Trace("found new CommitBatch event", "batch index", event.BatchIndex.Uint64())
 			rollupEvent = &CommitBatchEvent{
-				batchIndex:  event.batchIndex,
-				batchHash:   event.batchHash,
-				txHash:      vLog.TxHash,
-				blockHash:   vLog.BlockHash,
-				blockNumber: vLog.BlockNumber,
+				BatchIndex:  event.BatchIndex,
+				BatchHash:   event.BatchHash,
+				TxHash:      vLog.TxHash,
+				BlockHash:   vLog.BlockHash,
+				BlockNumber: vLog.BlockNumber,
 			}
 
 		case r.l1RevertBatchEventSignature:
@@ -198,7 +203,7 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 			if err = UnpackLog(r.scrollChainABI, event, revertBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
-			log.Trace("found new RevertBatchType event", "batch index", event.batchIndex.Uint64())
+			log.Trace("found new RevertBatchType event", "batch index", event.BatchIndex.Uint64())
 			rollupEvent = event
 
 		case r.l1FinalizeBatchEventSignature:
@@ -206,7 +211,7 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 			if err = UnpackLog(r.scrollChainABI, event, finalizeBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
-			log.Trace("found new FinalizeBatchType event", "batch index", event.batchIndex.Uint64())
+			log.Trace("found new FinalizeBatchType event", "batch index", event.BatchIndex.Uint64())
 			rollupEvent = event
 
 		default:
@@ -218,9 +223,9 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 	return rollupEvents, nil
 }
 
-func (r *Reader) queryInBatches(fromBlock, toBlock uint64, batchSize int, queryFunc func(from, to uint64) error) error {
+func (r *Reader) queryInBatches(fromBlock, toBlock uint64, batchSize uint64, queryFunc func(from, to uint64) error) error {
 	for from := fromBlock; from <= toBlock; from += uint64(batchSize) {
-		to := from + defaultL1MsgFetchBlockRange - 1
+		to := from + batchSize - 1
 		if to > toBlock {
 			to = toBlock
 		}

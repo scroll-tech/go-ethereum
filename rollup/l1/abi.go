@@ -27,95 +27,62 @@ const (
 // RollupEvent represents a single rollup event (commit, revert, finalize)
 type RollupEvent interface {
 	Type() int
-	BatchIndex() *big.Int
-	BatchHash() common.Hash
+	GetBatchIndex() *big.Int
 }
 
 type RollupEvents []RollupEvent
 
 // CommitBatchEventUnpacked represents a CommitBatch event raised by the ScrollChain contract.
 type CommitBatchEventUnpacked struct {
-	batchIndex *big.Int
-	batchHash  common.Hash
+	BatchIndex *big.Int
+	BatchHash  common.Hash
 }
 
 // CommitBatchEvent represents a CommitBatch event raised by the ScrollChain contract with additional fields.
 type CommitBatchEvent struct {
-	batchIndex  *big.Int
-	batchHash   common.Hash
-	txHash      common.Hash
-	blockHash   common.Hash
-	blockNumber uint64
+	BatchIndex  *big.Int
+	BatchHash   common.Hash
+	TxHash      common.Hash
+	BlockHash   common.Hash
+	BlockNumber uint64
 }
 
 func (c *CommitBatchEvent) Type() int {
 	return CommitEventType
 }
 
-func (c *CommitBatchEvent) BatchIndex() *big.Int {
-	return c.batchIndex
-}
-
-func (c *CommitBatchEvent) BatchHash() common.Hash {
-	return c.batchHash
-}
-
-func (c *CommitBatchEvent) TxHash() common.Hash {
-	return c.txHash
-}
-
-func (c *CommitBatchEvent) BlockHash() common.Hash {
-	return c.blockHash
-}
-
-func (c *CommitBatchEvent) BlockNumber() uint64 {
-	return c.blockNumber
+func (c *CommitBatchEvent) GetBatchIndex() *big.Int {
+	return c.BatchIndex
 }
 
 // RevertBatchEvent represents a RevertBatch event raised by the ScrollChain contract.
 type RevertBatchEvent struct {
-	batchIndex *big.Int
-	batchHash  common.Hash
+	BatchIndex *big.Int
+	BatchHash  common.Hash
 }
 
 func (r *RevertBatchEvent) Type() int {
 	return RevertEventType
 }
 
-func (r *RevertBatchEvent) BatchIndex() *big.Int {
-	return r.batchIndex
-}
-
-func (r *RevertBatchEvent) BatchHash() common.Hash {
-	return r.batchHash
+func (r *RevertBatchEvent) GetBatchIndex() *big.Int {
+	return r.BatchIndex
 }
 
 // FinalizeBatchEvent represents a FinalizeBatch event raised by the ScrollChain contract.
 type FinalizeBatchEvent struct {
-	batchIndex   *big.Int
-	batchHash    common.Hash
-	stateRoot    common.Hash
-	withdrawRoot common.Hash
+	BatchIndex   *big.Int
+	BatchHash    common.Hash
+	StateRoot    common.Hash
+	WithdrawRoot common.Hash
 }
 
 func (r *FinalizeBatchEvent) Type() int {
 	return FinalizeEventType
 }
 
-func (r *FinalizeBatchEvent) BatchIndex() *big.Int {
-	return r.batchIndex
-}
-
-func (r *FinalizeBatchEvent) BatchHash() common.Hash {
-	return r.batchHash
-}
-
-func (r *FinalizeBatchEvent) StateRoot() common.Hash {
-	return r.stateRoot
-}
-
-func (r *FinalizeBatchEvent) WithdrawRoot() common.Hash {
-	return r.withdrawRoot
+func (r *FinalizeBatchEvent) GetBatchIndex() *big.Int {
+	return r.BatchIndex
 }
 
 // UnpackLog unpacks a retrieved log into the provided output structure.

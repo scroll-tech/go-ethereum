@@ -601,6 +601,7 @@ func (b testBackend) ServiceFilter(ctx context.Context, session *bloombits.Match
 func (b testBackend) StateAt(root common.Hash) (*state.StateDB, error) {
 	return b.chain.StateAt(root)
 }
+func (b testBackend) RemoveTx(txHash common.Hash) {}
 
 func TestEstimateGas(t *testing.T) {
 	t.Parallel()

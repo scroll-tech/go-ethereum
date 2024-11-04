@@ -57,10 +57,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
+	"github.com/scroll-tech/go-ethereum/rollup/l1"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
-	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -76,6 +77,7 @@ type Ethereum struct {
 	txPool            *txpool.TxPool
 	syncService       *sync_service.SyncService
 	rollupSyncService *rollup_sync_service.RollupSyncService
+	asyncChecker      *ccc.AsyncChecker
 	syncingPipeline   *da_syncer.SyncingPipeline
 
 	blockchain         *core.BlockChain
@@ -113,7 +115,7 @@ type Ethereum struct {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthClient) (*Ethereum, error) {
+func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ethereum, error) {
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
@@ -222,8 +224,11 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, err
 	}
 	if config.CheckCircuitCapacity {
-		tracer := tracing.NewTracerWrapper()
-		eth.blockchain.Validator().SetupTracerAndCircuitCapacityChecker(tracer)
+		eth.asyncChecker = ccc.NewAsyncChecker(eth.blockchain, config.CCCMaxWorkers, false)
+		eth.asyncChecker.WithOnFailingBlock(func(b *types.Block, err error) {
+			log.Warn("block failed CCC check, it will be reorged by the sequencer", "hash", b.Hash(), "err", err)
+		})
+		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
 	}
 	eth.bloomIndexer.Start(eth.blockchain)
 
@@ -545,7 +550,6 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 func (s *Ethereum) Protocols() []p2p.Protocol {
 	// if DA syncing enabled then we don't create handler
 	if s.config.EnableDASyncing {
-		fmt.Println(">>>>>> DA syncing enabled, do not start protocols")
 		return nil
 	}
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)
@@ -605,6 +609,9 @@ func (s *Ethereum) Stop() error {
 		s.syncingPipeline.Stop()
 	}
 	s.miner.Close()
+	if s.config.CheckCircuitCapacity {
+		s.asyncChecker.Wait()
+	}
 	s.blockchain.Stop()
 	s.engine.Close()
 
@@ -615,4 +622,16 @@ func (s *Ethereum) Stop() error {
 	s.eventMux.Stop()
 
 	return nil
+}
+
+// GetRollupSyncService returns the RollupSyncService of the Ethereum instance.
+// It returns nil if the service is not initialized.
+func (e *Ethereum) GetRollupSyncService() *rollup_sync_service.RollupSyncService {
+	return e.rollupSyncService
+}
+
+// GetSyncService returns the SyncService of the Ethereum instance.
+// It returns nil if the service is not initialized.
+func (e *Ethereum) GetSyncService() *sync_service.SyncService {
+	return e.syncService
 }

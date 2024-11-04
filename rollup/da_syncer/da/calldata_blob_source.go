@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/scroll-tech/da-codec/encoding"
+
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
@@ -19,7 +21,7 @@ const (
 	commitBatchMethodName                     = "commitBatch"
 	commitBatchWithBlobProofMethodName        = "commitBatchWithBlobProof"
 
-	// the length og method ID at the beginning of transaction data
+	// the length of method ID at the beginning of transaction data
 	methodIDLength = 4
 )
 
@@ -102,111 +104,46 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 			if !ok {
 				return nil, fmt.Errorf("unexpected type of rollup event: %T", rollupEvent)
 			}
-			if entry, err = ds.getCommitBatchDA(rollupEvent.GetBatchIndex().Uint64(), commitEvent); err != nil {
-				return nil, fmt.Errorf("failed to get commit batch da: %v, err: %w", rollupEvent.GetBatchIndex().Uint64(), err)
+			if entry, err = ds.getCommitBatchDA(commitEvent); err != nil {
+				return nil, fmt.Errorf("failed to get commit batch da: %v, err: %w", rollupEvent.BatchIndex().Uint64(), err)
 			}
 
 		case l1.RevertEventType:
-			entry = NewRevertBatch(rollupEvent.GetBatchIndex().Uint64())
+			entry = NewRevertBatch(rollupEvent.BatchIndex().Uint64())
 
 		case l1.FinalizeEventType:
-			entry = NewFinalizeBatch(rollupEvent.GetBatchIndex().Uint64())
+			entry = NewFinalizeBatch(rollupEvent.BatchIndex().Uint64())
 
 		default:
 			return nil, fmt.Errorf("unknown rollup event, type: %v", rollupEvent.Type())
 		}
+
 		entries = append(entries, entry)
 	}
 	return entries, nil
 }
 
-type commitBatchArgs struct {
-	Version                uint8
-	ParentBatchHeader      []byte
-	Chunks                 [][]byte
-	SkippedL1MessageBitmap []byte
-}
-
-func newCommitBatchArgs(method *abi.Method, values []interface{}) (*commitBatchArgs, error) {
-	var args commitBatchArgs
-	err := method.Inputs.Copy(&args, values)
-	return &args, err
-}
-
-func newCommitBatchArgsFromCommitBatchWithProof(method *abi.Method, values []interface{}) (*commitBatchArgs, error) {
-	var args commitBatchWithBlobProofArgs
-	err := method.Inputs.Copy(&args, values)
-	if err != nil {
-		return nil, err
-	}
-	return &commitBatchArgs{
-		Version:                args.Version,
-		ParentBatchHeader:      args.ParentBatchHeader,
-		Chunks:                 args.Chunks,
-		SkippedL1MessageBitmap: args.SkippedL1MessageBitmap,
-	}, nil
-}
-
-type commitBatchWithBlobProofArgs struct {
-	Version                uint8
-	ParentBatchHeader      []byte
-	Chunks                 [][]byte
-	SkippedL1MessageBitmap []byte
-	BlobDataProof          []byte
-}
-
-func (ds *CalldataBlobSource) getCommitBatchDA(batchIndex uint64, commitEvent *l1.CommitBatchEvent) (Entry, error) {
-	if batchIndex == 0 {
+func (ds *CalldataBlobSource) getCommitBatchDA(commitEvent *l1.CommitBatchEvent) (Entry, error) {
+	if commitEvent.BatchIndex().Uint64() == 0 {
 		return NewCommitBatchDAV0Empty(), nil
 	}
 
-	txData, err := ds.l1Reader.FetchTxData(commitEvent.TxHash, commitEvent.BlockHash)
+	args, err := ds.l1Reader.FetchCommitTxData(commitEvent)
 	if err != nil {
-		return nil, err
-	}
-	if len(txData) < methodIDLength {
-		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)
+		return nil, fmt.Errorf("failed to fetch commit tx data of batch %d, tx hash: %v, err: %w", commitEvent.BatchIndex().Uint64(), commitEvent.TxHash().Hex(), err)
 	}
 
-	method, err := ds.scrollChainABI.MethodById(txData[:methodIDLength])
+	codec, err := encoding.CodecFromVersion(encoding.CodecVersion(args.Version))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:methodIDLength], err)
-	}
-	values, err := method.Inputs.Unpack(txData[methodIDLength:])
-	if err != nil {
-		return nil, fmt.Errorf("failed to unpack transaction data using ABI, tx data: %v, err: %w", txData, err)
+		return nil, fmt.Errorf("unsupported codec version: %v, batch index: %v, err: %w", args.Version, commitEvent.BatchIndex().Uint64(), err)
 	}
 
-	if method.Name == commitBatchMethodName {
-		args, err := newCommitBatchArgs(method, values)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
-		}
-		switch args.Version {
-		case 0:
-			return NewCommitBatchDAV0(ds.msgStorage, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, commitEvent.BlockNumber)
-		case 1:
-			return NewCommitBatchDAV1(ds.ctx, ds.msgStorage, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
-		case 2:
-			return NewCommitBatchDAV2(ds.ctx, ds.msgStorage, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
-		default:
-			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
-		}
-	} else if method.Name == commitBatchWithBlobProofMethodName {
-		args, err := newCommitBatchArgsFromCommitBatchWithProof(method, values)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode calldata into commitBatch args, values: %+v, err: %w", values, err)
-		}
-		switch args.Version {
-		case 3:
-			// we can use V2 for version 3, because it's same
-			return NewCommitBatchDAV2(ds.ctx, ds.msgStorage, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
-		case 4:
-			return NewCommitBatchDAV4(ds.ctx, ds.msgStorage, ds.l1Reader, ds.blobClient, commitEvent, args.Version, batchIndex, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
-		default:
-			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
-		}
+	switch codec.Version() {
+	case 0:
+		return NewCommitBatchDAV0(ds.msgStorage, codec, commitEvent, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+	case 1, 2, 3, 4:
+		return NewCommitBatchDAWithBlob(ds.ctx, ds.msgStorage, ds.l1Reader, ds.blobClient, codec, commitEvent, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap)
+	default:
+		return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 	}
-
-	return nil, fmt.Errorf("unknown method name: %s", method.Name)
 }

@@ -19,6 +19,7 @@ package eth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -27,6 +28,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/internal/ethapi"
+	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -234,4 +237,24 @@ func (api *ScrollAPI) GetSkippedTransactionHashes(ctx context.Context, from uint
 	}
 
 	return hashes, nil
+}
+
+// CalculateRowConsumptionByBlockNumber
+func (api *ScrollAPI) CalculateRowConsumptionByBlockNumber(ctx context.Context, number rpc.BlockNumber) (*types.RowConsumption, error) {
+	block := api.eth.blockchain.GetBlockByNumber(uint64(number.Int64()))
+	if block == nil {
+		return nil, errors.New("block not found")
+	}
+
+	// todo: fix temp AsyncChecker leaking the internal Checker instances
+	var checkErr error
+	asyncChecker := ccc.NewAsyncChecker(api.eth.blockchain, 1, false).WithOnFailingBlock(func(b *types.Block, err error) {
+		log.Error("failed to calculate row consumption on demand", "number", number, "hash", b.Hash().Hex(), "err", err)
+		checkErr = err
+	})
+	if err := asyncChecker.Check(block); err != nil {
+		return nil, err
+	}
+	asyncChecker.Wait()
+	return rawdb.ReadBlockRowConsumption(api.eth.ChainDb(), block.Hash()), checkErr
 }

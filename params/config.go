@@ -205,6 +205,7 @@ var (
 		BernoulliBlock:      big.NewInt(3747132),
 		CurieBlock:          big.NewInt(4740239),
 		DarwinTime:          newUint64(1723622400),
+		DarwinV2Time:        newUint64(1724832000),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -245,6 +246,7 @@ var (
 		BernoulliBlock:      big.NewInt(5220340),
 		CurieBlock:          big.NewInt(7096836),
 		DarwinTime:          newUint64(1724227200),
+		DarwinV2Time:        newUint64(1725264000),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -501,12 +503,12 @@ type ChainConfig struct {
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-	ShanghaiTime *uint64 `json:"shanghaiTime,omitempty"` // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-	CancunTime   *uint64 `json:"cancunTime,omitempty"`   // Cancun switch time (nil = no fork, 0 = already on cancun)
-	PragueTime   *uint64 `json:"pragueTime,omitempty"`   // Prague switch time (nil = no fork, 0 = already on prague)
-	VerkleTime   *uint64 `json:"verkleTime,omitempty"`   // Verkle switch time (nil = no fork, 0 = already on verkle)
-	DarwinTime   *uint64 `json:"darwinTime,omitempty"`   // Darwin switch time (nil = no fork, 0 = already on darwin)
-	DarwinV2Time *uint64 `json:"darwinv2Time,omitempty"` // DarwinV2 switch time (nil = no fork, 0 = already on darwinv2)
+	ShanghaiTime *uint64 `json:"shanghaiBlock,omitempty"` // Shanghai switch time (nil = no fork, 0 = already on shanghai)
+	CancunTime   *uint64 `json:"cancunTime,omitempty"`    // Cancun switch time (nil = no fork, 0 = already on cancun)
+	PragueTime   *uint64 `json:"pragueTime,omitempty"`    // Prague switch time (nil = no fork, 0 = already on prague)
+	VerkleTime   *uint64 `json:"verkleTime,omitempty"`    // Verkle switch time (nil = no fork, 0 = already on verkle)
+	DarwinTime   *uint64 `json:"darwinTime,omitempty"`    // Darwin switch time (nil = no fork, 0 = already on darwin)
+	DarwinV2Time *uint64 `json:"darwinv2Time,omitempty"`  // DarwinV2 switch time (nil = no fork, 0 = already on darwinv2)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -579,8 +581,13 @@ func (s ScrollConfig) IsValidTxCount(count int) bool {
 }
 
 // IsValidBlockSize returns whether the given block's transaction payload size is below the limit.
-func (s ScrollConfig) IsValidBlockSize(size uint64) bool {
-	return s.MaxTxPayloadBytesPerBlock == nil || size <= uint64(*s.MaxTxPayloadBytesPerBlock)
+func (s ScrollConfig) IsValidBlockSize(size common.StorageSize) bool {
+	return s.MaxTxPayloadBytesPerBlock == nil || size <= common.StorageSize(*s.MaxTxPayloadBytesPerBlock)
+}
+
+// IsValidBlockSizeForMining is similar to IsValidBlockSize, but it accounts for the confidence factor in Rust CCC
+func (s ScrollConfig) IsValidBlockSizeForMining(size common.StorageSize) bool {
+	return s.IsValidBlockSize(size * (1.0 / 0.95))
 }
 
 func (s ScrollConfig) String() string {

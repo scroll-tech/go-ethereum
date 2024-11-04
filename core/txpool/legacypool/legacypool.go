@@ -30,9 +30,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/prque"
 	"github.com/scroll-tech/go-ethereum/consensus/misc/eip1559"
 	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/txpool"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -80,11 +82,12 @@ var (
 	queuedEvictionMeter  = metrics.NewRegisteredMeter("txpool/queued/eviction", nil)  // Dropped due to lifetime
 
 	// General tx metrics
-	knownTxMeter       = metrics.NewRegisteredMeter("txpool/known", nil)
-	validTxMeter       = metrics.NewRegisteredMeter("txpool/valid", nil)
-	invalidTxMeter     = metrics.NewRegisteredMeter("txpool/invalid", nil)
-	underpricedTxMeter = metrics.NewRegisteredMeter("txpool/underpriced", nil)
-	overflowedTxMeter  = metrics.NewRegisteredMeter("txpool/overflowed", nil)
+	knownTxMeter        = metrics.NewRegisteredMeter("txpool/known", nil)
+	knownSkippedTxMeter = metrics.NewRegisteredMeter("txpool/known/skipped", nil)
+	validTxMeter        = metrics.NewRegisteredMeter("txpool/valid", nil)
+	invalidTxMeter      = metrics.NewRegisteredMeter("txpool/invalid", nil)
+	underpricedTxMeter  = metrics.NewRegisteredMeter("txpool/underpriced", nil)
+	overflowedTxMeter   = metrics.NewRegisteredMeter("txpool/overflowed", nil)
 
 	// throttleTxMeter counts how many transactions are rejected due to too-many-changes between
 	// txpool reorgs.
@@ -122,6 +125,8 @@ type BlockChain interface {
 
 	// StateAt returns a state database for a given root hash (generally the head).
 	StateAt(root common.Hash) (*state.StateDB, error)
+
+	Database() ethdb.Database
 }
 
 // Config are the configuration parameters of the transaction pool.
@@ -239,6 +244,7 @@ type LegacyPool struct {
 
 	reorgPauseCh             chan bool // requests to pause scheduleReorgLoop
 	realTxActivityShutdownCh chan struct{}
+	isMiner                  atomic.Bool
 }
 
 type txpoolResetRequest struct {
@@ -408,6 +414,7 @@ func (pool *LegacyPool) loop() {
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					list := pool.queue[addr].Flatten()
 					for _, tx := range list {
+						log.Debug("evict queue tx for timeout", "tx", tx.Hash().String())
 						pool.removeTx(tx.Hash(), true, true)
 					}
 					queuedEvictionMeter.Mark(int64(len(list)))
@@ -478,6 +485,17 @@ func (pool *LegacyPool) SetGasTip(tip *big.Int) {
 		pool.priced.Removed(len(drop))
 	}
 	log.Info("Legacy pool tip threshold updated", "tip", tip)
+}
+
+// SetIsMiner updates the miner status of the node.
+func (pool *LegacyPool) SetIsMiner(isMiner bool) {
+	pool.isMiner.Store(isMiner)
+	log.Info("Transaction pool miner status updated", "isMiner", isMiner)
+}
+
+// IsMiner returns the current miner status of the node.
+func (pool *LegacyPool) IsMiner() bool {
+	return pool.isMiner.Load()
 }
 
 // Nonce returns the next nonce of an account, with all transactions executable
@@ -742,6 +760,13 @@ func (pool *LegacyPool) add(tx *types.Transaction, local bool) (replaced bool, e
 		knownTxMeter.Mark(1)
 		return false, txpool.ErrAlreadyKnown
 	}
+
+	if pool.IsMiner() && rawdb.IsSkippedTransaction(pool.chain.Database(), hash) {
+		log.Trace("Discarding already known skipped transaction", "hash", hash)
+		knownSkippedTxMeter.Mark(1)
+		return false, txpool.ErrAlreadyKnown
+	}
+
 	// Make the local flag. If it's from local source or it's from the network but
 	// the sender is marked as local previously, treat it as the local transaction.
 	isLocal := local || pool.locals.containsTx(tx)
@@ -938,6 +963,9 @@ func (pool *LegacyPool) enqueueTx(hash common.Hash, tx *types.Transaction, local
 	if pool.all.Get(hash) == nil && !addAll {
 		log.Error("Missing transaction in lookup set, please report the issue", "hash", hash)
 	}
+
+	log.Debug("Enqueued transaction", "hash", hash.String(), "from", from, "to", tx.To(), "new tx", !addAll)
+
 	if addAll {
 		pool.all.Add(tx, local)
 		pool.priced.Put(tx, local)
@@ -991,6 +1019,9 @@ func (pool *LegacyPool) promoteTx(addr common.Address, hash common.Hash, tx *typ
 		// Nothing was replaced, bump the pending counter
 		pendingGauge.Inc(1)
 	}
+
+	log.Debug("Promoted transaction from queue to pending", "hash", hash.String(), "from", addr, "to", tx.To())
+
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.pendingNonces.set(addr, tx.Nonce()+1)
 
@@ -1175,6 +1206,9 @@ func (pool *LegacyPool) removeTx(hash common.Hash, outofbound bool, unreserve bo
 	if tx == nil {
 		return 0
 	}
+
+	log.Debug("remove tx", "hash", hash, "outofbound", outofbound)
+
 	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
 
 	// If after deletion there are no more transactions belonging to this account,
@@ -1835,6 +1869,9 @@ func (pool *LegacyPool) calculateTxsLifecycle(txs types.Transactions, t time.Tim
 	for _, tx := range txs {
 		if tx.Time().Before(t) {
 			txLifecycle := t.Sub(tx.Time())
+			if txLifecycle >= time.Minute*30 {
+				log.Debug("calculate tx life cycle, cost over 30 minutes", "tx", tx.Hash().String(), "txLifecycle(s)", txLifecycle.Seconds())
+			}
 			txLifecycleTimer.Update(txLifecycle)
 		}
 	}

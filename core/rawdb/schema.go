@@ -151,10 +151,10 @@ var (
 
 	// Scroll rollup event store
 	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")
-	batchChunkRangesPrefix            = []byte("R-bcr")
 	batchMetaPrefix                   = []byte("R-bm")
 	finalizedL2BlockNumberKey         = []byte("R-finalized")
 	lastFinalizedBatchIndexKey        = []byte("R-finalizedBatchIndex")
+	committedBatchMetaPrefix          = []byte("R-cbm")
 
 	// Scroll da syncer store
 	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")
@@ -411,12 +411,12 @@ func SkippedTransactionHashKey(index uint64) []byte {
 	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
 }
 
-// batchChunkRangesKey = batchChunkRangesPrefix + batch index (uint64 big endian)
-func batchChunkRangesKey(batchIndex uint64) []byte {
-	return append(batchChunkRangesPrefix, encodeBigEndian(batchIndex)...)
-}
-
 // batchMetaKey = batchMetaPrefix + batch index (uint64 big endian)
 func batchMetaKey(batchIndex uint64) []byte {
 	return append(batchMetaPrefix, encodeBigEndian(batchIndex)...)
+}
+
+// committedBatchMetaKey = committedBatchMetaPrefix + batch index (uint64 big endian)
+func committedBatchMetaKey(batchIndex uint64) []byte {
+	return append(committedBatchMetaPrefix, encodeBigEndian(batchIndex)...)
 }

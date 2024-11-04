@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	commitBatchEventName   = "CommitBatch"
-	revertBatchEventName   = "RevertBatch"
-	finalizeBatchEventName = "FinalizeBatch"
+	commitBatchEventName      = "CommitBatch"
+	revertBatchEventName      = "RevertBatch"
+	finalizeBatchEventName    = "FinalizeBatch"
+	nextUnfinalizedQueueIndex = "nextUnfinalizedQueueIndex"
+	lastFinalizedBatchIndex   = "lastFinalizedBatchIndex"
 
 	defaultL1MsgFetchBlockRange        = 500
 	defaultRollupEventsFetchBlockRange = 500
@@ -31,6 +33,7 @@ type Reader struct {
 	filterer *L1MessageQueueFilterer
 
 	scrollChainABI                *abi.ABI
+	l1MessageQueueABI             *abi.ABI
 	l1CommitBatchEventSignature   common.Hash
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
@@ -48,11 +51,6 @@ func NewReader(ctx context.Context, config Config, l1Client Client) (*Reader, er
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}
 
-	scrollChainABI, err := ScrollChainMetaData.GetAbi()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get scroll chain abi: %w", err)
-	}
-
 	filterer, err := NewL1MessageQueueFilterer(config.L1MessageQueueAddress, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize L1MessageQueueFilterer, err = %w", err)
@@ -64,13 +62,63 @@ func NewReader(ctx context.Context, config Config, l1Client Client) (*Reader, er
 		client:   l1Client,
 		filterer: filterer,
 
-		scrollChainABI:                scrollChainABI,
-		l1CommitBatchEventSignature:   scrollChainABI.Events[commitBatchEventName].ID,
-		l1RevertBatchEventSignature:   scrollChainABI.Events[revertBatchEventName].ID,
-		l1FinalizeBatchEventSignature: scrollChainABI.Events[finalizeBatchEventName].ID,
+		scrollChainABI:                ScrollChainABI,
+		l1MessageQueueABI:             L1MessageQueueABImanual,
+		l1CommitBatchEventSignature:   ScrollChainABI.Events[commitBatchEventName].ID,
+		l1RevertBatchEventSignature:   ScrollChainABI.Events[revertBatchEventName].ID,
+		l1FinalizeBatchEventSignature: ScrollChainABI.Events[finalizeBatchEventName].ID,
 	}
 
 	return &reader, nil
+}
+
+func (r *Reader) FinalizedL1MessageQueueIndex(blockNumber uint64) (uint64, error) {
+	data, err := r.l1MessageQueueABI.Pack(nextUnfinalizedQueueIndex)
+	if err != nil {
+		return 0, fmt.Errorf("failed to pack %s: %w", nextUnfinalizedQueueIndex, err)
+	}
+
+	result, err := r.client.CallContract(r.ctx, ethereum.CallMsg{
+		To:   &r.config.L1MessageQueueAddress,
+		Data: data,
+	}, new(big.Int).SetUint64(blockNumber))
+	if err != nil {
+		return 0, fmt.Errorf("failed to call %s: %w", nextUnfinalizedQueueIndex, err)
+	}
+
+	var parsedResult *big.Int
+	if err = r.l1MessageQueueABI.UnpackIntoInterface(&parsedResult, nextUnfinalizedQueueIndex, result); err != nil {
+		return 0, fmt.Errorf("failed to unpack result: %w", err)
+	}
+
+	next := parsedResult.Uint64()
+	if next == 0 {
+		return 0, nil
+	}
+
+	return next - 1, nil
+}
+
+func (r *Reader) LatestFinalizedBatch(blockNumber uint64) (uint64, error) {
+	data, err := r.scrollChainABI.Pack(lastFinalizedBatchIndex)
+	if err != nil {
+		return 0, fmt.Errorf("failed to pack %s: %w", lastFinalizedBatchIndex, err)
+	}
+
+	result, err := r.client.CallContract(r.ctx, ethereum.CallMsg{
+		To:   &r.config.ScrollChainAddress,
+		Data: data,
+	}, new(big.Int).SetUint64(blockNumber))
+	if err != nil {
+		return 0, fmt.Errorf("failed to call %s: %w", lastFinalizedBatchIndex, err)
+	}
+
+	var parsedResult *big.Int
+	if err = r.scrollChainABI.UnpackIntoInterface(&parsedResult, lastFinalizedBatchIndex, result); err != nil {
+		return 0, fmt.Errorf("failed to unpack result: %w", err)
+	}
+
+	return parsedResult.Uint64(), nil
 }
 
 // GetLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.
@@ -122,7 +170,7 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 	var logs []types.Log
 
-	err := r.queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) error {
+	err := queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(from)), // inclusive
 			ToBlock:   big.NewInt(int64(to)),   // inclusive
@@ -138,10 +186,10 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 
 		logsBatch, err := r.client.FilterLogs(r.ctx, query)
 		if err != nil {
-			return fmt.Errorf("failed to filter logs, err: %w", err)
+			return false, fmt.Errorf("failed to filter logs, err: %w", err)
 		}
 		logs = append(logs, logsBatch...)
-		return nil
+		return true, nil
 	})
 	if err != nil {
 		return nil, err
@@ -149,27 +197,72 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 	return r.processLogsToRollupEvents(logs)
 }
 
+// FetchRollupEventsInRangeWithCallback retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
+func (r *Reader) FetchRollupEventsInRangeWithCallback(from, to uint64, callback func(event RollupEvent) bool) error {
+	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
+
+	err := queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(int64(from)), // inclusive
+			ToBlock:   big.NewInt(int64(to)),   // inclusive
+			Addresses: []common.Address{
+				r.config.ScrollChainAddress,
+			},
+			Topics: make([][]common.Hash, 1),
+		}
+		query.Topics[0] = make([]common.Hash, 3)
+		query.Topics[0][0] = r.l1CommitBatchEventSignature
+		query.Topics[0][1] = r.l1RevertBatchEventSignature
+		query.Topics[0][2] = r.l1FinalizeBatchEventSignature
+
+		logsBatch, err := r.client.FilterLogs(r.ctx, query)
+		if err != nil {
+			return false, fmt.Errorf("failed to filter logs, err: %w", err)
+		}
+
+		rollupEvents, err := r.processLogsToRollupEvents(logsBatch)
+		if err != nil {
+			return false, fmt.Errorf("failed to process logs to rollup events, err: %w", err)
+		}
+
+		for _, event := range rollupEvents {
+			if !callback(event) {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *Reader) FetchL1MessageEventsInRange(fromBlock, toBlock uint64) ([]*L1MessageQueueQueueTransaction, error) {
 	var events []*L1MessageQueueQueueTransaction
-	err := r.queryInBatches(fromBlock, toBlock, defaultL1MsgFetchBlockRange, func(from, to uint64) error {
+	err := queryInBatches(fromBlock, toBlock, defaultL1MsgFetchBlockRange, func(from, to uint64) (bool, error) {
 		it, err := r.filterer.FilterQueueTransaction(&bind.FilterOpts{
 			Start:   from,
 			End:     &to,
 			Context: r.ctx,
 		}, nil, nil)
 		if err != nil {
-			return err
+			return false, err
 		}
 		for it.Next() {
 			event := it.Event
 			log.Trace("Received new L1 QueueTransaction event", "event", event)
-
 			if !event.GasLimit.IsUint64() {
-				return fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
+				return false, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
 			}
-			events = append(events, event)
 		}
-		return it.Error()
+		if it.Error() != nil {
+			return false, it.Error()
+		} else {
+			return true, nil
+		}
 	})
 	if err != nil {
 		return nil, err
@@ -191,28 +284,42 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 			}
 			log.Trace("found new CommitBatch event", "batch index", event.BatchIndex.Uint64())
 			rollupEvent = &CommitBatchEvent{
-				BatchIndex:  event.BatchIndex,
-				BatchHash:   event.BatchHash,
-				TxHash:      vLog.TxHash,
-				BlockHash:   vLog.BlockHash,
-				BlockNumber: vLog.BlockNumber,
+				batchIndex:  event.BatchIndex,
+				batchHash:   event.BatchHash,
+				txHash:      vLog.TxHash,
+				blockHash:   vLog.BlockHash,
+				blockNumber: vLog.BlockNumber,
 			}
 
 		case r.l1RevertBatchEventSignature:
-			event := &RevertBatchEvent{}
+			event := &RevertBatchEventUnpacked{}
 			if err = UnpackLog(r.scrollChainABI, event, revertBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
 			log.Trace("found new RevertBatchType event", "batch index", event.BatchIndex.Uint64())
-			rollupEvent = event
+			rollupEvent = &RevertBatchEvent{
+				batchIndex:  event.BatchIndex,
+				batchHash:   event.BatchHash,
+				txHash:      vLog.TxHash,
+				blockHash:   vLog.BlockHash,
+				blockNumber: vLog.BlockNumber,
+			}
 
 		case r.l1FinalizeBatchEventSignature:
-			event := &FinalizeBatchEvent{}
+			event := &FinalizeBatchEventUnpacked{}
 			if err = UnpackLog(r.scrollChainABI, event, finalizeBatchEventName, vLog); err != nil {
 				return nil, fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
 			log.Trace("found new FinalizeBatchType event", "batch index", event.BatchIndex.Uint64())
-			rollupEvent = event
+			rollupEvent = &FinalizeBatchEvent{
+				batchIndex:   event.BatchIndex,
+				batchHash:    event.BatchHash,
+				stateRoot:    event.StateRoot,
+				withdrawRoot: event.WithdrawRoot,
+				txHash:       vLog.TxHash,
+				blockHash:    vLog.BlockHash,
+				blockNumber:  vLog.BlockNumber,
+			}
 
 		default:
 			return nil, fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
@@ -223,15 +330,19 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 	return rollupEvents, nil
 }
 
-func (r *Reader) queryInBatches(fromBlock, toBlock uint64, batchSize uint64, queryFunc func(from, to uint64) error) error {
-	for from := fromBlock; from <= toBlock; from += uint64(batchSize) {
+// TODO: add context to allow for cancellation
+func queryInBatches(fromBlock, toBlock uint64, batchSize uint64, queryFunc func(from, to uint64) (bool, error)) error {
+	for from := fromBlock; from <= toBlock; from += batchSize {
 		to := from + batchSize - 1
 		if to > toBlock {
 			to = toBlock
 		}
-		err := queryFunc(from, to)
+		cont, err := queryFunc(from, to)
 		if err != nil {
-			return err
+			return fmt.Errorf("error querying blocks %d to %d: %w", from, to, err)
+		}
+		if !cont {
+			break
 		}
 	}
 	return nil
@@ -262,4 +373,42 @@ func (r *Reader) fetchTx(txHash, blockHash common.Hash) (*types.Transaction, err
 	}
 
 	return tx, nil
+}
+
+func (r *Reader) FetchCommitTxData(commitEvent *CommitBatchEvent) (*CommitBatchArgs, error) {
+	tx, err := r.fetchTx(commitEvent.TxHash(), commitEvent.BlockHash())
+	if err != nil {
+		return nil, err
+	}
+	txData := tx.Data()
+
+	if len(txData) < methodIDLength {
+		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)
+	}
+
+	method, err := r.scrollChainABI.MethodById(txData[:methodIDLength])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:methodIDLength], err)
+	}
+	values, err := method.Inputs.Unpack(txData[methodIDLength:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack transaction data using ABI, tx data: %v, err: %w", txData, err)
+	}
+
+	var args *CommitBatchArgs
+	if method.Name == commitBatchMethodName {
+		args, err = newCommitBatchArgs(method, values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode calldata into commitBatch args %s, values: %+v, err: %w", commitBatchMethodName, values, err)
+		}
+	} else if method.Name == commitBatchWithBlobProofMethodName {
+		args, err = newCommitBatchArgsFromCommitBatchWithProof(method, values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode calldata into commitBatch args %s, values: %+v, err: %w", commitBatchWithBlobProofMethodName, values, err)
+		}
+	} else {
+		return nil, fmt.Errorf("unknown method name for commit transaction: %s", method.Name)
+	}
+
+	return args, nil
 }

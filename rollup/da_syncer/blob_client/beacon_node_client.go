@@ -39,7 +39,10 @@ func NewBeaconNodeClient(apiEndpoint string) (*BeaconNodeClient, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("beacon node request failed with status: %s: could not read response body: %w", resp.Status, err)
+		}
 		bodyStr := string(body)
 		return nil, fmt.Errorf("beacon node request failed, status: %s, body: %s", resp.Status, bodyStr)
 	}
@@ -66,7 +69,10 @@ func NewBeaconNodeClient(apiEndpoint string) (*BeaconNodeClient, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("beacon node request failed with status: %s: could not read response body: %w", resp.Status, err)
+		}
 		bodyStr := string(body)
 		return nil, fmt.Errorf("beacon node request failed, status: %s, body: %s", resp.Status, bodyStr)
 	}
@@ -106,7 +112,10 @@ func (c *BeaconNodeClient) GetBlobByVersionedHashAndBlockTime(ctx context.Contex
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("beacon node request failed with status: %s: could not read response body: %w", resp.Status, err)
+		}
 		bodyStr := string(body)
 		return nil, fmt.Errorf("beacon node request failed, status: %s, body: %s", resp.Status, bodyStr)
 	}

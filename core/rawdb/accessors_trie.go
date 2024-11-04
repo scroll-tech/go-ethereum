@@ -161,10 +161,25 @@ func DeleteStorageTrieNode(db ethdb.KeyValueWriter, accountHash common.Hash, pat
 	}
 }
 
+var bitReverseForNibble = []byte{0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15}
+
+func bitReverse(inp []byte) (out []byte) {
+	l := len(inp)
+	out = make([]byte, l)
+	for i, b := range inp {
+		out[l-i-1] = bitReverseForNibble[b&15]<<4 + bitReverseForNibble[b>>4]
+	}
+	return
+}
+
+func legacyTrieNodeKey(hash common.Hash) []byte {
+	return bitReverse(hash.Bytes())
+}
+
 // ReadLegacyTrieNode retrieves the legacy trie node with the given
 // associated node hash.
 func ReadLegacyTrieNode(db ethdb.KeyValueReader, hash common.Hash) []byte {
-	data, err := db.Get(hash.Bytes())
+	data, err := db.Get(legacyTrieNodeKey(hash))
 	if err != nil {
 		return nil
 	}
@@ -173,20 +188,20 @@ func ReadLegacyTrieNode(db ethdb.KeyValueReader, hash common.Hash) []byte {
 
 // HasLegacyTrieNode checks if the trie node with the provided hash is present in db.
 func HasLegacyTrieNode(db ethdb.KeyValueReader, hash common.Hash) bool {
-	ok, _ := db.Has(hash.Bytes())
+	ok, _ := db.Has(legacyTrieNodeKey(hash))
 	return ok
 }
 
 // WriteLegacyTrieNode writes the provided legacy trie node to database.
 func WriteLegacyTrieNode(db ethdb.KeyValueWriter, hash common.Hash, node []byte) {
-	if err := db.Put(hash.Bytes(), node); err != nil {
+	if err := db.Put(legacyTrieNodeKey(hash), node); err != nil {
 		log.Crit("Failed to store legacy trie node", "err", err)
 	}
 }
 
 // DeleteLegacyTrieNode deletes the specified legacy trie node from database.
 func DeleteLegacyTrieNode(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Delete(hash.Bytes()); err != nil {
+	if err := db.Delete(legacyTrieNodeKey(hash)); err != nil {
 		log.Crit("Failed to delete legacy trie node", "err", err)
 	}
 }

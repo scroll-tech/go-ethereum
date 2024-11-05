@@ -251,6 +251,9 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	// simply let them run simultaneously. If messages are missing in DA syncing, it will be handled by the syncing pipeline
 	// by waiting and retrying.
 	if config.EnableDASyncing {
+		// Enable CCC if flag is set so that row consumption can be generated.
+		config.DA.CCCEnable = config.CheckCircuitCapacity
+		config.DA.CCCNumWorkers = config.CCCMaxWorkers
 		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)

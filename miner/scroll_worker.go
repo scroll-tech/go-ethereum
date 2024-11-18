@@ -412,7 +412,11 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 	}
 
 	if w.config.SigningDisabled {
-		header.Difficulty = new(big.Int)
+		// Need to make sure to set difficulty so that a new canonical chain is detected in Blockchain
+		header.Difficulty = new(big.Int).SetUint64(1)
+		header.MixDigest = common.Hash{}
+		header.Coinbase = common.Address{}
+		header.Nonce = types.BlockNonce{}
 	} else {
 		prepareStart := time.Now()
 		if err := w.engine.Prepare(w.chain, header); err != nil {

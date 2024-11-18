@@ -5,6 +5,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 )
@@ -15,15 +16,22 @@ var (
 )
 
 type DASyncer struct {
-	l2EndBlock uint64
-	blockchain *core.BlockChain
+	asyncChecker *ccc.AsyncChecker
+	l2EndBlock   uint64
+	blockchain   *core.BlockChain
 }
 
-func NewDASyncer(blockchain *core.BlockChain, l2EndBlock uint64) *DASyncer {
-	return &DASyncer{
+func NewDASyncer(blockchain *core.BlockChain, cccEnable bool, cccNumWorkers int, l2EndBlock uint64) *DASyncer {
+	s := &DASyncer{
 		l2EndBlock: l2EndBlock,
 		blockchain: blockchain,
 	}
+
+	if cccEnable {
+		s.asyncChecker = ccc.NewAsyncChecker(blockchain, cccNumWorkers, false)
+	}
+
+	return s
 }
 
 // SyncOneBlock receives a PartialBlock, makes sure it's the next block in the chain, executes it and inserts it to the blockchain.
@@ -50,8 +58,13 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock, override bool, sign bool
 		return fmt.Errorf("failed getting parent block, number: %d", parentBlockNumber)
 	}
 
-	if _, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions, sign); err != nil {
+	fullBlock, _, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions, sign)
+	if err != nil {
 		return fmt.Errorf("failed building and writing block, number: %d, error: %v", block.PartialHeader.Number, err)
+	}
+
+	if s.asyncChecker != nil {
+		_ = s.asyncChecker.Check(fullBlock)
 	}
 
 	currentBlock = s.blockchain.CurrentBlock()

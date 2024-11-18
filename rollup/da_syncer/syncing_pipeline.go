@@ -27,6 +27,9 @@ type Config struct {
 	BlockNativeAPIEndpoint string      // BlockNative blob api endpoint
 	BeaconNodeAPIEndpoint  string      // Beacon node api endpoint
 
+	CCCEnable     bool // enable CCC verification and generation of row consumption
+	CCCNumWorkers int  // number of workers for CCC verification
+
 	RecoveryMode   bool   // Recovery mode is used to override existing blocks with the blocks read from the pipeline and start from a specific L1 block and batch
 	InitialL1Block uint64 // L1 block in which the InitialBatch was committed (or any earlier L1 block but requires more RPC requests)
 	InitialBatch   uint64 // Batch number from which to start syncing and overriding blocks
@@ -94,6 +97,13 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		}
 
 		initialL1Block = config.InitialL1Block
+		if initialL1Block == 0 {
+			return nil, errors.New("sync from DA: initial L1 block must be set in recovery mode")
+		}
+		if config.InitialBatch == 0 {
+			return nil, errors.New("sync from DA: initial batch must be set in recovery mode")
+		}
+
 		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", initialL1Block, "initialBatch", config.InitialBatch)
 	} else {
 		initialL1Block = l1DeploymentBlock - 1
@@ -108,7 +118,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	daQueue := NewDAQueue(initialL1Block, config.InitialBatch, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db)
 	blockQueue := NewBlockQueue(batchQueue)
-	daSyncer := NewDASyncer(blockchain, config.L2EndBlock)
+	daSyncer := NewDASyncer(blockchain, config.CCCEnable, config.CCCNumWorkers, config.L2EndBlock)
 
 	ctx, cancel := context.WithCancel(ctx)
 	return &SyncingPipeline{

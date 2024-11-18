@@ -253,12 +253,15 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if config.EnableDASyncing {
 		// Do not start syncing pipeline if we are producing blocks.
 		if !config.DA.ProduceBlocks {
-			eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
-			if err != nil {
-				return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
-			}
+		// Enable CCC if flag is set so that row consumption can be generated.
+		config.DA.CCCEnable = config.CheckCircuitCapacity
+		config.DA.CCCNumWorkers = config.CCCMaxWorkers
+		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
+		}
+		eth.syncingPipeline.Start()
 
-			eth.syncingPipeline.Start()
 		}
 	}
 

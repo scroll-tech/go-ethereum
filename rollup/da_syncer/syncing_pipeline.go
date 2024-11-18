@@ -85,9 +85,16 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 
 	var initialL1Block uint64
 	if config.RecoveryMode {
+		// sanity check the config
+		if config.InitialL1Block == 0 {
+			return nil, fmt.Errorf("sync from DA: recovery mode requires initial L1 block to be set")
+		}
+		if config.InitialBatch == 0 {
+			return nil, fmt.Errorf("sync from DA: recovery mode requires initial batch to be set")
+		}
+
 		initialL1Block = config.InitialL1Block
 		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", initialL1Block, "initialBatch", config.InitialBatch)
-		// TODO: do some sanity checks for the config values
 	} else {
 		initialL1Block = l1DeploymentBlock - 1
 		config.InitialL1Block = initialL1Block

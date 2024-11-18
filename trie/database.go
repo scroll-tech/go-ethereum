@@ -18,7 +18,6 @@ package trie
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
@@ -34,9 +33,6 @@ type Config struct {
 	Preimages bool           // Flag whether the preimage of node key is recorded
 	HashDB    *hashdb.Config // Configs for hash-based scheme
 	PathDB    *pathdb.Config // Configs for experimental path-based scheme
-
-	// zktrie related stuff
-	IsUsingZktrie bool
 }
 
 // HashDefaults represents a config for using hash-based scheme with
@@ -44,13 +40,6 @@ type Config struct {
 var HashDefaults = &Config{
 	Preimages: false,
 	HashDB:    hashdb.Defaults,
-}
-
-// HashDefaultsWithZktrie represents a config based on HashDefaults but with zktrie enabled.
-var HashDefaultsWithZktrie = &Config{
-	Preimages:     false,
-	HashDB:        hashdb.Defaults,
-	IsUsingZktrie: true,
 }
 
 // HashDefaultsWithPreimages represents a config based on HashDefaults but with Preimages enabled.
@@ -90,9 +79,6 @@ type backend interface {
 
 	// Close closes the trie database backend and releases all held resources.
 	Close() error
-
-	// database supplementary methods, to get the underlying fields
-	GetLock() *sync.RWMutex
 }
 
 // Database is the wrapper of the underlying backend which is shared by different
@@ -103,10 +89,6 @@ type Database struct {
 	diskdb    ethdb.Database // Persistent database to store the snapshot
 	preimages *preimageStore // The store for caching preimages
 	backend   backend        // The backend for managing trie nodes
-
-	// zktrie related stuff
-	// TODO: It's a quick&dirty implementation. FIXME later.
-	rawDirties KvMap
 }
 
 // NewDatabase initializes the trie database with default settings, note
@@ -124,8 +106,6 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 		config:    config,
 		diskdb:    diskdb,
 		preimages: preimages,
-		// scroll-related
-		rawDirties: make(KvMap),
 	}
 	if config.HashDB != nil && config.PathDB != nil {
 		log.Crit("Both 'hash' and 'path' mode are configured")
@@ -133,22 +113,9 @@ func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 	if config.PathDB != nil {
 		db.backend = pathdb.New(diskdb, config.PathDB)
 	} else {
-		db.backend = hashdb.New(diskdb, config.HashDB, mptResolver{})
+		db.backend = hashdb.New(diskdb, config.HashDB, ZkChildResolver{})
 	}
 	return db
-}
-
-func (db *Database) IsUsingZktrie() bool {
-	// compatible logic for light mode
-	if db == nil || db.config == nil {
-		return false
-	}
-	return db.config.IsUsingZktrie
-}
-
-func (db *Database) SetIsUsingZktrie(isUsingZktrie bool) {
-	// config must not be nil
-	db.config.IsUsingZktrie = isUsingZktrie
 }
 
 // Reader returns a reader for accessing all trie nodes with provided state root.
@@ -181,25 +148,6 @@ func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, n
 // to disk. As a side effect, all pre-images accumulated up to this point are
 // also written.
 func (db *Database) Commit(root common.Hash, report bool) error {
-	batch := db.diskdb.NewBatch()
-
-	db.GetLock().Lock()
-	for _, v := range db.rawDirties {
-		batch.Put(v.K, v.V)
-	}
-	for k := range db.rawDirties {
-		delete(db.rawDirties, k)
-	}
-	db.GetLock().Unlock()
-	if err := batch.Write(); err != nil {
-		return err
-	}
-	batch.Reset()
-
-	if (root == common.Hash{}) {
-		return nil
-	}
-
 	if db.preimages != nil {
 		db.preimages.commit(true)
 	}

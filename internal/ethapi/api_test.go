@@ -114,6 +114,7 @@ type txData struct {
 }
 
 func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txData {
+	emptyRootHash := common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 	return []txData{
 		{
 			Tx: &types.LegacyTx{
@@ -188,7 +189,7 @@ func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txDa
 				AccessList: types.AccessList{
 					types.AccessTuple{
 						Address:     common.Address{0x2},
-						StorageKeys: []common.Hash{types.EmptyLegacyTrieRootHash},
+						StorageKeys: []common.Hash{emptyRootHash},
 					},
 				},
 				V: big.NewInt(32),
@@ -234,7 +235,7 @@ func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txDa
 				AccessList: types.AccessList{
 					types.AccessTuple{
 						Address:     common.Address{0x2},
-						StorageKeys: []common.Hash{types.EmptyLegacyTrieRootHash},
+						StorageKeys: []common.Hash{emptyRootHash},
 					},
 				},
 				V: big.NewInt(32),
@@ -281,7 +282,7 @@ func allTransactionTypes(addr common.Address, config *params.ChainConfig) []txDa
 				AccessList: types.AccessList{
 					types.AccessTuple{
 						Address:     common.Address{0x2},
-						StorageKeys: []common.Hash{types.EmptyLegacyTrieRootHash},
+						StorageKeys: []common.Hash{emptyRootHash},
 					},
 				},
 				V: big.NewInt(32),
@@ -682,6 +683,47 @@ func TestEstimateGas(t *testing.T) {
 				randomAccounts[0].addr: OverrideAccount{Balance: newRPCBalance(big.NewInt(0))},
 			},
 			expectErr: core.ErrInsufficientFunds,
+		},
+		// Test for a bug where the gas price was set to zero but the basefee non-zero
+		//
+		// contract BasefeeChecker {
+		//    constructor() {
+		//        require(tx.gasprice >= block.basefee);
+		//        if (tx.gasprice > 0) {
+		//            require(block.basefee > 0);
+		//        }
+		//    }
+		//}
+		{
+			blockNumber: rpc.LatestBlockNumber,
+			call: TransactionArgs{
+				From:     &accounts[0].addr,
+				Input:    hex2Bytes("6080604052348015600f57600080fd5b50483a1015601c57600080fd5b60003a111560315760004811603057600080fd5b5b603f80603e6000396000f3fe6080604052600080fdfea264697066735822122060729c2cee02b10748fae5200f1c9da4661963354973d9154c13a8e9ce9dee1564736f6c63430008130033"),
+				GasPrice: (*hexutil.Big)(big.NewInt(1_000_000_000)), // Legacy as pricing
+			},
+			expectErr: nil,
+			want:      67617,
+		},
+		{
+			blockNumber: rpc.LatestBlockNumber,
+			call: TransactionArgs{
+				From:         &accounts[0].addr,
+				Input:        hex2Bytes("6080604052348015600f57600080fd5b50483a1015601c57600080fd5b60003a111560315760004811603057600080fd5b5b603f80603e6000396000f3fe6080604052600080fdfea264697066735822122060729c2cee02b10748fae5200f1c9da4661963354973d9154c13a8e9ce9dee1564736f6c63430008130033"),
+				MaxFeePerGas: (*hexutil.Big)(big.NewInt(1_000_000_000)), // 1559 gas pricing
+			},
+			expectErr: nil,
+			want:      67617,
+		},
+		{
+			blockNumber: rpc.LatestBlockNumber,
+			call: TransactionArgs{
+				From:         &accounts[0].addr,
+				Input:        hex2Bytes("6080604052348015600f57600080fd5b50483a1015601c57600080fd5b60003a111560315760004811603057600080fd5b5b603f80603e6000396000f3fe6080604052600080fdfea264697066735822122060729c2cee02b10748fae5200f1c9da4661963354973d9154c13a8e9ce9dee1564736f6c63430008130033"),
+				GasPrice:     nil, // No legacy gas pricing
+				MaxFeePerGas: nil, // No 1559 gas pricing
+			},
+			expectErr: nil,
+			want:      67595,
 		},
 	}
 	for i, tc := range testSuite {

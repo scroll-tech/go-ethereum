@@ -283,7 +283,7 @@ var (
 	GCModeFlag = &cli.StringFlag{
 		Name:     "gcmode",
 		Usage:    `Blockchain garbage collection mode, only relevant in state.scheme=hash ("full", "archive")`,
-		Value:    GCModeArchive,
+		Value:    GCModeFull,
 		Category: flags.StateCategory,
 	}
 	StateSchemeFlag = &cli.StringFlag{
@@ -2091,12 +2091,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "4038000")
 		stack.Config().L1DeploymentBlock = 4038000
-		// disable pruning
-		if ctx.String(GCModeFlag.Name) != GCModeArchive {
-			log.Crit("Must use --gcmode=archive")
-		}
-		log.Info("Pruning disabled")
-		cfg.NoPruning = true
 	case ctx.Bool(ScrollFlag.Name):
 		if !ctx.IsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 534352
@@ -2107,12 +2101,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "18306000")
 		stack.Config().L1DeploymentBlock = 18306000
-		// disable pruning
-		if ctx.String(GCModeFlag.Name) != GCModeArchive {
-			log.Crit("Must use --gcmode=archive")
-		}
-		log.Info("Pruning disabled")
-		cfg.NoPruning = true
 	case ctx.Bool(DeveloperFlag.Name):
 		if !ctx.IsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337
@@ -2366,12 +2354,11 @@ func SplitTagsFlag(tagsFlag string) map[string]string {
 	return tagsMap
 }
 
-// MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
+// MakeChainDatabase opens a database using the flags passed to the client and will hard crash if it fails.
 func MakeChainDatabase(ctx *cli.Context, stack *node.Node, readonly bool) ethdb.Database {
 	var (
 		cache   = ctx.Int(CacheFlag.Name) * ctx.Int(CacheDatabaseFlag.Name) / 100
 		handles = MakeDatabaseHandles(ctx.Int(FDLimitFlag.Name))
-
 		err     error
 		chainDb ethdb.Database
 	)

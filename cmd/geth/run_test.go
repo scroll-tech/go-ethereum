@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/scroll-tech/go-ethereum/internal/cmdtest"
+	"github.com/scroll-tech/go-ethereum/internal/reexec"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 

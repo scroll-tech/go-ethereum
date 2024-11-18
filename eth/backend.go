@@ -36,7 +36,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state/pruner"
 	"github.com/scroll-tech/go-ethereum/core/txpool"
-	"github.com/scroll-tech/go-ethereum/core/txpool/blobpool"
 	"github.com/scroll-tech/go-ethereum/core/txpool/legacypool"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
@@ -161,6 +160,10 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if err != nil {
 		return nil, err
 	}
+	networkID := config.NetworkId
+	if networkID == 0 {
+		networkID = chainConfig.ChainID.Uint64()
+	}
 	eth := &Ethereum{
 		config:            config,
 		merger:            consensus.NewMerger(chainDb),
@@ -169,7 +172,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		accountManager:    stack.AccountManager(),
 		engine:            engine,
 		closeBloomHandler: make(chan struct{}),
-		networkID:         config.NetworkId,
+		networkID:         networkID,
 		gasPrice:          config.Miner.GasPrice,
 		etherbase:         config.Miner.Etherbase,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
@@ -182,7 +185,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if bcVersion != nil {
 		dbVer = fmt.Sprintf("%d", *bcVersion)
 	}
-	log.Info("Initialising Ethereum protocol", "network", config.NetworkId, "dbversion", dbVer)
+	log.Info("Initialising Ethereum protocol", "network", networkID, "dbversion", dbVer)
 
 	if !config.SkipBcVersionCheck {
 		if bcVersion != nil && *bcVersion > core.BlockChainVersion {
@@ -231,17 +234,17 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth.bloomIndexer.Start(eth.blockchain)
 
-	if config.BlobPool.Datadir != "" {
-		config.BlobPool.Datadir = stack.ResolvePath(config.BlobPool.Datadir)
-	}
-	blobPool := blobpool.New(config.BlobPool, eth.blockchain)
+	//if config.BlobPool.Datadir != "" {
+	//	config.BlobPool.Datadir = stack.ResolvePath(config.BlobPool.Datadir)
+	//}
+	//blobPool := blobpool.New(config.BlobPool, eth.blockchain)
 
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
 	}
 	legacyPool := legacypool.New(config.TxPool, eth.blockchain)
 
-	eth.txPool, err = txpool.New(new(big.Int).SetUint64(config.TxPool.PriceLimit), eth.blockchain, []txpool.SubPool{legacyPool, blobPool})
+	eth.txPool, err = txpool.New(new(big.Int).SetUint64(config.TxPool.PriceLimit), eth.blockchain, []txpool.SubPool{legacyPool})
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +286,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		Chain:          eth.blockchain,
 		TxPool:         eth.txPool,
 		Merger:         eth.merger,
-		Network:        config.NetworkId,
+		Network:        networkID,
 		Sync:           config.SyncMode,
 		BloomCache:     uint64(cacheLimit),
 		EventMux:       eth.eventMux,
@@ -320,7 +323,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 
 	// Start the RPC service
-	eth.netRPCService = ethapi.NewNetAPI(eth.p2pServer, config.NetworkId)
+	eth.netRPCService = ethapi.NewNetAPI(eth.p2pServer, networkID)
 
 	// Register the backend on the node
 	stack.RegisterAPIs(eth.APIs())

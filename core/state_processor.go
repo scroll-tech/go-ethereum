@@ -144,7 +144,7 @@ func applyTransaction(msg *Message, config *params.ChainConfig, gp *GasPool, sta
 	// Apply the transaction to the current state (included in the env).
 	applyMessageStartTime := time.Now()
 	result, err := ApplyMessage(evm, msg, gp, l1DataFee)
-	if evm.Config.Tracer != nil && evm.Config.Tracer.IsDebug() {
+	if evm.Config.Tracer != nil {
 		if erroringTracer, ok := evm.Config.Tracer.(interface{ Error() error }); ok {
 			err = errors.Join(err, erroringTracer.Error())
 		}
@@ -207,7 +207,8 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, config, author)
-	vmenv := vm.NewEVM(blockContext, vm.TxContext{BlobHashes: tx.BlobHashes()}, statedb, config, cfg)
+	txContext := NewEVMTxContext(msg)
+	vmenv := vm.NewEVM(blockContext, txContext, statedb, config, cfg)
 	return applyTransaction(msg, config, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
 }
 

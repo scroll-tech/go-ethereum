@@ -30,8 +30,8 @@ dependencies = [
 
 [[package]]
 name = "aggregator"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "ark-std 0.3.0",
  "bitstream-io",
@@ -64,13 +64,14 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.3"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c99f64d1e06488f620f932677e24bc6e2897582980441ae90a671415bd7ec2f"
+checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if 1.0.0",
  "once_cell",
  "version_check",
+ "zerocopy",
 ]
 
 [[package]]
@@ -297,7 +298,7 @@ checksum = "cc6dde6e4ed435a4c1ee4e73592f5ba9da2151af10076cc04858746af9352d09"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -340,7 +341,7 @@ checksum = "3c87f3f15e7794432337fc718554eaa4dc8f04c9677a950ffe366f20a162ae42"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -536,14 +537,13 @@ checksum = "a3e2c3daef883ecc1b5d58c15adae93470a91d425f3532ba1695849656af3fc1"
 
 [[package]]
 name = "bus-mapping"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "eth-types",
  "ethers-core",
  "ethers-providers",
  "ethers-signers",
- "external-tracer",
  "gadgets",
  "halo2_proofs",
  "hex",
@@ -553,7 +553,6 @@ dependencies = [
  "mpt-zktrie",
  "num",
  "poseidon-circuit",
- "rand",
  "revm-precompile",
  "serde",
  "serde_json",
@@ -1045,7 +1044,7 @@ checksum = "b893c4eb2dc092c811165f84dc7447fae16fb66521717968c34c509b39b1a5c5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -1125,8 +1124,8 @@ dependencies = [
 
 [[package]]
 name = "eth-types"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "base64 0.13.1",
  "ethers-core",
@@ -1143,7 +1142,6 @@ dependencies = [
  "revm-primitives",
  "serde",
  "serde_json",
- "serde_stacker",
  "serde_with",
  "sha3 0.10.8",
  "strum 0.25.0",
@@ -1282,8 +1280,8 @@ dependencies = [
 
 [[package]]
 name = "external-tracer"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "eth-types",
  "geth-utils",
@@ -1410,7 +1408,7 @@ checksum = "89ca545a94061b6365f2c7355b4b32bd20df3ff95f02da9329b34ccc3bd6ee72"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -1464,8 +1462,8 @@ dependencies = [
 
 [[package]]
 name = "gadgets"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "eth-types",
  "halo2_proofs",
@@ -1487,8 +1485,8 @@ dependencies = [
 
 [[package]]
 name = "geth-utils"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "env_logger 0.10.0",
  "gobuild",
@@ -1593,7 +1591,7 @@ dependencies = [
 [[package]]
 name = "halo2-base"
 version = "0.2.2"
-source = "git+https://github.com/scroll-tech/halo2-lib?branch=develop#817cace374a9f4b2eca682b1cc36f143255ea25f"
+source = "git+https://github.com/scroll-tech/halo2-lib?branch=v0.2#817cace374a9f4b2eca682b1cc36f143255ea25f"
 dependencies = [
  "ff",
  "halo2_proofs",
@@ -1608,7 +1606,7 @@ dependencies = [
 [[package]]
 name = "halo2-ecc"
 version = "0.2.2"
-source = "git+https://github.com/scroll-tech/halo2-lib?branch=develop#817cace374a9f4b2eca682b1cc36f143255ea25f"
+source = "git+https://github.com/scroll-tech/halo2-lib?branch=v0.2#817cace374a9f4b2eca682b1cc36f143255ea25f"
 dependencies = [
  "ff",
  "group",
@@ -2236,8 +2234,8 @@ dependencies = [
 
 [[package]]
 name = "mock"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "eth-types",
  "ethers-core",
@@ -2251,8 +2249,8 @@ dependencies = [
 
 [[package]]
 name = "mpt-zktrie"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "eth-types",
  "halo2curves",
@@ -2401,7 +2399,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -2592,7 +2590,7 @@ checksum = "ec2e072ecce94ec471b13398d5402c188e76ac03cf74dd1a975161b23a3f6d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -2635,7 +2633,7 @@ dependencies = [
 [[package]]
 name = "poseidon-base"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/poseidon-circuit.git?branch=main#6cc36ab9dfa153f554ff7b84305f39838366a8df"
+source = "git+https://github.com/scroll-tech/poseidon-circuit.git?branch=main#b978cee00aae1e0a1e79e0d74c4683b137f5ea2d"
 dependencies = [
  "bitvec",
  "halo2curves",
@@ -2646,7 +2644,7 @@ dependencies = [
 [[package]]
 name = "poseidon-circuit"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/poseidon-circuit.git?branch=main#6cc36ab9dfa153f554ff7b84305f39838366a8df"
+source = "git+https://github.com/scroll-tech/poseidon-circuit.git?branch=main#b978cee00aae1e0a1e79e0d74c4683b137f5ea2d"
 dependencies = [
  "ff",
  "halo2_proofs",
@@ -2724,8 +2722,8 @@ dependencies = [
 
 [[package]]
 name = "prover"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "aggregator",
  "anyhow",
@@ -3386,7 +3384,7 @@ checksum = "f28482318d6641454cb273da158647922d1be6b5a2fcc6165cd89ebdd7ed576b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -3526,7 +3524,7 @@ checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
 [[package]]
 name = "snark-verifier"
 version = "0.1.0"
-source = "git+https://github.com/scroll-tech/snark-verifier?branch=develop#fe1f8906041ad323034881fbd808908250d44829"
+source = "git+https://github.com/scroll-tech/snark-verifier?branch=v0.1#a4f92916c0f61193f325de6c195a733289a7f6a0"
 dependencies = [
  "bytes",
  "ethereum-types",
@@ -3549,7 +3547,7 @@ dependencies = [
 [[package]]
 name = "snark-verifier-sdk"
 version = "0.0.1"
-source = "git+https://github.com/scroll-tech/snark-verifier?branch=develop#fe1f8906041ad323034881fbd808908250d44829"
+source = "git+https://github.com/scroll-tech/snark-verifier?branch=v0.1#a4f92916c0f61193f325de6c195a733289a7f6a0"
 dependencies = [
  "bincode",
  "ethereum-types",
@@ -3657,7 +3655,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -3692,9 +3690,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.27"
+version = "2.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b60f673f44a8255b9c8c657daf66a596d435f2da81a555b06dc644d080ba45e0"
+checksum = "239814284fd6f1a4ffe4ca893952cdd93c224b6a1571c9a9eadd670295c0c9e2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3746,7 +3744,7 @@ checksum = "090198534930841fab3a5d1bb637cde49e339654e606195f8d9c76eeb081dc96"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -3902,7 +3900,7 @@ checksum = "5f4f31f56159e98206da9efd823404b79b6ef3143b4a7ab76e67b1751b25a4ab"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -4085,26 +4083,27 @@ checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.87"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7706a72ab36d8cb1f80ffbf0e071533974a60d0a308d01a5d0375bf60499a342"
+checksum = "128d1e363af62632b8eb57219c8fd7877144af57558fb2ef0368d0087bddeb2e"
 dependencies = [
  "cfg-if 1.0.0",
+ "once_cell",
  "wasm-bindgen-macro",
 ]
 
 [[package]]
 name = "wasm-bindgen-backend"
-version = "0.2.87"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ef2b6d3c510e9625e5fe6f509ab07d66a760f0885d858736483c32ed7809abd"
+checksum = "cb6dd4d3ca0ddffd1dd1c9c04f94b868c37ff5fac97c30b97cff2d74fce3a358"
 dependencies = [
  "bumpalo",
  "log",
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
  "wasm-bindgen-shared",
 ]
 
@@ -4122,9 +4121,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.87"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dee495e55982a3bd48105a7b947fd2a9b4a8ae3010041b9e0faab3f9cd028f1d"
+checksum = "e79384be7f8f5a9dd5d7167216f022090cf1f9ec128e6e6a482a2cb5c5422c56"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -4132,22 +4131,22 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.87"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54681b18a46765f095758388f2d0cf16eb8d4169b639ab575a8f5693af210c7b"
+checksum = "26c6ab57572f7a24a4985830b120de1594465e5d500f24afe89e16b4e833ef68"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.87"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca6ad05a4870b2bf5fe995117d3728437bd27d7cd5f06f13c17443ef369775a1"
+checksum = "65fc09f10666a9f147042251e0dda9c18f166ff7de300607007e96bdebc1068d"
 
 [[package]]
 name = "web-sys"
@@ -4340,6 +4339,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "zerocopy"
+version = "0.7.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.7.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.32",
+]
+
+[[package]]
 name = "zeroize"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4356,13 +4375,13 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.27",
+ "syn 2.0.32",
 ]
 
 [[package]]
 name = "zkevm-circuits"
-version = "0.11.0"
-source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.11.8#1f2f15c48edcd56ad05bad9dc04bfbec1ed36c05"
+version = "0.13.0"
+source = "git+https://github.com/scroll-tech/zkevm-circuits.git?tag=v0.13.2#77703545b439b8d267b92ae1f10e369c9441b5af"
 dependencies = [
  "array-init",
  "bus-mapping",
@@ -4420,7 +4439,7 @@ dependencies = [
 [[package]]
 name = "zktrie"
 version = "0.3.0"
-source = "git+https://github.com/scroll-tech/zktrie.git?branch=v0.7#23181f209e94137f74337b150179aeb80c72e7c8"
+source = "git+https://github.com/scroll-tech/zktrie.git?branch=v0.9#460b8c22af65b7809164548cba1e0253b6db5a70"
 dependencies = [
  "gobuild",
  "zktrie_rust",
@@ -4429,7 +4448,7 @@ dependencies = [
 [[package]]
 name = "zktrie_rust"
 version = "0.3.0"
-source = "git+https://github.com/scroll-tech/zktrie.git?branch=v0.7#23181f209e94137f74337b150179aeb80c72e7c8"
+source = "git+https://github.com/scroll-tech/zktrie.git?branch=v0.9#460b8c22af65b7809164548cba1e0253b6db5a70"
 dependencies = [
  "hex",
  "lazy_static",

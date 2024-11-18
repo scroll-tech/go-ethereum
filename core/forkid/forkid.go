@@ -77,18 +77,10 @@ func NewID(config *params.ChainConfig, genesis *types.Block, head, time uint64) 
 	hash := crc32.ChecksumIEEE(genesis.Hash().Bytes())
 
 	// Calculate the current fork checksum and the next fork block
-	forksByBlock, forksByTime := gatherForks(config, genesis.Time())
+	forksByBlock, _ := gatherForks(config, genesis.Time())
 	for _, fork := range forksByBlock {
 		if fork <= head {
 			// Fork already passed, checksum the previous hash and the fork number
-			hash = checksumUpdate(hash, fork)
-			continue
-		}
-		return ID{Hash: checksumToBytes(hash), Next: fork}
-	}
-	for _, fork := range forksByTime {
-		if fork <= time {
-			// Fork already passed, checksum the previous hash and fork timestamp
 			hash = checksumUpdate(hash, fork)
 			continue
 		}
@@ -134,9 +126,8 @@ func NewStaticFilter(config *params.ChainConfig, genesis *types.Block) Filter {
 func newFilter(config *params.ChainConfig, genesis *types.Block, headfn func() (uint64, uint64)) Filter {
 	// Calculate the all the valid fork hash and fork next combos
 	var (
-		forksByBlock, forksByTime = gatherForks(config, genesis.Time())
-		forks                     = append(append([]uint64{}, forksByBlock...), forksByTime...)
-		sums                      = make([][4]byte, len(forks)+1) // 0th is the genesis
+		forks, _ = gatherForks(config, genesis.Time())
+		sums     = make([][4]byte, len(forks)+1) // 0th is the genesis
 	)
 	hash := crc32.ChecksumIEEE(genesis.Hash().Bytes())
 	sums[0] = checksumToBytes(hash)
@@ -147,10 +138,6 @@ func newFilter(config *params.ChainConfig, genesis *types.Block, headfn func() (
 	// Add two sentries to simplify the fork checks and don't require special
 	// casing the last one.
 	forks = append(forks, math.MaxUint64) // Last fork will never be passed
-	if len(forksByTime) == 0 {
-		// In purely block based forks, avoid the sentry spilling into timestapt territory
-		forksByBlock = append(forksByBlock, math.MaxUint64) // Last fork will never be passed
-	}
 	// Create a validator that will filter out incompatible chains
 	return func(id ID) error {
 		// Run the fork checksum validation ruleset:
@@ -172,13 +159,10 @@ func newFilter(config *params.ChainConfig, genesis *types.Block, headfn func() (
 		//        the remote, but at this current point in time we don't have enough
 		//        information.
 		//   4. Reject in all other cases.
-		block, time := headfn()
+		block, _ := headfn()
 		for i, fork := range forks {
 			// Pick the head comparison based on fork progression
 			head := block
-			if i >= len(forksByBlock) {
-				head = time
-			}
 			// If our head is beyond this fork, continue to the next (we have a dummy
 			// fork of maxuint64 as the last item to always fail this check eventually).
 			if head >= fork {
@@ -189,7 +173,7 @@ func newFilter(config *params.ChainConfig, genesis *types.Block, headfn func() (
 			if sums[i] == id.Hash {
 				// Fork checksum matched, check if a remote future fork block already passed
 				// locally without the local node being aware of it (rule #1a).
-				if id.Next > 0 && (head >= id.Next || (id.Next > timestampThreshold && time >= id.Next)) {
+				if id.Next > 0 && head >= id.Next {
 					return ErrLocalIncompatibleOrStale
 				}
 				// Haven't passed locally a remote-only fork, accept the connection (rule #1b).

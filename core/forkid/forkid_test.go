@@ -1,3 +1,6 @@
+//go:build all_tests
+// +build all_tests
+
 // Copyright 2019 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -445,6 +448,31 @@ func TestTimeBasedForkInGenesis(t *testing.T) {
 	for _, tt := range tests {
 		if have := NewID(tt.config, genesis, 0, time); have != tt.want {
 			t.Fatalf("incorrect forkid hash: have %x, want %x", have, tt.want)
+		}
+	}
+}
+
+func TestScroll(t *testing.T) {
+	tests := []struct {
+		config  *params.ChainConfig
+		genesis *types.Block
+		head    uint64
+		time    uint64
+		want    ID
+	}{
+		// Scroll test cases
+		{
+			params.ScrollMainnetChainConfig,
+			core.DefaultScrollMainnetGenesisBlock().ToBlock(),
+			10281275,
+			1729250728, // omit timestamp-based forks
+			ID{Hash: checksumToBytes(0x18d3c8d9), Next: 0}, // 0x18d3c8d9 is fetched from develop branch
+		},
+	}
+
+	for i, tt := range tests {
+		if have := NewID(tt.config, tt.genesis, tt.head, tt.time); have != tt.want {
+			t.Errorf("test %d: fork ID mismatch: have %x, want %x", i, have, tt.want)
 		}
 	}
 }

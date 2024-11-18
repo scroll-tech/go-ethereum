@@ -99,7 +99,7 @@ func TestStateProcessorErrors(t *testing.T) {
 		}), signer, key1)
 		return tx
 	}
-	var mkBlobTx = func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap *big.Int, hashes []common.Hash) *types.Transaction {
+	var mkBlobTx = func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap, blobGasFeeCap *big.Int, hashes []common.Hash) *types.Transaction {
 		tx, err := types.SignTx(types.NewTx(&types.BlobTx{
 			Nonce:      nonce,
 			GasTipCap:  uint256.MustFromBig(gasTipCap),
@@ -107,6 +107,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			Gas:        gasLimit,
 			To:         to,
 			BlobHashes: hashes,
+			BlobFeeCap: uint256.MustFromBig(blobGasFeeCap),
 			Value:      new(uint256.Int),
 		}), signer, key1)
 		if err != nil {
@@ -200,7 +201,7 @@ func TestStateProcessorErrors(t *testing.T) {
 				txs: []*types.Transaction{
 					mkDynamicTx(0, common.Address{}, params.TxGas, big.NewInt(0), big.NewInt(0)),
 				},
-				want: "could not apply tx 0 [0xc4ab868fef0c82ae0387b742aee87907f2d0fc528fc6ea0a021459fb0fc4a4a8]: max fee per gas less than block base fee: address 0x71562b71999873DB5b286dF957af199Ec94617F7, maxFeePerGas: 0 baseFee: 38100000",
+				want: "could not apply tx 0 [0xc4ab868fef0c82ae0387b742aee87907f2d0fc528fc6ea0a021459fb0fc4a4a8]: max fee per gas less than block base fee: address 0x71562b71999873DB5b286dF957af199Ec94617F7, maxFeePerGas: 0, baseFee: 39370000",
 			},
 			{ // ErrTipVeryHigh
 				txs: []*types.Transaction{
@@ -241,19 +242,19 @@ func TestStateProcessorErrors(t *testing.T) {
 				txs: []*types.Transaction{
 					mkDynamicCreationTx(0, 500000, common.Big0, big.NewInt(params.InitialBaseFee), tooBigInitCode[:]),
 				},
-				want: "could not apply tx 0 [0xa31de6e26bd5ffba0ca91a2bc29fc2eaad6a6cfc5ad9ab6ffb69cac121e0125c]: max initcode size exceeded: code size 49153 limit 49152",
+				want: "could not apply tx 0 [0xd491405f06c92d118dd3208376fcee18a57c54bc52063ee4a26b1cf296857c25]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{
 					mkDynamicCreationTx(0, 54299, common.Big0, big.NewInt(params.InitialBaseFee), make([]byte, 320)),
 				},
-				want: "could not apply tx 0 [0xf36b7d68cf239f956f7c36be26688a97aaa317ea5f5230d109bb30dbc8598ccb]: intrinsic gas too low: have 54299, want 54300",
+				want: "could not apply tx 0 [0xfd49536a9b323769d8472fcb3ebb3689b707a349379baee3e2ee3fe7baae06a1]: intrinsic gas too low: have 54299, want 54300",
 			},
 			{ // ErrBlobFeeCapTooLow
 				txs: []*types.Transaction{
-					mkBlobTx(0, common.Address{}, params.TxGas, big.NewInt(1), big.NewInt(1), []common.Hash{(common.Hash{1})}),
+					mkBlobTx(0, common.Address{}, params.TxGas, big.NewInt(1), big.NewInt(1), big.NewInt(0), []common.Hash{(common.Hash{1})}),
 				},
-				want: "could not apply tx 0 [0x6c11015985ce82db691d7b2d017acda296db88b811c3c60dc71449c76256c716]: max fee per gas less than block base fee: address 0x71562b71999873DB5b286dF957af199Ec94617F7, maxFeePerGas: 1 baseFee: 38100000",
+				want: "could not apply tx 0 [0x6c11015985ce82db691d7b2d017acda296db88b811c3c60dc71449c76256c716]: max fee per gas less than block base fee: address 0x71562b71999873DB5b286dF957af199Ec94617F7, maxFeePerGas: 1, baseFee: 39370000",
 			},
 		} {
 			block := GenerateBadBlock(gspec.ToBlock(), beacon.New(ethash.NewFaker()), tt.txs, gspec.Config)
@@ -363,7 +364,8 @@ func TestStateProcessorErrors(t *testing.T) {
 func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Transactions, config *params.ChainConfig) *types.Block {
 	difficulty := big.NewInt(0)
 	if !config.TerminalTotalDifficultyPassed {
-		difficulty = engine.CalcDifficulty(&fakeChainReader{config}, parent.Time()+10, &types.Header{
+		fakeChainReader := newChainMaker(nil, config, engine)
+		difficulty = engine.CalcDifficulty(fakeChainReader, parent.Time()+10, &types.Header{
 			Number:     parent.Number(),
 			Time:       parent.Time(),
 			Difficulty: parent.Difficulty(),

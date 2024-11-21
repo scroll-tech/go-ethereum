@@ -176,7 +176,7 @@ func (mt *ZkTrie) TryUpdate(key []byte, vFlag uint32, vPreimage []Byte32) error 
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 
-	mt.secKeyCache[string(nodeKey.Bytes())] = key
+	mt.secKeyCache[string(nodeKey.Bytes())] = append([]byte{}, key...)
 
 	newRootKey, _, err := mt.addLeaf(newLeafNode, mt.rootKey, 0, path)
 	// sanity check
@@ -293,8 +293,9 @@ func (mt *ZkTrie) commit(nodeHash *Hash, path []byte, nodeSet *trienode.NodeSet,
 
 	if node.Type == NodeTypeLeaf_New {
 		if mt.preimages != nil {
+			nodeKeyBytes := node.NodeKey.Bytes()
 			mt.preimages.insertPreimage(map[common.Hash][]byte{
-				common.BytesToHash(nodeHash.Bytes()): node.NodeKey.Bytes(),
+				common.BytesToHash(nodeKeyBytes): mt.secKeyCache[string(nodeKeyBytes)],
 			})
 		}
 		if collectLeaf {

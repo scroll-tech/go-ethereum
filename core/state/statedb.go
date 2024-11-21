@@ -357,13 +357,8 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
-	return s.GetProofByHash(common.BytesToHash(addr.Bytes()))
-}
-
-// GetProofByHash returns the Merkle proof for a given account.
-func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
 	var proof zkproof.ProofList
-	err := s.trie.Prove(addrHash[:] /*, 0*/, &proof)
+	err := s.trie.Prove(addr.Bytes(), &proof)
 	return proof, err
 }
 

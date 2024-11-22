@@ -477,7 +477,7 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			env.sMu.Unlock()
 
 			var proof zkproof.ProofList
-			if err = zkStorageTrie.Prove(key.Bytes(), &proof); err != nil {
+			if err = env.ZkTrieTracer[addrStr].Prove(key.Bytes(), &proof); err != nil {
 				log.Error("Storage proof not available", "error", err, "address", addrStr, "key", keyStr)
 				// but we still mark the proofs map with nil array
 			}

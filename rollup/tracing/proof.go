@@ -8,6 +8,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
+var (
+	magicHash     = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
+	magicSMTBytes = []byte("THIS IS SOME MAGIC BYTES FOR SMT m1rRXgP2xpDI")
+)
+
 type ProofTracer struct {
 	trie           *trie.ZkTrie
 	deletionTracer map[trie.Hash]struct{}
@@ -124,7 +129,7 @@ func (t *ProofTracer) MarkDeletion(key []byte) error {
 func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 	fromLevel := uint(0)
 	var mptPath []*trie.Node
-	return t.trie.ProveWithDeletion(key, fromLevel,
+	if err := t.trie.ProveWithDeletion(key, fromLevel,
 		func(n *trie.Node) error {
 			nodeHash, err := n.NodeHash()
 			if err != nil {
@@ -153,5 +158,11 @@ func (t *ProofTracer) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 			mptPath = append(mptPath, n)
 			t.rawPaths[string(key)] = mptPath
 		},
-	)
+	); err != nil {
+		return err
+	}
+
+	// we put this special kv pair in db so we can distinguish the type and
+	// make suitable Proof
+	return proofDb.Put(magicHash, magicSMTBytes)
 }

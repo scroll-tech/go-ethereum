@@ -49,6 +49,10 @@ func NewReader(ctx context.Context, config Config, l1Client Client) (*Reader, er
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}
 
+	if config.L1MessageQueueAddress == (common.Address{}) {
+		return nil, errors.New("must pass non-zero l1MessageQueueAddress to L1Client")
+	}
+
 	reader := Reader{
 		ctx:    ctx,
 		config: config,
@@ -157,7 +161,7 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 	var logs []types.Log
 
-	err := queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
+	err := queryInBatches(r.ctx, from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(from)), // inclusive
 			ToBlock:   big.NewInt(int64(to)),   // inclusive
@@ -188,7 +192,7 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 func (r *Reader) FetchRollupEventsInRangeWithCallback(from, to uint64, callback func(event RollupEvent) bool) error {
 	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 
-	err := queryInBatches(from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
+	err := queryInBatches(r.ctx, from, to, defaultRollupEventsFetchBlockRange, func(from, to uint64) (bool, error) {
 		query := ethereum.FilterQuery{
 			FromBlock: big.NewInt(int64(from)), // inclusive
 			ToBlock:   big.NewInt(int64(to)),   // inclusive
@@ -287,9 +291,15 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 	return rollupEvents, nil
 }
 
-// TODO: add context to allow for cancellation
-func queryInBatches(fromBlock, toBlock uint64, batchSize uint64, queryFunc func(from, to uint64) (bool, error)) error {
+func queryInBatches(ctx context.Context, fromBlock, toBlock uint64, batchSize uint64, queryFunc func(from, to uint64) (bool, error)) error {
 	for from := fromBlock; from <= toBlock; from += batchSize {
+		// check if context is done and return if it is
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		to := from + batchSize - 1
 		if to > toBlock {
 			to = toBlock

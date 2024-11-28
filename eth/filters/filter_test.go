@@ -123,35 +123,35 @@ func TestFilters(t *testing.T) {
 			pragma solidity >=0.7.0 <0.9.0;
 
 			contract Logger {
-			    function log0() external {
-			        assembly {
-			            log0(0, 0)
-			        }
-			    }
+				function log0() external {
+					assembly {
+						log0(0, 0)
+					}
+				}
 
-			    function log1(uint t1) external {
-			        assembly {
-			            log1(0, 0, t1)
-			        }
-			    }
+				function log1(uint t1) external {
+					assembly {
+						log1(0, 0, t1)
+					}
+				}
 
-			    function log2(uint t1, uint t2) external {
-			        assembly {
-			            log2(0, 0, t1, t2)
-			        }
-			    }
+				function log2(uint t1, uint t2) external {
+					assembly {
+						log2(0, 0, t1, t2)
+					}
+				}
 
-			    function log3(uint t1, uint t2, uint t3) external {
-			        assembly {
-			            log3(0, 0, t1, t2, t3)
-			        }
-			    }
+				function log3(uint t1, uint t2, uint t3) external {
+					assembly {
+						log3(0, 0, t1, t2, t3)
+					}
+				}
 
-			    function log4(uint t1, uint t2, uint t3, uint t4) external {
-			        assembly {
-			            log4(0, 0, t1, t2, t3, t4)
-			        }
-			    }
+				function log4(uint t1, uint t2, uint t3, uint t4) external {
+					assembly {
+						log4(0, 0, t1, t2, t3, t4)
+					}
+				}
 			}
 		*/
 		bytecode = common.FromHex("608060405234801561001057600080fd5b50600436106100575760003560e01c80630aa731851461005c5780632a4c08961461006657806378b9a1f314610082578063c670f8641461009e578063c683d6a3146100ba575b600080fd5b6100646100d6565b005b610080600480360381019061007b9190610143565b6100dc565b005b61009c60048036038101906100979190610196565b6100e8565b005b6100b860048036038101906100b391906101d6565b6100f2565b005b6100d460048036038101906100cf9190610203565b6100fa565b005b600080a0565b808284600080a3505050565b8082600080a25050565b80600080a150565b80828486600080a450505050565b600080fd5b6000819050919050565b6101208161010d565b811461012b57600080fd5b50565b60008135905061013d81610117565b92915050565b60008060006060848603121561015c5761015b610108565b5b600061016a8682870161012e565b935050602061017b8682870161012e565b925050604061018c8682870161012e565b9150509250925092565b600080604083850312156101ad576101ac610108565b5b60006101bb8582860161012e565b92505060206101cc8582860161012e565b9150509250929050565b6000602082840312156101ec576101eb610108565b5b60006101fa8482850161012e565b91505092915050565b6000806000806080858703121561021d5761021c610108565b5b600061022b8782880161012e565b945050602061023c8782880161012e565b935050604061024d8782880161012e565b925050606061025e8782880161012e565b9150509295919450925056fea264697066735822122073a4b156f487e59970dc1ef449cc0d51467268f676033a17188edafcee861f9864736f6c63430008110033")
@@ -180,7 +180,7 @@ func TestFilters(t *testing.T) {
 
 	// Hack: GenerateChainWithGenesis creates a new db.
 	// Commit the genesis manually and use GenerateChain.
-	_, err = gspec.Commit(db, trie.NewDatabase(db, &trie.Config{IsUsingZktrie: true}))
+	_, err = gspec.Commit(db, trie.NewDatabase(db, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,54 +286,72 @@ func TestFilters(t *testing.T) {
 	}{
 		{
 			f:    sys.NewBlockFilter(chain[2].Hash(), []common.Address{contract}, nil),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x4dde288e6ea5d516f51c258fca8c5c907c9cec9fe99d59a3ab4f3dd76dba4901","transactionIndex":"0x0","blockHash":"0x8e80be62abafaf12faf73bb072bd9e5d473cd3f03f441af0bae404e1498c2dc7","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x247e299ae5658e0f12383ab0e4fe05b3d8728305db61f5671714e6837a5e71c8","transactionIndex":"0x0","blockHash":"0x8f3409264ca812320c0738f0a745273e7f3fae9aa64957900864e9c377e18938","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:    sys.NewRangeFilter(0, int64(rpc.LatestBlockNumber), []common.Address{contract}, [][]common.Hash{{hash1, hash2, hash3, hash4}}),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x2","transactionHash":"0x7a7b8d344425cde1f45a8c3424bb8545fedcf300fbd7d4fcc64be5a862225902","transactionIndex":"0x0","blockHash":"0xd3bd52cd219a8d5bac4ae74de4a9fe99591cfa665246ad57f9aa64dd63043fd3","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x4dde288e6ea5d516f51c258fca8c5c907c9cec9fe99d59a3ab4f3dd76dba4901","transactionIndex":"0x0","blockHash":"0x8e80be62abafaf12faf73bb072bd9e5d473cd3f03f441af0bae404e1498c2dc7","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x19a895675832b0f61159e9b83b5ba7e10809c0b4daf7aab6bdc9c517cdbdbe2b","transactionIndex":"0x0","blockHash":"0x075fed6806471359a9fbc14e1a8fc64af09d921493b67532904b4b0ba52713b3","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x2","transactionHash":"0x460e31a1ff9cd882c8fff7fe77ba0db4c8a548cbf039d5dd6b672f379fd81b4f","transactionIndex":"0x0","blockHash":"0xe6f2a0a397afb6d338e4fc2a3a742e4ce63ec8b0e73256141622395b43a11ca8","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x247e299ae5658e0f12383ab0e4fe05b3d8728305db61f5671714e6837a5e71c8","transactionIndex":"0x0","blockHash":"0x8f3409264ca812320c0738f0a745273e7f3fae9aa64957900864e9c377e18938","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x94b6fe027973facd0403a62e3e0e4aa862e2fa6cf32fe45d7551d8f0114aef9e","transactionIndex":"0x0","blockHash":"0x61da7c9a874d3d3d3c1fd61f1ceb972e05078aae59dfa9622cf2109d0705c6d3","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f: sys.NewRangeFilter(900, 999, []common.Address{contract}, [][]common.Hash{{hash3}}),
-		}, {
+		},
+		{
 			f:    sys.NewRangeFilter(990, int64(rpc.LatestBlockNumber), []common.Address{contract2}, [][]common.Hash{{hash3}}),
-			want: `[{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696333"],"data":"0x","blockNumber":"0x3e7","transactionHash":"0xfcac8107f0b5f1e91f590c601a0e774cf33cdae476a21aec9f452e045fa7ee48","transactionIndex":"0x0","blockHash":"0xa9e836bf71b4ba51e4193ba8efb5b21206aa52c1ead58d55d599c57f0eb0b582","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696333"],"data":"0x","blockNumber":"0x3e7","transactionHash":"0x6a1a2121fb265a88e60d3dfd4379c2d7178d3cf55aa51852f648524c89cb522f","transactionIndex":"0x0","blockHash":"0x40b6867c2a9b864c8f28fb9042735323f450448d6fae840b575ac7caebc67e78","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:    sys.NewRangeFilter(1, 10, []common.Address{contract}, [][]common.Hash{{hash2}, {hash1}}),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x4dde288e6ea5d516f51c258fca8c5c907c9cec9fe99d59a3ab4f3dd76dba4901","transactionIndex":"0x0","blockHash":"0x8e80be62abafaf12faf73bb072bd9e5d473cd3f03f441af0bae404e1498c2dc7","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x247e299ae5658e0f12383ab0e4fe05b3d8728305db61f5671714e6837a5e71c8","transactionIndex":"0x0","blockHash":"0x8f3409264ca812320c0738f0a745273e7f3fae9aa64957900864e9c377e18938","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:    sys.NewRangeFilter(1, 10, nil, [][]common.Hash{{hash1, hash2}}),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x2","transactionHash":"0x7a7b8d344425cde1f45a8c3424bb8545fedcf300fbd7d4fcc64be5a862225902","transactionIndex":"0x0","blockHash":"0xd3bd52cd219a8d5bac4ae74de4a9fe99591cfa665246ad57f9aa64dd63043fd3","logIndex":"0x0","removed":false},{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x2","transactionHash":"0x6acc4a13a10f9db3d5806e036ae96f57e053113c3fa225cda6cb7d3cb5e1aba8","transactionIndex":"0x1","blockHash":"0xd3bd52cd219a8d5bac4ae74de4a9fe99591cfa665246ad57f9aa64dd63043fd3","logIndex":"0x1","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x4dde288e6ea5d516f51c258fca8c5c907c9cec9fe99d59a3ab4f3dd76dba4901","transactionIndex":"0x0","blockHash":"0x8e80be62abafaf12faf73bb072bd9e5d473cd3f03f441af0bae404e1498c2dc7","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x2","transactionHash":"0x460e31a1ff9cd882c8fff7fe77ba0db4c8a548cbf039d5dd6b672f379fd81b4f","transactionIndex":"0x0","blockHash":"0xe6f2a0a397afb6d338e4fc2a3a742e4ce63ec8b0e73256141622395b43a11ca8","logIndex":"0x0","removed":false},{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x2","transactionHash":"0x79e95b855dd2e1e647ae2a3cf29d3ee54a84684f47d9b2b16375bf1091d1a560","transactionIndex":"0x1","blockHash":"0xe6f2a0a397afb6d338e4fc2a3a742e4ce63ec8b0e73256141622395b43a11ca8","logIndex":"0x1","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696332","0x0000000000000000000000000000000000000000000000000000746f70696331"],"data":"0x","blockNumber":"0x3","transactionHash":"0x247e299ae5658e0f12383ab0e4fe05b3d8728305db61f5671714e6837a5e71c8","transactionIndex":"0x0","blockHash":"0x8f3409264ca812320c0738f0a745273e7f3fae9aa64957900864e9c377e18938","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f: sys.NewRangeFilter(0, int64(rpc.LatestBlockNumber), nil, [][]common.Hash{{common.BytesToHash([]byte("fail"))}}),
-		}, {
+		},
+		{
 			f: sys.NewRangeFilter(0, int64(rpc.LatestBlockNumber), []common.Address{common.BytesToAddress([]byte("failmenow"))}, nil),
-		}, {
+		},
+		{
 			f: sys.NewRangeFilter(0, int64(rpc.LatestBlockNumber), nil, [][]common.Hash{{common.BytesToHash([]byte("fail"))}, {hash1}}),
-		}, {
+		},
+		{
 			f:    sys.NewRangeFilter(int64(rpc.LatestBlockNumber), int64(rpc.LatestBlockNumber), nil, nil),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x19a895675832b0f61159e9b83b5ba7e10809c0b4daf7aab6bdc9c517cdbdbe2b","transactionIndex":"0x0","blockHash":"0x075fed6806471359a9fbc14e1a8fc64af09d921493b67532904b4b0ba52713b3","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x94b6fe027973facd0403a62e3e0e4aa862e2fa6cf32fe45d7551d8f0114aef9e","transactionIndex":"0x0","blockHash":"0x61da7c9a874d3d3d3c1fd61f1ceb972e05078aae59dfa9622cf2109d0705c6d3","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:    sys.NewRangeFilter(int64(rpc.FinalizedBlockNumber), int64(rpc.LatestBlockNumber), nil, nil),
-			want: `[{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696333"],"data":"0x","blockNumber":"0x3e7","transactionHash":"0xfcac8107f0b5f1e91f590c601a0e774cf33cdae476a21aec9f452e045fa7ee48","transactionIndex":"0x0","blockHash":"0xa9e836bf71b4ba51e4193ba8efb5b21206aa52c1ead58d55d599c57f0eb0b582","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x19a895675832b0f61159e9b83b5ba7e10809c0b4daf7aab6bdc9c517cdbdbe2b","transactionIndex":"0x0","blockHash":"0x075fed6806471359a9fbc14e1a8fc64af09d921493b67532904b4b0ba52713b3","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696333"],"data":"0x","blockNumber":"0x3e7","transactionHash":"0x6a1a2121fb265a88e60d3dfd4379c2d7178d3cf55aa51852f648524c89cb522f","transactionIndex":"0x0","blockHash":"0x40b6867c2a9b864c8f28fb9042735323f450448d6fae840b575ac7caebc67e78","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x94b6fe027973facd0403a62e3e0e4aa862e2fa6cf32fe45d7551d8f0114aef9e","transactionIndex":"0x0","blockHash":"0x61da7c9a874d3d3d3c1fd61f1ceb972e05078aae59dfa9622cf2109d0705c6d3","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:    sys.NewRangeFilter(int64(rpc.FinalizedBlockNumber), int64(rpc.FinalizedBlockNumber), nil, nil),
-			want: `[{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696333"],"data":"0x","blockNumber":"0x3e7","transactionHash":"0xfcac8107f0b5f1e91f590c601a0e774cf33cdae476a21aec9f452e045fa7ee48","transactionIndex":"0x0","blockHash":"0xa9e836bf71b4ba51e4193ba8efb5b21206aa52c1ead58d55d599c57f0eb0b582","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xff00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696333"],"data":"0x","blockNumber":"0x3e7","transactionHash":"0x6a1a2121fb265a88e60d3dfd4379c2d7178d3cf55aa51852f648524c89cb522f","transactionIndex":"0x0","blockHash":"0x40b6867c2a9b864c8f28fb9042735323f450448d6fae840b575ac7caebc67e78","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f: sys.NewRangeFilter(int64(rpc.LatestBlockNumber), int64(rpc.FinalizedBlockNumber), nil, nil),
-		}, {
+		},
+		{
 			f:   sys.NewRangeFilter(int64(rpc.SafeBlockNumber), int64(rpc.LatestBlockNumber), nil, nil),
 			err: "safe header not found",
-		}, {
+		},
+		{
 			f:   sys.NewRangeFilter(int64(rpc.SafeBlockNumber), int64(rpc.SafeBlockNumber), nil, nil),
 			err: "safe header not found",
-		}, {
+		},
+		{
 			f:   sys.NewRangeFilter(int64(rpc.LatestBlockNumber), int64(rpc.SafeBlockNumber), nil, nil),
 			err: "safe header not found",
-		}, {
+		},
+		{
 			f:    sys.NewRangeFilter(int64(rpc.PendingBlockNumber), int64(rpc.PendingBlockNumber), nil, nil),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696335"],"data":"0x","blockNumber":"0x3e9","transactionHash":"0x1579188dbe93ba4d91335fd4e7634b2af133b63795918d243ad8b753aa7a9f1e","transactionIndex":"0x0","blockHash":"0xedd09b4e7ef27a9866fcbde0bfef9fcb455b8264659d05afa963563fdea9a750","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696335"],"data":"0x","blockNumber":"0x3e9","transactionHash":"0xfc96d0695c5141805c2f01a4155bb4365630b5f09350621613931a1e58685cc4","transactionIndex":"0x0","blockHash":"0x9d798e6b2389902b733017b799170c6171ae7f0ca93d0af2af50826d5f05dfa5","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:    sys.NewRangeFilter(int64(rpc.LatestBlockNumber), int64(rpc.PendingBlockNumber), nil, nil),
-			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x19a895675832b0f61159e9b83b5ba7e10809c0b4daf7aab6bdc9c517cdbdbe2b","transactionIndex":"0x0","blockHash":"0x075fed6806471359a9fbc14e1a8fc64af09d921493b67532904b4b0ba52713b3","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696335"],"data":"0x","blockNumber":"0x3e9","transactionHash":"0x1579188dbe93ba4d91335fd4e7634b2af133b63795918d243ad8b753aa7a9f1e","transactionIndex":"0x0","blockHash":"0xedd09b4e7ef27a9866fcbde0bfef9fcb455b8264659d05afa963563fdea9a750","logIndex":"0x0","removed":false}]`,
-		}, {
+			want: `[{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696334"],"data":"0x","blockNumber":"0x3e8","transactionHash":"0x94b6fe027973facd0403a62e3e0e4aa862e2fa6cf32fe45d7551d8f0114aef9e","transactionIndex":"0x0","blockHash":"0x61da7c9a874d3d3d3c1fd61f1ceb972e05078aae59dfa9622cf2109d0705c6d3","logIndex":"0x0","removed":false},{"address":"0xfe00000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000746f70696335"],"data":"0x","blockNumber":"0x3e9","transactionHash":"0xfc96d0695c5141805c2f01a4155bb4365630b5f09350621613931a1e58685cc4","transactionIndex":"0x0","blockHash":"0x9d798e6b2389902b733017b799170c6171ae7f0ca93d0af2af50826d5f05dfa5","logIndex":"0x0","removed":false}]`,
+		},
+		{
 			f:   sys.NewRangeFilter(int64(rpc.PendingBlockNumber), int64(rpc.LatestBlockNumber), nil, nil),
 			err: "invalid block range",
 		},

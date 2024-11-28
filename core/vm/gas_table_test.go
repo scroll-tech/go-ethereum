@@ -133,48 +133,53 @@ var createGasTests = []struct {
 
 func TestCreateGas(t *testing.T) {
 	for i, tt := range createGasTests {
-		var gasUsed = uint64(0)
-		doCheck := func(testGas int) bool {
-			address := common.BytesToAddress([]byte("contract"))
-			statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-			statedb.CreateAccount(address)
-			statedb.SetCode(address, hexutil.MustDecode(tt.code))
-			statedb.Finalise(true)
-			vmctx := BlockContext{
-				CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
-				Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
-				BlockNumber: big.NewInt(0),
+		t.Run("createGasTests", func(t *testing.T) {
+			if tt.eip3860 == false {
+				t.Skip("EIP-3860 is enabled by default on Scroll")
 			}
-			config := Config{}
-			if tt.eip3860 {
-				config.ExtraEips = []int{3860}
-			}
+			var gasUsed = uint64(0)
+			doCheck := func(testGas int) bool {
+				address := common.BytesToAddress([]byte("contract"))
+				statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+				statedb.CreateAccount(address)
+				statedb.SetCode(address, hexutil.MustDecode(tt.code))
+				statedb.Finalise(true)
+				vmctx := BlockContext{
+					CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
+					Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
+					BlockNumber: big.NewInt(0),
+				}
+				config := Config{}
+				if tt.eip3860 {
+					config.ExtraEips = []int{3860}
+				}
 
-			vmenv := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, config)
-			var startGas = uint64(testGas)
-			ret, gas, err := vmenv.Call(AccountRef(common.Address{}), address, nil, startGas, new(big.Int))
-			if err != nil {
-				return false
+				vmenv := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, config)
+				var startGas = uint64(testGas)
+				ret, gas, err := vmenv.Call(AccountRef(common.Address{}), address, nil, startGas, new(big.Int))
+				if err != nil {
+					return false
+				}
+				gasUsed = startGas - gas
+				if len(ret) != 32 {
+					t.Fatalf("test %d: expected 32 bytes returned, have %d", i, len(ret))
+				}
+				if bytes.Equal(ret, make([]byte, 32)) {
+					// Failure
+					return false
+				}
+				return true
 			}
-			gasUsed = startGas - gas
-			if len(ret) != 32 {
-				t.Fatalf("test %d: expected 32 bytes returned, have %d", i, len(ret))
+			minGas := sort.Search(100_000, doCheck)
+			if uint64(minGas) != tt.minimumGas {
+				t.Fatalf("test %d: min gas error, want %d, have %d", i, tt.minimumGas, minGas)
 			}
-			if bytes.Equal(ret, make([]byte, 32)) {
-				// Failure
-				return false
+			// If the deployment succeeded, we also check the gas used
+			if minGas < 100_000 {
+				if gasUsed != tt.gasUsed {
+					t.Errorf("test %d: gas used mismatch: have %v, want %v", i, gasUsed, tt.gasUsed)
+				}
 			}
-			return true
-		}
-		minGas := sort.Search(100_000, doCheck)
-		if uint64(minGas) != tt.minimumGas {
-			t.Fatalf("test %d: min gas error, want %d, have %d", i, tt.minimumGas, minGas)
-		}
-		// If the deployment succeeded, we also check the gas used
-		if minGas < 100_000 {
-			if gasUsed != tt.gasUsed {
-				t.Errorf("test %d: gas used mismatch: have %v, want %v", i, gasUsed, tt.gasUsed)
-			}
-		}
+		})
 	}
 }

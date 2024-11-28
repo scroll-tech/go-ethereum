@@ -18,6 +18,7 @@ package trie
 
 import (
 	"bytes"
+	"errors"
 	"sync"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -92,12 +93,14 @@ func NewStackTrie(options *StackTrieOptions) *StackTrie {
 
 // Update inserts a (key, value) pair into the stack trie.
 func (t *StackTrie) Update(key, value []byte) error {
-	k := keybytesToHex(key)
 	if len(value) == 0 {
-		panic("deletion not supported")
+		return errors.New("trying to insert empty (deletion)")
 	}
+	k := keybytesToHex(key)
 	k = k[:len(k)-1] // chop the termination flag
-
+	if bytes.Compare(t.last, k) >= 0 {
+		return errors.New("non-ascending key order")
+	}
 	// track the first and last inserted entries.
 	if t.first == nil {
 		t.first = append([]byte{}, k...)
@@ -344,15 +347,16 @@ func (t *StackTrie) insert(st *stNode, key, value []byte, path []byte) {
 // This method also sets 'st.type' to hashedNode, and clears 'st.key'.
 func (t *StackTrie) hash(st *stNode, path []byte) {
 	var (
-		blob     []byte   // RLP-encoded node blob
-		internal [][]byte // List of node paths covered by the extension node
+		emptyHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+		blob      []byte   // RLP-encoded node blob
+		internal  [][]byte // List of node paths covered by the extension node
 	)
 	switch st.typ {
 	case hashedNode:
 		return
 
 	case emptyNode:
-		st.val = types.EmptyLegacyTrieRootHash.Bytes()
+		st.val = emptyHash.Bytes()
 		st.key = st.key[:0]
 		st.typ = hashedNode
 		return

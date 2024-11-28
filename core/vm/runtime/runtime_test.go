@@ -270,6 +270,7 @@ func (d *dummyChain) GetHeader(h common.Hash, n uint64) *types.Header {
 // TestBlockhash tests the blockhash operation. It's a bit special, since it internally
 // requires access to a chain reader.
 func TestBlockhash(t *testing.T) {
+	t.Skip("Scroll has a different implementation of blockhash")
 	// Current head
 	n := uint64(1000)
 	parentHash := common.Hash{}
@@ -672,13 +673,14 @@ func TestColdAccountAccessCost(t *testing.T) {
 			step: 6,
 			want: 2855,
 		},
-		{ // SELFDESTRUCT(0xff)
-			code: []byte{
-				byte(vm.PUSH1), 0xff, byte(vm.SELFDESTRUCT),
-			},
-			step: 1,
-			want: 7600,
-		},
+		// disabled due to SELFDESTRUCT not being supported in Scroll
+		// { // SELFDESTRUCT(0xff)
+		// 	code: []byte{
+		// 		byte(vm.PUSH1), 0xff, byte(vm.SELFDESTRUCT),
+		// 	},
+		// 	step: 1,
+		// 	want: 7600,
+		// },
 	} {
 		tracer := logger.NewStructLogger(nil)
 		Execute(tc.code, nil, &Config{
@@ -697,6 +699,7 @@ func TestColdAccountAccessCost(t *testing.T) {
 }
 
 func TestRuntimeJSTracer(t *testing.T) {
+	t.Skip("disabled due to SELFDESTRUCT not being supported in Scroll")
 	jsTracers := []string{
 		`{enters: 0, exits: 0, enterGas: 0, gasUsed: 0, steps:0,
 	step: function() { this.steps++},

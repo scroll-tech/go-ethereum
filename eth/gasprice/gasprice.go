@@ -40,6 +40,12 @@ var (
 	DefaultMaxPrice    = big.NewInt(500 * params.GWei)
 	DefaultIgnorePrice = big.NewInt(1 * params.Wei)
 	DefaultBasePrice   = big.NewInt(0)
+	// DefaultGasTip is set to 100 wei instead of 1 wei for the following reasons:
+	// 1. It prevents issues with very low tip values (e.g., 1 wei):
+	//    - Transaction pools commonly prevent replacing transactions with the same tip cap.
+	//    - Extremely low tips like 1 wei may fail to increase due to rounding in integer arithmetic of SDK implementations (e.g. 1 wei * 1.5 = 1 wei).
+	// 2. The cost of gas tip 100 wei is negligible compared to base fee normally.
+	DefaultGasTip = big.NewInt(100) // Default minimum tip cap in wei (used after Curie/EIP-1559).
 )
 
 type Config struct {
@@ -52,6 +58,7 @@ type Config struct {
 	IgnorePrice        *big.Int `toml:",omitempty"`
 	CongestedThreshold int      // Number of pending transactions to consider the network congested and suggest a minimum tip cap.
 	DefaultBasePrice   *big.Int `toml:",omitempty"` // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
+	DefaultGasTip      *big.Int `toml:",omitempty"` // Default minimum tip cap to use after Curie (EIP 1559).
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -82,6 +89,7 @@ type Oracle struct {
 	maxHeaderHistory, maxBlockHistory int
 	congestedThreshold                int      // Number of pending transactions to consider the network congested and suggest a minimum tip cap.
 	defaultBasePrice                  *big.Int // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
+	defaultGasTip                     *big.Int // Default gas tip to suggest when the network is not congested.
 	historyCache                      *lru.Cache
 }
 
@@ -132,6 +140,11 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 	if defaultBasePrice == nil || defaultBasePrice.Int64() < 0 {
 		defaultBasePrice = DefaultBasePrice
 		log.Warn("Sanitizing invalid gasprice oracle default base price", "provided", params.DefaultBasePrice, "updated", defaultBasePrice)
+	}
+	defaultGasTip := params.DefaultGasTip
+	if defaultGasTip == nil || defaultGasTip.Int64() < 0 {
+		defaultGasTip = DefaultGasTip
+		log.Warn("Sanitizing invalid gasprice oracle default gas tip", "provided", params.DefaultGasTip, "updated", defaultGasTip)
 	}
 
 	cache, _ := lru.New(2048)
@@ -195,14 +208,10 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	// high-priced txs are causing the suggested tip cap to be high.
 	pendingTxCount, _ := oracle.backend.StatsWithMinBaseFee(head.BaseFee)
 	if pendingTxCount < oracle.congestedThreshold {
-		// Before Curie (EIP-1559), we need to return the total suggested gas price (base fee + tip cap).
-		// After Curie, a minimum tip cap of 100 wei is used to avoid issues with extremely low values like 1 wei:
-		// 1. txpool protections:
-		//   - txpool commonly prevents replacing transactions with the same tip cap.
-		//   - A 1 wei tip may fail to increase (e.g., 1.1x rounds down to 1 wei) due to integer arithmetic.
-		// 2. Negligible cost:
-		//   - Both 100 wei and 1 wei are almost zero in cost, so this change has no noticeable impact on users.
-		price := big.NewInt(100)
+		// Determine the suggested gas price based on the network configuration:
+		// - Before Curie (EIP-1559): total gas price = base fee + tip cap.
+		// - After Curie (EIP-1559): use the default tip cap.
+		price := oracle.defaultGasTip
 		if !oracle.backend.ChainConfig().IsCurie(head.Number) {
 			price = oracle.defaultBasePrice
 		}

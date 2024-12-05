@@ -741,6 +741,10 @@ var (
 		Usage: "Number of pending transactions to consider the network congested and suggest a minimum tip cap",
 		Value: ethconfig.Defaults.GPO.CongestedThreshold,
 	}
+	GpoDefaultGasTipFlag = cli.Int64Flag{
+		Name:  "gpo.defaultgastip",
+		Usage: "Default minimum tip cap (in wei) to be used after Curie fork (EIP-1559)",
+	}
 
 	// Metrics flags
 	MetricsEnabledFlag = cli.BoolFlag{
@@ -1449,6 +1453,9 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config, light bool) {
 	}
 	if ctx.GlobalIsSet(GpoCongestionThresholdFlag.Name) {
 		cfg.CongestedThreshold = ctx.GlobalInt(GpoCongestionThresholdFlag.Name)
+	}
+	if ctx.GlobalIsSet(GpoDefaultGasTipFlag.Name) {
+		cfg.DefaultGasTip = big.NewInt(ctx.GlobalInt64(GpoDefaultGasTipFlag.Name))
 	}
 }
 

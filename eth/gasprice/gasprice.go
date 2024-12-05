@@ -41,10 +41,10 @@ var (
 	DefaultIgnorePrice = big.NewInt(1 * params.Wei)
 	DefaultBasePrice   = big.NewInt(0)
 	// DefaultGasTipCap is set to 100 wei instead of 1 wei for the following reasons:
-	// 1. It prevents issues with very low tip values (e.g., 1 wei):
-	//    - Transaction pools commonly prevent replacing transactions with the same gas tip cap.
-	//    - Extremely low tips like 1 wei may fail to increase due to rounding in integer arithmetic of SDK implementations (e.g. 1 wei * 1.5 = 1 wei).
-	// 2. The cost of gas tip cap 100 wei is negligible compared to base fee normally.
+	// 1. Very low tip values (e.g. 1 wei) can cause issues because transaction pools often reject replacing transactions
+	//    with the same gas tip cap. This becomes problematic when low tips like 1 wei fail to increase due to rounding
+	//    in some SDK implementations (e.g. 1 wei * 1.5 = 1 wei).
+	// 2. The cost of a gas tip cap of 100 wei is negligible compared to the base fee in most cases.
 	DefaultGasTipCap = big.NewInt(100) // Default minimum gas tip cap in wei (used after Curie/EIP-1559).
 )
 

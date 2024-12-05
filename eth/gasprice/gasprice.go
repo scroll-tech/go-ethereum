@@ -171,6 +171,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		maxBlockHistory:    maxBlockHistory,
 		congestedThreshold: congestedThreshold,
 		defaultBasePrice:   defaultBasePrice,
+		defaultGasTip:      defaultGasTip,
 		historyCache:       cache,
 	}
 }

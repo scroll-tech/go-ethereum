@@ -431,7 +431,7 @@ func (pool *TxPool) loop() {
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					list := pool.queue[addr].Flatten()
 					for _, tx := range list {
-						log.Trace("Evicting transaction due to timeout", "account", addr.Hex(), "tx_hash", tx.Hash().Hex(), "lifetime_sec", time.Since(pool.beats[addr]).Seconds(), "lifetime_limit_sec", pool.config.Lifetime.Seconds())
+						log.Trace("Evicting transaction due to timeout", "account", addr.Hex(), "hash", tx.Hash().Hex(), "lifetime sec", time.Since(pool.beats[addr]).Seconds(), "lifetime limit sec", pool.config.Lifetime.Seconds())
 						pool.removeTx(tx.Hash(), true)
 					}
 					queuedEvictionMeter.Mark(int64(len(list)))
@@ -866,7 +866,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		pool.priced.Put(tx, isLocal)
 		pool.journalTx(from, tx)
 		pool.queueTxEvent(tx)
-		log.Trace("Transaction added to pending pool", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To().Hex())
+		log.Trace("Pooled new executable transaction", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To().Hex())
 
 		// Successful promotion, bump the heartbeat
 		pool.beats[from] = time.Now()
@@ -888,7 +888,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	}
 	pool.journalTx(from, tx)
 
-	log.Trace("Transaction added to future queue", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To().Hex())
+	log.Trace("Pooled new future transaction", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To().Hex())
 	return replaced, nil
 }
 
@@ -1773,7 +1773,7 @@ func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 		if tx.Time().Before(t) {
 			txLifecycle := t.Sub(tx.Time())
 			if txLifecycle >= time.Minute*30 {
-				log.Debug("Transaction lifecycle exceeds 30 minutes", "hash", tx.Hash().Hex(), "duration_seconds", txLifecycle.Seconds())
+				log.Debug("Transaction lifecycle exceeds 30 minutes", "hash", tx.Hash().Hex(), "duration seconds", txLifecycle.Seconds())
 			}
 			txLifecycleTimer.Update(txLifecycle)
 		}

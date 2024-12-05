@@ -89,7 +89,7 @@ type Oracle struct {
 	maxHeaderHistory, maxBlockHistory int
 	congestedThreshold                int      // Number of pending transactions to consider the network congested and suggest a minimum tip cap.
 	defaultBasePrice                  *big.Int // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
-	defaultGasTipCap                  *big.Int // Default gas tip cap to suggest when the network is not congested.
+	defaultGasTipCap                  *big.Int // Default gas tip cap to suggest after Curie (EIP 1559) when the network is not congested.
 	historyCache                      *lru.Cache
 }
 

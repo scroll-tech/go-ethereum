@@ -195,13 +195,14 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	// high-priced txs are causing the suggested tip cap to be high.
 	pendingTxCount, _ := oracle.backend.StatsWithMinBaseFee(head.BaseFee)
 	if pendingTxCount < oracle.congestedThreshold {
-		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return 2 wei as the tip cap,
-		// as the base fee is set separately or added manually for legacy transactions.
-		// 1. Set price to at least 1 as otherwise tx with a 0 tip might be filtered out by the default mempool config.
-		// 2. Since oracle.ignoreprice was set to 2 (DefaultIgnorePrice) before by default, we need to set the price
-		//    to 2 to avoid filtering in oracle.getBlockValues() by nodes that did not yet update to this version.
-		//    In the future we can set the price to 1 wei.
-		price := big.NewInt(2)
+		// Before Curie (EIP-1559), we need to return the total suggested gas price (base fee + tip cap).
+		// After Curie, a minimum tip cap of 100 wei is used to avoid issues with extremely low values like 1 wei:
+		// 1. txpool protections:
+		//   - txpool commonly prevents replacing transactions with the same tip cap.
+		//   - A 1 wei tip may fail to increase (e.g., 1.1x rounds down to 1 wei) due to integer arithmetic.
+		// 2. Negligible cost:
+		//   - Both 100 wei and 1 wei are almost zero in cost, so this change has no noticeable impact on users.
+		price := big.NewInt(100)
 		if !oracle.backend.ChainConfig().IsCurie(head.Number) {
 			price = oracle.defaultBasePrice
 		}

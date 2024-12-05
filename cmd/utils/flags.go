@@ -743,7 +743,7 @@ var (
 	}
 	GpoDefaultGasTipCapFlag = cli.Int64Flag{
 		Name:  "gpo.defaultgastipcap",
-		Usage: "Default minimum gas tip cap (in wei) to be used after Curie fork (EIP-1559)",
+		Usage: "Default minimum gas tip cap (in wei) to be used after Curie fork (EIP-1559) (default: 100)",
 	}
 
 	// Metrics flags

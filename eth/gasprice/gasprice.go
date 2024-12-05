@@ -208,9 +208,8 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	// high-priced txs are causing the suggested tip cap to be high.
 	pendingTxCount, _ := oracle.backend.StatsWithMinBaseFee(head.BaseFee)
 	if pendingTxCount < oracle.congestedThreshold {
-		// Determine the suggested gas price based on the network configuration:
-		// - Before Curie (EIP-1559): total gas price = base fee + tip cap.
-		// - After Curie (EIP-1559): use the default tip cap.
+		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTip wei as the tip cap,
+		// as the base fee is set separately or added manually for legacy transactions.
 		price := oracle.defaultGasTip
 		if !oracle.backend.ChainConfig().IsCurie(head.Number) {
 			price = oracle.defaultBasePrice

@@ -432,6 +432,7 @@ func (pool *TxPool) loop() {
 					list := pool.queue[addr].Flatten()
 					for _, tx := range list {
 						log.Trace("Evicting transaction due to timeout", "account", addr.Hex(), "tx_hash", tx.Hash().Hex(), "lifetime_sec", time.Since(pool.beats[addr]).Seconds(), "lifetime_limit_sec", pool.config.Lifetime.Seconds())
+						pool.removeTx(tx.Hash(), true)
 					}
 					queuedEvictionMeter.Mark(int64(len(list)))
 				}

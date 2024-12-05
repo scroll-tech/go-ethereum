@@ -866,7 +866,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 		pool.priced.Put(tx, isLocal)
 		pool.journalTx(from, tx)
 		pool.queueTxEvent(tx)
-		log.Trace("Pooled new executable transaction", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To().Hex())
+		log.Trace("Pooled new executable transaction", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To())
 
 		// Successful promotion, bump the heartbeat
 		pool.beats[from] = time.Now()
@@ -888,7 +888,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	}
 	pool.journalTx(from, tx)
 
-	log.Trace("Pooled new future transaction", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To().Hex())
+	log.Trace("Pooled new future transaction", "hash", hash.Hex(), "from", from.Hex(), "to", tx.To())
 	return replaced, nil
 }
 
@@ -976,7 +976,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		// Nothing was replaced, bump the pending counter
 		pendingGauge.Inc(1)
 	}
-	log.Trace("Transaction promoted from future queue to pending", "hash", hash.Hex(), "from", addr.Hex(), "to", tx.To().Hex())
+	log.Trace("Transaction promoted from future queue to pending", "hash", hash.Hex(), "from", addr.Hex(), "to", tx.To())
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.pendingNonces.set(addr, tx.Nonce()+1)
 

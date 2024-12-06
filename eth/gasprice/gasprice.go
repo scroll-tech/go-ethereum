@@ -142,7 +142,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle default base price", "provided", params.DefaultBasePrice, "updated", defaultBasePrice)
 	}
 	defaultGasTipCap := params.DefaultGasTipCap
-	if defaultGasTipCap == nil || defaultGasTipCap.Int64() < 0 {
+	if defaultGasTipCap == nil || defaultGasTipCap.Int64() <= 0 {
 		defaultGasTipCap = DefaultGasTipCap
 		log.Warn("Sanitizing invalid gasprice oracle default gas tip cap", "provided", params.DefaultGasTipCap, "updated", DefaultGasTipCap)
 	}

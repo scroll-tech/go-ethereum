@@ -110,7 +110,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errInvalidNonce
 	}
 	// Check that the extra-data contains signature
-	if len(header.Extra) != extraSeal {
+	if header.Number != big.NewInt(0) && len(header.Extra) != extraSeal {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -121,7 +121,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if header.UncleHash != uncleHash {
 		return errInvalidUncleHash
 	}
-	// Ensure that the difficulty is zero
+	// Ensure that the difficulty is one
 	if header.Difficulty.Cmp(common.Big0) != 1 {
 		return errInvalidDifficulty
 	}

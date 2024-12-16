@@ -78,7 +78,6 @@ func (s *SystemContract) Start() {
 				return
 			case <-syncTicker.C:
 				blockNumber := big.NewInt(-1) // todo: get block number from L1BlocksContract (l1 block hash relay) or other source (depending on exact design)
-
 				address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, blockNumber)
 				if err != nil {
 					log.Error("failed to get signer address from L1 System Contract", "err", err)

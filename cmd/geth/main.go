@@ -172,7 +172,6 @@ var (
 		utils.RollupVerifyEnabledFlag,
 		utils.ShadowforkPeersFlag,
 		utils.DASyncEnabledFlag,
-		utils.DASnapshotFileFlag,
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,
 		utils.DABeaconNodeAPIEndpointFlag,

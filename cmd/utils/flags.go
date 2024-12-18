@@ -881,10 +881,6 @@ var (
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
 	}
-	DASnapshotFileFlag = &cli.StringFlag{
-		Name:  "da.snapshot.file",
-		Usage: "Snapshot file to sync from DA",
-	}
 	DABlobScanAPIEndpointFlag = &cli.StringFlag{
 		Name:  "da.blob.blobscan",
 		Usage: "BlobScan blob API endpoint",

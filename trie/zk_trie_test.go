@@ -26,12 +26,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	zkt "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 func newEmptyZkTrie() *ZkTrie {
@@ -263,4 +267,73 @@ func TestZkTrieDelete(t *testing.T) {
 		hash := trie1.Hash()
 		assert.Equal(t, hashes[i].Hex(), hash.Hex())
 	}
+}
+
+func TestEquivalence(t *testing.T) {
+	t.Skip()
+
+	zkDb, err := leveldb.New("/Users/omer/Documents/go-ethereum/l2geth-datadir/geth/chaindata", 0, 0, "", true)
+	require.NoError(t, err)
+	mptDb, err := leveldb.New("/Users/omer/Documents/go-ethereum/l2geth-datadir-mpt/geth/chaindata", 0, 0, "", true)
+	require.NoError(t, err)
+
+	zkRoot := common.HexToHash("0x294b458b5b571bb634dbe9a81331dd2aabb5ef40cdc0328b075a9666d5df55d0")
+	mptRoot, err := rawdb.ReadDiskStateRoot(mptDb, zkRoot)
+	require.NoError(t, err)
+
+	checkTrieEquality(t, &dbs{
+		zkDb:  zkDb,
+		mptDb: mptDb,
+	}, zkRoot, mptRoot, checkAccountEquality)
+}
+
+type dbs struct {
+	zkDb  *leveldb.Database
+	mptDb *leveldb.Database
+}
+
+var accountsLeft = -1
+
+func checkTrieEquality(t *testing.T, dbs *dbs, zkRoot, mptRoot common.Hash, leafChecker func(*testing.T, *dbs, []byte, []byte)) {
+	zkTrie, err := NewZkTrie(zkRoot, NewZktrieDatabase(dbs.zkDb))
+	require.NoError(t, err)
+
+	mptTrie, err := NewSecure(mptRoot, NewDatabaseWithConfig(dbs.mptDb, &Config{Preimages: true}))
+	require.NoError(t, err)
+
+	expectedLeaves := zkTrie.CountLeaves()
+	trieIt := NewIterator(mptTrie.NodeIterator(nil))
+	if accountsLeft == -1 {
+		accountsLeft = int(expectedLeaves)
+	}
+
+	for trieIt.Next() {
+		expectedLeaves--
+		preimageKey := mptTrie.GetKey(trieIt.Key)
+		require.NotEmpty(t, preimageKey)
+		leafChecker(t, dbs, zkTrie.Get(preimageKey), mptTrie.Get(preimageKey))
+	}
+	require.Zero(t, expectedLeaves)
+}
+
+func checkAccountEquality(t *testing.T, dbs *dbs, zkAccountBytes, mptAccountBytes []byte) {
+	mptAccount := &types.StateAccount{}
+	require.NoError(t, rlp.DecodeBytes(mptAccountBytes, mptAccount))
+	zkAccount, err := types.UnmarshalStateAccount(zkAccountBytes)
+	require.NoError(t, err)
+
+	require.Equal(t, mptAccount.Nonce, zkAccount.Nonce)
+	require.True(t, mptAccount.Balance.Cmp(zkAccount.Balance) == 0)
+	require.Equal(t, mptAccount.KeccakCodeHash, zkAccount.KeccakCodeHash)
+	checkTrieEquality(t, dbs, common.BytesToHash(zkAccount.Root[:]), common.BytesToHash(mptAccount.Root[:]), checkStorageEquality)
+	accountsLeft--
+	t.Log("Accounts left:", accountsLeft)
+}
+
+func checkStorageEquality(t *testing.T, _ *dbs, zkStorageBytes, mptStorageBytes []byte) {
+	zkValue := common.BytesToHash(zkStorageBytes)
+	_, content, _, err := rlp.Split(mptStorageBytes)
+	require.NoError(t, err)
+	mptValue := common.BytesToHash(content)
+	require.Equal(t, zkValue, mptValue)
 }

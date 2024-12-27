@@ -17,6 +17,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
@@ -54,7 +56,7 @@ type RollupSyncService struct {
 	callDataBlobSource *da.CalldataBlobSource
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client l1.Client, bc *core.BlockChain, stack *node.Node) (*RollupSyncService, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client l1.Client, bc *core.BlockChain, stack *node.Node, config da_syncer.Config) (*RollupSyncService, error) {
 	if genesisConfig.Scroll.L1Config == nil {
 		return nil, fmt.Errorf("missing L1 config in genesis")
 	}
@@ -72,6 +74,14 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		latestProcessedBlock = *block
 	}
 
+	var success bool
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		if !success {
+			cancel()
+		}
+	}()
+
 	l1Reader, err := l1.NewReader(ctx, l1.Config{
 		ScrollChainAddress:    genesisConfig.Scroll.L1Config.ScrollChainAddress,
 		L1MessageQueueAddress: genesisConfig.Scroll.L1Config.L1MessageQueueAddress,
@@ -80,16 +90,33 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		return nil, fmt.Errorf("failed to initialize l1.Reader, err = %w", err)
 	}
 
-	// TODO: create blob clients based on new config parameters
+	blobClientList := blob_client.NewBlobClients()
+	if config.BeaconNodeAPIEndpoint != "" {
+		beaconNodeClient, err := blob_client.NewBeaconNodeClient(config.BeaconNodeAPIEndpoint)
+		if err != nil {
+			log.Warn("failed to create BeaconNodeClient", "err", err)
+		} else {
+			blobClientList.AddBlobClient(beaconNodeClient)
+		}
+	}
+	if config.BlobScanAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewBlobScanClient(config.BlobScanAPIEndpoint))
+	}
+	if config.BlockNativeAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
+	}
+	if blobClientList.Size() == 0 {
+		return nil, errors.New("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag")
+	}
 
-	calldataBlobSource, err := da.NewCalldataBlobSource(ctx, latestProcessedBlock, l1Reader, nil, db)
+	calldataBlobSource, err := da.NewCalldataBlobSource(ctx, latestProcessedBlock, l1Reader, blobClientList, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create calldata blob source: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	success = true
 
-	service := RollupSyncService{
+	return &RollupSyncService{
 		ctx:    ctx,
 		cancel: cancel,
 		db:     db,
@@ -97,9 +124,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		stack:  stack,
 
 		callDataBlobSource: calldataBlobSource,
-	}
-
-	return &service, nil
+	}, nil
 }
 
 func (s *RollupSyncService) Start() {

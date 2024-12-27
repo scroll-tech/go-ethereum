@@ -26,9 +26,6 @@ import (
 )
 
 const (
-	// defaultFetchBlockRange is the number of blocks that we collect in a single eth_getLogs query.
-	defaultFetchBlockRange = uint64(100)
-
 	// defaultSyncInterval is the frequency at which we query for new rollup event.
 	defaultSyncInterval = 60 * time.Second
 

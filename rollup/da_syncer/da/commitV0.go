@@ -15,7 +15,7 @@ import (
 )
 
 type CommitBatchDAV0 struct {
-	version                    uint8
+	version                    encoding.CodecVersion
 	batchIndex                 uint64
 	parentTotalL1MessagePopped uint64
 	skippedL1MessageBitmap     []byte
@@ -37,11 +37,11 @@ func NewCommitBatchDAV0(db ethdb.Database,
 		return nil, fmt.Errorf("failed to unpack chunks: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 	}
 
-	return NewCommitBatchDAV0WithChunks(db, uint8(codec.Version()), commitEvent.BatchIndex().Uint64(), parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent)
+	return NewCommitBatchDAV0WithChunks(db, codec.Version(), commitEvent.BatchIndex().Uint64(), parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent)
 }
 
 func NewCommitBatchDAV0WithChunks(db ethdb.Database,
-	version uint8,
+	version encoding.CodecVersion,
 	batchIndex uint64,
 	parentBatchHeader []byte,
 	decodedChunks []*encoding.DAChunkRawTx,
@@ -71,7 +71,7 @@ func NewCommitBatchDAV0Empty() *CommitBatchDAV0 {
 	}
 }
 
-func (c *CommitBatchDAV0) Version() uint8 {
+func (c *CommitBatchDAV0) Version() encoding.CodecVersion {
 	return c.version
 }
 

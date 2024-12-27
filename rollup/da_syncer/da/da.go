@@ -35,7 +35,7 @@ type Entry interface {
 type EntryWithBlocks interface {
 	Entry
 	Blocks() []*PartialBlock
-	Version() uint8
+	Version() encoding.CodecVersion
 	Chunks() []*encoding.DAChunkRawTx
 	BlobVersionedHashes() []common.Hash
 }

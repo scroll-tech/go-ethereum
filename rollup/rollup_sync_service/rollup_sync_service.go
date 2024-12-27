@@ -106,7 +106,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
 	}
 	if blobClientList.Size() == 0 {
-		return nil, errors.New("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag")
+		return nil, errors.New("no blob client is configured for rollup verifier. Please provide at least one blob client via command line flag")
 	}
 
 	calldataBlobSource, err := da.NewCalldataBlobSource(ctx, latestProcessedBlock, l1Reader, blobClientList, db)
@@ -372,7 +372,7 @@ func (s *RollupSyncService) getCommittedBatchMeta(commitedBatch da.EntryWithBloc
 	}
 
 	return &rawdb.CommittedBatchMeta{
-		Version:             commitedBatch.Version(),
+		Version:             uint8(commitedBatch.Version()),
 		ChunkBlockRanges:    chunkRanges,
 		BlobVersionedHashes: commitedBatch.BlobVersionedHashes(),
 	}, nil

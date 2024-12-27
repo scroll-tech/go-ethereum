@@ -78,7 +78,7 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 		return nil, fmt.Errorf("decodedChunks is nil after decoding")
 	}
 
-	v0, err := NewCommitBatchDAV0WithChunks(db, uint8(codec.Version()), commitEvent.BatchIndex().Uint64(), parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent)
+	v0, err := NewCommitBatchDAV0WithChunks(db, codec.Version(), commitEvent.BatchIndex().Uint64(), parentBatchHeader, decodedChunks, skippedL1MessageBitmap, commitEvent)
 	if err != nil {
 		return nil, err
 	}

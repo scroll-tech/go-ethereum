@@ -27,7 +27,7 @@ import (
 
 const (
 	// defaultSyncInterval is the frequency at which we query for new rollup event.
-	defaultSyncInterval = 60 * time.Second
+	defaultSyncInterval = 30 * time.Second
 
 	// defaultMaxRetries is the maximum number of retries allowed when the local node is not synced up to the required block height.
 	defaultMaxRetries = 20
@@ -37,7 +37,7 @@ const (
 	// of a specific L1 batch finalize event.
 	defaultGetBlockInRangeRetryDelay = 60 * time.Second
 
-	// defaultLogInterval is the frequency at which we print the latestProcessedBlock.
+	// defaultLogInterval is the frequency at which we print the latest processed block.
 	defaultLogInterval = 5 * time.Minute
 )
 
@@ -148,7 +148,7 @@ func (s *RollupSyncService) Start() {
 					log.Error("failed to fetch rollup events", "err", err)
 				}
 			case <-logTicker.C:
-				log.Info("Sync rollup events progress update", "latestProcessedBlock", s.callDataBlobSource.L1Height())
+				log.Info("Sync rollup events progress update", "latest processed block", s.callDataBlobSource.L1Height())
 			}
 		}
 	}()

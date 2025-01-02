@@ -22,13 +22,13 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
 
-func TestGetCommittedBatchMetaCodecv0(t *testing.T) {
+func TestGetCommittedBatchMetaCodecV0(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
 		Scroll: params.ScrollConfig{
 			L1Config: &params.L1Config{
 				L1ChainId:             11155111,
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
-				L1MessageQueueAddress: common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a1"),
+				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000001"),
 			},
 		},
 	}
@@ -39,7 +39,7 @@ func TestGetCommittedBatchMetaCodecv0(t *testing.T) {
 	defer stack.Close()
 
 	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, &l1.MockNopClient{}, &core.BlockChain{}, stack, da_syncer.Config{
-		BlobScanAPIEndpoint: "http://localhost:8080",
+		BlobScanAPIEndpoint: "http://dummy-endpoint:1234",
 	})
 	require.NoError(t, err)
 
@@ -77,7 +77,7 @@ func TestGetCommittedBatchMetaCodecV1(t *testing.T) {
 			L1Config: &params.L1Config{
 				L1ChainId:             11155111,
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
-				L1MessageQueueAddress: common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a1"),
+				L1MessageQueueAddress: common.HexToAddress("0x0000000000000000000000000000000000000001"),
 			},
 		},
 	}
@@ -233,7 +233,7 @@ func (b *mockDABlock) Number() uint64 {
 	return b.number
 }
 
-func TestValidateBatchCodecv0(t *testing.T) {
+func TestValidateBatchCodecV0(t *testing.T) {
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}
 
@@ -300,7 +300,7 @@ func TestValidateBatchCodecv0(t *testing.T) {
 	assert.Equal(t, parentFinalizedBatchMeta3, finalizedBatchMeta2)
 }
 
-func TestValidateBatchCodecv1(t *testing.T) {
+func TestValidateBatchCodecV1(t *testing.T) {
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}
 
@@ -365,7 +365,7 @@ func TestValidateBatchCodecv1(t *testing.T) {
 	assert.Equal(t, parentFinalizedBatchMeta3, finalizedBatchMeta2)
 }
 
-func TestValidateBatchCodecv2(t *testing.T) {
+func TestValidateBatchCodecV2(t *testing.T) {
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}
 
@@ -430,7 +430,7 @@ func TestValidateBatchCodecv2(t *testing.T) {
 	assert.Equal(t, parentFinalizedBatchMeta3, finalizedBatchMeta2)
 }
 
-func TestValidateBatchCodecv3(t *testing.T) {
+func TestValidateBatchCodecV3(t *testing.T) {
 	block1 := readBlockFromJSON(t, "./testdata/blockTrace_02.json")
 	chunk1 := &encoding.Chunk{Blocks: []*encoding.Block{block1}}
 

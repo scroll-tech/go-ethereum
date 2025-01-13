@@ -29,15 +29,11 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 	parentBatchHeader []byte,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
+	versionedHashes []common.Hash,
 ) (*CommitBatchDAV1, error) {
 	decodedChunks, err := codec.DecodeDAChunksRawTx(chunks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack chunks: %v, err: %w", commitEvent.BatchIndex().Uint64(), err)
-	}
-
-	versionedHashes, err := l1Reader.FetchTxBlobHashes(commitEvent.TxHash(), commitEvent.BlockHash())
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch blob hash, err: %w", err)
 	}
 
 	// with CommitBatchDAV1 we expect only one versioned hash as we commit only one blob per batch submission

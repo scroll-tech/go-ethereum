@@ -2,7 +2,6 @@ package system_contract
 
 import (
 	"context"
-	"math/big"
 	"sync"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 )
 
 const (
-	defaultSyncInterval = 10
+	defaultSyncInterval = 10 * time.Second
 )
 
 // SystemContract
@@ -34,9 +33,8 @@ type SystemContract struct {
 // New creates a SystemContract consensus engine with the initial
 // signers set to the ones provided by the user.
 func New(ctx context.Context, config *params.SystemContractConfig, client sync_service.EthClient) *SystemContract {
-	blockNumber := big.NewInt(-1) // todo: get block number from L1BlocksContract (l1 block hash relay) or other source (depending on exact design)
 	ctx, cancel := context.WithCancel(ctx)
-	address, err := client.StorageAt(ctx, config.SystemContractAddress, config.SystemContractSlot, blockNumber)
+	address, err := client.StorageAt(ctx, config.SystemContractAddress, config.SystemContractSlot, nil)
 	if err != nil {
 		log.Error("failed to get signer address from L1 System Contract", "err", err)
 	}
@@ -77,8 +75,7 @@ func (s *SystemContract) Start() {
 			case <-s.ctx.Done():
 				return
 			case <-syncTicker.C:
-				blockNumber := big.NewInt(-1) // todo: get block number from L1BlocksContract (l1 block hash relay) or other source (depending on exact design)
-				address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, blockNumber)
+				address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
 				if err != nil {
 					log.Error("failed to get signer address from L1 System Contract", "err", err)
 				}

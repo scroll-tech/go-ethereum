@@ -252,10 +252,13 @@ func (s *SystemContract) Seal(chain consensus.ChainHeaderReader, block *types.Bl
 	// Don't hold the signer fields for the entire sealing procedure
 	s.lock.RLock()
 	signer, signFn := s.signer, s.signFn
+	signerAddressL1 := s.signerAddressL1
 	s.lock.RUnlock()
 
 	// Bail out if we're unauthorized to sign a block
-	// todo
+	if signer != signerAddressL1 {
+		return errors.New("local node is not authorized to sign this block")
+	}
 
 	// Sweet, the protocol permits us to sign the block, wait for our time
 	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
@@ -299,7 +302,6 @@ func SealHash(header *types.Header) (hash common.Hash) {
 	hasher.(crypto.KeccakState).Read(hash[:])
 	return hash
 }
-
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {

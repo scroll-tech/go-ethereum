@@ -19,6 +19,7 @@ package les
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -191,7 +192,7 @@ func (b *LesApiBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 		vmConfig = new(vm.Config)
 	}
 	txContext := core.NewEVMTxContext(msg)
-	context := core.NewEVMBlockContext(header, b.eth.blockchain, nil)
+	context := core.NewEVMBlockContext(header, b.eth.blockchain, b.eth.chainConfig, nil)
 	return vm.NewEVM(context, txContext, state, b.eth.chainConfig, *vmConfig), state.Error, nil
 }
 
@@ -222,6 +223,10 @@ func (b *LesApiBackend) GetPoolNonce(ctx context.Context, addr common.Address) (
 
 func (b *LesApiBackend) Stats() (pending int, queued int) {
 	return b.eth.txPool.Stats(), 0
+}
+
+func (b *LesApiBackend) StatsWithMinBaseFee(minBaseFee *big.Int) (pending int, queued int) {
+	return b.eth.txPool.StatsWithMinBaseFee(minBaseFee), 0
 }
 
 func (b *LesApiBackend) TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
@@ -335,4 +340,7 @@ func (b *LesApiBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 
 func (b *LesApiBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error) {
 	return b.eth.stateAtTransaction(ctx, block, txIndex, reexec)
+}
+func (b *LesApiBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return nil, fmt.Errorf("StateAt is not supported in LES protocol")
 }

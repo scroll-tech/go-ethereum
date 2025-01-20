@@ -130,6 +130,8 @@ var (
 		utils.MinerExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNoVerifyFlag,
+		utils.MinerStoreSkippedTxTracesFlag,
+		utils.MinerMaxAccountsNumFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,
@@ -147,6 +149,7 @@ var (
 		utils.GoerliFlag,
 		utils.ScrollAlphaFlag,
 		utils.ScrollSepoliaFlag,
+		utils.ScrollFlag,
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.EthStatsURLFlag,
@@ -156,6 +159,8 @@ var (
 		utils.GpoPercentileFlag,
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
+		utils.GpoCongestionThresholdFlag,
+
 		utils.MinerNotifyFullFlag,
 		configFileFlag,
 		utils.CatalystFlag,
@@ -163,6 +168,13 @@ var (
 		utils.L1ConfirmationsFlag,
 		utils.L1DeploymentBlockFlag,
 		utils.CircuitCapacityCheckEnabledFlag,
+		utils.CircuitCapacityCheckWorkersFlag,
+		utils.RollupVerifyEnabledFlag,
+		utils.ShadowforkPeersFlag,
+		utils.DASyncEnabledFlag,
+		utils.DABlockNativeAPIEndpointFlag,
+		utils.DABlobScanAPIEndpointFlag,
+		utils.DABeaconNodeAPIEndpointFlag,
 	}
 
 	rpcFlags = []cli.Flag{
@@ -189,6 +201,7 @@ var (
 		utils.RPCGlobalEVMTimeoutFlag,
 		utils.RPCGlobalTxFeeCapFlag,
 		utils.AllowUnprotectedTxs,
+		utils.MaxBlockRangeFlag,
 	}
 
 	metricsFlags = []cli.Flag{
@@ -290,6 +303,9 @@ func prepare(ctx *cli.Context) {
 
 	case ctx.GlobalIsSet(utils.ScrollSepoliaFlag.Name):
 		log.Info("Starting l2geth on Scroll Sepolia testnet...")
+
+	case ctx.GlobalIsSet(utils.ScrollFlag.Name):
+		log.Info("Starting l2geth on Scroll mainnet...")
 
 	case ctx.GlobalIsSet(utils.DeveloperFlag.Name):
 		log.Info("Starting Geth in ephemeral dev mode...")
@@ -429,6 +445,7 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend) {
 		// Set the gas price to the limits from the CLI and start mining
 		gasprice := utils.GlobalBig(ctx, utils.MinerGasPriceFlag.Name)
 		ethBackend.TxPool().SetGasPrice(gasprice)
+		ethBackend.TxPool().SetIsMiner(true)
 		// start mining
 		threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name)
 		if err := ethBackend.StartMining(threads); err != nil {

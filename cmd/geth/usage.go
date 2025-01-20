@@ -49,6 +49,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.SepoliaFlag,
 			utils.ScrollAlphaFlag,
 			utils.ScrollSepoliaFlag,
+			utils.ScrollFlag,
 			utils.SyncModeFlag,
 			utils.ExitWhenSyncedFlag,
 			utils.GCModeFlag,
@@ -192,6 +193,8 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.MinerExtraDataFlag,
 			utils.MinerRecommitIntervalFlag,
 			utils.MinerNoVerifyFlag,
+			utils.MinerStoreSkippedTxTracesFlag,
+			utils.MinerMaxAccountsNumFlag,
 		},
 	},
 	{
@@ -201,6 +204,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.GpoPercentileFlag,
 			utils.GpoMaxGasPriceFlag,
 			utils.GpoIgnoreGasPriceFlag,
+			utils.GpoCongestionThresholdFlag,
 		},
 	},
 	{
@@ -233,6 +237,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.BloomFilterSizeFlag,
 			cli.HelpFlag,
 			utils.CatalystFlag,
+			utils.ShadowforkPeersFlag,
 		},
 	},
 }

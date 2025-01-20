@@ -46,6 +46,8 @@ type (
 func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
 	var precompiles map[common.Address]PrecompiledContract
 	switch {
+	case evm.chainRules.IsBernoulli:
+		precompiles = PrecompiledContractsBernoulli
 	case evm.chainRules.IsArchimedes:
 		precompiles = PrecompiledContractsArchimedes
 	case evm.chainRules.IsBerlin:
@@ -85,9 +87,11 @@ type BlockContext struct {
 // All fields can change between transactions.
 type TxContext struct {
 	// Message information
-	Origin   common.Address  // Provides information for ORIGIN
-	To       *common.Address // Provides information for trace
-	GasPrice *big.Int        // Provides information for GASPRICE
+	Origin        common.Address     // Provides information for ORIGIN
+	To            *common.Address    // Provides information for trace
+	IsL1MessageTx bool               // Provides information for trace
+	TxSize        common.StorageSize // Provides information for trace
+	GasPrice      *big.Int           // Provides information for GASPRICE
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -136,7 +140,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		StateDB:     statedb,
 		Config:      config,
 		chainConfig: chainConfig,
-		chainRules:  chainConfig.Rules(blockCtx.BlockNumber),
+		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Time.Uint64()),
 	}
 	evm.interpreter = NewEVMInterpreter(evm, config)
 	return evm
@@ -537,9 +541,5 @@ func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
 // FeeRecipient returns the environment's transaction fee recipient address.
 func (evm *EVM) FeeRecipient() common.Address {
-	if evm.ChainConfig().Scroll.FeeVaultEnabled() {
-		return *evm.chainConfig.Scroll.FeeVaultAddress
-	} else {
-		return evm.Context.Coinbase
-	}
+	return evm.Context.Coinbase
 }

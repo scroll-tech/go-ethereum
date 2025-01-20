@@ -96,6 +96,9 @@ var (
 	txFetcherQueueingHashes = metrics.NewRegisteredGauge("eth/fetcher/transaction/queueing/hashes", nil)
 	txFetcherFetchingPeers  = metrics.NewRegisteredGauge("eth/fetcher/transaction/fetching/peers", nil)
 	txFetcherFetchingHashes = metrics.NewRegisteredGauge("eth/fetcher/transaction/fetching/hashes", nil)
+
+	peerAnnounceTxsLenGauge  = metrics.NewRegisteredGauge("eth/fetcher/peer/announce/txs", nil)
+	peerRetrievalTxsLenGauge = metrics.NewRegisteredGauge("eth/fetcher/peer/retrieval/txs", nil)
 )
 
 // txAnnounce is the notification of the availability of a batch
@@ -790,6 +793,11 @@ func (f *TxFetcher) scheduleFetches(timer *mclock.Timer, timeout chan struct{}, 
 			}
 			return true // continue in the for-each
 		})
+
+		log.Debug("Scheduling transaction retrieval", "peer", peer, "len(f.announces[peer])", len(f.announces[peer]), "len(hashes)", len(hashes))
+		peerAnnounceTxsLenGauge.Update(int64(len(f.announces[peer])))
+		peerRetrievalTxsLenGauge.Update(int64(len(hashes)))
+
 		// If any hashes were allocated, request them from the peer
 		if len(hashes) > 0 {
 			f.requests[peer] = &txRequest{hashes: hashes, time: f.clock.Now()}

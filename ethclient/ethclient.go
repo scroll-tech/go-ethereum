@@ -28,6 +28,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/eth"
+	"github.com/scroll-tech/go-ethereum/eth/tracers"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -52,6 +54,11 @@ func DialContext(ctx context.Context, rawurl string) (*Client, error) {
 // NewClient creates a client that uses the given RPC client.
 func NewClient(c *rpc.Client) *Client {
 	return &Client{c}
+}
+
+// SetHeader expose the function, in able to set http header.
+func (ec *Client) SetHeader(key, value string) {
+	ec.c.SetHeader(key, value)
 }
 
 func (ec *Client) Close() {
@@ -92,6 +99,23 @@ func (ec *Client) BlockNumber(ctx context.Context) (uint64, error) {
 	var result hexutil.Uint64
 	err := ec.c.CallContext(ctx, &result, "eth_blockNumber")
 	return uint64(result), err
+}
+
+// PeerCount returns the number of p2p peers as reported by the net_peerCount method.
+func (ec *Client) PeerCount(ctx context.Context) (uint64, error) {
+	var result hexutil.Uint64
+	err := ec.c.CallContext(ctx, &result, "net_peerCount")
+	return uint64(result), err
+}
+
+// BlockReceipts returns the receipts of a given block number or hash
+func (ec *Client) BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]*types.Receipt, error) {
+	var r []*types.Receipt
+	err := ec.c.CallContext(ctx, &r, "eth_getBlockReceipts", blockNrOrHash)
+	if err == nil && r == nil {
+		return nil, ethereum.NotFound
+	}
+	return r, err
 }
 
 type rpcBlock struct {
@@ -335,6 +359,30 @@ func (ec *Client) GetBlockTraceByHash(ctx context.Context, blockHash common.Hash
 func (ec *Client) GetBlockTraceByNumber(ctx context.Context, number *big.Int) (*types.BlockTrace, error) {
 	blockTrace := &types.BlockTrace{}
 	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getBlockTraceByNumberOrHash", toBlockNumArg(number))
+}
+
+// GetTxBlockTraceOnTopOfBlock returns the BlockTrace given the tx and block.
+func (ec *Client) GetTxBlockTraceOnTopOfBlock(ctx context.Context, tx *types.Transaction, blockNumberOrHash rpc.BlockNumberOrHash, config *tracers.TraceConfig) (*types.BlockTrace, error) {
+	blockTrace := &types.BlockTrace{}
+	return blockTrace, ec.c.CallContext(ctx, &blockTrace, "scroll_getTxBlockTraceOnTopOfBlock", tx, blockNumberOrHash, config)
+}
+
+// GetNumSkippedTransactions returns the ...
+func (ec *Client) GetNumSkippedTransactions(ctx context.Context) (uint64, error) {
+	var num uint64
+	return num, ec.c.CallContext(ctx, &num, "scroll_getNumSkippedTransactions")
+}
+
+// GetSkippedTransactionHashes returns the BlockTrace given the tx and block.
+func (ec *Client) GetSkippedTransactionHashes(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
+	hashes := []common.Hash{}
+	return hashes, ec.c.CallContext(ctx, &hashes, "scroll_getSkippedTransactionHashes", from, to)
+}
+
+// GetSkippedTransaction returns the BlockTrace given the tx and block.
+func (ec *Client) GetSkippedTransaction(ctx context.Context, txHash common.Hash) (*eth.RPCTransaction, error) {
+	tx := &eth.RPCTransaction{}
+	return tx, ec.c.CallContext(ctx, &tx, "scroll_getSkippedTransaction", txHash)
 }
 
 type rpcRowConsumption struct {
@@ -687,6 +735,21 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 	}
 	if msg.GasPrice != nil {
 		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
+	}
+	if msg.GasFeeCap != nil {
+		arg["maxFeePerGas"] = (*hexutil.Big)(msg.GasFeeCap)
+	}
+	if msg.GasTipCap != nil {
+		arg["maxPriorityFeePerGas"] = (*hexutil.Big)(msg.GasTipCap)
+	}
+	if msg.AccessList != nil {
+		arg["accessList"] = msg.AccessList
+	}
+	if msg.BlobGasFeeCap != nil {
+		arg["maxFeePerBlobGas"] = (*hexutil.Big)(msg.BlobGasFeeCap)
+	}
+	if msg.BlobHashes != nil {
+		arg["blobVersionedHashes"] = msg.BlobHashes
 	}
 	return arg
 }

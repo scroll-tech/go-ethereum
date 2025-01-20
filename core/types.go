@@ -32,6 +32,9 @@ type Validator interface {
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
 	ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error
+
+	// WithAsyncValidator sets up an async validator to be triggered on each new block
+	WithAsyncValidator(asyncValidator func(*types.Block) error) Validator
 }
 
 // Prefetcher is an interface for pre-caching transaction signatures and state.

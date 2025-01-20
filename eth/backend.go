@@ -55,6 +55,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/ccc"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
+	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -68,8 +71,12 @@ type Ethereum struct {
 	config *ethconfig.Config
 
 	// Handlers
-	txPool             *core.TxPool
-	syncService        *sync_service.SyncService
+	txPool            *core.TxPool
+	syncService       *sync_service.SyncService
+	rollupSyncService *rollup_sync_service.RollupSyncService
+	asyncChecker      *ccc.AsyncChecker
+	syncingPipeline   *da_syncer.SyncingPipeline
+
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -189,13 +196,20 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 			TrieTimeLimit:       config.TrieTimeout,
 			SnapshotLimit:       config.SnapshotCache,
 			Preimages:           config.Preimages,
-			MPTWitness:          config.MPTWitness,
 		}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit, config.CheckCircuitCapacity)
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)
 	if err != nil {
 		return nil, err
 	}
+	if config.CheckCircuitCapacity {
+		eth.asyncChecker = ccc.NewAsyncChecker(eth.blockchain, config.CCCMaxWorkers, false)
+		eth.asyncChecker.WithOnFailingBlock(func(b *types.Block, err error) {
+			log.Warn("block failed CCC check, it will be reorged by the sequencer", "hash", b.Hash().Hex(), "err", err)
+		})
+		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
+	}
+
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -209,12 +223,33 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
+	// Initialize and start DA syncing pipeline before SyncService as SyncService is blocking until all L1 messages are loaded.
+	// We need SyncService to load the L1 messages for DA syncing, but since both sync from last known L1 state, we can
+	// simply let them run simultaneously. If messages are missing in DA syncing, it will be handled by the syncing pipeline
+	// by waiting and retrying.
+	if config.EnableDASyncing {
+		eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
+		}
+		eth.syncingPipeline.Start()
+	}
+
 	// initialize and start L1 message sync service
 	eth.syncService, err = sync_service.NewSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
 	eth.syncService.Start()
+
+	if config.EnableRollupVerify {
+		// initialize and start rollup event sync service
+		eth.rollupSyncService, err = rollup_sync_service.NewRollupSyncService(context.Background(), chainConfig, eth.chainDb, l1Client, eth.blockchain, stack)
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
+		}
+		eth.rollupSyncService.Start()
+	}
 
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
@@ -223,20 +258,21 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		checkpoint = params.TrustedCheckpoints[genesisHash]
 	}
 	if eth.handler, err = newHandler(&handlerConfig{
-		Database:   chainDb,
-		Chain:      eth.blockchain,
-		TxPool:     eth.txPool,
-		Network:    config.NetworkId,
-		Sync:       config.SyncMode,
-		BloomCache: uint64(cacheLimit),
-		EventMux:   eth.eventMux,
-		Checkpoint: checkpoint,
-		Whitelist:  config.Whitelist,
+		Database:          chainDb,
+		Chain:             eth.blockchain,
+		TxPool:            eth.txPool,
+		Network:           config.NetworkId,
+		Sync:              config.SyncMode,
+		BloomCache:        uint64(cacheLimit),
+		EventMux:          eth.eventMux,
+		Checkpoint:        checkpoint,
+		Whitelist:         config.Whitelist,
+		ShadowForkPeerIDs: config.ShadowForkPeerIDs,
 	}); err != nil {
 		return nil, err
 	}
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
@@ -247,6 +283,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.Miner.GasPrice
 	}
+	gpoParams.DefaultBasePrice = new(big.Int).SetUint64(config.TxPool.PriceLimit)
 	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
 
 	// Setup DNS discovery iterators.
@@ -308,6 +345,15 @@ func (s *Ethereum) APIs() []rpc.API {
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, s.engine.APIs(s.BlockChain())...)
 
+	if !s.config.EnableDASyncing {
+		apis = append(apis, rpc.API{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
+			Public:    true,
+		})
+	}
+
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
@@ -321,11 +367,6 @@ func (s *Ethereum) APIs() []rpc.API {
 			Service:   NewPublicMinerAPI(s),
 			Public:    true,
 		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
-			Public:    true,
-		}, {
 			Namespace: "miner",
 			Version:   "1.0",
 			Service:   NewPrivateMinerAPI(s),
@@ -333,7 +374,7 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.APIBackend, false, 5*time.Minute),
+			Service:   filters.NewPublicFilterAPI(s.APIBackend, false, 5*time.Minute, s.config.MaxBlockRange),
 			Public:    true,
 		}, {
 			Namespace: "admin",
@@ -531,6 +572,11 @@ func (s *Ethereum) SyncService() *sync_service.SyncService { return s.syncServic
 // Protocols returns all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
+	// if DA syncing enabled then we don't create handler
+	if s.config.EnableDASyncing {
+		return nil
+	}
+
 	protos := eth.MakeProtocols((*ethHandler)(s.handler), s.networkID, s.ethDialCandidates)
 	if !s.blockchain.Config().Scroll.ZktrieEnabled() && s.config.SnapshotCache > 0 {
 		protos = append(protos, snap.MakeProtocols((*snapHandler)(s.handler), s.snapDialCandidates)...)
@@ -541,7 +587,7 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 // Start implements node.Lifecycle, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
 func (s *Ethereum) Start() error {
-	//eth.StartENRUpdater(s.blockchain, s.p2pServer.LocalNode())
+	eth.StartENRUpdater(s.blockchain, s.p2pServer.LocalNode())
 
 	// Start the bloom bits servicing goroutines
 	s.startBloomHandlers(params.BloomBitsBlocks)
@@ -555,7 +601,11 @@ func (s *Ethereum) Start() error {
 	//	maxPeers -= s.config.LightPeers
 	//}
 	// Start the networking layer and the light server if requested
-	s.handler.Start(maxPeers)
+
+	// handler is not enabled when DA syncing enabled
+	if !s.config.EnableDASyncing {
+		s.handler.Start(maxPeers)
+	}
 	return nil
 }
 
@@ -565,14 +615,26 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	s.handler.Stop()
+	// handler is not enabled if DA syncing enabled
+	if !s.config.EnableDASyncing {
+		s.handler.Stop()
+	}
 
 	// Then stop everything else.
 	s.bloomIndexer.Close()
 	close(s.closeBloomHandler)
 	s.txPool.Stop()
 	s.syncService.Stop()
+	if s.config.EnableRollupVerify {
+		s.rollupSyncService.Stop()
+	}
+	if s.config.EnableDASyncing {
+		s.syncingPipeline.Stop()
+	}
 	s.miner.Close()
+	if s.config.CheckCircuitCapacity {
+		s.asyncChecker.Wait()
+	}
 	s.blockchain.Stop()
 	s.engine.Close()
 	rawdb.PopUncleanShutdownMarker(s.chainDb)
@@ -580,4 +642,16 @@ func (s *Ethereum) Stop() error {
 	s.eventMux.Stop()
 
 	return nil
+}
+
+// GetRollupSyncService returns the RollupSyncService of the Ethereum instance.
+// It returns nil if the service is not initialized.
+func (e *Ethereum) GetRollupSyncService() *rollup_sync_service.RollupSyncService {
+	return e.rollupSyncService
+}
+
+// GetSyncService returns the SyncService of the Ethereum instance.
+// It returns nil if the service is not initialized.
+func (e *Ethereum) GetSyncService() *sync_service.SyncService {
+	return e.syncService
 }

@@ -37,6 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/miner"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 )
 
 // FullNodeGPO contains default gasprice oracle settings for full node.
@@ -91,7 +92,8 @@ var Defaults = Config{
 	RPCGasCap:     50000000,
 	RPCEVMTimeout: 5 * time.Second,
 	GPO:           FullNodeGPO,
-	RPCTxFeeCap:   1, // 1 ether
+	RPCTxFeeCap:   1,  // 1 ether
+	MaxBlockRange: -1, // Default unconfigured value: no block range limit for backward compatibility
 }
 
 func init() {
@@ -205,11 +207,24 @@ type Config struct {
 	// Arrow Glacier block override (TODO: remove after the fork)
 	OverrideArrowGlacier *big.Int `toml:",omitempty"`
 
-	// Trace option
-	MPTWitness int
-
 	// Check circuit capacity in block validator
 	CheckCircuitCapacity bool
+	CCCMaxWorkers        int
+
+	// Enable verification of batch consistency between L1 and L2 in rollup
+	EnableRollupVerify bool
+
+	// Max block range for eth_getLogs api method
+	MaxBlockRange int64
+
+	// List of peer ids that take part in the shadow-fork
+	ShadowForkPeerIDs []string
+
+	// Enable syncing node from DA
+	EnableDASyncing bool
+
+	// DA syncer options
+	DA da_syncer.Config
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

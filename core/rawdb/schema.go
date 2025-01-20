@@ -105,12 +105,36 @@ var (
 
 	// Scroll L1 message store
 	syncedL1BlockNumberKey            = []byte("LastSyncedL1BlockNumber")
-	l1MessagePrefix                   = []byte("l1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
+	l1MessageLegacyPrefix             = []byte("l1")
+	l1MessagePrefix                   = []byte("L1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
 	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
+	highestSyncedQueueIndexKey        = []byte("HighestSyncedQueueIndex")
+
+	// Scroll rollup event store
+	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")
+	batchMetaPrefix                   = []byte("R-bm")
+	finalizedL2BlockNumberKey         = []byte("R-finalized")
+	lastFinalizedBatchIndexKey        = []byte("R-finalizedBatchIndex")
+	committedBatchMetaPrefix          = []byte("R-cbm")
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
+
+	// Skipped transactions
+	numSkippedTransactionsKey    = []byte("NumberOfSkippedTransactions")
+	skippedTransactionPrefix     = []byte("skip") // skippedTransactionPrefix + tx hash -> skipped transaction
+	skippedTransactionHashPrefix = []byte("sh")   // skippedTransactionHashPrefix + index -> tx hash
+
+	// Scroll da syncer store
+	daSyncedL1BlockNumberKey = []byte("LastDASyncedL1BlockNumber")
 )
+
+// Use the updated "L1" prefix on all new networks
+// to avoid overlap with txLookupPrefix.
+// Use the legacy "l1" prefix on Scroll Sepolia.
+func SetL1MessageLegacyPrefix() {
+	l1MessagePrefix = l1MessageLegacyPrefix
+}
 
 const (
 	// freezerHeaderTable indicates the name of the freezer header table.
@@ -243,8 +267,8 @@ func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
 
-// encodeQueueIndex encodes an L1 enqueue index as big endian uint64
-func encodeQueueIndex(index uint64) []byte {
+// encodeBigEndian encodes an index as big endian uint64
+func encodeBigEndian(index uint64) []byte {
 	enc := make([]byte, 8)
 	binary.BigEndian.PutUint64(enc, index)
 	return enc
@@ -252,7 +276,7 @@ func encodeQueueIndex(index uint64) []byte {
 
 // L1MessageKey = l1MessagePrefix + queueIndex (uint64 big endian)
 func L1MessageKey(queueIndex uint64) []byte {
-	return append(l1MessagePrefix, encodeQueueIndex(queueIndex)...)
+	return append(l1MessagePrefix, encodeBigEndian(queueIndex)...)
 }
 
 // FirstQueueIndexNotInL2BlockKey = firstQueueIndexNotInL2BlockPrefix + L2 block hash
@@ -267,4 +291,24 @@ func rowConsumptionKey(hash common.Hash) []byte {
 
 func isNotFoundErr(err error) bool {
 	return errors.Is(err, leveldb.ErrNotFound) || errors.Is(err, memorydb.ErrMemorydbNotFound)
+}
+
+// SkippedTransactionKey = skippedTransactionPrefix + tx hash
+func SkippedTransactionKey(txHash common.Hash) []byte {
+	return append(skippedTransactionPrefix, txHash.Bytes()...)
+}
+
+// SkippedTransactionHashKey = skippedTransactionHashPrefix + index (uint64 big endian)
+func SkippedTransactionHashKey(index uint64) []byte {
+	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
+}
+
+// batchMetaKey = batchMetaPrefix + batch index (uint64 big endian)
+func batchMetaKey(batchIndex uint64) []byte {
+	return append(batchMetaPrefix, encodeBigEndian(batchIndex)...)
+}
+
+// committedBatchMetaKey = committedBatchMetaPrefix + batch index (uint64 big endian)
+func committedBatchMetaKey(batchIndex uint64) []byte {
+	return append(committedBatchMetaPrefix, encodeBigEndian(batchIndex)...)
 }

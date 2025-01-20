@@ -27,6 +27,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime"
 	godebug "runtime/debug"
 	"strconv"
 	"strings"
@@ -73,6 +74,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/nat"
 	"github.com/scroll-tech/go-ethereum/p2p/netutil"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
@@ -103,6 +105,11 @@ func printHelp(out io.Writer, templ string, data interface{}) {
 	}
 	w.Flush()
 }
+
+const (
+	GCModeFull    = "full"
+	GCModeArchive = "archive"
+)
 
 // These are all the command line flags we support.
 // If you add to this list, please remember to include the
@@ -172,6 +179,10 @@ var (
 		Name:  "scroll-sepolia",
 		Usage: "Scroll Sepolia test network",
 	}
+	ScrollFlag = cli.BoolFlag{
+		Name:  "scroll",
+		Usage: "Scroll mainnet",
+	}
 	DeveloperFlag = cli.BoolFlag{
 		Name:  "dev",
 		Usage: "Ephemeral proof-of-authority network with a pre-funded developer account, mining enabled",
@@ -233,7 +244,7 @@ var (
 	GCModeFlag = cli.StringFlag{
 		Name:  "gcmode",
 		Usage: `Blockchain garbage collection mode ("full", "archive")`,
-		Value: "full",
+		Value: GCModeArchive,
 	}
 	SnapshotFlag = cli.BoolTFlag{
 		Name:  "snapshot",
@@ -486,6 +497,15 @@ var (
 		Name:  "miner.noverify",
 		Usage: "Disable remote sealing verification",
 	}
+	MinerStoreSkippedTxTracesFlag = cli.BoolFlag{
+		Name:  "miner.storeskippedtxtraces",
+		Usage: "Store the wrapped traces when storing a skipped tx",
+	}
+	MinerMaxAccountsNumFlag = cli.IntFlag{
+		Name:  "miner.maxaccountsnum",
+		Usage: "Maximum number of accounts that miner will fetch the pending transactions of when building a new block",
+		Value: math.MaxInt,
+	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
 		Name:  "unlock",
@@ -716,6 +736,15 @@ var (
 		Usage: "Gas price below which gpo will ignore transactions",
 		Value: ethconfig.Defaults.GPO.IgnorePrice.Int64(),
 	}
+	GpoCongestionThresholdFlag = cli.IntFlag{
+		Name:  "gpo.congestionthreshold",
+		Usage: "Number of pending transactions to consider the network congested and suggest a minimum tip cap",
+		Value: ethconfig.Defaults.GPO.CongestedThreshold,
+	}
+	GpoDefaultGasTipCapFlag = cli.Int64Flag{
+		Name:  "gpo.defaultgastipcap",
+		Usage: "Default minimum gas tip cap (in wei) to be used after Curie fork (EIP-1559) (default: 100)",
+	}
 
 	// Metrics flags
 	MetricsEnabledFlag = cli.BoolFlag{
@@ -822,6 +851,48 @@ var (
 		Name:  "ccc",
 		Usage: "Enable circuit capacity check during block validation",
 	}
+
+	CircuitCapacityCheckWorkersFlag = cli.UintFlag{
+		Name:  "ccc.numworkers",
+		Usage: "Set the number of workers that will be used for background CCC tasks",
+		Value: uint(runtime.GOMAXPROCS(0)),
+	}
+
+	// Rollup verify service settings
+	RollupVerifyEnabledFlag = cli.BoolFlag{
+		Name:  "rollup.verify",
+		Usage: "Enable verification of batch consistency between L1 and L2 in rollup",
+	}
+
+	// Max block range for `eth_getLogs` method
+	MaxBlockRangeFlag = cli.Int64Flag{
+		Name:  "rpc.getlogs.maxrange",
+		Usage: "Limit max fetched block range for `eth_getLogs` method",
+	}
+
+	// Shadowfork peers
+	ShadowforkPeersFlag = cli.StringSliceFlag{
+		Name:  "net.shadowforkpeers",
+		Usage: "peer ids of shadow fork peers",
+	}
+
+	// DA syncing settings
+	DASyncEnabledFlag = &cli.BoolFlag{
+		Name:  "da.sync",
+		Usage: "Enable node syncing from DA",
+	}
+	DABlobScanAPIEndpointFlag = &cli.StringFlag{
+		Name:  "da.blob.blobscan",
+		Usage: "BlobScan blob API endpoint",
+	}
+	DABlockNativeAPIEndpointFlag = &cli.StringFlag{
+		Name:  "da.blob.blocknative",
+		Usage: "BlockNative blob API endpoint",
+	}
+	DABeaconNodeAPIEndpointFlag = &cli.StringFlag{
+		Name:  "da.blob.beaconnode",
+		Usage: "Beacon node API endpoint",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -848,6 +919,9 @@ func MakeDataDir(ctx *cli.Context) string {
 		}
 		if ctx.GlobalBool(ScrollSepoliaFlag.Name) {
 			return filepath.Join(path, "scroll-sepolia")
+		}
+		if ctx.GlobalBool(ScrollFlag.Name) {
+			return filepath.Join(path, "scroll")
 		}
 		return path
 	}
@@ -907,6 +981,8 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		urls = params.ScrollAlphaBootnodes
 	case ctx.GlobalBool(ScrollSepoliaFlag.Name):
 		urls = params.ScrollSepoliaBootnodes
+	case ctx.GlobalBool(ScrollFlag.Name):
+		urls = params.ScrollMainnetBootnodes
 	case cfg.BootstrapNodes != nil:
 		return // already set, don't apply defaults.
 	}
@@ -1261,6 +1337,10 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setSmartCard(ctx, cfg)
 	setL1(ctx, cfg)
 
+	if ctx.IsSet(DASyncEnabledFlag.Name) {
+		cfg.DaSyncingEnabled = ctx.Bool(DASyncEnabledFlag.Name)
+	}
+
 	if ctx.GlobalIsSet(ExternalSignerFlag.Name) {
 		cfg.ExternalSigner = ctx.GlobalString(ExternalSignerFlag.Name)
 	}
@@ -1369,6 +1449,8 @@ func setDataDir(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "scroll-alpha")
 	case ctx.GlobalBool(ScrollSepoliaFlag.Name) && cfg.DataDir == node.DefaultDataDir():
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "scroll-sepolia")
+	case ctx.GlobalBool(ScrollFlag.Name) && cfg.DataDir == node.DefaultDataDir():
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "scroll")
 
 	}
 }
@@ -1390,6 +1472,12 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config, light bool) {
 	}
 	if ctx.GlobalIsSet(GpoIgnoreGasPriceFlag.Name) {
 		cfg.IgnorePrice = big.NewInt(ctx.GlobalInt64(GpoIgnoreGasPriceFlag.Name))
+	}
+	if ctx.GlobalIsSet(GpoCongestionThresholdFlag.Name) {
+		cfg.CongestedThreshold = ctx.GlobalInt(GpoCongestionThresholdFlag.Name)
+	}
+	if ctx.GlobalIsSet(GpoDefaultGasTipCapFlag.Name) {
+		cfg.DefaultGasTipCap = big.NewInt(ctx.GlobalInt64(GpoDefaultGasTipCapFlag.Name))
 	}
 }
 
@@ -1483,8 +1571,19 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	if ctx.GlobalIsSet(MinerNoVerifyFlag.Name) {
 		cfg.Noverify = ctx.GlobalBool(MinerNoVerifyFlag.Name)
 	}
+	if ctx.GlobalIsSet(MinerStoreSkippedTxTracesFlag.Name) {
+		cfg.StoreSkippedTxTraces = ctx.GlobalBool(MinerStoreSkippedTxTracesFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerMaxAccountsNumFlag.Name) {
+		cfg.MaxAccountsNum = ctx.GlobalInt(MinerMaxAccountsNumFlag.Name)
+	}
 	if ctx.GlobalIsSet(LegacyMinerGasTargetFlag.Name) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
+	}
+
+	cfg.CCCMaxWorkers = runtime.GOMAXPROCS(0)
+	if ctx.GlobalIsSet(CircuitCapacityCheckWorkersFlag.Name) {
+		cfg.CCCMaxWorkers = int(ctx.GlobalUint(CircuitCapacityCheckWorkersFlag.Name))
 	}
 }
 
@@ -1514,6 +1613,39 @@ func setWhitelist(ctx *cli.Context, cfg *ethconfig.Config) {
 func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(CircuitCapacityCheckEnabledFlag.Name) {
 		cfg.CheckCircuitCapacity = ctx.GlobalBool(CircuitCapacityCheckEnabledFlag.Name)
+		cfg.CCCMaxWorkers = runtime.GOMAXPROCS(0)
+		if ctx.GlobalIsSet(CircuitCapacityCheckWorkersFlag.Name) {
+			cfg.CCCMaxWorkers = int(ctx.GlobalUint(CircuitCapacityCheckWorkersFlag.Name))
+		}
+	}
+}
+
+func setEnableRollupVerify(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(RollupVerifyEnabledFlag.Name) {
+		cfg.EnableRollupVerify = ctx.GlobalBool(RollupVerifyEnabledFlag.Name)
+	}
+}
+
+func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.IsSet(DASyncEnabledFlag.Name) {
+		cfg.EnableDASyncing = ctx.Bool(DASyncEnabledFlag.Name)
+		if ctx.IsSet(DABlobScanAPIEndpointFlag.Name) {
+			cfg.DA.BlobScanAPIEndpoint = ctx.String(DABlobScanAPIEndpointFlag.Name)
+		}
+		if ctx.IsSet(DABlockNativeAPIEndpointFlag.Name) {
+			cfg.DA.BlockNativeAPIEndpoint = ctx.String(DABlockNativeAPIEndpointFlag.Name)
+		}
+		if ctx.IsSet(DABeaconNodeAPIEndpointFlag.Name) {
+			cfg.DA.BeaconNodeAPIEndpoint = ctx.String(DABeaconNodeAPIEndpointFlag.Name)
+		}
+	}
+}
+
+func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
+		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
+	} else {
+		cfg.MaxBlockRange = -1
 	}
 }
 
@@ -1561,10 +1693,10 @@ func CheckExclusive(ctx *cli.Context, args ...interface{}) {
 // SetEthConfig applies eth-related command line flags to the config.
 func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	// Avoid conflicting network flags
-	CheckExclusive(ctx, MainnetFlag, DeveloperFlag, RopstenFlag, RinkebyFlag, GoerliFlag, SepoliaFlag, ScrollAlphaFlag, ScrollSepoliaFlag)
+	CheckExclusive(ctx, MainnetFlag, DeveloperFlag, RopstenFlag, RinkebyFlag, GoerliFlag, SepoliaFlag, ScrollAlphaFlag, ScrollSepoliaFlag, ScrollFlag)
 	CheckExclusive(ctx, LightServeFlag, SyncModeFlag, "light")
 	CheckExclusive(ctx, DeveloperFlag, ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
-	if ctx.GlobalString(GCModeFlag.Name) == "archive" && ctx.GlobalUint64(TxLookupLimitFlag.Name) != 0 {
+	if ctx.GlobalString(GCModeFlag.Name) == GCModeArchive && ctx.GlobalUint64(TxLookupLimitFlag.Name) != 0 {
 		ctx.GlobalSet(TxLookupLimitFlag.Name, "0")
 		log.Warn("Disable transaction unindexing for archive node")
 	}
@@ -1583,6 +1715,13 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setWhitelist(ctx, cfg)
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
+	setEnableRollupVerify(ctx, cfg)
+	setDA(ctx, cfg)
+	setMaxBlockRange(ctx, cfg)
+	if ctx.GlobalIsSet(ShadowforkPeersFlag.Name) {
+		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)
+		log.Info("Shadow fork peers", "ids", cfg.ShadowForkPeerIDs)
+	}
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()
@@ -1618,11 +1757,11 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.DatabaseFreezer = ctx.GlobalString(AncientFlag.Name)
 	}
 
-	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
+	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != GCModeFull && gcmode != GCModeArchive {
 		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
 	}
 	if ctx.GlobalIsSet(GCModeFlag.Name) {
-		cfg.NoPruning = ctx.GlobalString(GCModeFlag.Name) == "archive"
+		cfg.NoPruning = ctx.GlobalString(GCModeFlag.Name) == GCModeArchive
 	}
 	if ctx.GlobalIsSet(CacheNoPrefetchFlag.Name) {
 		cfg.NoPrefetch = ctx.GlobalBool(CacheNoPrefetchFlag.Name)
@@ -1740,6 +1879,28 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "4038000")
 		stack.Config().L1DeploymentBlock = 4038000
+		// disable pruning
+		if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
+			log.Crit("Must use --gcmode=archive")
+		}
+		log.Info("Pruning disabled")
+		cfg.NoPruning = true
+	case ctx.GlobalBool(ScrollFlag.Name):
+		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			cfg.NetworkId = 534352
+		}
+		cfg.Genesis = core.DefaultScrollMainnetGenesisBlock()
+		// forced for mainnet
+		log.Info("Setting flag", "--l1.confirmations", "finalized")
+		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
+		log.Info("Setting flag", "--l1.sync.startblock", "18306000")
+		stack.Config().L1DeploymentBlock = 18306000
+		// disable pruning
+		if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
+			log.Crit("Must use --gcmode=archive")
+		}
+		log.Info("Pruning disabled")
+		cfg.NoPruning = true
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337
@@ -1792,6 +1953,12 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			SetDNSDiscoveryDefaults(cfg, params.MainnetGenesisHash)
 		}
 	}
+
+	// set db prefix for backward-compatibility
+	if cfg.NetworkId == 534351 {
+		log.Warn("Using legacy db prefix for L1 messages")
+		rawdb.SetL1MessageLegacyPrefix()
+	}
 }
 
 // SetDNSDiscoveryDefaults configures DNS discovery with the given URL if
@@ -1819,7 +1986,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 		if err != nil {
 			Fatalf("Failed to register the Ethereum service: %v", err)
 		}
-		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend))
+		scrollTracerWrapper := tracing.NewTracerWrapper()
+		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, scrollTracerWrapper))
 		return backend.ApiBackend, nil
 	}
 
@@ -1848,7 +2016,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 			Fatalf("Failed to create the LES server: %v", err)
 		}
 	}
-	stack.RegisterAPIs(tracers.APIs(backend.APIBackend))
+	scrollTracerWrapper := tracing.NewTracerWrapper()
+	stack.RegisterAPIs(tracers.APIs(backend.APIBackend, scrollTracerWrapper))
 	return backend.APIBackend, backend
 }
 
@@ -1982,6 +2151,8 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 		genesis = core.DefaultScrollAlphaGenesisBlock()
 	case ctx.GlobalBool(ScrollSepoliaFlag.Name):
 		genesis = core.DefaultScrollSepoliaGenesisBlock()
+	case ctx.GlobalBool(ScrollFlag.Name):
+		genesis = core.DefaultScrollMainnetGenesisBlock()
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		Fatalf("Developer chains are ephemeral")
 	}
@@ -2014,14 +2185,14 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 			}, nil, false)
 		}
 	}
-	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
+	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != GCModeFull && gcmode != GCModeArchive {
 		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
 	}
 	cache := &core.CacheConfig{
 		TrieCleanLimit:      ethconfig.Defaults.TrieCleanCache,
 		TrieCleanNoPrefetch: ctx.GlobalBool(CacheNoPrefetchFlag.Name),
 		TrieDirtyLimit:      ethconfig.Defaults.TrieDirtyCache,
-		TrieDirtyDisabled:   ctx.GlobalString(GCModeFlag.Name) == "archive",
+		TrieDirtyDisabled:   ctx.GlobalString(GCModeFlag.Name) == GCModeArchive,
 		TrieTimeLimit:       ethconfig.Defaults.TrieTimeout,
 		SnapshotLimit:       ethconfig.Defaults.SnapshotCache,
 		Preimages:           ctx.GlobalBool(CachePreimagesFlag.Name),
@@ -2043,7 +2214,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 
 	// TODO(rjl493456442) disable snapshot generation/wiping if the chain is read only.
 	// Disable transaction indexing/unindexing by default.
-	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg, nil, nil, false)
+	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg, nil, nil)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

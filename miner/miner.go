@@ -56,6 +56,10 @@ type Config struct {
 	GasPrice   *big.Int       // Minimum gas price for mining a transaction
 	Recommit   time.Duration  // The time interval for miner to re-create mining work.
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
+
+	StoreSkippedTxTraces bool // Whether store the wrapped traces when storing a skipped tx
+	MaxAccountsNum       int  // Maximum number of accounts that miner will fetch the pending transactions of when building a new block
+	CCCMaxWorkers        int  // Maximum number of workers to use for async CCC tasks
 }
 
 // Miner creates blocks and searches for proof-of-work values.
@@ -72,7 +76,7 @@ type Miner struct {
 	wg sync.WaitGroup
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, daSyncingEnabled bool) *Miner {
 	miner := &Miner{
 		eth:     eth,
 		mux:     mux,
@@ -80,10 +84,12 @@ func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *even
 		exitCh:  make(chan struct{}),
 		startCh: make(chan common.Address),
 		stopCh:  make(chan struct{}),
-		worker:  newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true),
+		worker:  newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true, daSyncingEnabled),
 	}
-	miner.wg.Add(1)
-	go miner.update()
+	if !daSyncingEnabled {
+		miner.wg.Add(1)
+		go miner.update()
+	}
 	return miner
 }
 
@@ -183,11 +189,6 @@ func (miner *Miner) SetExtra(extra []byte) error {
 	}
 	miner.worker.setExtra(extra)
 	return nil
-}
-
-// SetRecommitInterval sets the interval for sealing work resubmitting.
-func (miner *Miner) SetRecommitInterval(interval time.Duration) {
-	miner.worker.setRecommitInterval(interval)
 }
 
 // Pending returns the currently pending block and associated state.

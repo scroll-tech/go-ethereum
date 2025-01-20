@@ -46,13 +46,15 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"github.com/scroll-tech/go-ethereum/trie/zkproof"
 )
 
 var (
 	headBlockGauge     = metrics.NewRegisteredGauge("chain/head/block", nil)
 	headHeaderGauge    = metrics.NewRegisteredGauge("chain/head/header", nil)
 	headFastBlockGauge = metrics.NewRegisteredGauge("chain/head/receipt", nil)
+	headTimeGapGauge   = metrics.NewRegisteredGauge("chain/head/timegap", nil)
+
+	l2BaseFeeGauge = metrics.NewRegisteredGauge("chain/fees/l2basefee", nil)
 
 	accountReadTimer   = metrics.NewRegisteredTimer("chain/account/reads", nil)
 	accountHashTimer   = metrics.NewRegisteredTimer("chain/account/hashes", nil)
@@ -132,7 +134,6 @@ type CacheConfig struct {
 	TrieTimeLimit       time.Duration // Time limit after which to flush the current in-memory trie to disk
 	SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
 	Preimages           bool          // Whether to store preimage of trie key to the disk
-	MPTWitness          int           // How to generate witness data for mpt circuit, 0: nothing, 1: natural
 
 	SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
 }
@@ -145,7 +146,6 @@ var defaultCacheConfig = &CacheConfig{
 	TrieTimeLimit:  5 * time.Minute,
 	SnapshotLimit:  256,
 	SnapshotWait:   true,
-	MPTWitness:     int(zkproof.MPTWitnessNothing),
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -220,7 +220,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64, checkCircuitCapacity bool) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -263,7 +263,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		engine:         engine,
 		vmConfig:       vmConfig,
 	}
-	bc.validator = NewBlockValidator(chainConfig, bc, engine, db, checkCircuitCapacity)
+	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
@@ -1246,6 +1246,19 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		return NonStatTy, errInsertionInterrupted
 	}
 
+	// Note latest seen L2 base fee
+	if block.BaseFee() != nil {
+		l2BaseFeeGauge.Update(block.BaseFee().Int64())
+	} else {
+		l2BaseFeeGauge.Update(0)
+	}
+
+	parent := bc.GetHeaderByHash(block.ParentHash())
+	// block.Time is guaranteed to be larger than parent.Time,
+	// and the time gap should fit into int64.
+	gap := int64(block.Time() - parent.Time)
+	headTimeGapGauge.Update(gap)
+
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
 	if ptd == nil {
@@ -1790,6 +1803,56 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	return it.index, err
 }
 
+func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types.Header, txs types.Transactions) (WriteStatus, error) {
+	if !bc.chainmu.TryLock() {
+		return NonStatTy, errInsertionInterrupted
+	}
+	defer bc.chainmu.Unlock()
+
+	statedb, err := state.New(parentBlock.Root(), bc.stateCache, bc.snaps)
+	if err != nil {
+		return NonStatTy, err
+	}
+
+	statedb.StartPrefetcher("l1sync")
+	defer statedb.StopPrefetcher()
+
+	header.ParentHash = parentBlock.Hash()
+
+	tempBlock := types.NewBlockWithHeader(header).WithBody(txs, nil)
+	receipts, logs, gasUsed, err := bc.processor.Process(tempBlock, statedb, bc.vmConfig)
+	if err != nil {
+		return NonStatTy, fmt.Errorf("error processing block: %w", err)
+	}
+
+	// TODO: once we have the extra and difficulty we need to verify the signature of the block with Clique
+	//  This should be done with https://github.com/scroll-tech/go-ethereum/pull/913.
+
+	// finalize and assemble block as fullBlock
+	header.GasUsed = gasUsed
+	header.Root = statedb.IntermediateRoot(bc.chainConfig.IsEIP158(header.Number))
+
+	fullBlock := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+
+	blockHash := fullBlock.Hash()
+	// manually replace the block hash in the receipts
+	for i, receipt := range receipts {
+		// add block location fields
+		receipt.BlockHash = blockHash
+		receipt.BlockNumber = tempBlock.Number()
+		receipt.TransactionIndex = uint(i)
+
+		for _, l := range receipt.Logs {
+			l.BlockHash = blockHash
+		}
+	}
+	for _, l := range logs {
+		l.BlockHash = blockHash
+	}
+
+	return bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)
+}
+
 // insertSideChain is called when an import batch hits upon a pruned ancestor
 // error, which happens when a sidechain with a sufficiently old fork-block is
 // found.
@@ -2269,4 +2332,9 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 	defer bc.chainmu.Unlock()
 	_, err := bc.hc.InsertHeaderChain(chain, start)
 	return 0, err
+}
+
+// Database gives access to the underlying database for convenience
+func (bc *BlockChain) Database() ethdb.Database {
+	return bc.db
 }

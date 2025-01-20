@@ -190,6 +190,16 @@ web3._extend({
 			name: 'stopWS',
 			call: 'admin_stopWS'
 		}),
+		new web3._extend.Method({
+			name: 'setRollupEventSyncedL1Height',
+			call: 'admin_setRollupEventSyncedL1Height',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'setL1MessageSyncedL1Height',
+			call: 'admin_setL1MessageSyncedL1Height',
+			params: 1
+		}),
 	],
 	properties: [
 		new web3._extend.Property({
@@ -577,6 +587,22 @@ web3._extend({
 			params: 3,
 			inputFormatter: [null, web3._extend.formatters.inputBlockNumberFormatter, null]
 		}),
+		new web3._extend.Method({
+			name: 'getLogs',
+			call: 'eth_getLogs',
+			params: 1,
+		}),
+		new web3._extend.Method({
+			name: 'call',
+			call: 'eth_call',
+			params: 4,
+			inputFormatter: [web3._extend.formatters.inputCallFormatter, web3._extend.formatters.inputDefaultBlockNumberFormatter, null, null],
+		}),
+		new web3._extend.Method({
+			name: 'getBlockReceipts',
+			call: 'eth_getBlockReceipts',
+			params: 1,
+		}),
 	],
 	properties: [
 		new web3._extend.Property({
@@ -636,11 +662,6 @@ web3._extend({
 			call: 'miner_setGasLimit',
 			params: 1,
 			inputFormatter: [web3._extend.utils.fromDecimal]
-		}),
-		new web3._extend.Method({
-			name: 'setRecommitInterval',
-			call: 'miner_setRecommitInterval',
-			params: 1,
 		}),
 		new web3._extend.Method({
 			name: 'getHashrate',
@@ -761,6 +782,11 @@ web3._extend({
 			call: 'txpool_contentFrom',
 			params: 1,
 		}),
+		new web3._extend.Method({
+			name: 'removeTransactionByHash',
+			call: 'txpool_removeTransactionByHash',
+			params: 1
+		}),
 	]
 });
 `
@@ -866,6 +892,12 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'getTxBlockTraceOnTopOfBlock',
+			call: 'scroll_getTxBlockTraceOnTopOfBlock',
+			params: 3,
+			inputFormatter: [web3._extend.formatters.inputTransactionFormatter, null, null]
+		}),
+		new web3._extend.Method({
 			name: 'getL1MessageByIndex',
 			call: 'scroll_getL1MessageByIndex',
 			params: 1
@@ -887,6 +919,29 @@ web3._extend({
 			params: 2,
 			inputFormatter: [null, function (val) { return !!val; }]
 		}),
+		new web3._extend.Method({
+			name: 'getSkippedTransaction',
+			call: 'scroll_getSkippedTransaction',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getSkippedTransactionHashes',
+			call: 'scroll_getSkippedTransactionHashes',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'estimateL1DataFee',
+			call: 'scroll_estimateL1DataFee',
+			params: 2,
+			inputFormatter: [web3._extend.formatters.inputCallFormatter, web3._extend.formatters.inputBlockNumberFormatter],
+			outputFormatter: web3._extend.utils.toDecimal
+		}),
+		new web3._extend.Method({
+			name: 'calculateRowConsumptionByBlockNumber',
+			call: 'scroll_calculateRowConsumptionByBlockNumber',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
 	],
 	properties:
 	[
@@ -897,7 +952,15 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'latestRelayedQueueIndex',
 			getter: 'scroll_getLatestRelayedQueueIndex'
-		})
+		}),
+		new web3._extend.Property({
+			name: 'numSkippedTransactions',
+			getter: 'scroll_getNumSkippedTransactions'
+		}),
+		new web3._extend.Property({
+			name: 'syncStatus',
+			getter: 'scroll_syncStatus',
+		}),
 	]
 });
 `

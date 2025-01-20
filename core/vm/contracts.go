@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto/blake2b"
 	"github.com/scroll-tech/go-ethereum/crypto/bls12381"
 	"github.com/scroll-tech/go-ethereum/crypto/bn256"
+	"github.com/scroll-tech/go-ethereum/crypto/secp256r1"
 	"github.com/scroll-tech/go-ethereum/params"
 
 	//lint:ignore SA1019 Needed for precompile
@@ -111,6 +112,20 @@ var PrecompiledContractsArchimedes = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2FDisabled{},
 }
 
+// PrecompiledContractsBernoulli contains the default set of pre-compiled Ethereum
+// contracts used in the Bernoulli release. Same as Archimedes but with sha256hash enabled again
+var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{1}): &ecrecover{},
+	common.BytesToAddress([]byte{2}): &sha256hash{},
+	common.BytesToAddress([]byte{3}): &ripemd160hashDisabled{},
+	common.BytesToAddress([]byte{4}): &dataCopy{},
+	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true},
+	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{9}): &blake2FDisabled{},
+}
+
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
 // contracts specified in EIP-2537. These are exported for testing purposes.
 var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
@@ -125,7 +140,14 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{18}): &bls12381MapG2{},
 }
 
+// PrecompiledContractsP256Verify contains the precompiled Ethereum
+// contract specified in EIP-7212/RIP-7212. This is exported for testing purposes.
+var PrecompiledContractsP256Verify = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
+}
+
 var (
+	PrecompiledAddressesBernoulli  []common.Address
 	PrecompiledAddressesArchimedes []common.Address
 	PrecompiledAddressesBerlin     []common.Address
 	PrecompiledAddressesIstanbul   []common.Address
@@ -149,11 +171,16 @@ func init() {
 	for k := range PrecompiledContractsArchimedes {
 		PrecompiledAddressesArchimedes = append(PrecompiledAddressesArchimedes, k)
 	}
+	for k := range PrecompiledContractsBernoulli {
+		PrecompiledAddressesBernoulli = append(PrecompiledAddressesBernoulli, k)
+	}
 }
 
 // ActivePrecompiles returns the precompiles enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
+	case rules.IsBernoulli:
+		return PrecompiledAddressesBernoulli
 	case rules.IsArchimedes:
 		return PrecompiledAddressesArchimedes
 	case rules.IsBerlin:
@@ -309,9 +336,10 @@ var (
 // modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
 //
 // def mult_complexity(x):
-//    if x <= 64: return x ** 2
-//    elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-//    else: return x ** 2 // 16 + 480 * x - 199680
+//
+//	if x <= 64: return x ** 2
+//	elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//	else: return x ** 2 // 16 + 480 * x - 199680
 //
 // where is x is max(length_of_MODULUS, length_of_BASE)
 func modexpMultComplexity(x *big.Int) *big.Int {
@@ -407,12 +435,18 @@ func (c *bigModExp) RequiredGas(input []byte) uint64 {
 
 func (c *bigModExp) Run(input []byte) ([]byte, error) {
 	var (
-		baseLen = new(big.Int).SetBytes(getData(input, 0, 32)).Uint64()
-		expLen  = new(big.Int).SetBytes(getData(input, 32, 32)).Uint64()
-		modLen  = new(big.Int).SetBytes(getData(input, 64, 32)).Uint64()
+		baseLenBigInt = new(big.Int).SetBytes(getData(input, 0, 32))
+		expLenBigInt  = new(big.Int).SetBytes(getData(input, 32, 32))
+		modLenBigInt  = new(big.Int).SetBytes(getData(input, 64, 32))
+	)
+	var (
+		baseLen = baseLenBigInt.Uint64()
+		expLen  = expLenBigInt.Uint64()
+		modLen  = modLenBigInt.Uint64()
 	)
 	// Check that all inputs are `u256` (32 - bytes) or less, revert otherwise
-	if baseLen > 32 || expLen > 32 || modLen > 32 {
+	var lenLimit = new(big.Int).SetInt64(32)
+	if baseLenBigInt.Cmp(lenLimit) > 0 || expLenBigInt.Cmp(lenLimit) > 0 || modLenBigInt.Cmp(lenLimit) > 0 {
 		return nil, errModexpUnsupportedInput
 	}
 	if len(input) > 96 {
@@ -1102,4 +1136,38 @@ func (c *bls12381MapG2) Run(input []byte) ([]byte, error) {
 
 	// Encode the G2 point to 256 bytes
 	return g.EncodePoint(r), nil
+}
+
+// P256VERIFY (secp256r1 signature verification)
+// implemented as a native contract
+type p256Verify struct{}
+
+// RequiredGas returns the gas required to execute the precompiled contract
+func (c *p256Verify) RequiredGas(input []byte) uint64 {
+	return params.P256VerifyGas
+}
+
+// Run executes the precompiled contract with given 160 bytes of param, returning the output and the used gas
+func (c *p256Verify) Run(input []byte) ([]byte, error) {
+	// Required input length is 160 bytes
+	const p256VerifyInputLength = 160
+	// Check the input length
+	if len(input) != p256VerifyInputLength {
+		// Input length is invalid
+		return nil, nil
+	}
+
+	// Extract the hash, r, s, x, y from the input
+	hash := input[0:32]
+	r, s := new(big.Int).SetBytes(input[32:64]), new(big.Int).SetBytes(input[64:96])
+	x, y := new(big.Int).SetBytes(input[96:128]), new(big.Int).SetBytes(input[128:160])
+
+	// Verify the secp256r1 signature
+	if secp256r1.Verify(hash, r, s, x, y) {
+		// Signature is valid
+		return common.LeftPadBytes([]byte{1}, 32), nil
+	} else {
+		// Signature is invalid
+		return nil, nil
+	}
 }

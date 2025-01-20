@@ -9,7 +9,7 @@ GO ?= latest
 GORUN = env GO111MODULE=on go run
 
 libzkp:
-	cd $(PWD)/rollup/circuitcapacitychecker/libzkp && make libzkp
+	cd $(PWD)/rollup/ccc/libzkp && make libzkp
 
 nccc_geth: ## geth without circuit capacity checker
 	$(GORUN) build/ci.go install ./cmd/geth
@@ -40,7 +40,7 @@ test: all
 	# genesis test
 	cd ${PWD}/cmd/geth; go test -test.run TestCustomGenesis
 	# module test
-	$(GORUN) build/ci.go test ./consensus ./core ./eth ./miner ./node ./trie
+	$(GORUN) build/ci.go test ./consensus ./core ./eth ./miner ./node ./trie ./rollup/...
 
 lint: ## Run linters.
 	$(GORUN) build/ci.go lint

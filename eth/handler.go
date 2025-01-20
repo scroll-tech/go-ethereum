@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,9 +36,15 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/trie"
+)
+
+var (
+	annoTxsLenGauge   = metrics.NewRegisteredGauge("eth/handler/broadast/announce/txs", nil)
+	directTxsLenGauge = metrics.NewRegisteredGauge("eth/handler/broadast/direct/txs", nil)
 )
 
 const (
@@ -76,15 +83,16 @@ type txPool interface {
 // handlerConfig is the collection of initialization parameters to create a full
 // node network handler.
 type handlerConfig struct {
-	Database   ethdb.Database            // Database for direct sync insertions
-	Chain      *core.BlockChain          // Blockchain to serve data from
-	TxPool     txPool                    // Transaction pool to propagate from
-	Network    uint64                    // Network identifier to adfvertise
-	Sync       downloader.SyncMode       // Whether to fast or full sync
-	BloomCache uint64                    // Megabytes to alloc for fast sync bloom
-	EventMux   *event.TypeMux            // Legacy event mux, deprecate for `feed`
-	Checkpoint *params.TrustedCheckpoint // Hard coded checkpoint for sync challenges
-	Whitelist  map[uint64]common.Hash    // Hard coded whitelist for sync challenged
+	Database          ethdb.Database            // Database for direct sync insertions
+	Chain             *core.BlockChain          // Blockchain to serve data from
+	TxPool            txPool                    // Transaction pool to propagate from
+	Network           uint64                    // Network identifier to adfvertise
+	Sync              downloader.SyncMode       // Whether to fast or full sync
+	BloomCache        uint64                    // Megabytes to alloc for fast sync bloom
+	EventMux          *event.TypeMux            // Legacy event mux, deprecate for `feed`
+	Checkpoint        *params.TrustedCheckpoint // Hard coded checkpoint for sync challenges
+	Whitelist         map[uint64]common.Hash    // Hard coded whitelist for sync challenged
+	ShadowForkPeerIDs []string                  // List of peer ids that take part in the shadow-fork
 }
 
 type handler struct {
@@ -122,6 +130,8 @@ type handler struct {
 	chainSync *chainSyncer
 	wg        sync.WaitGroup
 	peerWG    sync.WaitGroup
+
+	shadowForkPeerIDs []string
 }
 
 // newHandler returns a handler for all Ethereum chain management protocol.
@@ -131,15 +141,16 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		config.EventMux = new(event.TypeMux) // Nicety initialization for tests
 	}
 	h := &handler{
-		networkID:  config.Network,
-		forkFilter: forkid.NewFilter(config.Chain),
-		eventMux:   config.EventMux,
-		database:   config.Database,
-		txpool:     config.TxPool,
-		chain:      config.Chain,
-		peers:      newPeerSet(),
-		whitelist:  config.Whitelist,
-		quitSync:   make(chan struct{}),
+		networkID:         config.Network,
+		forkFilter:        forkid.NewFilter(config.Chain),
+		eventMux:          config.EventMux,
+		database:          config.Database,
+		txpool:            config.TxPool,
+		chain:             config.Chain,
+		peers:             newPeerSet(),
+		whitelist:         config.Whitelist,
+		quitSync:          make(chan struct{}),
+		shadowForkPeerIDs: config.ShadowForkPeerIDs,
 	}
 	if config.Sync == downloader.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the fast
@@ -182,6 +193,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	if atomic.LoadUint32(&h.fastSync) == 1 && atomic.LoadUint32(&h.snapSync) == 0 {
 		h.stateBloom = trie.NewSyncBloom(config.BloomCache, config.Database)
 	}
+
 	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, h.removePeer)
 
 	// Construct the fetcher (short sync)
@@ -217,7 +229,13 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		}
 		return n, err
 	}
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, h.removePeer)
+
+	fetcherDropPeerFunc := h.removePeer
+	// If we are shadowforking, don't drop peers.
+	if config.ShadowForkPeerIDs != nil {
+		fetcherDropPeerFunc = func(id string) {}
+	}
+	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, fetcherDropPeerFunc)
 
 	fetchTx := func(peer string, hashes []common.Hash) error {
 		p := h.peers.peer(peer)
@@ -306,7 +324,9 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 
 	// Propagate existing transactions. new transactions appearing
 	// after this will be sent via broadcasts.
-	h.syncTransactions(peer)
+	if h.shadowForkPeerIDs == nil || slices.Contains(h.shadowForkPeerIDs, peer.ID()) {
+		h.syncTransactions(peer)
+	}
 
 	// If we have a trusted CHT, reject all peers below that (avoid fast sync eclipse)
 	if h.checkpointHash != (common.Hash{}) {
@@ -433,7 +453,7 @@ func (h *handler) Stop() {
 // will only announce its availability (depending what's requested).
 func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 	hash := block.Hash()
-	peers := h.peers.peersWithoutBlock(hash)
+	peers := onlyShadowForkPeers(h.shadowForkPeerIDs, h.peers.peersWithoutBlock(hash))
 
 	// If propagation is requested, send to a subset of the peer
 	if propagate {
@@ -483,7 +503,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		if tx.IsL1MessageTx() {
 			continue
 		}
-		peers := h.peers.peersWithoutTransaction(tx.Hash())
+		peers := onlyShadowForkPeers(h.shadowForkPeerIDs, h.peers.peersWithoutTransaction(tx.Hash()))
 		// Send the tx unconditionally to a subset of our peers
 		numDirect := int(math.Sqrt(float64(len(peers))))
 		for _, peer := range peers[:numDirect] {
@@ -498,15 +518,24 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		directPeers++
 		directCount += len(hashes)
 		peer.AsyncSendTransactions(hashes)
+		log.Debug("Transactions being broadcasted to", "peer", peer.String(), "len", len(hashes))
 	}
 	for peer, hashes := range annos {
 		annoPeers++
 		annoCount += len(hashes)
 		peer.AsyncSendPooledTransactionHashes(hashes)
+		log.Debug("Transactions being announced to", "peer", peer.String(), "len", len(hashes))
 	}
 	log.Debug("Transaction broadcast", "txs", len(txs),
 		"announce packs", annoPeers, "announced hashes", annoCount,
 		"tx packs", directPeers, "broadcast txs", directCount)
+
+	if directPeers > 0 {
+		directTxsLenGauge.Update(int64(directCount / directPeers))
+	}
+	if annoPeers > 0 {
+		annoTxsLenGauge.Update(int64(annoCount / annoPeers))
+	}
 }
 
 // minedBroadcastLoop sends mined blocks to connected peers.
@@ -532,4 +561,17 @@ func (h *handler) txBroadcastLoop() {
 			return
 		}
 	}
+}
+
+// onlyShadowForkPeers filters out peers that are not part of the shadow fork
+func onlyShadowForkPeers[peerT interface {
+	ID() string
+}](shadowForkPeerIDs []string, peers []peerT) []peerT {
+	if shadowForkPeerIDs == nil {
+		return peers
+	}
+
+	return slices.DeleteFunc(peers, func(peer peerT) bool {
+		return !slices.Contains(shadowForkPeerIDs, peer.ID())
+	})
 }

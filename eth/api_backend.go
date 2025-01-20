@@ -76,6 +76,17 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	if number == rpc.LatestBlockNumber {
 		return b.eth.blockchain.CurrentBlock().Header(), nil
 	}
+	if number == rpc.FinalizedBlockNumber {
+		if !b.eth.config.EnableRollupVerify {
+			return nil, errors.New("sync L1 finalized batch feature not enabled, cannot query L2 finalized block height")
+		}
+		finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(b.eth.ChainDb())
+		if finalizedBlockHeightPtr == nil {
+			return nil, errors.New("L2 finalized block height not found in database")
+		}
+		number = rpc.BlockNumber(*finalizedBlockHeightPtr)
+		return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
+	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
 }
 
@@ -109,6 +120,17 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	// Otherwise resolve and return the block
 	if number == rpc.LatestBlockNumber {
 		return b.eth.blockchain.CurrentBlock(), nil
+	}
+	if number == rpc.FinalizedBlockNumber {
+		if !b.eth.config.EnableRollupVerify {
+			return nil, errors.New("sync L1 finalized batch feature not enabled, cannot query L2 finalized block height")
+		}
+		finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(b.eth.ChainDb())
+		if finalizedBlockHeightPtr == nil {
+			return nil, errors.New("L2 finalized block height not found in database")
+		}
+		number = rpc.BlockNumber(*finalizedBlockHeightPtr)
+		return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 	}
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 }
@@ -211,7 +233,7 @@ func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 		vmConfig = b.eth.blockchain.GetVMConfig()
 	}
 	txContext := core.NewEVMTxContext(msg)
-	context := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
+	context := core.NewEVMBlockContext(header, b.eth.BlockChain(), b.eth.blockchain.Config(), nil)
 	return vm.NewEVM(context, txContext, state, b.eth.blockchain.Config(), *vmConfig), vmError, nil
 }
 
@@ -244,6 +266,10 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	return b.eth.txPool.AddLocal(signedTx)
 }
 
+func (b *EthAPIBackend) RemoveTx(txHash common.Hash) {
+	b.eth.txPool.RemoveTx(txHash, true)
+}
+
 func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {
 	pending := b.eth.txPool.Pending(false)
 	var txs types.Transactions
@@ -268,6 +294,10 @@ func (b *EthAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (
 
 func (b *EthAPIBackend) Stats() (pending int, queued int) {
 	return b.eth.txPool.Stats()
+}
+
+func (b *EthAPIBackend) StatsWithMinBaseFee(minBaseFee *big.Int) (pending int, queued int) {
+	return b.eth.txPool.StatsWithMinBaseFee(minBaseFee)
 }
 
 func (b *EthAPIBackend) TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
@@ -363,4 +393,8 @@ func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 
 func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error) {
 	return b.eth.stateAtTransaction(block, txIndex, reexec)
+}
+
+func (b *EthAPIBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return b.eth.BlockChain().StateAt(root)
 }

@@ -708,10 +708,12 @@ func TestLargeL1MessageSkipPayloadCheck(t *testing.T) {
 func TestSkipMessageWithStrangeError(t *testing.T) {
 	assert := assert.New(t)
 
-	// message #0 is skipped because of `Value`
-	// TODO: trigger skipping in some other way after this behaviour is changed
 	msgs := []types.L1MessageTx{
-		{QueueIndex: 0, Gas: 25100, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}, Value: big.NewInt(1)},
+		// message #0 is skipped because of `GasLimit`
+		// (cannot happen in practice, this is checked in the contracts)
+		{QueueIndex: 0, Gas: 20000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+
+		// messages #1 and #2 are correct
 		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
 		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}},
 	}
@@ -742,15 +744,55 @@ func TestSkipMessageWithStrangeError(t *testing.T) {
 	})
 }
 
+func TestL1MessageWithInsufficientBalanceNotSkipped(t *testing.T) {
+	assert := assert.New(t)
+
+	msgs := []types.L1MessageTx{
+		// message #0 sends more funds than available in the sender account
+		{QueueIndex: 0, Gas: 25100, To: &common.Address{1}, Data: make([]byte, 1025), Sender: common.Address{2}, Value: big.NewInt(1)},
+
+		// #message #1 is a correct msg
+		{QueueIndex: 1, Gas: 25100, To: &common.Address{1}, Data: make([]byte, 1025), Sender: common.Address{2}},
+	}
+
+	l1MessageTest(t, msgs, false, func(blockNum int, block *types.Block, db ethdb.Database, w *worker, bc *core.BlockChain) bool {
+		switch blockNum {
+		case 0:
+			return false
+		case 1:
+			// include both #0 and #1
+			assert.Equal(2, len(block.Transactions()))
+			assert.True(block.Transactions()[0].IsL1MessageTx())
+			assert.Equal(uint64(0), block.Transactions()[0].AsL1MessageTx().QueueIndex)
+			assert.True(block.Transactions()[1].IsL1MessageTx())
+			assert.Equal(uint64(1), block.Transactions()[1].AsL1MessageTx().QueueIndex)
+
+			// #0 fails, #1 succeeds
+			receipts := bc.GetReceiptsByHash(block.Hash())
+			assert.Equal(2, len(receipts))
+			assert.Equal(types.ReceiptStatusFailed, receipts[0].Status)
+			assert.Equal(types.ReceiptStatusSuccessful, receipts[1].Status)
+
+			// db is updated correctly
+			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
+			assert.NotNil(queueIndex)
+			assert.Equal(uint64(2), *queueIndex)
+
+			return true
+		default:
+			return true
+		}
+	})
+}
+
 func TestSkipAllL1MessagesInBlock(t *testing.T) {
 	assert := assert.New(t)
 
-	// messages are skipped because of `Value`
-	// TODO: trigger skipping in some other way after this behaviour is changed
+	// messages are skipped because of `GasLimit`
 	msgs := []types.L1MessageTx{
-		{QueueIndex: 0, Gas: 25100, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}, Value: big.NewInt(1)},
-		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}, Value: big.NewInt(1)},
-		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}, Value: big.NewInt(1)},
+		{QueueIndex: 0, Gas: 20000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 1, Gas: 20000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 2, Gas: 20000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}},
 	}
 
 	l1MessageTest(t, msgs, true, func(blockNum int, block *types.Block, db ethdb.Database, w *worker, bc *core.BlockChain) bool {

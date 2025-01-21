@@ -101,6 +101,11 @@ type Header struct {
 	// ParentBeaconRoot was added by EIP-4788 and is ignored in legacy headers.
 	// Included for Ethereum compatibility in Scroll SDK
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
+
+	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
+	// The tag "rlp:\"-\"" ensures it's excluded from the RLP encoding (and thus, from the hash computation).
+
+	Requested bool `json:"requested" rlp:"-"`
 }
 
 // field type overrides for gencodec

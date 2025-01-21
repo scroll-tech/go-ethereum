@@ -9,7 +9,7 @@ import (
 // API is a user facing RPC API to allow controlling the signer and voting
 // mechanisms of the proof-of-authority scheme.
 type API struct {
-	chain  consensus.ChainHeaderReader
+	chain consensus.ChainHeaderReader
 }
 
 // GetSigners retrieves the list of authorized signers at the specified block.

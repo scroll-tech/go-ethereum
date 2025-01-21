@@ -174,17 +174,21 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		return err
 	}
 
-	signer, err := ecrecover(header)
-	if err != nil {
-		return err
+	// only if block header has NOT been requested, then verify the signature against the current signer
+	if !header.Requested {
+		signer, err := ecrecover(header)
+		if err != nil {
+			return err
+		}
+
+		s.lock.RLock()
+		defer s.lock.RUnlock()
+
+		if signer != s.signerAddressL1 {
+			return errUnauthorizedSigner
+		}
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if signer != s.signerAddressL1 {
-		return errUnauthorizedSigner
-	}
 	return nil
 }
 

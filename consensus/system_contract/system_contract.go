@@ -79,9 +79,15 @@ func (s *SystemContract) Start() {
 				if err != nil {
 					log.Error("failed to get signer address from L1 System Contract", "err", err)
 				}
-				s.lock.Lock()
-				s.signerAddressL1 = common.BytesToAddress(address)
-				s.lock.Unlock()
+				bAddress := common.BytesToAddress(address)
+				s.lock.RLock()
+				addressChanged := s.signerAddressL1 != bAddress
+				s.lock.RUnlock()
+				if addressChanged {
+					s.lock.Lock()
+					s.signerAddressL1 = bAddress
+					s.lock.Unlock()
+				}
 			}
 		}
 	}()

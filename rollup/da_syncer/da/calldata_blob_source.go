@@ -130,7 +130,7 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 			}
 
 			// if this is a different commit transaction, we need to create a new DA
-			if lastCommitTransactionHash != commitEvent.TxHash() {
+			if lastCommitTransactionHash != commitEvent.TxHash() && len(lastCommitEvents) > 0 {
 				if err = getAndAppendCommitBatchDA(); err != nil {
 					return nil, fmt.Errorf("failed to get and append commit batch DA: %w", err)
 				}

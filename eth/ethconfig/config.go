@@ -19,6 +19,7 @@ package ethconfig
 
 import (
 	"context"
+	"github.com/scroll-tech/go-ethereum/consensus/consensus_wrapper"
 	"math/big"
 	"os"
 	"os/user"
@@ -232,13 +233,31 @@ type Config struct {
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.
 func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, l1Client sync_service.EthClient) consensus.Engine {
-	// If proof-of-authority is requested, set it up
+	// Case 1: Both SystemContract and Clique are defined: create an upgradable engine.
+	if chainConfig.SystemContract != nil && chainConfig.Clique != nil {
+		// Create the Clique engine.
+		cliqueEngine := clique.New(chainConfig.Clique, db)
+		// Create the SystemContract engine.
+		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
+
+		// Determine the fork block at which the switch occurs.
+		var forkBlock *big.Int
+		if chainConfig.EuclidBlock != nil {
+			forkBlock = chainConfig.EuclidBlock
+		}
+		return consensus_wrapper.NewUpgradableEngine(forkBlock, cliqueEngine, sysEngine)
+	}
+
+	// Case 2: Only the Clique engine is defined.
 	if chainConfig.Clique != nil {
 		return clique.New(chainConfig.Clique, db)
 	}
+
+	// Case 3: Only the SystemContract engine is defined.
 	if chainConfig.SystemContract != nil {
 		return system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
 	}
+
 	// Otherwise assume proof-of-work
 	switch config.PowMode {
 	case ethash.ModeFake:

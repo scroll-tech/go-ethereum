@@ -79,7 +79,7 @@ type Header struct {
 	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
 	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
 	Time        uint64         `json:"timestamp"        gencodec:"required"`
-	Extra       []byte         `json:"extraData"        gencodec:"required"`
+	Extra       []byte         `json:"extraData"        gencodec:"required" rlp:"-"`
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
 
@@ -105,7 +105,7 @@ type Header struct {
 	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
 	// The tag "rlp:\"-\"" ensures it's excluded from the RLP encoding (and thus, from the hash computation).
 
-	Requested bool `json:"requested" rlp:"-"`
+	Requested bool `rlp:"-"`
 }
 
 // field type overrides for gencodec

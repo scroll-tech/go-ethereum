@@ -21,8 +21,7 @@ type CommitBatchDAV1 struct {
 	versionedHashes []common.Hash
 }
 
-func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
-	l1Reader *l1.Reader,
+func NewCommitBatchDAV1(ctx context.Context, db ethdb.Database,
 	blobClient blob_client.BlobClient,
 	codec encoding.Codec,
 	commitEvent *l1.CommitBatchEvent,
@@ -30,6 +29,7 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 	chunks [][]byte,
 	skippedL1MessageBitmap []byte,
 	versionedHashes []common.Hash,
+	l1BlockTime uint64,
 ) (*CommitBatchDAV1, error) {
 	decodedChunks, err := codec.DecodeDAChunksRawTx(chunks)
 	if err != nil {
@@ -42,11 +42,7 @@ func NewCommitBatchDAWithBlob(ctx context.Context, db ethdb.Database,
 	}
 	versionedHash := versionedHashes[0]
 
-	header, err := l1Reader.FetchBlockHeaderByNumber(commitEvent.BlockNumber())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get header by number, err: %w", err)
-	}
-	blob, err := blobClient.GetBlobByVersionedHashAndBlockTime(ctx, versionedHash, header.Time)
+	blob, err := blobClient.GetBlobByVersionedHashAndBlockTime(ctx, versionedHash, l1BlockTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)
 	}

@@ -238,7 +238,6 @@ func (r *Reader) processLogsToRollupEvents(logs []types.Log) (RollupEvents, erro
 	var rollupEvent RollupEvent
 	var err error
 
-	// TODO: once commit event is changed to include the versioned hash of the blob, we need to update this function and the CommitEvent struct
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case r.l1CommitBatchEventSignature:

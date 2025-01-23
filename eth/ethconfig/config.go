@@ -19,7 +19,7 @@ package ethconfig
 
 import (
 	"context"
-	"github.com/scroll-tech/go-ethereum/consensus/consensus_wrapper"
+	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"math/big"
 	"os"
 	"os/user"
@@ -240,20 +240,15 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 		// Create the SystemContract engine.
 		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
 
-		// Determine the fork block at which the switch occurs.
-		var forkBlock *big.Int
-		if chainConfig.EuclidBlock != nil {
-			forkBlock = chainConfig.EuclidBlock
-		}
-		return consensus_wrapper.NewUpgradableEngine(forkBlock, cliqueEngine, sysEngine)
+		return wrapper.NewUpgradableEngine(chainConfig.IsEuclid, cliqueEngine, sysEngine)
 	}
 
-	// Case 2: Only the Clique engine is defined.
+	//// Case 2: Only the Clique engine is defined.
 	if chainConfig.Clique != nil {
 		return clique.New(chainConfig.Clique, db)
 	}
-
-	// Case 3: Only the SystemContract engine is defined.
+	//
+	//// Case 3: Only the SystemContract engine is defined.
 	if chainConfig.SystemContract != nil {
 		return system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
 	}

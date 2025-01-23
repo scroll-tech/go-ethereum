@@ -105,7 +105,7 @@ type Header struct {
 	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
 	// The tag "rlp:\"-\"" ensures it's excluded from the RLP encoding (and thus, from the hash computation).
 
-	Requested bool `rlp:"-"`
+	Requested bool `json:"-" rlp:"-"`
 }
 
 // field type overrides for gencodec

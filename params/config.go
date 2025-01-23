@@ -633,7 +633,7 @@ type ChainConfig struct {
 	CurieBlock          *big.Int `json:"curieBlock,omitempty"`          // Curie switch block (nil = no fork, 0 = already on curie)
 	DarwinTime          *uint64  `json:"darwinTime,omitempty"`          // Darwin switch time (nil = no fork, 0 = already on darwin)
 	DarwinV2Time        *uint64  `json:"darwinv2Time,omitempty"`        // DarwinV2 switch time (nil = no fork, 0 = already on darwinv2)
-	EuclidBlock         *big.Int `json:"euclidBlock,omitempty"`         // Euclid switch block (nil = no fork, 0 = already on euclid)
+	EuclidTime          *uint64  `json:"euclidTime,omitempty"`          // Euclid switch time (nil = no fork, 0 = already on euclid)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -903,6 +903,11 @@ func (c *ChainConfig) IsDarwin(now uint64) bool {
 // IsDarwinV2 returns whether num is either equal to the DarwinV2 fork block or greater.
 func (c *ChainConfig) IsDarwinV2(now uint64) bool {
 	return isForkedTime(now, c.DarwinV2Time)
+}
+
+// IsEuclid returns 	whether num is either equal to the Darwin fork block or greater.
+func (c *ChainConfig) IsEuclid(now uint64) bool {
+	return isForkedTime(now, c.EuclidTime)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

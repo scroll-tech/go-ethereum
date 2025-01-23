@@ -1,4 +1,4 @@
-package consensus_wrapper
+package wrapper
 
 import (
 	"github.com/scroll-tech/go-ethereum/common"
@@ -14,7 +14,7 @@ import (
 // calls to either Clique or SystemContract consensus based on block height.
 type UpgradableEngine struct {
 	// forkBlock is the block number at which the switchover to SystemContract occurs.
-	forkBlock *big.Int
+	isUpgraded func(uint64) bool
 
 	// clique is the original Clique consensus engine.
 	clique consensus.Engine
@@ -24,22 +24,17 @@ type UpgradableEngine struct {
 }
 
 // NewUpgradableEngine constructs a new upgradable consensus middleware.
-func NewUpgradableEngine(forkBlock *big.Int, clique consensus.Engine, system consensus.Engine) *UpgradableEngine {
+func NewUpgradableEngine(isUpgraded func(uint64) bool, clique consensus.Engine, system consensus.Engine) *UpgradableEngine {
 	return &UpgradableEngine{
-		forkBlock: forkBlock,
-		clique:    clique,
-		system:    system,
+		isUpgraded: isUpgraded,
+		clique:     clique,
+		system:     system,
 	}
 }
 
 // chooseEngine returns the appropriate consensus engine based on the header's number.
 func (ue *UpgradableEngine) chooseEngine(header *types.Header) consensus.Engine {
-	if header.Number == nil {
-		// Fallback: treat as pre-fork if header number is unknown.
-		return ue.clique
-	}
-	// If block number is >= forkBlock, use the new SystemContract consensus, else use Clique.
-	if header.Number.Cmp(ue.forkBlock) >= 0 {
+	if ue.isUpgraded(header.Time) {
 		return ue.system
 	}
 	return ue.clique
@@ -177,7 +172,7 @@ func (ue *UpgradableEngine) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	}
 
 	// Choose engine based on whether the chain head is before or after the fork block.
-	if head.Number.Cmp(ue.forkBlock) >= 0 {
+	if ue.isUpgraded(head.Time) {
 		return ue.system.APIs(chain)
 	}
 	return ue.clique.APIs(chain)

@@ -639,6 +639,7 @@ type ChainConfig struct {
 	DarwinTime          *uint64  `json:"darwinTime,omitempty"`          // Darwin switch time (nil = no fork, 0 = already on darwin)
 	DarwinV2Time        *uint64  `json:"darwinv2Time,omitempty"`        // DarwinV2 switch time (nil = no fork, 0 = already on darwinv2)
 	EuclidTime          *uint64  `json:"euclidTime,omitempty"`          // Euclid switch time (nil = no fork, 0 = already on euclid)
+	EuclidV2Time        *uint64  `json:"euclidV2Time,omitempty"`        // EuclidV2 switch time (nil = no fork, 0 = already on euclid)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -686,10 +687,11 @@ type ScrollConfig struct {
 
 // L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer
 type L1Config struct {
-	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
-	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
-	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
-	ScrollChainAddress    common.Address `json:"scrollChainAddress,omitempty"`
+	L1ChainId               uint64         `json:"l1ChainId,string,omitempty"`
+	L1MessageQueueAddress   common.Address `json:"l1MessageQueueAddress,omitempty"`
+	L1MessageQueueV2Address common.Address `json:"l1MessageQueueV2Address,omitempty"` // TODO: set address once known
+	NumL1MessagesPerBlock   uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+	ScrollChainAddress      common.Address `json:"scrollChainAddress,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -912,6 +914,11 @@ func (c *ChainConfig) IsDarwinV2(now uint64) bool {
 // IsEuclid returns whether num is either equal to the Darwin fork block or greater.
 func (c *ChainConfig) IsEuclid(now uint64) bool {
 	return isForkedTime(now, c.EuclidTime)
+}
+
+// IsEuclidV2 returns whether num is either equal to the EuclidV2 fork block or greater.
+func (c *ChainConfig) IsEuclidV2(now uint64) bool {
+	return isForkedTime(now, c.EuclidV2Time)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

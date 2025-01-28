@@ -150,6 +150,7 @@ var (
 		utils.ScrollAlphaFlag,
 		utils.ScrollSepoliaFlag,
 		utils.ScrollFlag,
+		utils.ScrollMPTFlag,
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.EthStatsURLFlag,

@@ -438,7 +438,13 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
-	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
+
+	// If we are on EuclidV2, we need to read L1 messages from L1MessageQueueV2.
+	if w.chainConfig.IsEuclidV2(w.current.header.Time) {
+		return rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
+	}
+
+	return rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
 }
 
 // newWork

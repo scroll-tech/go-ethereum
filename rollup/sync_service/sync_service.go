@@ -227,7 +227,7 @@ func (s *SyncService) fetchMessages() {
 			to = latestConfirmed
 		}
 
-		msgs, err := s.client.fetchMessagesInRange(s.ctx, from, to)
+		msgsV1, msgsV2, err := s.client.fetchMessagesInRange(s.ctx, from, to)
 		if err != nil {
 			// flush pending writes to database
 			if from > 0 {
@@ -236,6 +236,14 @@ func (s *SyncService) fetchMessages() {
 			log.Warn("Failed to fetch L1 messages in range", "fromBlock", from, "toBlock", to, "err", err)
 			return
 		}
+
+		// write start index of very first L1MessageV2 to database
+		if len(msgsV2) > 0 && rawdb.ReadL1MessageV2StartIndex(s.db) == nil {
+			firstL1MessageV2 := msgsV2[0]
+			rawdb.WriteL1MessageV2StartIndex(batchWriter, firstL1MessageV2.QueueIndex)
+		}
+
+		msgs := append(msgsV1, msgsV2...)
 
 		if len(msgs) > 0 {
 			log.Debug("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))

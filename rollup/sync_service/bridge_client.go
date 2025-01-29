@@ -69,10 +69,10 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 
 // fetchMessagesInRange retrieves and parses all L1 messages between the
 // provided from and to L1 block numbers (inclusive).
-func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, error) {
+func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, []types.L1MessageTx, error) {
 	log.Trace("BridgeClient fetchMessagesInRange", "fromBlock", from, "toBlock", to)
 
-	var msgs []types.L1MessageTx
+	var msgsV1, msgsV2 []types.L1MessageTx
 
 	opts := bind.FilterOpts{
 		Start:   from,
@@ -85,7 +85,7 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 	if !c.skipV1L1Messages {
 		it, err := c.filtererV1.FilterQueueTransaction(&opts, nil, nil)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for it.Next() {
@@ -93,10 +93,10 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 			log.Trace("Received new L1 QueueTransaction event from L1MessageQueueV1", "event", event)
 
 			if !event.GasLimit.IsUint64() {
-				return nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
+				return nil, nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
 			}
 
-			msgs = append(msgs, types.L1MessageTx{
+			msgsV1 = append(msgsV1, types.L1MessageTx{
 				QueueIndex: event.QueueIndex,
 				Gas:        event.GasLimit.Uint64(),
 				To:         &event.Target,
@@ -107,7 +107,7 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 		}
 
 		if err = it.Error(); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -115,7 +115,7 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 	// L1MessageQueueV2 to enqueue L1 messages before EuclidV2.
 	it, err := c.filtererV2.FilterQueueTransaction(&opts, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for it.Next() {
@@ -123,10 +123,10 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 		log.Trace("Received new L1 QueueTransaction event from L1MessageQueueV2", "event", event)
 
 		if !event.GasLimit.IsUint64() {
-			return nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
+			return nil, nil, fmt.Errorf("invalid QueueTransaction event: QueueIndex = %v, GasLimit = %v", event.QueueIndex, event.GasLimit)
 		}
 
-		msgs = append(msgs, types.L1MessageTx{
+		msgsV2 = append(msgsV2, types.L1MessageTx{
 			QueueIndex: event.QueueIndex,
 			Gas:        event.GasLimit.Uint64(),
 			To:         &event.Target,
@@ -140,10 +140,10 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 	}
 
 	if err = it.Error(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return msgs, nil
+	return msgsV1, msgsV2, nil
 }
 
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {

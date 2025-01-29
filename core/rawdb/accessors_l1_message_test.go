@@ -72,7 +72,7 @@ func TestIterateL1Message(t *testing.T) {
 		t.Fatal("max index mismatch", "expected", 1000, "got", max)
 	}
 
-	it := IterateL1MessagesFrom(db, 103)
+	it := iterateL1MessagesFrom(db, 103)
 	defer it.Release()
 
 	for ii := 2; ii < len(msgs); ii++ {
@@ -104,7 +104,7 @@ func TestReadL1MessageTxRange(t *testing.T) {
 	db := NewMemoryDatabase()
 	WriteL1Messages(db, msgs)
 
-	got := ReadL1MessagesFrom(db, 101, 3)
+	got := ReadL1MessagesV1From(db, 101, 3)
 
 	if len(got) != 3 {
 		t.Fatal("Invalid length", "expected", 3, "got", len(got))
@@ -151,7 +151,7 @@ func TestIterationStopsAtMaxQueueIndex(t *testing.T) {
 	WriteHighestSyncedQueueIndex(db, 102)
 
 	// iteration should terminate at 102 and not read 103
-	got := ReadL1MessagesFrom(db, 100, 10)
+	got := ReadL1MessagesV1From(db, 100, 10)
 
 	if len(got) != 3 {
 		t.Fatal("Invalid length", "expected", 3, "got", len(got))

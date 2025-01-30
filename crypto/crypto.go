@@ -37,7 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-//SignatureLength indicates the byte length required to carry a signature with recovery id.
+// SignatureLength indicates the byte length required to carry a signature with recovery id.
 const SignatureLength = 64 + 1 // 64 bytes ECDSA signature + 1 byte recovery id
 
 // RecoveryIDOffset points to the byte offset within the signature that contains the recovery id.
@@ -169,6 +169,9 @@ func FromECDSA(priv *ecdsa.PrivateKey) []byte {
 func UnmarshalPubkey(pub []byte) (*ecdsa.PublicKey, error) {
 	x, y := elliptic.Unmarshal(S256(), pub)
 	if x == nil {
+		return nil, errInvalidPubkey
+	}
+	if !S256().IsOnCurve(x, y) {
 		return nil, errInvalidPubkey
 	}
 	return &ecdsa.PublicKey{Curve: S256(), X: x, Y: y}, nil

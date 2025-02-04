@@ -19,6 +19,7 @@ package trie
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -33,6 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -292,28 +294,58 @@ type dbs struct {
 	mptDb *leveldb.Database
 }
 
-var accountsLeft = -1
+var accountsDone = 0
 
 func checkTrieEquality(t *testing.T, dbs *dbs, zkRoot, mptRoot common.Hash, leafChecker func(*testing.T, *dbs, []byte, []byte)) {
-	zkTrie, err := NewZkTrie(zkRoot, NewZktrieDatabase(dbs.zkDb))
+	zkTrie, err := NewZkTrie(zkRoot, NewZktrieDatabaseFromTriedb(NewDatabaseWithConfig(dbs.zkDb, &Config{Preimages: true})))
 	require.NoError(t, err)
 
 	mptTrie, err := NewSecure(mptRoot, NewDatabaseWithConfig(dbs.mptDb, &Config{Preimages: true}))
 	require.NoError(t, err)
 
-	expectedLeaves := zkTrie.CountLeaves()
-	trieIt := NewIterator(mptTrie.NodeIterator(nil))
-	if accountsLeft == -1 {
-		accountsLeft = int(expectedLeaves)
+	dup := func(s []byte) []byte {
+		return append([]byte{}, s...)
 	}
 
-	for trieIt.Next() {
-		expectedLeaves--
-		preimageKey := mptTrie.GetKey(trieIt.Key)
-		require.NotEmpty(t, preimageKey)
-		leafChecker(t, dbs, zkTrie.Get(preimageKey), mptTrie.Get(preimageKey))
+	mptLeafMap := make(map[string][]byte, 1000)
+	trieIt := NewIterator(mptTrie.NodeIterator(nil))
+	mptDone := make(chan struct{})
+	go func() {
+		for trieIt.Next() {
+			mptLeafMap[string(dup(trieIt.Key))] = dup(trieIt.Value)
+			if len(mptLeafMap)%10000 == 0 {
+				t.Log("MPT Accounts Loaded:", len(mptLeafMap))
+			}
+		}
+		close(mptDone)
+	}()
+
+	zkLeafMap := make(map[string][]byte, 1000)
+	var zkLeafMutex sync.Mutex
+	zkDone := make(chan struct{})
+	go func() {
+		zkTrie.CountLeaves(func(key, value []byte) {
+			preimageKey := zkTrie.GetKey(key)
+			require.NotEmpty(t, preimageKey)
+			zkLeafMutex.Lock()
+			zkLeafMap[string(dup(preimageKey))] = value
+			zkLeafMutex.Unlock()
+			if len(zkLeafMap)%10000 == 0 {
+				t.Log("ZK Accounts Loaded:", len(zkLeafMap))
+			}
+		})
+		close(zkDone)
+	}()
+
+	<-zkDone
+	<-mptDone
+	require.Equal(t, len(mptLeafMap), len(zkLeafMap))
+	for preimageKey, zkValue := range zkLeafMap {
+		mptKey := crypto.Keccak256([]byte(preimageKey))
+		mptVal, ok := mptLeafMap[string(mptKey)]
+		require.True(t, ok, "key %s not found in mpt", hex.EncodeToString([]byte(preimageKey)))
+		leafChecker(t, dbs, zkValue, mptVal)
 	}
-	require.Zero(t, expectedLeaves)
 }
 
 func checkAccountEquality(t *testing.T, dbs *dbs, zkAccountBytes, mptAccountBytes []byte) {
@@ -322,12 +354,12 @@ func checkAccountEquality(t *testing.T, dbs *dbs, zkAccountBytes, mptAccountByte
 	zkAccount, err := types.UnmarshalStateAccount(zkAccountBytes)
 	require.NoError(t, err)
 
-	require.Equal(t, mptAccount.Nonce, zkAccount.Nonce)
-	require.True(t, mptAccount.Balance.Cmp(zkAccount.Balance) == 0)
-	require.Equal(t, mptAccount.KeccakCodeHash, zkAccount.KeccakCodeHash)
+	require.Equal(t, mptAccount.Nonce, zkAccount.Nonce, "nonce zk: %d, mpt: %d", zkAccount.Nonce, mptAccount.Nonce)
+	require.True(t, mptAccount.Balance.Cmp(zkAccount.Balance) == 0, "balance zk: %s, mpt: %s", zkAccount.Balance.String(), mptAccount.Balance.String())
+	require.Equal(t, mptAccount.KeccakCodeHash, zkAccount.KeccakCodeHash, "code hash zk: %s, mpt: %s", hex.EncodeToString(zkAccount.KeccakCodeHash), hex.EncodeToString(mptAccount.KeccakCodeHash))
 	checkTrieEquality(t, dbs, common.BytesToHash(zkAccount.Root[:]), common.BytesToHash(mptAccount.Root[:]), checkStorageEquality)
-	accountsLeft--
-	t.Log("Accounts left:", accountsLeft)
+	accountsDone++
+	t.Log("Accounts done:", accountsDone)
 }
 
 func checkStorageEquality(t *testing.T, _ *dbs, zkStorageBytes, mptStorageBytes []byte) {
@@ -335,5 +367,5 @@ func checkStorageEquality(t *testing.T, _ *dbs, zkStorageBytes, mptStorageBytes 
 	_, content, _, err := rlp.Split(mptStorageBytes)
 	require.NoError(t, err)
 	mptValue := common.BytesToHash(content)
-	require.Equal(t, zkValue, mptValue)
+	require.Equal(t, zkValue, mptValue, "storage zk: %s, mpt: %s", zkValue.Hex(), mptValue.Hex())
 }

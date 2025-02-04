@@ -441,6 +441,20 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 
 	// If we are on EuclidV2, we need to read L1 messages from L1MessageQueueV2.
 	if w.chainConfig.IsEuclidV2(w.current.header.Time) {
+		parent := w.chain.CurrentHeader()
+
+		// w.current would be the first block in the EuclidV2 fork
+		if !w.chainConfig.IsEuclidV2(parent.Time) {
+			// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2 as with EuclidV2
+			// only L1 messages V2 are allowed.
+			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
+			if len(l1MessagesV1) > 0 {
+				// backdate the block to the parent block's timestamp -> not yet EuclidV2
+				w.current.header.Time = parent.Time
+				return l1MessagesV1
+			}
+		}
+
 		return rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
 	}
 

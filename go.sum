@@ -404,6 +404,8 @@ github.com/scroll-tech/da-codec v0.1.3-0.20250122003441-91171709155b h1:DWiVtzXK
 github.com/scroll-tech/da-codec v0.1.3-0.20250122003441-91171709155b/go.mod h1:XfQhUl3msmE6dpZEbR/LIwiMxywPQcUQsch9URgXDzs=
 github.com/scroll-tech/da-codec v0.1.3-0.20250122041800-4ef7bfc6b634 h1:YtD7XjP1F7GzL9nxj1lq88m1/bwSroVSGVR050i05yY=
 github.com/scroll-tech/da-codec v0.1.3-0.20250122041800-4ef7bfc6b634/go.mod h1:XfQhUl3msmE6dpZEbR/LIwiMxywPQcUQsch9URgXDzs=
+github.com/scroll-tech/da-codec v0.1.3-0.20250203093155-be6b422f605f h1:Kh2Tdy3/+ooeeFeZZ2duKeUlSHgKy+sOQ2oxzuuSNZE=
+github.com/scroll-tech/da-codec v0.1.3-0.20250203093155-be6b422f605f/go.mod h1:irqXJdRI5fsGkilJCpNTnJb8oV8KR51j68QXIWoth6U=
 github.com/scroll-tech/zktrie v0.8.4 h1:UagmnZ4Z3ITCk+aUq9NQZJNAwnWl4gSxsLb2Nl7IgRE=
 github.com/scroll-tech/zktrie v0.8.4/go.mod h1:XvNo7vAk8yxNyTjBDj5WIiFzYW4bx/gJ78+NK6Zn6Uk=
 github.com/segmentio/kafka-go v0.1.0/go.mod h1:X6itGqS9L4jDletMsxZ7Dz+JFWxM6JHfPOCvTvk+EJo=

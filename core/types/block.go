@@ -421,22 +421,6 @@ func (b *Block) ContainsL1Messages() bool {
 	return false
 }
 
-func (b *Block) NumL1Messages() int {
-	if l1MsgCount := b.l1MsgCount.Load(); l1MsgCount != nil {
-		return l1MsgCount.(int)
-	}
-
-	count := 0
-	for _, tx := range b.transactions {
-		if tx.IsL1MessageTx() {
-			count += 1
-		}
-	}
-
-	b.l1MsgCount.Store(count)
-	return count
-}
-
 // NumL1MessagesProcessed returns the number of L1 messages processed in this block.
 // This count includes both skipped and included messages.
 // `firstQueueIndex` is the first queue index available for this block to process.

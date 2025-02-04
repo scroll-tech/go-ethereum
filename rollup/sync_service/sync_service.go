@@ -175,6 +175,9 @@ func (s *SyncService) fetchMessages() {
 	// keep track of next queue index we're expecting to see
 	queueIndex := rawdb.ReadHighestSyncedQueueIndex(s.db)
 
+	// read start index of very first L1MessageV2 from database
+	l1MessageV2StartIndex := rawdb.ReadL1MessageV2StartIndex(s.db)
+
 	batchWriter := s.db.NewBatch()
 	numBlocksPendingDbWrite := uint64(0)
 	numMessagesPendingDbWrite := 0
@@ -227,7 +230,8 @@ func (s *SyncService) fetchMessages() {
 			to = latestConfirmed
 		}
 
-		msgsV1, msgsV2, err := s.client.fetchMessagesInRange(s.ctx, from, to)
+		queryL1MessagesV1 := l1MessageV2StartIndex == nil
+		msgsV1, msgsV2, err := s.client.fetchMessagesInRange(s.ctx, from, to, queryL1MessagesV1)
 		if err != nil {
 			// flush pending writes to database
 			if from > 0 {
@@ -237,9 +241,10 @@ func (s *SyncService) fetchMessages() {
 			return
 		}
 
-		// write start index of very first L1MessageV2 to database
-		if len(msgsV2) > 0 && rawdb.ReadL1MessageV2StartIndex(s.db) == nil {
+		// write start index of very first L1MessageV2 to database. This is true only once.
+		if len(msgsV2) > 0 && l1MessageV2StartIndex == nil {
 			firstL1MessageV2 := msgsV2[0]
+			l1MessageV2StartIndex = &firstL1MessageV2.QueueIndex
 			rawdb.WriteL1MessageV2StartIndex(batchWriter, firstL1MessageV2.QueueIndex)
 		}
 

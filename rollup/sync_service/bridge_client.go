@@ -19,7 +19,6 @@ type BridgeClient struct {
 	client        EthClient
 	confirmations rpc.BlockNumber
 
-	skipV1L1Messages        bool
 	l1MessageQueueV1Address common.Address
 	filtererV1              *L1MessageQueueFilterer
 
@@ -69,7 +68,7 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 
 // fetchMessagesInRange retrieves and parses all L1 messages between the
 // provided from and to L1 block numbers (inclusive).
-func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64) ([]types.L1MessageTx, []types.L1MessageTx, error) {
+func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64, queryL1MessagesV1 bool) ([]types.L1MessageTx, []types.L1MessageTx, error) {
 	log.Trace("BridgeClient fetchMessagesInRange", "fromBlock", from, "toBlock", to)
 
 	var msgsV1, msgsV2 []types.L1MessageTx
@@ -80,9 +79,9 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 		Context: ctx,
 	}
 
-	// Query L1MessageQueueV1 if is enabled. We disable querying of L1MessageQueueV1 once L1MessageQueueV2 is enabled,
+	// Query L1MessageQueueV1 if enabled. We disable querying of L1MessageQueueV1 once L1MessageQueueV2 is enabled,
 	// and we have received the first QueueTransaction event from L1MessageQueueV2.
-	if !c.skipV1L1Messages {
+	if queryL1MessagesV1 {
 		it, err := c.filtererV1.FilterQueueTransaction(&opts, nil, nil)
 		if err != nil {
 			return nil, nil, err
@@ -134,9 +133,6 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 			Data:       event.Data,
 			Sender:     event.Sender,
 		})
-
-		// once we receive the first L1MessageQueueV2 event, we disable querying of L1MessageQueueV1
-		c.skipV1L1Messages = true
 	}
 
 	if err = it.Error(); err != nil {

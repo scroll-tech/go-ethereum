@@ -214,6 +214,9 @@ type L1MessageV1Iterator struct {
 	L1MessageIterator
 }
 
+// IterateL1MessagesV1From yields a L1MessageV1Iterator with following behavior:
+// - If fromQueueIndex >= L1MessageV2StartIndex: yield 0 messages.
+// - Otherwise, simply yield all messages (guaranteed to be V1) starting from `fromQueueIndex` until `L1MessageV2StartIndex`.
 func IterateL1MessagesV1From(db ethdb.Database, fromQueueIndex uint64) L1MessageV1Iterator {
 	return L1MessageV1Iterator{
 		db:                db,
@@ -241,6 +244,9 @@ type L1MessageV2Iterator struct {
 	L1MessageIterator
 }
 
+// IterateL1MessagesV2From yields a L1MessageV2Iterator with following behavior:
+// - If fromQueueIndex < v2StartIndex: yield 0 messages.
+// - Otherwise, simply yield all messages (guaranteed to be v2) starting from `fromQueueIndex`.
 func IterateL1MessagesV2From(db ethdb.Database, fromQueueIndex uint64) L1MessageV2Iterator {
 	v2StartIndex := ReadL1MessageV2StartIndex(db)
 
@@ -255,14 +261,11 @@ func (it *L1MessageV2Iterator) Next() bool {
 		return false
 	}
 
-	for it.L1MessageIterator.Next() {
-		return it.QueueIndex() >= *it.v2StartIndex
-	}
-
-	return false
+	return it.L1MessageIterator.Next() && it.QueueIndex() >= *it.v2StartIndex
 }
 
 // ReadL1MessagesV1From retrieves up to `maxCount` L1 messages V1 starting at `startIndex`.
+// If startIndex is >= L1MessageV2StartIndex, this function returns an empty slice.
 func ReadL1MessagesV1From(db ethdb.Database, startIndex, maxCount uint64) []types.L1MessageTx {
 	msgs := make([]types.L1MessageTx, 0, maxCount)
 	it := IterateL1MessagesV1From(db, startIndex)
@@ -304,7 +307,7 @@ func ReadL1MessagesV1From(db ethdb.Database, startIndex, maxCount uint64) []type
 }
 
 // ReadL1MessagesV2From retrieves up to `maxCount` L1 messages V2 starting at `startIndex`.
-// If startIndex is smaller than L1MessageV2StartIndex, this function will return an empty slice.
+// If startIndex is smaller than L1MessageV2StartIndex, this function returns an empty slice.
 func ReadL1MessagesV2From(db ethdb.Database, startIndex, maxCount uint64) []types.L1MessageTx {
 	msgs := make([]types.L1MessageTx, 0, maxCount)
 

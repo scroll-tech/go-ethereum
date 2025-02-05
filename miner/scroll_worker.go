@@ -436,6 +436,11 @@ func (w *worker) updateSnapshot() {
 	w.snapshotState = w.current.state.Copy()
 }
 
+// collectPendingL1Messages reads pending L1 messages from the database.
+// It returns a list of L1 messages that can be included in the block. Depending on the current
+// block time, it reads L1 messages from either L1MessageQueueV1 or L1MessageQueueV2.
+// It also makes sure that all L1 messages V1 are consumed before we activate EuclidV2 fork by backdating the block's time
+// to the parent block's timestamp.
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 

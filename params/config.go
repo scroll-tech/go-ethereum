@@ -1158,6 +1158,6 @@ func (c *ChainConfig) Rules(num *big.Int, time uint64) Rules {
 		IsCurie:          c.IsCurie(num),
 		IsDarwin:         c.IsDarwin(time),
 		IsEuclid:         c.IsEuclid(time),
-    IsEuclidV2:       c.IsEuclidV2(time),
+		IsEuclidV2:       c.IsEuclidV2(time),
 	}
 }

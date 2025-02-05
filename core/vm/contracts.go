@@ -155,12 +155,6 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{18}): &bls12381MapG2{},
 }
 
-// PrecompiledContractsP256Verify contains the precompiled Ethereum
-// contract specified in RIP-7212. This is exported for testing purposes.
-var PrecompiledContractsP256Verify = map[common.Address]PrecompiledContract{
-	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
-}
-
 var (
 	PrecompiledAddressesEuclidV2   []common.Address
 	PrecompiledAddressesBernoulli  []common.Address

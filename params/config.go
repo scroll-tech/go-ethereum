@@ -910,7 +910,7 @@ func (c *ChainConfig) IsDarwinV2(now uint64) bool {
 	return isForkedTime(now, c.DarwinV2Time)
 }
 
-// IsEuclid returns whether time is either equal to the Darwin fork time or greater.
+// IsEuclid returns whether time is either equal to the Euclid fork time or greater.
 func (c *ChainConfig) IsEuclid(now uint64) bool {
 	return isForkedTime(now, c.EuclidTime)
 }

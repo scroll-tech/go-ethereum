@@ -62,7 +62,7 @@ func NewCommitBatchDAV7(ctx context.Context, db ethdb.Database,
 	}
 	blobVersionedHash := common.Hash(kzg4844.CalcBlobHashV1(sha256.New(), &c))
 	if blobVersionedHash != blobHash {
-		return nil, fmt.Errorf("blobVersionedHash from blob source is not equal to versionedHash from tx, correct versioned hash: %s, fetched blob hash: %s", blobHash.Hex(), blobVersionedHash.String())
+		return nil, fmt.Errorf("blobVersionedHash from blob source is not equal to versionedHash from tx, correct versioned hash: %s, fetched blob hash: %s", blobHash.Hex(), blobVersionedHash.Hex())
 	}
 
 	blobPayload, err := codec.DecodeBlob(blob)

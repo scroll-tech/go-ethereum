@@ -96,7 +96,6 @@ func (ds *CalldataBlobSource) L1Finalized() uint64 {
 
 func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEvents) (Entries, error) {
 	var entries Entries
-	var emptyHash common.Hash
 	// we keep track of the last commit transaction hash, so we can process all events created in the same tx together.
 	// if we have a different commit transaction, we need to create a new commit batch DA.
 	var lastCommitTransactionHash common.Hash
@@ -105,6 +104,9 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 
 	// getAndAppendCommitBatchDA is a helper function that gets the commit batch DA for the last commit events and appends it to the entries list.
 	// It also resets the last commit events and last commit transaction hash.
+	// This is necessary because we need to process all events created in the same tx together.
+	// However, we only know all events created in the same tx when we see a different commit transaction (next iteration of the loop).
+	// Therefore, we need to process the last commit events when we see a different event (finalize, revert) or commit transaction (or when we reach the end of the rollup events).
 	getAndAppendCommitBatchDA := func() error {
 		commitBatchDAEntries, err := ds.getCommitBatchDA(lastCommitEvents)
 		if err != nil {
@@ -113,7 +115,7 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 
 		entries = append(entries, commitBatchDAEntries...)
 		lastCommitEvents = nil
-		lastCommitTransactionHash = emptyHash
+		lastCommitTransactionHash = common.Hash{}
 
 		return nil
 	}

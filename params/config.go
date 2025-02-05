@@ -878,14 +878,19 @@ func (c *ChainConfig) IsCurie(num *big.Int) bool {
 	return isForked(c.CurieBlock, num)
 }
 
-// IsDarwin returns whether num is either equal to the Darwin fork block or greater.
+// IsDarwin returns whether time is either equal to the Darwin fork time or greater.
 func (c *ChainConfig) IsDarwin(now uint64) bool {
 	return isForkedTime(now, c.DarwinTime)
 }
 
-// IsDarwinV2 returns whether num is either equal to the DarwinV2 fork block or greater.
+// IsDarwinV2 returns whether time is either equal to the DarwinV2 fork time or greater.
 func (c *ChainConfig) IsDarwinV2(now uint64) bool {
 	return isForkedTime(now, c.DarwinV2Time)
+}
+
+// IsEuclidV2 returns whether time is either equal to the EuclidV2 fork time or greater.
+func (c *ChainConfig) IsEuclidV2(now uint64) bool {
+	return false // TODO: add EuclidV2 fork time
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
@@ -1100,7 +1105,7 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon, IsArchimedes, IsShanghai            bool
-	IsBernoulli, IsCurie, IsDarwin                          bool
+	IsBernoulli, IsCurie, IsDarwin, IsEuclidV2              bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1126,5 +1131,6 @@ func (c *ChainConfig) Rules(num *big.Int, time uint64) Rules {
 		IsBernoulli:      c.IsBernoulli(num),
 		IsCurie:          c.IsCurie(num),
 		IsDarwin:         c.IsDarwin(time),
+		IsEuclidV2:       c.IsEuclidV2(time),
 	}
 }

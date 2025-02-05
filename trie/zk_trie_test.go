@@ -286,7 +286,7 @@ func TestEquivalence(t *testing.T) {
 	checkTrieEquality(t, &dbs{
 		zkDb:  zkDb,
 		mptDb: mptDb,
-	}, zkRoot, mptRoot, checkAccountEquality)
+	}, zkRoot, mptRoot, checkAccountEquality, true)
 }
 
 type dbs struct {
@@ -296,7 +296,7 @@ type dbs struct {
 
 var accountsDone = 0
 
-func checkTrieEquality(t *testing.T, dbs *dbs, zkRoot, mptRoot common.Hash, leafChecker func(*testing.T, *dbs, []byte, []byte)) {
+func checkTrieEquality(t *testing.T, dbs *dbs, zkRoot, mptRoot common.Hash, leafChecker func(*testing.T, *dbs, []byte, []byte), top bool) {
 	zkTrie, err := NewZkTrie(zkRoot, NewZktrieDatabaseFromTriedb(NewDatabaseWithConfig(dbs.zkDb, &Config{Preimages: true})))
 	require.NoError(t, err)
 
@@ -328,17 +328,31 @@ func checkTrieEquality(t *testing.T, dbs *dbs, zkRoot, mptRoot common.Hash, leaf
 			preimageKey := zkTrie.GetKey(key)
 			require.NotEmpty(t, preimageKey)
 			zkLeafMutex.Lock()
+			defer zkLeafMutex.Unlock()
 			zkLeafMap[string(dup(preimageKey))] = value
-			zkLeafMutex.Unlock()
-			if len(zkLeafMap)%10000 == 0 {
+			if top && len(zkLeafMap)%10000 == 0 {
 				t.Log("ZK Accounts Loaded:", len(zkLeafMap))
 			}
 		})
 		close(zkDone)
 	}()
 
-	<-zkDone
-	<-mptDone
+	select {
+	case <-zkDone:
+		if top {
+			t.Log("ZK Accounts Done Loading:", len(zkLeafMap))
+		}
+		<-mptDone
+	case <-mptDone:
+		if top {
+			t.Log("MPT Accounts Done Loading:", len(mptLeafMap))
+		}
+		<-zkDone
+	}
+	if top {
+		t.Log("Accounts Loaded")
+	}
+
 	require.Equal(t, len(mptLeafMap), len(zkLeafMap))
 	for preimageKey, zkValue := range zkLeafMap {
 		mptKey := crypto.Keccak256([]byte(preimageKey))
@@ -357,9 +371,9 @@ func checkAccountEquality(t *testing.T, dbs *dbs, zkAccountBytes, mptAccountByte
 	require.Equal(t, mptAccount.Nonce, zkAccount.Nonce, "nonce zk: %d, mpt: %d", zkAccount.Nonce, mptAccount.Nonce)
 	require.True(t, mptAccount.Balance.Cmp(zkAccount.Balance) == 0, "balance zk: %s, mpt: %s", zkAccount.Balance.String(), mptAccount.Balance.String())
 	require.Equal(t, mptAccount.KeccakCodeHash, zkAccount.KeccakCodeHash, "code hash zk: %s, mpt: %s", hex.EncodeToString(zkAccount.KeccakCodeHash), hex.EncodeToString(mptAccount.KeccakCodeHash))
-	checkTrieEquality(t, dbs, common.BytesToHash(zkAccount.Root[:]), common.BytesToHash(mptAccount.Root[:]), checkStorageEquality)
+	checkTrieEquality(t, dbs, common.BytesToHash(zkAccount.Root[:]), common.BytesToHash(mptAccount.Root[:]), checkStorageEquality, true)
 	accountsDone++
-	t.Log("Accounts done:", accountsDone)
+	t.Log("Accounts checked:", accountsDone)
 }
 
 func checkStorageEquality(t *testing.T, _ *dbs, zkStorageBytes, mptStorageBytes []byte) {

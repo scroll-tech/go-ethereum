@@ -234,45 +234,6 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 	}
 }
 
-func (t *ZkTrie) CountLeaves(cb func(key, value []byte)) uint64 {
-	root, err := t.ZkTrie.Tree().Root()
-	if err != nil {
-		panic("CountLeaves cannot get root")
-	}
-	return t.countLeaves(root, cb, 0)
-}
-
-func (t *ZkTrie) countLeaves(root *zkt.Hash, cb func(key, value []byte), depth int) uint64 {
-	if root == nil {
-		return 0
-	}
-
-	rootNode, err := t.ZkTrie.Tree().GetNode(root)
-	if err != nil {
-		panic("countLeaves cannot get rootNode")
-	}
-
-	if rootNode.Type == zktrie.NodeTypeLeaf_New {
-		cb(append([]byte{}, rootNode.NodeKey.Bytes()...), append([]byte{}, rootNode.Data()...))
-		return 1
-	} else {
-		count := make(chan uint64)
-		if depth < 5 {
-			leftT := t.Copy()
-			rightT := t.Copy()
-			go func() {
-				count <- leftT.countLeaves(rootNode.ChildL, cb, depth+1)
-			}()
-			go func() {
-				count <- rightT.countLeaves(rootNode.ChildR, cb, depth+1)
-			}()
-			return <-count + <-count
-		} else {
-			return t.countLeaves(rootNode.ChildL, cb, depth+1) + t.countLeaves(rootNode.ChildR, cb, depth+1)
-		}
-	}
-}
-
 // Witness returns a set containing all trie nodes that have been accessed.
 func (t *ZkTrie) Witness() map[string]struct{} {
 	panic("not implemented")

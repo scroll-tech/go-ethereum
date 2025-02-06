@@ -36,7 +36,7 @@ func NewUpgradableEngine(isUpgraded func(uint64) bool, clique consensus.Engine, 
 
 // chooseEngine returns the appropriate consensus engine based on the header's number.
 func (ue *UpgradableEngine) chooseEngine(header *types.Header) consensus.Engine {
-	if ue.isUpgraded(header.Time) {
+	if ue.isUpgraded(header.Number.Uint64()) {
 		return ue.system
 	}
 	return ue.clique

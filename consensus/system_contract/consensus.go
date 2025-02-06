@@ -227,7 +227,9 @@ func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *type
 // Finalize implements consensus.Engine. There is no post-transaction
 // consensus rules in clique, therefore no rules here
 func (s *SystemContract) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
-	// No block rewards in PoA, so the state remains as is
+	// No block rewards in PoA, so the state remains as is and uncles are dropped
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.UncleHash = types.CalcUncleHash(nil)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
@@ -235,9 +237,6 @@ func (s *SystemContract) Finalize(chain consensus.ChainHeaderReader, header *typ
 func (s *SystemContract) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Finalize block
 	s.Finalize(chain, header, state, txs, uncles)
-
-	// Assign the final state root to header.
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Assemble and return the final block for sealing.
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil

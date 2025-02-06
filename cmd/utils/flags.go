@@ -183,6 +183,10 @@ var (
 		Name:  "scroll",
 		Usage: "Scroll mainnet",
 	}
+	ScrollMPTFlag = cli.BoolFlag{
+		Name:  "scroll-mpt",
+		Usage: "Use MPT trie for state storage",
+	}
 	DeveloperFlag = cli.BoolFlag{
 		Name:  "dev",
 		Usage: "Ephemeral proof-of-authority network with a pre-funded developer account, mining enabled",
@@ -401,6 +405,11 @@ var (
 		Name:  "txpool.globalqueue",
 		Usage: "Maximum number of non-executable transaction slots for all accounts",
 		Value: ethconfig.Defaults.TxPool.GlobalQueue,
+	}
+	TxPoolAccountPendingLimitFlag = cli.Uint64Flag{
+		Name:  "txpool.accountpendinglimit",
+		Usage: "Maximum number of executable transactions allowed per account",
+		Value: ethconfig.Defaults.TxPool.AccountPendingLimit,
 	}
 	TxPoolLifetimeFlag = cli.DurationFlag{
 		Name:  "txpool.lifetime",
@@ -1519,6 +1528,9 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	if ctx.GlobalIsSet(TxPoolGlobalQueueFlag.Name) {
 		cfg.GlobalQueue = ctx.GlobalUint64(TxPoolGlobalQueueFlag.Name)
 	}
+	if ctx.GlobalIsSet(TxPoolAccountPendingLimitFlag.Name) {
+		cfg.AccountPendingLimit = ctx.GlobalUint64(TxPoolAccountPendingLimitFlag.Name)
+	}
 	if ctx.GlobalIsSet(TxPoolLifetimeFlag.Name) {
 		cfg.Lifetime = ctx.GlobalDuration(TxPoolLifetimeFlag.Name)
 	}
@@ -1879,12 +1891,15 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "4038000")
 		stack.Config().L1DeploymentBlock = 4038000
-		// disable pruning
-		if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
-			log.Crit("Must use --gcmode=archive")
+		cfg.Genesis.Config.Scroll.UseZktrie = !ctx.GlobalBool(ScrollMPTFlag.Name)
+		if cfg.Genesis.Config.Scroll.UseZktrie {
+			// disable pruning
+			if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
+				log.Crit("Must use --gcmode=archive")
+			}
+			log.Info("Pruning disabled")
+			cfg.NoPruning = true
 		}
-		log.Info("Pruning disabled")
-		cfg.NoPruning = true
 	case ctx.GlobalBool(ScrollFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 534352
@@ -1895,12 +1910,15 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		stack.Config().L1Confirmations = rpc.FinalizedBlockNumber
 		log.Info("Setting flag", "--l1.sync.startblock", "18306000")
 		stack.Config().L1DeploymentBlock = 18306000
-		// disable pruning
-		if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
-			log.Crit("Must use --gcmode=archive")
+		cfg.Genesis.Config.Scroll.UseZktrie = !ctx.GlobalBool(ScrollMPTFlag.Name)
+		if cfg.Genesis.Config.Scroll.UseZktrie {
+			// disable pruning
+			if ctx.GlobalString(GCModeFlag.Name) != GCModeArchive {
+				log.Crit("Must use --gcmode=archive")
+			}
+			log.Info("Pruning disabled")
+			cfg.NoPruning = true
 		}
-		log.Info("Pruning disabled")
-		cfg.NoPruning = true
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337

@@ -234,31 +234,6 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 	}
 }
 
-func (t *ZkTrie) CountLeaves() uint64 {
-	root, err := t.ZkTrie.Tree().Root()
-	if err != nil {
-		panic("CountLeaves cannot get root")
-	}
-	return t.countLeaves(root)
-}
-
-func (t *ZkTrie) countLeaves(root *zkt.Hash) uint64 {
-	if root == nil {
-		return 0
-	}
-
-	rootNode, err := t.ZkTrie.Tree().GetNode(root)
-	if err != nil {
-		panic("countLeaves cannot get rootNode")
-	}
-
-	if rootNode.Type == zktrie.NodeTypeLeaf_New {
-		return 1
-	} else {
-		return t.countLeaves(rootNode.ChildL) + t.countLeaves(rootNode.ChildR)
-	}
-}
-
 // Witness returns a set containing all trie nodes that have been accessed.
 func (t *ZkTrie) Witness() map[string]struct{} {
 	panic("not implemented")

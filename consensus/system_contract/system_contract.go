@@ -35,6 +35,8 @@ type SystemContract struct {
 func New(ctx context.Context, config *params.SystemContractConfig, client sync_service.EthClient) *SystemContract {
 	ctx, cancel := context.WithCancel(ctx)
 	address, err := client.StorageAt(ctx, config.SystemContractAddress, config.SystemContractSlot, nil)
+	//ATT just did this for testing!
+	//address = common.Hex2Bytes("0x756EA06BDEe36de11F22DCca45a31d8a178eF3c6")
 	if err != nil {
 		log.Error("failed to get signer address from L1 System Contract", "err", err)
 	}
@@ -53,6 +55,7 @@ func New(ctx context.Context, config *params.SystemContractConfig, client sync_s
 // Authorize injects a private key into the consensus engine to mint new blocks
 // with.
 func (s *SystemContract) Authorize(signer common.Address, signFn SignerFn) {
+	log.Info("Authorizing system contract", "signer", signer.Hex())
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -80,6 +83,7 @@ func (s *SystemContract) Start() {
 					log.Error("failed to get signer address from L1 System Contract", "err", err)
 				}
 				bAddress := common.BytesToAddress(address)
+				log.Info("Read address from system contract", "address", bAddress.Hex())
 				s.lock.RLock()
 				addressChanged := s.signerAddressL1 != bAddress
 				s.lock.RUnlock()

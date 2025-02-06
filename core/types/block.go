@@ -79,7 +79,7 @@ type Header struct {
 	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
 	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
 	Time        uint64         `json:"timestamp"        gencodec:"required"`
-	Extra       []byte         `json:"extraData"        gencodec:"required" rlp:"-"`
+	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
 
@@ -103,8 +103,6 @@ type Header struct {
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
 
 	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
-	// The tag "rlp:\"-\"" ensures it's excluded from the RLP encoding (and thus, from the hash computation).
-
 	Requested bool `json:"-" rlp:"-"`
 }
 
@@ -383,7 +381,6 @@ func CalcUncleHash(uncles []*Header) common.Hash {
 // the sealed one.
 func (b *Block) WithSeal(header *Header) *Block {
 	cpy := *header
-
 	return &Block{
 		header:       &cpy,
 		transactions: b.transactions,

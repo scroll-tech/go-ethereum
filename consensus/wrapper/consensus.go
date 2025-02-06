@@ -3,6 +3,8 @@ package wrapper
 import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/consensus/clique"
+	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -11,7 +13,7 @@ import (
 )
 
 // UpgradableEngine implements consensus.Engine and acts as a middleware to dispatch
-// calls to either Clique or SystemContract consensus based on block height.
+// calls to either Clique or SystemContract consensus.
 type UpgradableEngine struct {
 	// forkBlock is the block number at which the switchover to SystemContract occurs.
 	isUpgraded func(uint64) bool
@@ -190,4 +192,15 @@ func (ue *UpgradableEngine) Close() error {
 // SealHash returns the hash of a block prior to it being sealed.
 func (ue *UpgradableEngine) SealHash(header *types.Header) common.Hash {
 	return ue.chooseEngine(header).SealHash(header)
+}
+
+// Authorize injects a private key into the consensus engine to mint new blocks
+// with.
+func (ue *UpgradableEngine) Authorize(signer common.Address, signFn clique.SignerFn, signFn2 system_contract.SignerFn) {
+	if cliqueEngine, ok := ue.clique.(*clique.Clique); ok {
+		cliqueEngine.Authorize(signer, signFn)
+	}
+	if sysContractEngine, ok := ue.system.(*system_contract.SystemContract); ok {
+		sysContractEngine.Authorize(signer, signFn2)
+	}
 }

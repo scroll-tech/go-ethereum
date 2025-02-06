@@ -17,9 +17,12 @@
 package miner
 
 import (
+	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
+	"github.com/scroll-tech/go-ethereum/log"
 	"math"
 	"math/big"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 
@@ -128,7 +131,17 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 		Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 	}
 
+	log.Info("Test engine type: ", "type:", reflect.TypeOf(engine))
+
 	switch e := engine.(type) {
+	case *wrapper.UpgradableEngine:
+		log.Info("Upgradable Engine type, fall over to Clique for now", ":", "NVM")
+		gspec.ExtraData = make([]byte, 32+common.AddressLength+crypto.SignatureLength)
+		gspec.Timestamp = uint64(time.Now().Unix())
+		copy(gspec.ExtraData[32:32+common.AddressLength], testBankAddress.Bytes())
+		e.Authorize(testBankAddress, func(account accounts.Account, s string, data []byte) ([]byte, error) {
+			return crypto.Sign(crypto.Keccak256(data), testBankKey)
+		})
 	case *clique.Clique:
 		gspec.ExtraData = make([]byte, 32+common.AddressLength+crypto.SignatureLength)
 		gspec.Timestamp = uint64(time.Now().Unix())

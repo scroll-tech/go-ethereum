@@ -35,8 +35,6 @@ type SystemContract struct {
 func New(ctx context.Context, config *params.SystemContractConfig, client sync_service.EthClient) *SystemContract {
 	ctx, cancel := context.WithCancel(ctx)
 	address, err := client.StorageAt(ctx, config.SystemContractAddress, config.SystemContractSlot, nil)
-	//ATT just did this for testing!
-	//address = common.Hex2Bytes("0x756EA06BDEe36de11F22DCca45a31d8a178eF3c6")
 	if err != nil {
 		log.Error("failed to get signer address from L1 System Contract", "err", err)
 	}

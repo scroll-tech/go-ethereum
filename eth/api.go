@@ -971,7 +971,7 @@ type DiskAndHeaderRoot struct {
 	HeaderRoot common.Hash `json:"headerRoot"`
 }
 
-// CalculateRowConsumptionByBlockNumber
+// DiskRoot
 func (api *ScrollAPI) DiskRoot(ctx context.Context, blockNrOrHash *rpc.BlockNumberOrHash) (DiskAndHeaderRoot, error) {
 	block, err := api.eth.APIBackend.BlockByNumberOrHash(ctx, *blockNrOrHash)
 	if err != nil {

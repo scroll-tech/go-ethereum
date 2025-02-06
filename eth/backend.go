@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"math/big"
 	"runtime"
 	"sync"
@@ -151,6 +152,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}
+
 	eth := &Ethereum{
 		config:            config,
 		chainDb:           chainDb,
@@ -523,7 +525,14 @@ func (s *Ethereum) StartMining(threads int) error {
 			log.Error("Cannot start mining without etherbase", "err", err)
 			return fmt.Errorf("etherbase missing: %v", err)
 		}
-		if clique, ok := s.engine.(*clique.Clique); ok {
+		if wrapper, ok := s.engine.(*wrapper.UpgradableEngine); ok {
+			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
+			if wallet == nil || err != nil {
+				log.Error("Etherbase account unavailable locally", "err", err)
+				return fmt.Errorf("signer missing: %v", err)
+			}
+			wrapper.Authorize(eb, wallet.SignData, wallet.SignData)
+		} else if clique, ok := s.engine.(*clique.Clique); ok {
 			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 			if wallet == nil || err != nil {
 				log.Error("Etherbase account unavailable locally", "err", err)

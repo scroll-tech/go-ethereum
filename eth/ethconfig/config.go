@@ -235,20 +235,17 @@ type Config struct {
 func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, l1Client sync_service.EthClient) consensus.Engine {
 	// Case 1: Both SystemContract and Clique are defined: create an upgradable engine.
 	if chainConfig.SystemContract != nil && chainConfig.Clique != nil {
-		// Create the Clique engine.
 		cliqueEngine := clique.New(chainConfig.Clique, db)
-		// Create the SystemContract engine.
 		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
-
 		return wrapper.NewUpgradableEngine(chainConfig.IsEuclid, cliqueEngine, sysEngine)
 	}
 
-	//// Case 2: Only the Clique engine is defined.
+	// Case 2: Only the Clique engine is defined.
 	if chainConfig.Clique != nil {
 		return clique.New(chainConfig.Clique, db)
 	}
-	//
-	//// Case 3: Only the SystemContract engine is defined.
+
+	// Case 3: Only the SystemContract engine is defined.
 	if chainConfig.SystemContract != nil {
 		return system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
 	}

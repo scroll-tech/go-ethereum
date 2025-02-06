@@ -19,6 +19,7 @@ package miner
 import (
 	"errors"
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"math"
 	"math/big"
 	"sync"
@@ -358,8 +359,11 @@ func (w *worker) mainLoop() {
 		}
 
 		var retryableCommitError *retryableCommitError
-		if errors.As(err, &retryableCommitError) {
+		if errors.As(err, &retryableCommitError) || errors.Is(err, system_contract.ErrUnauthorizedSigner) {
 			log.Warn("failed to commit to a block, retrying", "err", err)
+			if errors.Is(err, system_contract.ErrUnauthorizedSigner) {
+				time.Sleep(5 * time.Second) // half the time it takes for the system contract consensus to read and update the address locally.
+			}
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorging, w.current.reorgReason); err != nil {
 				continue
 			}
@@ -367,7 +371,6 @@ func (w *worker) mainLoop() {
 			log.Error("failed to mine block", "err", err)
 			w.current = nil
 		}
-
 		idleStart := time.Now()
 		select {
 		case <-w.startCh:
@@ -481,6 +484,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 	if err := w.engine.Prepare(w.chain, header); err != nil {
 		return fmt.Errorf("failed to prepare header for mining: %w", err)
 	}
+
 	prepareTimer.UpdateSince(prepareStart)
 
 	var nextL1MsgIndex uint64
@@ -523,6 +527,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 // tryCommitNewWork
 func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorging bool, reorgReason error) (common.Hash, error) {
 	err := w.newWork(now, parent, reorging, reorgReason)
+
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed creating new work: %w", err)
 	}

@@ -51,9 +51,10 @@ var (
 	// errInvalidTimestamp is returned if the timestamp of a block is lower than
 	// the previous block's timestamp + the minimum block period.
 	errInvalidTimestamp = errors.New("invalid timestamp")
-	// errUnauthorizedSigner is returned if a header is signed by a non-authorized entity.
-	errUnauthorizedSigner = errors.New("unauthorized signer")
 )
+
+// ErrUnauthorizedSigner is returned if a header is signed by a non-authorized entity.
+var ErrUnauthorizedSigner = errors.New("unauthorized signer")
 
 // SignerFn hashes and signs the data to be signed by a backing account.
 type SignerFn func(signer accounts.Account, mimeType string, message []byte) ([]byte, error)
@@ -81,7 +82,9 @@ func (s *SystemContract) VerifyHeaders(chain consensus.ChainHeaderReader, header
 	go func() {
 		for i, header := range headers {
 			err := s.verifyHeader(chain, header, headers[:i])
-
+			if err != nil {
+				log.Error("Error verifying headers", "err", err)
+			}
 			select {
 			case <-abort:
 				return
@@ -185,7 +188,8 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		defer s.lock.RUnlock()
 
 		if signer != s.signerAddressL1 {
-			return errUnauthorizedSigner
+			log.Error("Unauthorized signer", "Got", signer, "Expected:", s.signerAddressL1)
+			return ErrUnauthorizedSigner
 		}
 	}
 
@@ -243,25 +247,26 @@ func (s *SystemContract) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 // the local signing credentials.
 func (s *SystemContract) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	header := block.Header()
-
 	// Sealing the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
 		return errUnknownBlock
 	}
+
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
 	if s.config.Period == 0 && len(block.Transactions()) == 0 {
 		return errors.New("sealing paused while waiting for transactions")
 	}
+
 	// Don't hold the signer fields for the entire sealing procedure
 	s.lock.RLock()
 	signer, signFn := s.signer, s.signFn
 	signerAddressL1 := s.signerAddressL1
 	s.lock.RUnlock()
 
-	// Bail out if we're unauthorized to sign a block
+	// Bail out if we are unauthorized to sign a block
 	if signer != signerAddressL1 {
-		return errors.New("local node is not authorized to sign this block")
+		return ErrUnauthorizedSigner
 	}
 
 	// Sweet, the protocol permits us to sign the block, wait for our time

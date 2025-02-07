@@ -237,7 +237,7 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 	if chainConfig.SystemContract != nil && chainConfig.Clique != nil {
 		cliqueEngine := clique.New(chainConfig.Clique, db)
 		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
-		return wrapper.NewUpgradableEngine(chainConfig.IsEuclid, cliqueEngine, sysEngine)
+		return wrapper.NewUpgradableEngine(chainConfig.IsEuclidV2, cliqueEngine, sysEngine)
 	}
 
 	// Case 2: Only the Clique engine is defined.

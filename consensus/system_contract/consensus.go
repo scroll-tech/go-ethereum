@@ -113,7 +113,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errInvalidNonce
 	}
 	// Check that the extra-data contains signature
-	if header.Number != big.NewInt(0) && len(header.Extra) != extraSeal {
+	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.Extra) != extraSeal {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -125,7 +125,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errInvalidUncleHash
 	}
 	// Ensure that the difficulty is one
-	if header.Difficulty.Cmp(common.Big0) != 1 {
+	if header.Difficulty.Cmp(common.Big1) != 0 {
 		return errInvalidDifficulty
 	}
 	// Verify that the gas limit is <= 2^63-1

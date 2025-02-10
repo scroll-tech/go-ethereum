@@ -238,3 +238,42 @@ func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueRead
 func (t *ZkTrie) Witness() map[string]struct{} {
 	panic("not implemented")
 }
+
+func (t *ZkTrie) CountLeaves(cb func(key, value []byte), parallel bool) uint64 {
+	root, err := t.ZkTrie.Tree().Root()
+	if err != nil {
+		panic("CountLeaves cannot get root")
+	}
+	return t.countLeaves(root, cb, 0, parallel)
+}
+
+func (t *ZkTrie) countLeaves(root *zkt.Hash, cb func(key, value []byte), depth int, parallel bool) uint64 {
+	if root == nil {
+		return 0
+	}
+
+	rootNode, err := t.ZkTrie.Tree().GetNode(root)
+	if err != nil {
+		panic("countLeaves cannot get rootNode")
+	}
+
+	if rootNode.Type == zktrie.NodeTypeLeaf_New {
+		cb(append([]byte{}, rootNode.NodeKey.Bytes()...), append([]byte{}, rootNode.Data()...))
+		return 1
+	} else {
+		if parallel && depth < 5 {
+			count := make(chan uint64)
+			leftT := t.Copy()
+			rightT := t.Copy()
+			go func() {
+				count <- leftT.countLeaves(rootNode.ChildL, cb, depth+1, parallel)
+			}()
+			go func() {
+				count <- rightT.countLeaves(rootNode.ChildR, cb, depth+1, parallel)
+			}()
+			return <-count + <-count
+		} else {
+			return t.countLeaves(rootNode.ChildL, cb, depth+1, parallel) + t.countLeaves(rootNode.ChildR, cb, depth+1, parallel)
+		}
+	}
+}

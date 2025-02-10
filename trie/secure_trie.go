@@ -65,6 +65,16 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	return &SecureTrie{trie: *trie, preimages: db.preimages}, nil
 }
 
+func NewSecureNoTracer(root common.Hash, db *Database) (*SecureTrie, error) {
+	t, err := NewSecure(root, db)
+	if err != nil {
+		return nil, err
+	}
+
+	t.trie.tracer = nil
+	return t, nil
+}
+
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 func (t *SecureTrie) Get(key []byte) []byte {

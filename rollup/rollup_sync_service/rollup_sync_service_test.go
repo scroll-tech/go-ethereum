@@ -658,11 +658,165 @@ func TestValidateBatchInFinalizeByBundle(t *testing.T) {
 	assert.Equal(t, parentFinalizedBatchMeta5, finalizedBatchMeta4)
 }
 
+func TestValidateBatchCodecV7(t *testing.T) {
+	codecV7 := encoding.DACodecV7{}
+
+	var finalizedBatchMeta1 *rawdb.FinalizedBatchMeta
+	var committedBatchMeta1 *rawdb.CommittedBatchMeta
+	{
+		block1 := replaceBlockNumber(readBlockFromJSON(t, "./testdata/blockTrace_02.json"), 1)
+		batch1 := &encoding.Batch{
+			Index:                     1,
+			InitialL1MessageIndex:     0,
+			InitialL1MessageQueueHash: common.Hash{},
+			LastL1MessageQueueHash:    common.Hash{},
+			Blocks:                    []*encoding.Block{block1},
+		}
+		batch1LastBlock := batch1.Blocks[len(batch1.Blocks)-1]
+
+		daBatch1, err := codecV7.NewDABatch(batch1)
+		require.NoError(t, err)
+
+		event1 := l1.NewFinalizeBatchEvent(
+			new(big.Int).SetUint64(batch1.Index),
+			daBatch1.Hash(),
+			batch1LastBlock.Header.Root,
+			batch1LastBlock.WithdrawRoot,
+			common.HexToHash("0x1"),
+			common.HexToHash("0x1"),
+			1,
+		)
+
+		committedBatchMeta1 = &rawdb.CommittedBatchMeta{
+			Version:                uint8(encoding.CodecV7),
+			LastL1MessageQueueHash: common.Hash{},
+		}
+
+		var endBlock1 uint64
+		endBlock1, finalizedBatchMeta1, err = validateBatch(event1.BatchIndex().Uint64(), event1, &rawdb.FinalizedBatchMeta{}, &rawdb.CommittedBatchMeta{}, committedBatchMeta1, []*encoding.Chunk{{Blocks: batch1.Blocks}}, nil)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, endBlock1)
+		require.Equal(t, &rawdb.FinalizedBatchMeta{
+			BatchHash:            daBatch1.Hash(),
+			TotalL1MessagePopped: 0,
+			StateRoot:            batch1LastBlock.Header.Root,
+			WithdrawRoot:         batch1LastBlock.WithdrawRoot,
+		}, finalizedBatchMeta1)
+	}
+
+	// finalize 3 batches with CodecV7 at once
+	block2 := replaceBlockNumber(readBlockFromJSON(t, "./testdata/blockTrace_03.json"), 2)
+	batch2 := &encoding.Batch{
+		Index:                     2,
+		ParentBatchHash:           finalizedBatchMeta1.BatchHash,
+		InitialL1MessageIndex:     0,
+		InitialL1MessageQueueHash: common.Hash{},
+		LastL1MessageQueueHash:    common.Hash{},
+		Blocks:                    []*encoding.Block{block2},
+	}
+	batch2LastBlock := batch2.Blocks[len(batch2.Blocks)-1]
+
+	daBatch2, err := codecV7.NewDABatch(batch2)
+	require.NoError(t, err)
+
+	block3 := replaceBlockNumber(readBlockFromJSON(t, "./testdata/blockTrace_06.json"), 3)
+	LastL1MessageQueueHashBatch3, err := encoding.MessageQueueV2ApplyL1MessagesFromBlocks(common.Hash{}, []*encoding.Block{block3})
+	require.NoError(t, err)
+	batch3 := &encoding.Batch{
+		Index:                     3,
+		ParentBatchHash:           daBatch2.Hash(),
+		InitialL1MessageIndex:     0,
+		InitialL1MessageQueueHash: common.Hash{},
+		LastL1MessageQueueHash:    LastL1MessageQueueHashBatch3,
+		Blocks:                    []*encoding.Block{block3},
+	}
+	batch3LastBlock := batch3.Blocks[len(batch3.Blocks)-1]
+
+	daBatch3, err := codecV7.NewDABatch(batch3)
+	require.NoError(t, err)
+
+	block4 := replaceBlockNumber(readBlockFromJSON(t, "./testdata/blockTrace_07.json"), 4)
+	LastL1MessageQueueHashBatch4, err := encoding.MessageQueueV2ApplyL1MessagesFromBlocks(LastL1MessageQueueHashBatch3, []*encoding.Block{block4})
+	require.NoError(t, err)
+	batch4 := &encoding.Batch{
+		Index:                     4,
+		ParentBatchHash:           daBatch3.Hash(),
+		InitialL1MessageIndex:     1,
+		InitialL1MessageQueueHash: LastL1MessageQueueHashBatch3,
+		LastL1MessageQueueHash:    LastL1MessageQueueHashBatch4,
+		Blocks:                    []*encoding.Block{block4},
+	}
+	batch4LastBlock := batch4.Blocks[len(batch4.Blocks)-1]
+
+	daBatch4, err := codecV7.NewDABatch(batch4)
+	require.NoError(t, err)
+
+	event2 := l1.NewFinalizeBatchEvent(
+		new(big.Int).SetUint64(batch4.Index),
+		daBatch4.Hash(),
+		batch4LastBlock.Header.Root,
+		batch4LastBlock.WithdrawRoot,
+		common.HexToHash("0x1"),
+		common.HexToHash("0x1"),
+		1,
+	)
+
+	committedBatchMeta2 := &rawdb.CommittedBatchMeta{
+		Version:                uint8(encoding.CodecV7),
+		LastL1MessageQueueHash: common.Hash{},
+	}
+
+	committedBatchMeta3 := &rawdb.CommittedBatchMeta{
+		Version:                uint8(encoding.CodecV7),
+		LastL1MessageQueueHash: LastL1MessageQueueHashBatch3,
+	}
+
+	committedBatchMeta4 := &rawdb.CommittedBatchMeta{
+		Version:                uint8(encoding.CodecV7),
+		LastL1MessageQueueHash: LastL1MessageQueueHashBatch4,
+	}
+
+	endBlock2, finalizedBatchMeta2, err := validateBatch(2, event2, finalizedBatchMeta1, committedBatchMeta1, committedBatchMeta2, []*encoding.Chunk{{Blocks: batch2.Blocks}}, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, endBlock2)
+	require.Equal(t, &rawdb.FinalizedBatchMeta{
+		BatchHash:            daBatch2.Hash(),
+		TotalL1MessagePopped: 0,
+		StateRoot:            batch2LastBlock.Header.Root,
+		WithdrawRoot:         batch2LastBlock.WithdrawRoot,
+	}, finalizedBatchMeta2)
+
+	endBlock3, finalizedBatchMeta3, err := validateBatch(3, event2, finalizedBatchMeta2, committedBatchMeta2, committedBatchMeta3, []*encoding.Chunk{{Blocks: batch3.Blocks}}, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, endBlock3)
+	require.Equal(t, &rawdb.FinalizedBatchMeta{
+		BatchHash:            daBatch3.Hash(),
+		TotalL1MessagePopped: 1,
+		StateRoot:            batch3LastBlock.Header.Root,
+		WithdrawRoot:         batch3LastBlock.WithdrawRoot,
+	}, finalizedBatchMeta3)
+
+	endBlock4, finalizedBatchMeta4, err := validateBatch(4, event2, finalizedBatchMeta3, committedBatchMeta3, committedBatchMeta4, []*encoding.Chunk{{Blocks: batch4.Blocks}}, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 4, endBlock4)
+	require.Equal(t, &rawdb.FinalizedBatchMeta{
+		BatchHash:            daBatch4.Hash(),
+		TotalL1MessagePopped: 6,
+		StateRoot:            batch4LastBlock.Header.Root,
+		WithdrawRoot:         batch4LastBlock.WithdrawRoot,
+	}, finalizedBatchMeta4)
+}
+
 func readBlockFromJSON(t *testing.T, filename string) *encoding.Block {
 	data, err := os.ReadFile(filename)
 	assert.NoError(t, err)
 
 	block := &encoding.Block{}
 	assert.NoError(t, json.Unmarshal(data, block))
+	return block
+}
+
+func replaceBlockNumber(block *encoding.Block, newNumber uint64) *encoding.Block {
+	block.Header.Number = new(big.Int).SetUint64(newNumber)
 	return block
 }

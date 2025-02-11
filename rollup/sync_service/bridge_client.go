@@ -22,15 +22,16 @@ type BridgeClient struct {
 	l1MessageQueueV1Address common.Address
 	filtererV1              *L1MessageQueueFilterer
 
+	enableMessageQueueV2    bool
 	l1MessageQueueV2Address common.Address
 	filtererV2              *L1MessageQueueFilterer
 }
 
-func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueV1Address common.Address, l1MessageQueueV2Address common.Address) (*BridgeClient, error) {
+func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueV1Address common.Address, enableMessageQueueV2 bool, l1MessageQueueV2Address common.Address) (*BridgeClient, error) {
 	if l1MessageQueueV1Address == (common.Address{}) {
 		return nil, errors.New("must pass non-zero l1MessageQueueV1Address to BridgeClient")
 	}
-	if l1MessageQueueV2Address == (common.Address{}) {
+	if enableMessageQueueV2 && l1MessageQueueV2Address == (common.Address{}) {
 		return nil, errors.New("must pass non-zero l1MessageQueueV2Address to BridgeClient")
 	}
 
@@ -47,9 +48,13 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize L1MessageQueueV1Filterer, err = %w", err)
 	}
-	filtererV2, err := NewL1MessageQueueFilterer(l1MessageQueueV2Address, l1Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize L1MessageQueueV2Filterer, err = %w", err)
+
+	var filtererV2 *L1MessageQueueFilterer
+	if enableMessageQueueV2 {
+		filtererV2, err = NewL1MessageQueueFilterer(l1MessageQueueV2Address, l1Client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize L1MessageQueueV2Filterer, err = %w", err)
+		}
 	}
 
 	client := BridgeClient{
@@ -59,6 +64,7 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 		l1MessageQueueV1Address: l1MessageQueueV1Address,
 		filtererV1:              filtererV1,
 
+		enableMessageQueueV2:    enableMessageQueueV2,
 		l1MessageQueueV2Address: l1MessageQueueV2Address,
 		filtererV2:              filtererV2,
 	}
@@ -108,6 +114,12 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 		if err = it.Error(); err != nil {
 			return nil, nil, err
 		}
+	}
+
+	// We allow to explicitly enable/disable querying of L1MessageQueueV2. This is useful for running the node without
+	// MessageQueueV2 available on L1 or for testing purposes.
+	if !c.enableMessageQueueV2 {
+		return msgsV1, nil, nil
 	}
 
 	// We always query L1MessageQueueV2. Before EuclidV2 L1 upgrade tx this will return an empty list as we don't use

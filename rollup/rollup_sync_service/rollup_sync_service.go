@@ -146,6 +146,13 @@ func (s *RollupSyncService) Start() {
 			case <-syncTicker.C:
 				err := s.fetchRollupEvents()
 				if err != nil {
+					// Do not log the error if the context is canceled.
+					select {
+					case <-s.ctx.Done():
+						return
+					default:
+					}
+
 					log.Error("failed to fetch rollup events", "err", err)
 				}
 			case <-logTicker.C:

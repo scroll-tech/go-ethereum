@@ -196,6 +196,9 @@ func ReadCommittedBatchMeta(db ethdb.Reader, batchIndex uint64) (*CommittedBatch
 	// Try decoding from the newest format for future proofness, then the older one for old data.
 	cbm7 := new(committedBatchMetaV7)
 	if err = rlp.Decode(bytes.NewReader(data), cbm7); err == nil {
+		if encoding.CodecVersion(cbm7.Version) < encoding.CodecV7 {
+			return nil, fmt.Errorf("unexpected committed batch metadata version: batch index %d, version %d", batchIndex, cbm7.Version)
+		}
 		return &CommittedBatchMeta{
 			Version:                cbm7.Version,
 			ChunkBlockRanges:       cbm7.ChunkBlockRanges,

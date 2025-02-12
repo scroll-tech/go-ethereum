@@ -78,6 +78,24 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		latestProcessedBlock = *block
 	}
 
+	// reset synced height so that previous V2 messages are re-fetched in case a node upgraded after V2 deployment.
+	// otherwise there's no way for the node to know if it missed any messages of the V2 queue (as it was not querying it before)
+	// but continued to query the V1 queue (which after V2 deployment does not contain any messages anymore).
+	// this is a one-time operation and will not be repeated on subsequent restarts.
+	if genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock > 0 &&
+		genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock < latestProcessedBlock { // node synced after V2 deployment
+
+		// this means the node has never synced V2 messages before -> we need to reset the synced height to re-fetch V2 messages.
+		// Resetting the synced height will not cause any inconsistency as V1 messages are only available before V2 deployment block
+		// and V2 messages are only available after V2 deployment block. -> rawdb.ReadHighestSyncedQueueIndex(s.db) and the next expected index
+		// will still be consistent.
+		initialV2L1Block := rawdb.ReadL1MessageV2FirstL1BlockNumber(db)
+		if initialV2L1Block == nil {
+			latestProcessedBlock = genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock
+			log.Info("Resetting L1 message sync height to fetch previous V2 messages", "L1 block", latestProcessedBlock)
+		}
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	service := SyncService{
@@ -246,6 +264,7 @@ func (s *SyncService) fetchMessages() {
 			firstL1MessageV2 := msgsV2[0]
 			l1MessageV2StartIndex = &firstL1MessageV2.QueueIndex
 			rawdb.WriteL1MessageV2StartIndex(batchWriter, firstL1MessageV2.QueueIndex)
+			rawdb.WriteL1MessageV2FirstL1BlockNumber(batchWriter, to)
 		}
 
 		msgs := append(msgsV1, msgsV2...)

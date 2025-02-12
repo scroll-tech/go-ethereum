@@ -380,14 +380,14 @@ func ReadFirstQueueIndexNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *
 func WriteL1MessageV2StartIndex(db ethdb.KeyValueWriter, queueIndex uint64) {
 	value := big.NewInt(0).SetUint64(queueIndex).Bytes()
 
-	if err := db.Put(l1MessageV2StartIndex, value); err != nil {
+	if err := db.Put(l1MessageV2StartIndexKey, value); err != nil {
 		log.Crit("Failed to update L1MessageV2 start index", "err", err)
 	}
 }
 
 // ReadL1MessageV2StartIndex retrieves the start index of L1 messages that are from L1MessageQueueV2.
 func ReadL1MessageV2StartIndex(db ethdb.Reader) *uint64 {
-	data, err := db.Get(l1MessageV2StartIndex)
+	data, err := db.Get(l1MessageV2StartIndexKey)
 	if err != nil && isNotFoundErr(err) {
 		return nil
 	}
@@ -401,6 +401,37 @@ func ReadL1MessageV2StartIndex(db ethdb.Reader) *uint64 {
 	number := new(big.Int).SetBytes(data)
 	if !number.IsUint64() {
 		log.Crit("Unexpected number for L1MessageV2 start index", "number", number)
+	}
+
+	res := number.Uint64()
+	return &res
+}
+
+// WriteL1MessageV2FirstL1BlockNumber writes the first synced L1 block number for L1MessageV2.
+func WriteL1MessageV2FirstL1BlockNumber(db ethdb.KeyValueWriter, l1BlockNumber uint64) {
+	value := big.NewInt(0).SetUint64(l1BlockNumber).Bytes()
+
+	if err := db.Put(l1MessageV2FirstL1BlockNumberKey, value); err != nil {
+		log.Crit("Failed to update L1MessageV2 start index", "err", err)
+	}
+}
+
+// ReadL1MessageV2FirstL1BlockNumber retrieves the first synced L1 block number for L1MessageV2.
+func ReadL1MessageV2FirstL1BlockNumber(db ethdb.Reader) *uint64 {
+	data, err := db.Get(l1MessageV2FirstL1BlockNumberKey)
+	if err != nil && isNotFoundErr(err) {
+		return nil
+	}
+	if err != nil {
+		log.Crit("Failed to read L1MessageV2 first L1 block number from database", "err", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+	number := new(big.Int).SetBytes(data)
+	if !number.IsUint64() {
+		log.Crit("Unexpected number for L1MessageV2 first L1 block number", "number", number)
 	}
 
 	res := number.Uint64()

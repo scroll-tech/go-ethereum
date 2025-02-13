@@ -135,6 +135,9 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if header.GasLimit > cap {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, cap)
 	}
+	if len(header.Extra) > 0 {
+		return errInvalidExtra
+	}
 	//// All basic checks passed, verify cascading fields
 	return s.verifyCascadingFields(chain, header, parents)
 }
@@ -211,7 +214,7 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.BlockSignature = make([]byte, extraSeal)
-
+	header.Extra = []byte{}
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {

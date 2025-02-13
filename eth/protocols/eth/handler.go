@@ -103,6 +103,7 @@ type TxPool interface {
 // MakeProtocols constructs the P2P protocol definitions for `eth`.
 func MakeProtocols(backend Backend, network uint64, dnsdisc enode.Iterator) []p2p.Protocol {
 	protocols := make([]p2p.Protocol, len(ProtocolVersions))
+
 	for i, version := range ProtocolVersions {
 		version := version // Closure
 
@@ -111,7 +112,7 @@ func MakeProtocols(backend Backend, network uint64, dnsdisc enode.Iterator) []p2
 			Version: version,
 			Length:  protocolLengths[version],
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
-				peer := NewPeer(version, p, rw, backend.TxPool())
+				peer := NewPeerIsEuclidV2(version, p, rw, backend.TxPool(), backend.Chain().Config().IsEuclidV2)
 				defer peer.Close()
 
 				return backend.RunPeer(peer, func(peer *Peer) error {

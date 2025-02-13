@@ -19,9 +19,9 @@ package eth
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -50,6 +50,9 @@ func handleGetBlockHeaders66(backend Backend, msg Decoder, peer *Peer) error {
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
 	response := answerGetBlockHeadersQuery(backend, query.GetBlockHeadersPacket, peer)
+	if len(response) > 0 {
+		peer.Log().Warn("First header in get block headers 66 handler response:", "headerNumber", response[0].Number, "headerHash", response[0].Hash(), "headerExtra", response[0].Extra, "headerBlockSignature", response[0].BlockSignature)
+	}
 	return peer.ReplyBlockHeaders(query.RequestId, response)
 }
 
@@ -84,9 +87,16 @@ func answerGetBlockHeadersQuery(backend Backend, query *GetBlockHeadersPacket, p
 			origin = backend.Chain().GetHeaderByNumber(query.Origin.Number)
 		}
 		if origin == nil {
+			log.Warn("Origin == nil", "hashMode", hashMode, "query.Origin.Hash", query.Origin.Hash, "query.Origin.Number", query.Origin.Number)
 			break
 		}
-		headers = append(headers, origin)
+
+		originCopy := types.CopyHeader(origin)
+		peer.Log().Warn("OriginCopy:", "number", originCopy.Number, "EuclidHandled", originCopy.EuclidHandled, "Extra", originCopy.Extra, "BlockSignature", originCopy.BlockSignature)
+		if originCopy.EuclidHandled {
+			originCopy.Extra = originCopy.BlockSignature
+		}
+		headers = append(headers, originCopy)
 		bytes += estHeaderSize
 
 		// Advance to the next header of the query
@@ -270,16 +280,32 @@ func handleNewBlock(backend Backend, msg Decoder, peer *Peer) error {
 		return err
 	}
 	if hash := types.CalcUncleHash(ann.Block.Uncles()); hash != ann.Block.UncleHash() {
-		log.Warn("Propagated block has invalid uncles", "have", hash, "exp", ann.Block.UncleHash())
+		peer.Log().Warn("Propagated block has invalid uncles", "have", hash, "exp", ann.Block.UncleHash())
 		return nil // TODO(karalabe): return error eventually, but wait a few releases
 	}
 	if hash := types.DeriveSha(ann.Block.Transactions(), trie.NewStackTrie(nil)); hash != ann.Block.TxHash() {
-		log.Warn("Propagated block has invalid body", "have", hash, "exp", ann.Block.TxHash())
+		peer.Log().Warn("Propagated block has invalid body", "have", hash, "exp", ann.Block.TxHash())
 		return nil // TODO(karalabe): return error eventually, but wait a few releases
 	}
 	ann.Block.ReceivedAt = msg.Time()
 	ann.Block.ReceivedFrom = peer
 
+	// Extract and store the block signature if it's a Euclid V2 block
+	header := ann.Block.Header()
+	if peer.isEuclidV2(ann.Block.Header().Time) && !header.EuclidHandled {
+		if len(header.Extra) < crypto.SignatureLength {
+			peer.Log().Warn("Propagated Euclid V2 block is missing signature (handle new block)", "number", header.Number, "hash", header.Hash(), "extra", header.Extra, "blocksignature", header.BlockSignature)
+			return nil
+		}
+		// Extract signature from the end of Extra.
+		header.BlockSignature = make([]byte, len(header.Extra))
+		copy(header.BlockSignature, header.Extra)
+		// Remove the signature from Extra so internal hash remains correct.
+		header.Extra = []byte{}
+		header.EuclidHandled = true
+		header.IsNewBlock = true
+	}
+	ann.Block = ann.Block.CopyBlockDeepWithHeader(header)
 	// Mark the peer as owning the block
 	peer.markBlock(ann.Block.Hash())
 
@@ -292,6 +318,7 @@ func handleBlockHeaders66(backend Backend, msg Decoder, peer *Peer) error {
 	if err := msg.Decode(res); err != nil {
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
+
 	requestTracker.Fulfil(peer.id, peer.version, BlockHeadersMsg, res.RequestId)
 
 	return backend.Handle(peer, &res.BlockHeadersPacket)

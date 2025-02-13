@@ -108,6 +108,13 @@ func (h *ethHandler) Handle(peer *eth.Peer, packet eth.Packet) error {
 // of headers for the local node to process.
 func (h *ethHandler) handleHeaders(peer *eth.Peer, headers []*types.Header) error {
 	p := h.peers.peer(peer.ID())
+	for _, header := range headers {
+		if h.blockFetcher.IsEuclidV2(header.Time) && !header.EuclidHandled {
+			header.BlockSignature = header.Extra
+			header.Extra = []byte{}
+			header.EuclidHandled = true
+		}
+	}
 	if p == nil {
 		return errors.New("unregistered during callback")
 	}

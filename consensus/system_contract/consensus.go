@@ -112,8 +112,9 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if header.Nonce != (types.BlockNonce{}) {
 		return errInvalidNonce
 	}
-	// Check that the extra-data contains signature
-	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.Extra) != extraSeal {
+	// Check that the BlockSignature-data contains signature
+	if header.Number.Cmp(big.NewInt(0)) != 0 && (len(header.BlockSignature) != extraSeal && header.IsNewBlock) {
+		log.Warn("Block header has no signature", "number", header.Number, "extra:", len(header.Extra), "blockSig:", len(header.BlockSignature), "isNewBlock", header.IsNewBlock)
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -127,6 +128,10 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	// Ensure that the difficulty is one
 	if header.Difficulty.Cmp(common.Big1) != 0 {
 		return errInvalidDifficulty
+	}
+	// Verify .Extra is an empty slice
+	if len(header.Extra) > 0 {
+		return fmt.Errorf("Extra is not empty: %v", header.Extra)
 	}
 	// Verify that the gas limit is <= 2^63-1
 	cap := uint64(0x7fffffffffffffff)
@@ -177,8 +182,8 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		return err
 	}
 
-	// only if block header has NOT been requested, then verify the signature against the current signer
-	if !header.Requested {
+	// only if block header IS NEW, then verify the signature against the current signer
+	if header.IsNewBlock {
 		signer, err := ecrecover(header)
 		if err != nil {
 			return err
@@ -208,7 +213,10 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
-	header.Extra = make([]byte, extraSeal)
+	header.BlockSignature = make([]byte, extraSeal)
+	header.EuclidHandled = true
+	header.IsNewBlock = true
+	
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {
@@ -266,6 +274,7 @@ func (s *SystemContract) Seal(chain consensus.ChainHeaderReader, block *types.Bl
 
 	// Bail out if we are unauthorized to sign a block
 	if signer != signerAddressL1 {
+		log.Error("Error unauthorized signer here", "Got", signer, "Expected:", signerAddressL1)
 		return ErrUnauthorizedSigner
 	}
 
@@ -277,7 +286,7 @@ func (s *SystemContract) Seal(chain consensus.ChainHeaderReader, block *types.Bl
 	if err != nil {
 		return err
 	}
-	copy(header.Extra[0:], sighash)
+	copy(header.BlockSignature[0:], sighash)
 	// Wait until sealing is terminated or delay timeout.
 	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
 	go func() {
@@ -314,7 +323,7 @@ func SealHash(header *types.Header) (hash common.Hash) {
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
-	signature := header.Extra[0:]
+	signature := header.BlockSignature[0:]
 
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)

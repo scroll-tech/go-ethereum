@@ -93,11 +93,24 @@ type Peer struct {
 
 	term chan struct{} // Termination channel to stop the broadcasters
 	lock sync.RWMutex  // Mutex protecting the internal fields
+
+	//Hacky: function to verify whether the block isEuclidV2 or not
+	isEuclidV2 func(uint64) bool
+}
+
+// NewPeer create a wrapper for a network connection and negotiated  protocol
+// version.
+func NewPeerIsEuclidV2(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool, isEuclidV2 func(uint64) bool) *Peer {
+	return newPeer(version, p, rw, txpool, isEuclidV2)
 }
 
 // NewPeer create a wrapper for a network connection and negotiated  protocol
 // version.
 func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool) *Peer {
+	return newPeer(version, p, rw, txpool, func(uint64) bool { return false })
+}
+
+func newPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool, isEuclidV2 func(uint64) bool) *Peer {
 	peer := &Peer{
 		id:              p.ID().String(),
 		Peer:            p,
@@ -111,6 +124,7 @@ func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool) *Pe
 		txAnnounce:      make(chan []common.Hash),
 		txpool:          txpool,
 		term:            make(chan struct{}),
+		isEuclidV2:      isEuclidV2,
 	}
 	// Start up all the broadcasters
 	go peer.broadcastBlocks()
@@ -277,6 +291,16 @@ func (p *Peer) AsyncSendNewBlockHash(block *types.Block) {
 func (p *Peer) SendNewBlock(block *types.Block, td *big.Int) error {
 	// Mark all the block hash as known, but ensure we don't overflow our limits
 	p.knownBlocks.Add(block.Hash())
+
+	//block.PrepareHeaderForNetwork()
+	// If the block is EuclidV2, we need to send the block signature in the Extra field
+	log.Warn("Euclid handled", ":", block.Header().EuclidHandled)
+	header := block.Header()
+	if header.EuclidHandled {
+		header.Extra = header.BlockSignature
+	}
+	block = block.CopyBlockDeepWithHeader(header)
+	log.Warn("We are propagating this block", "number", block.Header().Number, "extra:", block.Header().Extra, "blocksig:", block.Header().BlockSignature, "euclidHandled", block.Header().EuclidHandled)
 	return p2p.Send(p.rw, NewBlockMsg, &NewBlockPacket{
 		Block: block,
 		TD:    td,

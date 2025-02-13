@@ -102,8 +102,11 @@ type Header struct {
 	// Included for Ethereum compatibility in Scroll SDK
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
 
-	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
-	Requested bool `json:"-" rlp:"-"`
+	//Hacky: used internally to mark the header as part of a new block hence checking the signature
+	IsNewBlock bool `json:"-" rlp:"-"`
+	//Hacky: used internally store the signature in memory.
+	BlockSignature []byte `json:"-" rlp:"-"`
+	EuclidHandled  bool   `json:"-" rlp:"-"`
 }
 
 // field type overrides for gencodec
@@ -264,6 +267,11 @@ func CopyHeader(h *Header) *Header {
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
+	}
+	// Copy the BlockSignature field if present
+	if len(h.BlockSignature) > 0 {
+		cpy.BlockSignature = make([]byte, len(h.BlockSignature))
+		copy(cpy.BlockSignature, h.BlockSignature)
 	}
 	return &cpy
 }
@@ -460,6 +468,22 @@ func (b *Block) CountL2Tx() int {
 		}
 	}
 	return count
+}
+
+func (b *Block) CopyBlockDeepWithHeader(header *Header) *Block {
+	return &Block{
+		header:       CopyHeader(header),
+		uncles:       b.uncles,       // slice reference (the slice header is copied but the underlying array is shared)
+		transactions: b.transactions, // reference copy
+		// caches (atomic.Value fields) are reused as-is; if necessary, you might want to load and store their values
+		hash:       b.hash,
+		size:       b.size,
+		l1MsgCount: b.l1MsgCount,
+		// Other fields are copied by value (td is a pointer so it's shared)
+		td:           b.td,
+		ReceivedAt:   b.ReceivedAt,
+		ReceivedFrom: b.ReceivedFrom,
+	}
 }
 
 type Blocks []*Block

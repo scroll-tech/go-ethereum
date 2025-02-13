@@ -19,6 +19,7 @@ package fetcher
 
 import (
 	"errors"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"math/rand"
 	"time"
 
@@ -194,10 +195,10 @@ type BlockFetcher struct {
 	fetchingHook       func([]common.Hash)               // Method to call upon starting a block (eth/61) or header (eth/62) fetch
 	completingHook     func([]common.Hash)               // Method to call upon starting a block body fetch (eth/62)
 	importedHook       func(*types.Header, *types.Block) // Method to call upon successful header or block import (both eth/61 and eth/62)
+	IsEuclidV2         func(uint64) bool
 }
 
-// NewBlockFetcher creates a block fetcher to retrieve blocks based on hash announcements.
-func NewBlockFetcher(light bool, getHeader HeaderRetrievalFn, getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, insertHeaders headersInsertFn, insertChain chainInsertFn, dropPeer peerDropFn) *BlockFetcher {
+func NewBlockFetcherEuclidV2(light bool, getHeader HeaderRetrievalFn, getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, insertHeaders headersInsertFn, insertChain chainInsertFn, dropPeer peerDropFn, isEuclidV2 func(uint64) bool) *BlockFetcher {
 	return &BlockFetcher{
 		light:          light,
 		notify:         make(chan *blockAnnounce),
@@ -217,12 +218,18 @@ func NewBlockFetcher(light bool, getHeader HeaderRetrievalFn, getBlock blockRetr
 		getHeader:      getHeader,
 		getBlock:       getBlock,
 		verifyHeader:   verifyHeader,
-		broadcastBlock: broadcastBlock,
+		broadcastBlock: broadcastBlockEuclidV2(broadcastBlock, isEuclidV2),
 		chainHeight:    chainHeight,
 		insertHeaders:  insertHeaders,
 		insertChain:    insertChain,
 		dropPeer:       dropPeer,
+		IsEuclidV2:     isEuclidV2,
 	}
+}
+
+// NewBlockFetcher creates a block fetcher to retrieve blocks based on hash announcements.
+func NewBlockFetcher(light bool, getHeader HeaderRetrievalFn, getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, insertHeaders headersInsertFn, insertChain chainInsertFn, dropPeer peerDropFn) *BlockFetcher {
+	return NewBlockFetcherEuclidV2(light, getHeader, getBlock, verifyHeader, broadcastBlock, chainHeight, insertHeaders, insertChain, dropPeer, func(uint64) bool { return false })
 }
 
 // Start boots up the announcement based synchroniser, accepting and processing
@@ -883,5 +890,23 @@ func (f *BlockFetcher) forgetBlock(hash common.Hash) {
 			delete(f.queues, insert.origin)
 		}
 		delete(f.queued, hash)
+	}
+}
+
+func broadcastBlockEuclidV2(broadcastBlock blockBroadcasterFn, isEuclidV2 func(uint64) bool) blockBroadcasterFn {
+	return func(block *types.Block, propagate bool) {
+		header := block.Header()
+		if isEuclidV2(header.Time) && !header.EuclidHandled {
+			if len(header.Extra) < crypto.SignatureLength {
+				log.Error("Propagated Euclid V2 block is missing signature", "hash", header.Hash())
+			}
+			// Extract signature from the end of Extra.
+			header.BlockSignature = header.Extra
+			// Remove the signature from Extra so internal hash remains correct.
+			header.Extra = []byte{}
+			header.EuclidHandled = true
+		}
+		block = block.CopyBlockDeepWithHeader(header)
+		broadcastBlock(block, propagate)
 	}
 }

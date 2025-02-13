@@ -182,8 +182,8 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		return err
 	}
 
-	// only if block header has NOT been requested, then verify the signature against the current signer
-	if !header.Requested {
+	// only if block header comes from a new block msg, then verify the signature against the current signer
+	if header.IsNewBlock {
 		signer, err := ecrecover(header)
 		if err != nil {
 			return err

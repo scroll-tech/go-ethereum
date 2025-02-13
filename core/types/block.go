@@ -106,7 +106,7 @@ type Header struct {
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
 
 	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
-	Requested bool `json:"-" rlp:"-"`
+	IsNewBlock bool `json:"-" rlp:"-"`
 }
 
 // field type overrides for gencodec

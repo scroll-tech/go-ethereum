@@ -215,6 +215,7 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.BlockSignature = make([]byte, extraSeal)
 	header.Extra = []byte{}
+	header.IsNewBlock = true
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {

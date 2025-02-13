@@ -10,6 +10,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
@@ -64,6 +65,8 @@ func (ds *CalldataBlobSource) NextData() (Entries, error) {
 		// make sure we don't request more than finalized blocks
 		to = min(to, ds.l1Finalized)
 	}
+
+	log.Debug("Fetching rollup events", "from", ds.l1Height, "to", to, "finalized", ds.l1Finalized)
 
 	if ds.l1Height > to {
 		return nil, ErrSourceExhausted

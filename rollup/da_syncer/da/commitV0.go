@@ -10,6 +10,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
@@ -172,6 +173,7 @@ func getL1Messages(db ethdb.Database, parentTotalL1MessagePopped uint64, skipped
 		}
 		l1Tx := rawdb.ReadL1Message(db, currentIndex)
 		if l1Tx == nil {
+			log.Info("L1 message not yet available", "index", currentIndex)
 			// message not yet available
 			// we return serrors.EOFError as this will be handled in the syncing pipeline with a backoff and retry
 			return nil, serrors.EOFError

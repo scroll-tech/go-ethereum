@@ -207,6 +207,7 @@ func (s *SyncingPipeline) mainLoop() {
 				// pipeline is empty, request a delayed step
 				// TODO: eventually (with state manager) this should not trigger a delayed step because external events will trigger a new step anyway
 				reqStep(true)
+				log.Debug("syncing pipeline is empty, requesting delayed step")
 				tempErrorCounter = 0
 				continue
 			} else if errors.Is(err, serrors.TemporaryError) {

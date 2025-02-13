@@ -51,6 +51,8 @@ var (
 	// errInvalidTimestamp is returned if the timestamp of a block is lower than
 	// the previous block's timestamp + the minimum block period.
 	errInvalidTimestamp = errors.New("invalid timestamp")
+	// errInvalidExtra is returned if the extra data is not empty
+	errInvalidExtra = errors.New("invalid extra")
 )
 
 // ErrUnauthorizedSigner is returned if a header is signed by a non-authorized entity.
@@ -113,7 +115,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errInvalidNonce
 	}
 	// Check that the extra-data contains signature
-	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.Extra) != extraSeal {
+	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -133,7 +135,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if header.GasLimit > cap {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, cap)
 	}
-	// All basic checks passed, verify cascading fields
+	//// All basic checks passed, verify cascading fields
 	return s.verifyCascadingFields(chain, header, parents)
 }
 
@@ -208,7 +210,8 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
-	header.Extra = make([]byte, extraSeal)
+	header.BlockSignature = make([]byte, extraSeal)
+
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {
@@ -277,7 +280,7 @@ func (s *SystemContract) Seal(chain consensus.ChainHeaderReader, block *types.Bl
 	if err != nil {
 		return err
 	}
-	copy(header.Extra[0:], sighash)
+	copy(header.BlockSignature[0:], sighash)
 	// Wait until sealing is terminated or delay timeout.
 	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
 	go func() {
@@ -314,7 +317,7 @@ func SealHash(header *types.Header) (hash common.Hash) {
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
-	signature := header.Extra[0:]
+	signature := header.BlockSignature[0:]
 
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)

@@ -42,8 +42,12 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock, override bool, sign bool
 
 	parentBlockNumber := currentBlock.Number().Uint64()
 	if override {
-		// TODO: does this work when we do a reorg and actually overwrite the existing chain?
 		parentBlockNumber = block.PartialHeader.Number - 1
+		// reset the chain head to the parent block so that the new block can be inserted as part of the new canonical chain.
+		err := s.blockchain.SetHead(parentBlockNumber)
+		if err != nil {
+			return fmt.Errorf("failed setting head, number: %d, error: %v", parentBlockNumber, err)
+		}
 	}
 
 	parentBlock := s.blockchain.GetBlockByNumber(parentBlockNumber)
@@ -51,23 +55,25 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock, override bool, sign bool
 		return fmt.Errorf("failed getting parent block, number: %d", parentBlockNumber)
 	}
 
-	_, _, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions, sign)
+	fullBlock, writeStatus, err := s.blockchain.BuildAndWriteBlock(parentBlock, block.PartialHeader.ToHeader(), block.Transactions, sign)
 	if err != nil {
 		return fmt.Errorf("failed building and writing block, number: %d, error: %v", block.PartialHeader.Number, err)
 	}
+	if writeStatus != core.CanonStatTy {
+		return fmt.Errorf("failed writing block as part of canonical chain, number: %d, status: %d", block.PartialHeader.Number, writeStatus)
+	}
 
 	currentBlock = s.blockchain.CurrentBlock()
-	if override && block.PartialHeader.Number != currentBlock.Number().Uint64() && block.PartialHeader.Number%100 == 0 {
-		newBlock := s.blockchain.GetHeaderByNumber(block.PartialHeader.Number)
-		log.Info("L1 sync progress", "processed block ", newBlock.Number.Uint64(), "block hash", newBlock.Hash(), "root", newBlock.Root)
-		log.Info("L1 sync progress", "blockchain height", currentBlock.Number().Uint64(), "block hash", currentBlock.Hash(), "root", currentBlock.Root())
-	} else if currentBlock.Number().Uint64()%100 == 0 {
-		log.Info("L1 sync progress", "blockchain height", currentBlock.Number().Uint64(), "block hash", currentBlock.Hash(), "root", currentBlock.Root())
+	if currentBlock.Number().Uint64() != fullBlock.NumberU64() || currentBlock.Hash() != fullBlock.Hash() {
+		return fmt.Errorf("failed to insert block: not part of canonical chain, number: %d, hash: %s - canonical: number: %d, hash: %s", fullBlock.NumberU64(), fullBlock.Hash(), currentBlock.Number().Uint64(), currentBlock.Hash())
+	}
+
+	if fullBlock.Number().Uint64()%100 == 0 {
+		log.Info("L1 sync progress", "blockchain height", fullBlock.Number().Uint64(), "block hash", fullBlock.Hash(), "root", fullBlock.Root())
 	}
 
 	if s.l2EndBlock > 0 && s.l2EndBlock == block.PartialHeader.Number {
-		newBlock := s.blockchain.GetHeaderByNumber(block.PartialHeader.Number)
-		log.Warn("L1 sync reached L2EndBlock: you can terminate recovery mode now", "L2EndBlock", newBlock.Number.Uint64(), "block hash", newBlock.Hash(), "root", newBlock.Root)
+		log.Warn("L1 sync reached L2EndBlock: you can terminate recovery mode now", "L2EndBlock", fullBlock.NumberU64(), "block hash", fullBlock.Hash(), "root", fullBlock.Root())
 		return serrors.Terminated
 	}
 

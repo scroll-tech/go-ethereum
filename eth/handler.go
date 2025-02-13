@@ -235,7 +235,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	if config.ShadowForkPeerIDs != nil {
 		fetcherDropPeerFunc = func(id string) {}
 	}
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, fetcherDropPeerFunc)
+	h.blockFetcher = fetcher.NewBlockFetcherEuclidV2(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, fetcherDropPeerFunc, config.Chain.Config().IsEuclidV2)
 
 	fetchTx := func(peer string, hashes []common.Hash) error {
 		p := h.peers.peer(peer)
@@ -470,7 +470,7 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 		for _, peer := range transfer {
 			peer.AsyncSendNewBlock(block, td)
 		}
-		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		log.Warn("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)), "number", block.Header().Number, "blocksig:", block.Header().BlockSignature)
 		return
 	}
 	// Otherwise if the block is indeed in out own chain, announce it
@@ -544,6 +544,7 @@ func (h *handler) minedBroadcastLoop() {
 
 	for obj := range h.minedBlockSub.Chan() {
 		if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
+			log.Warn("Broadcasting block", "header", ev.Block.Header().Number, "blocksig", ev.Block.Header().BlockSignature)
 			h.BroadcastBlock(ev.Block, true)  // First propagate block to peers
 			h.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 		}

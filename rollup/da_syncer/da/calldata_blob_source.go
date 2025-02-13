@@ -243,7 +243,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(commitEvents []*l1.CommitBatchEve
 			if entry, err = NewCommitBatchDAV1(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, args.BlobHashes, blockHeader.Time); err != nil {
 				return nil, fmt.Errorf("failed to decode DA, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 			}
-		case 7:
+		default: // CodecVersion 7 and above
 			if i >= len(args.BlobHashes) {
 				return nil, fmt.Errorf("not enough blob hashes for commit transaction: %s, index in tx: %d, batch index: %d, hash: %s", firstCommitEvent.TxHash(), i, commitEvent.BatchIndex().Uint64(), commitEvent.BatchHash().Hex())
 			}
@@ -259,8 +259,6 @@ func (ds *CalldataBlobSource) getCommitBatchDA(commitEvents []*l1.CommitBatchEve
 			if entry, err = NewCommitBatchDAV7(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, blobHash, parentBatchHash, blockHeader.Time); err != nil {
 				return nil, fmt.Errorf("failed to decode DA, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 			}
-		default:
-			return nil, fmt.Errorf("failed to decode DA, codec version is unknown: codec version: %d", args.Version)
 		}
 
 		previousEvent = commitEvent

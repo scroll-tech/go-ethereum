@@ -182,6 +182,7 @@ var (
 		utils.DARecoveryInitialBatchFlag,
 		utils.DARecoverySignBlocksFlag,
 		utils.DARecoveryL2EndBlockFlag,
+		utils.DARecoveryProduceBlocksFlag,
 	}
 
 	rpcFlags = []cli.Flag{

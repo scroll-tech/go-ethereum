@@ -323,7 +323,7 @@ func ReadL1MessagesV2From(db ethdb.Database, startIndex, maxCount uint64) []type
 		// sanity check
 		if msg.QueueIndex != index {
 			log.Crit(
-				"Unexpected QueueIndex in ReadL1MessagesV1From",
+				"Unexpected QueueIndex in ReadL1MessagesV2From",
 				"expected", index,
 				"got", msg.QueueIndex,
 				"startIndex", startIndex,

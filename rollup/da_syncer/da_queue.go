@@ -31,6 +31,12 @@ func NewDAQueue(l1height uint64, initialBatch uint64, dataSourceFactory *DataSou
 
 func (dq *DAQueue) NextDA(ctx context.Context) (da.Entry, error) {
 	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		for len(dq.da) == 0 {
 			err := dq.getNextData(ctx)
 			if err != nil {

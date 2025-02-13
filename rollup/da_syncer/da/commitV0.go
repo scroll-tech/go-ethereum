@@ -66,9 +66,10 @@ func NewCommitBatchDAV0WithChunks(db ethdb.Database,
 	}, nil
 }
 
-func NewCommitBatchDAV0Empty() *CommitBatchDAV0 {
+func NewCommitBatchDAV0Empty(event *l1.CommitBatchEvent) *CommitBatchDAV0 {
 	return &CommitBatchDAV0{
 		batchIndex: 0,
+		event:      event,
 	}
 }
 

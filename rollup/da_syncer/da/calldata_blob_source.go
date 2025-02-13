@@ -197,7 +197,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(commitEvents []*l1.CommitBatchEve
 	}
 
 	if commitEvents[0].BatchIndex().Uint64() == 0 {
-		return Entries{NewCommitBatchDAV0Empty()}, nil
+		return Entries{NewCommitBatchDAV0Empty(commitEvents[0])}, nil
 	}
 
 	firstCommitEvent := commitEvents[0]

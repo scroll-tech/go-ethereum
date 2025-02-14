@@ -109,8 +109,8 @@ var (
 	l1MessagePrefix                   = []byte("L1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
 	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
 	highestSyncedQueueIndexKey        = []byte("HighestSyncedQueueIndex")
-	l1MessageV2StartIndexKey          = []byte("L1MessageV2StartIndex")
-	l1MessageV2FirstL1BlockNumberKey  = []byte("L1MessageV2FirstL1BlockNumber")
+	l1MessageV2StartIndexKey          = []byte("MessageQueueV2StartIndex")
+	l1MessageV2FirstL1BlockNumberKey  = []byte("MessageQueueV2FirstL1BlockNumber")
 
 	// Scroll rollup event store
 	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")

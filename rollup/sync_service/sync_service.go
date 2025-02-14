@@ -262,6 +262,7 @@ func (s *SyncService) fetchMessages() {
 		// write start index of very first L1MessageV2 to database. This is true only once.
 		if len(msgsV2) > 0 && l1MessageV2StartIndex == nil {
 			firstL1MessageV2 := msgsV2[0]
+			log.Info("Received first L1Message from MessageQueueV2", "queueIndex", firstL1MessageV2.QueueIndex, "L1 blockNumber", to)
 			l1MessageV2StartIndex = &firstL1MessageV2.QueueIndex
 			rawdb.WriteL1MessageV2StartIndex(batchWriter, firstL1MessageV2.QueueIndex)
 			rawdb.WriteL1MessageV2FirstL1BlockNumber(batchWriter, to)

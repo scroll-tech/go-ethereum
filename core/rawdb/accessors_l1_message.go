@@ -210,7 +210,8 @@ func (it *L1MessageIterator) Error() error {
 
 // L1MessageV1Iterator is a wrapper around L1MessageIterator that allows us to iterate over L1 messages V1.
 type L1MessageV1Iterator struct {
-	db ethdb.Database
+	db           ethdb.Database
+	v2StartIndex *uint64
 	L1MessageIterator
 }
 
@@ -220,6 +221,7 @@ type L1MessageV1Iterator struct {
 func IterateL1MessagesV1From(db ethdb.Database, fromQueueIndex uint64) L1MessageV1Iterator {
 	return L1MessageV1Iterator{
 		db:                db,
+		v2StartIndex:      ReadL1MessageV2StartIndex(db),
 		L1MessageIterator: iterateL1MessagesFrom(db, fromQueueIndex),
 	}
 }
@@ -228,9 +230,12 @@ func (it *L1MessageV1Iterator) Next() bool {
 	for it.L1MessageIterator.Next() {
 		// L1MessageV2StartIndex is the first queue index of L1 messages that are from L1MessageQueueV2.
 		// Therefore, we stop reading L1 messages V1 when we reach this index.
-		// We need to check in every iteration as the start index can be set in the meantime when we are reading L1 messages.
-		v2StartIndex := ReadL1MessageV2StartIndex(it.db)
-		if v2StartIndex != nil && it.QueueIndex() >= *v2StartIndex {
+		// We need to check in every iteration if not yet set as the start index can be set in the meantime when we are reading L1 messages.
+		if it.v2StartIndex == nil {
+			it.v2StartIndex = ReadL1MessageV2StartIndex(it.db)
+		}
+
+		if it.v2StartIndex != nil && it.QueueIndex() >= *it.v2StartIndex {
 			return false
 		}
 		return true

@@ -83,14 +83,14 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
 
+	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
+	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
+
 	// BlockSignature was added by EuclidV2 to make Extra empty and is ignored during hashing
 	BlockSignature []byte `json:"-" rlp:"optional"`
 
 	// IsEuclidV2 was added by EuclidV2 to make Extra empty and is ignored during hashing
 	IsEuclidV2 bool `json:"-" rlp:"optional"`
-
-	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
-	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
 
 	// WithdrawalsHash was added by EIP-4895 and is ignored in legacy headers.
 	// Included for Ethereum compatibility in Scroll SDK

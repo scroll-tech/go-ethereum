@@ -67,7 +67,7 @@ docker:
 	docker build --platform linux/x86_64 -t scrolltech/l2geth:latest ./ -f Dockerfile
 
 mockccc_docker:
-	docker build --platform linux/x86_64 -t scrolltech/l2geth:latest ./ -f Dockerfile.mockccc
+	docker build --platform linux/x86_64 -t scrolltech/sequencer:scroll-v99.99.99-local -t scrolltech/l2geth:scroll-v99.99.99-local ./ -f Dockerfile.mockccc
 
 mockccc_alpine_docker:
 	docker build --platform linux/x86_64 -t scrolltech/l2geth:latest ./ -f Dockerfile.mockccc.alpine

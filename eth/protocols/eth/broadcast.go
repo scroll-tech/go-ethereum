@@ -59,7 +59,7 @@ func (p *Peer) broadcastBlocks() {
 			if err := p.SendNewBlock(prop.block, prop.td); err != nil {
 				return
 			}
-			p.Log().Warn("Propagated/ing block", "number", prop.block.Number(), "extra:", prop.block.Header().Extra)
+			p.Log().Warn("broadcastBlocks: Propagated/ing block", "number", prop.block.Number(), "hash", prop.block.Hash(), "extra:", prop.block.Header().Extra, "blockSig", prop.block.Header().BlockSignature)
 
 		case block := <-p.queuedBlockAnns:
 			if err := p.SendNewBlockHashes([]common.Hash{block.Hash()}, []uint64{block.NumberU64()}); err != nil {

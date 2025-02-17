@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -19,7 +21,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rpc"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -113,8 +114,8 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errInvalidNonce
 	}
 	// Check that the BlockSignature-data contains signature
-	if header.Number.Cmp(big.NewInt(0)) != 0 && (len(header.BlockSignature) != extraSeal && header.IsNewBlock) {
-		log.Warn("Block header has no signature", "number", header.Number, "extra:", len(header.Extra), "blockSig:", len(header.BlockSignature), "isNewBlock", header.IsNewBlock)
+	if !header.Requested && header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
+		log.Warn("Block header has no signature", "number", header.Number, "hash:", header.Hash(), "extra:", len(header.Extra), "blockSig:", len(header.BlockSignature), "requested:", header.Requested)
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -182,8 +183,8 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		return err
 	}
 
-	// only if block header IS NEW, then verify the signature against the current signer
-	if header.IsNewBlock {
+	// only if block header has NOT been requested, then verify the signature against the current signer
+	if !header.Requested {
 		signer, err := ecrecover(header)
 		if err != nil {
 			return err
@@ -214,9 +215,7 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.BlockSignature = make([]byte, extraSeal)
-	header.EuclidHandled = true
-	header.IsNewBlock = true
-	
+
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {

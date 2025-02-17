@@ -294,13 +294,12 @@ func (p *Peer) SendNewBlock(block *types.Block, td *big.Int) error {
 
 	//block.PrepareHeaderForNetwork()
 	// If the block is EuclidV2, we need to send the block signature in the Extra field
-	log.Warn("Euclid handled", ":", block.Header().EuclidHandled)
 	header := block.Header()
-	if header.EuclidHandled {
+	if len(header.BlockSignature) > 0 {
 		header.Extra = header.BlockSignature
 	}
 	block = block.CopyBlockDeepWithHeader(header)
-	log.Warn("We are propagating this block", "number", block.Header().Number, "extra:", block.Header().Extra, "blocksig:", block.Header().BlockSignature, "euclidHandled", block.Header().EuclidHandled)
+	log.Warn("SendNewBlock:", "number", block.Header().Number, "extra:", block.Header().Extra, "blocksig:", block.Header().BlockSignature)
 	return p2p.Send(p.rw, NewBlockMsg, &NewBlockPacket{
 		Block: block,
 		TD:    td,

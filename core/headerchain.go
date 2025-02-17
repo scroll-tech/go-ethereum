@@ -188,14 +188,9 @@ func (hc *HeaderChain) writeHeaders(headers []*types.Header) (result *headerWrit
 			rawdb.WriteTd(batch, hash, number, newTD)
 			hc.tdCache.Add(hash, new(big.Int).Set(newTD))
 
-			headerCopy := types.CopyHeader(header)
-			if headerCopy.EuclidHandled {
-				headerCopy.Extra = headerCopy.BlockSignature
-			}
-			log.Warn("writing header", "hash", hash, "number", number, "extra", headerCopy.Extra, "blocksignature", headerCopy.BlockSignature)
-			rawdb.WriteHeader(batch, headerCopy)
+			rawdb.WriteHeader(batch, header)
 			inserted = append(inserted, numberHash{number, hash})
-			hc.AddToHeaderCacheEuclidV2(hash, headerCopy)
+			hc.headerCache.Add(hash, header)
 			hc.numberCache.Add(hash, number)
 			if firstInserted < 0 {
 				firstInserted = i
@@ -459,51 +454,16 @@ func (hc *HeaderChain) GetTd(hash common.Hash, number uint64) *big.Int {
 // caching it if found.
 func (hc *HeaderChain) GetHeader(hash common.Hash, number uint64) *types.Header {
 	// Short circuit if the header's already in the cache, retrieve otherwise
-	if header, ok := hc.GetFromHeaderCacheEuclidV2(hash); ok {
-		log.Warn("Reading from cache", "Number", number, "extra", header.Extra, "blocksignature", header.BlockSignature)
-		return header
+	if header, ok := hc.headerCache.Get(hash); ok {
+		return header.(*types.Header)
 	}
 	header := rawdb.ReadHeader(hc.chainDb, hash, number)
-	log.Warn("Reading from chainDb", "Number", number, "extra", header.Extra, "blocksignature", header.BlockSignature)
 	if header == nil {
 		return nil
 	}
-	if hc.config.IsEuclidV2(header.Time) {
-		header.BlockSignature = header.Extra
-		header.Extra = []byte{}
-		header.EuclidHandled = true
-	}
 	// Cache the found header for next time and return
-	log.Warn("Adding to cache", "Number", number, "extra", header.Extra, "blocksignature", header.BlockSignature)
-	headerCopy := types.CopyHeader(header)
-	if header.EuclidHandled {
-		headerCopy.Extra = headerCopy.BlockSignature
-	}
-	hc.AddToHeaderCacheEuclidV2(hash, headerCopy)
-	return header
-}
-
-func (hc *HeaderChain) AddToHeaderCacheEuclidV2(hash common.Hash, header *types.Header) {
-	log.Warn("Adding to cache here", "Number", header.Number, "extra", header.Extra, "blocksignature", header.BlockSignature, "EuclidHandled", header.EuclidHandled)
-	header = types.CopyHeader(header)
-	if header.EuclidHandled {
-		header.Extra = header.BlockSignature
-	}
 	hc.headerCache.Add(hash, header)
-}
-
-func (hc *HeaderChain) GetFromHeaderCacheEuclidV2(hash common.Hash) (*types.Header, bool) {
-	if h, ok := hc.headerCache.Get(hash); !ok {
-		return nil, false
-	} else {
-		header := h.(*types.Header)
-		if hc.config.IsEuclidV2(header.Time) {
-			header.BlockSignature = header.Extra
-			header.Extra = []byte{}
-			header.EuclidHandled = true
-		}
-		return header, true
-	}
+	return header
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if

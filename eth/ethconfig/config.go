@@ -19,13 +19,14 @@ package ethconfig
 
 import (
 	"context"
-	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"math/big"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"

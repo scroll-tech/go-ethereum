@@ -19,6 +19,7 @@ package eth
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
@@ -92,8 +93,8 @@ func answerGetBlockHeadersQuery(backend Backend, query *GetBlockHeadersPacket, p
 		}
 
 		originCopy := types.CopyHeader(origin)
-		peer.Log().Warn("OriginCopy:", "number", originCopy.Number, "EuclidHandled", originCopy.EuclidHandled, "Extra", originCopy.Extra, "BlockSignature", originCopy.BlockSignature)
-		if originCopy.EuclidHandled {
+		peer.Log().Warn("OriginCopy:", "number", originCopy.Number, "hash", originCopy.Hash(), "Extra", originCopy.Extra, "BlockSignature", originCopy.BlockSignature)
+		if len(originCopy.BlockSignature) > 0 {
 			originCopy.Extra = originCopy.BlockSignature
 		}
 		headers = append(headers, originCopy)
@@ -292,20 +293,19 @@ func handleNewBlock(backend Backend, msg Decoder, peer *Peer) error {
 
 	// Extract and store the block signature if it's a Euclid V2 block
 	header := ann.Block.Header()
-	if peer.isEuclidV2(ann.Block.Header().Time) && !header.EuclidHandled {
+	log.Warn("handleNewBlock", "number", header.Number, "hash", header.Hash(), "extra", header.Extra, "blockSignature", header.BlockSignature)
+	if peer.isEuclidV2(ann.Block.Header().Time) {
 		if len(header.Extra) < crypto.SignatureLength {
-			peer.Log().Warn("Propagated Euclid V2 block is missing signature (handle new block)", "number", header.Number, "hash", header.Hash(), "extra", header.Extra, "blocksignature", header.BlockSignature)
+			peer.Log().Error("Propagated Euclid V2 block is missing signature (handle new block)", "number", header.Number, "hash", header.Hash(), "extra", header.Extra, "blocksignature", header.BlockSignature)
 			return nil
 		}
 		// Extract signature from the end of Extra.
-		header.BlockSignature = make([]byte, len(header.Extra))
-		copy(header.BlockSignature, header.Extra)
+		header.BlockSignature = header.Extra
 		// Remove the signature from Extra so internal hash remains correct.
 		header.Extra = []byte{}
-		header.EuclidHandled = true
-		header.IsNewBlock = true
+		ann.Block = ann.Block.CopyBlockDeepWithHeader(header)
 	}
-	ann.Block = ann.Block.CopyBlockDeepWithHeader(header)
+
 	// Mark the peer as owning the block
 	peer.markBlock(ann.Block.Hash())
 

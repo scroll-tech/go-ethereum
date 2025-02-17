@@ -109,10 +109,11 @@ func (h *ethHandler) Handle(peer *eth.Peer, packet eth.Packet) error {
 func (h *ethHandler) handleHeaders(peer *eth.Peer, headers []*types.Header) error {
 	p := h.peers.peer(peer.ID())
 	for _, header := range headers {
-		if h.blockFetcher.IsEuclidV2(header.Time) && !header.EuclidHandled {
+		if h.blockFetcher.IsEuclidV2(header.Time) {
 			header.BlockSignature = header.Extra
 			header.Extra = []byte{}
-			header.EuclidHandled = true
+
+			log.Info("handleHeaders: Euclid V2 header", "number", header.Number, "hash", header.Hash(), "extra", header.Extra, "blockSignature", header.BlockSignature)
 		}
 	}
 	if p == nil {

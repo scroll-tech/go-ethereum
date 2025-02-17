@@ -102,11 +102,10 @@ type Header struct {
 	// Included for Ethereum compatibility in Scroll SDK
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
 
-	//Hacky: used internally to mark the header as part of a new block hence checking the signature
-	IsNewBlock bool `json:"-" rlp:"-"`
-	//Hacky: used internally store the signature in memory.
+	// Hacky: used internally to mark the header as requested by the downloader at the deliver queue
+	Requested bool `json:"-" rlp:"-"`
+	// Hacky: used internally store the signature in memory.
 	BlockSignature []byte `json:"-" rlp:"-"`
-	EuclidHandled  bool   `json:"-" rlp:"-"`
 }
 
 // field type overrides for gencodec
@@ -472,9 +471,9 @@ func (b *Block) CountL2Tx() int {
 
 func (b *Block) CopyBlockDeepWithHeader(header *Header) *Block {
 	return &Block{
-		header:       CopyHeader(header),
-		uncles:       b.uncles,       // slice reference (the slice header is copied but the underlying array is shared)
-		transactions: b.transactions, // reference copy
+		header:       CopyHeader(header), // TODO: do we need to copy here again?
+		uncles:       b.uncles,           // slice reference (the slice header is copied but the underlying array is shared)
+		transactions: b.transactions,     // reference copy
 		// caches (atomic.Value fields) are reused as-is; if necessary, you might want to load and store their values
 		hash:       b.hash,
 		size:       b.size,

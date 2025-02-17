@@ -896,7 +896,7 @@ func (f *BlockFetcher) forgetBlock(hash common.Hash) {
 func broadcastBlockEuclidV2(broadcastBlock blockBroadcasterFn, isEuclidV2 func(uint64) bool) blockBroadcasterFn {
 	return func(block *types.Block, propagate bool) {
 		header := block.Header()
-		if isEuclidV2(header.Time) && !header.EuclidHandled {
+		if isEuclidV2(header.Time) {
 			if len(header.BlockSignature) < crypto.SignatureLength {
 				log.Error("Propagated Euclid V2 block is missing signature", "block number", header.Number.Uint64(), "hash", header.Hash())
 			}
@@ -905,10 +905,8 @@ func broadcastBlockEuclidV2(broadcastBlock blockBroadcasterFn, isEuclidV2 func(u
 			header.Extra = header.BlockSignature
 
 			log.Warn("Propagating Euclid V2 block", "block number", header.Number.Uint64(), "hash", header.Hash(), "sig", header.BlockSignature)
-			header.EuclidHandled = true
-			block = block.CopyBlockDeepWithHeader(header)
 		}
-
+		block = block.CopyBlockDeepWithHeader(header)
 		broadcastBlock(block, propagate)
 	}
 }

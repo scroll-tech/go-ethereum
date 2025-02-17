@@ -351,12 +351,7 @@ func WriteHeader(db ethdb.KeyValueWriter, header *types.Header) {
 	WriteHeaderNumber(db, hash, number)
 
 	// Write the encoded header
-	headerCopy := types.CopyHeader(header)
-	if header.EuclidHandled {
-		headerCopy.Extra = headerCopy.BlockSignature
-	}
-	log.Warn("Writing on chainDB", "Number", number, "extra", headerCopy.Extra, "blocksignature", headerCopy.BlockSignature, "EuclidHandled", headerCopy.EuclidHandled)
-	data, err := rlp.EncodeToBytes(headerCopy)
+	data, err := rlp.EncodeToBytes(header)
 	if err != nil {
 		log.Crit("Failed to RLP encode header", "err", err)
 	}
@@ -779,12 +774,7 @@ func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *type
 		return fmt.Errorf("can't add block %d hash: %v", num, err)
 	}
 
-	// Write the encoded header
-	headerCopy := types.CopyHeader(header)
-	//if header.EuclidHandled {
-	//	headerCopy.Extra = headerCopy.BlockSignature
-	//}
-	if err := op.Append(freezerHeaderTable, num, headerCopy); err != nil {
+	if err := op.Append(freezerHeaderTable, num, header); err != nil {
 		return fmt.Errorf("can't append block header %d: %v", num, err)
 	}
 	if err := op.Append(freezerBodiesTable, num, block.Body()); err != nil {

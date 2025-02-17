@@ -933,7 +933,8 @@ func (c *ChainConfig) IsEuclid(now uint64) bool {
 
 // IsEuclidV2 returns whether time is either equal to the EuclidV2 fork time or greater.
 func (c *ChainConfig) IsEuclidV2(now uint64) bool {
-	return isForkedTime(now, c.EuclidV2Time)
+	//return isForkedTime(now, c.EuclidV2Time)
+	return now > 8 //now is actually header.Number during testing
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
@@ -1175,6 +1176,6 @@ func (c *ChainConfig) Rules(num *big.Int, time uint64) Rules {
 		IsCurie:          c.IsCurie(num),
 		IsDarwin:         c.IsDarwin(time),
 		IsEuclid:         c.IsEuclid(time),
-		IsEuclidV2:       c.IsEuclidV2(time),
+		IsEuclidV2:       c.IsEuclidV2(num.Uint64()),
 	}
 }

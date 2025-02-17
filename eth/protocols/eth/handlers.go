@@ -266,6 +266,11 @@ func handleNewBlock(backend Backend, msg Decoder, peer *Peer) error {
 	if err := msg.Decode(ann); err != nil {
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
+
+	hCopy := ann.Block.Header()
+	hCopy.PrepareFromNetwork(backend.Chain().Config().IsEuclidV2(hCopy.Number.Uint64()))
+	ann.Block = ann.Block.CopyBlockDeepWithHeader(hCopy)
+
 	if err := ann.sanityCheck(); err != nil {
 		return err
 	}
@@ -294,6 +299,13 @@ func handleBlockHeaders66(backend Backend, msg Decoder, peer *Peer) error {
 	}
 	requestTracker.Fulfil(peer.id, peer.version, BlockHeadersMsg, res.RequestId)
 
+	headersCopy := make([]*types.Header, 0, len(res.BlockHeadersPacket))
+	for _, header := range res.BlockHeadersPacket {
+		hCopy := types.CopyHeader(header)
+		hCopy.PrepareFromNetwork(backend.Chain().Config().IsEuclidV2(header.Number.Uint64()))
+		headersCopy = append(headersCopy, hCopy)
+	}
+	res.BlockHeadersPacket = headersCopy
 	return backend.Handle(peer, &res.BlockHeadersPacket)
 }
 

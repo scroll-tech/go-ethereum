@@ -214,6 +214,7 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.BlockSignature = make([]byte, extraSeal)
+	header.IsEuclidV2 = true
 	header.Extra = []byte{}
 	header.IsNewBlock = true
 	// Ensure the timestamp has the correct delay

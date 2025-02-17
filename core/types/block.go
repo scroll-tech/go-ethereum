@@ -83,9 +83,6 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
 
-	// BlockSignature was added by EuclidV2 to make Extra empty and is ignored during hashing
-	BlockSignature []byte `json:"-" rlp:"optional"`
-
 	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
 	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
 
@@ -104,6 +101,12 @@ type Header struct {
 	// ParentBeaconRoot was added by EIP-4788 and is ignored in legacy headers.
 	// Included for Ethereum compatibility in Scroll SDK
 	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
+	
+	// BlockSignature was added by EuclidV2 to make Extra empty and is ignored during hashing
+	BlockSignature []byte `json:"-" rlp:"optional"`
+
+	// IsEuclidV2 was added by EuclidV2 to make Extra empty and is ignored during hashing
+	IsEuclidV2 bool `json:"-" rlp:"optional"`
 
 	//Hacky: used internally to mark the header as requested by the downloader at the deliver queue
 	IsNewBlock bool `json:"-" rlp:"-"`
@@ -126,6 +129,10 @@ type headerMarshaling struct {
 func (h *Header) Hash() common.Hash {
 	hCopy := CopyHeader(h)
 	hCopy.BlockSignature = nil
+	if hCopy.IsEuclidV2 {
+		hCopy.IsEuclidV2 = false
+		hCopy.Extra = []byte{}
+	}
 	return rlpHash(hCopy)
 }
 
@@ -170,6 +177,22 @@ func (h *Header) EmptyBody() bool {
 // EmptyReceipts returns true if there are no receipts for this header/block.
 func (h *Header) EmptyReceipts() bool {
 	return h.ReceiptHash == EmptyRootHash
+}
+
+func (h *Header) PrepareForNetwork() {
+	if h.IsEuclidV2 {
+		h.IsEuclidV2 = false
+		h.Extra = h.BlockSignature
+		h.BlockSignature = nil
+	}
+}
+
+func (h *Header) PrepareFromNetwork(isEuclidV2 bool) {
+	if isEuclidV2 {
+		h.IsEuclidV2 = true
+		h.BlockSignature = h.Extra
+		h.Extra = []byte{}
+	}
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -469,6 +492,22 @@ func (b *Block) CountL2Tx() int {
 		}
 	}
 	return count
+}
+
+func (b *Block) CopyBlockDeepWithHeader(header *Header) *Block {
+	return &Block{
+		header:       CopyHeader(header),
+		uncles:       b.uncles,       // slice reference (the slice header is copied but the underlying array is shared)
+		transactions: b.transactions, // reference copy
+		// caches (atomic.Value fields) are reused as-is; if necessary, you might want to load and store their values
+		hash:       b.hash,
+		size:       b.size,
+		l1MsgCount: b.l1MsgCount,
+		// Other fields are copied by value (td is a pointer so it's shared)
+		td:           b.td,
+		ReceivedAt:   b.ReceivedAt,
+		ReceivedFrom: b.ReceivedFrom,
+	}
 }
 
 type Blocks []*Block

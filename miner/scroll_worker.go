@@ -19,7 +19,6 @@ package miner
 import (
 	"errors"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"math"
 	"math/big"
 	"sync"
@@ -29,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
+	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -451,7 +451,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		GasLimit:   core.CalcGasLimit(parent.GasLimit(), w.config.GasCeil),
-		Extra:      w.extra,
+		Extra:      []byte{},
 		Time:       uint64(now.Unix()),
 	}
 
@@ -852,8 +852,11 @@ func (w *worker) commit() (common.Hash, error) {
 		return common.Hash{}, errors.New("missed seal response from consensus engine")
 	}
 
+	fmt.Println("commit block", block.Number(), "hash", block.Hash().String(), "extra", block.Header().Extra, "blockSig", block.Header().BlockSignature)
+
 	// verify the generated block with local consensus engine to make sure everything is as expected
 	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
+		fmt.Println("failed to verify header after mining", err)
 		return common.Hash{}, retryableCommitError{inner: err}
 	}
 

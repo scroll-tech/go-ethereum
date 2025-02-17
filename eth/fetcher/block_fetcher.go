@@ -19,7 +19,6 @@ package fetcher
 
 import (
 	"errors"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"math/rand"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/prque"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -897,16 +897,18 @@ func broadcastBlockEuclidV2(broadcastBlock blockBroadcasterFn, isEuclidV2 func(u
 	return func(block *types.Block, propagate bool) {
 		header := block.Header()
 		if isEuclidV2(header.Time) && !header.EuclidHandled {
-			if len(header.Extra) < crypto.SignatureLength {
-				log.Error("Propagated Euclid V2 block is missing signature", "hash", header.Hash())
+			if len(header.BlockSignature) < crypto.SignatureLength {
+				log.Error("Propagated Euclid V2 block is missing signature", "block number", header.Number.Uint64(), "hash", header.Hash())
 			}
-			// Extract signature from the end of Extra.
-			header.BlockSignature = header.Extra
-			// Remove the signature from Extra so internal hash remains correct.
-			header.Extra = []byte{}
+
+			// Set the extra data to the block signature. Since BlockSignature is an internal field only we can leave it as is.
+			header.Extra = header.BlockSignature
+
+			log.Warn("Propagating Euclid V2 block", "block number", header.Number.Uint64(), "hash", header.Hash(), "sig", header.BlockSignature)
 			header.EuclidHandled = true
+			block = block.CopyBlockDeepWithHeader(header)
 		}
-		block = block.CopyBlockDeepWithHeader(header)
+
 		broadcastBlock(block, propagate)
 	}
 }

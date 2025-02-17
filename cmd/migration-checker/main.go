@@ -51,6 +51,10 @@ func main() {
 		zkDb:  zkDb,
 		mptDb: mptDb,
 	}, zkRootHash, mptRootHash, "", checkAccountEquality, true)
+
+	for i := 0; i < runtime.GOMAXPROCS(0)*4; i++ {
+		<-trieCheckers
+	}
 }
 
 func panicOnError(err error, label, msg string) {

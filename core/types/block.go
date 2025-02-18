@@ -168,6 +168,14 @@ func (h *Header) SanityCheck() error {
 	return nil
 }
 
+// NetworkCompatibleEuclidV2Fields Enforces that both IsEuclidV2 and BlockSignature are empty when received over the network
+func (h *Header) NetworkCompatibleEuclidV2Fields() error {
+	if h.IsEuclidV2 || h.BlockSignature != nil {
+		return fmt.Errorf("header contains disallowed Euclid V2 fields (only used locally)")
+	}
+	return nil
+}
+
 // EmptyBody returns true if there is no additional 'body' to complete the header
 // that is: no transactions and no uncles.
 func (h *Header) EmptyBody() bool {

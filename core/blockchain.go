@@ -1886,14 +1886,16 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 		l.BlockHash = blockHash
 	}
 
-	// Double check: even though we just built the block, make sure it is valid.
+	// Make sure the block body is valid e.g. ordering of L1 messages is correct and continuous.
 	if err = bc.validator.ValidateBody(fullBlock); err != nil {
 		bc.reportBlock(fullBlock, receipts, err)
-		return nil, NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
+		return nil, NonStatTy, fmt.Errorf("error validating block body %d: %w", fullBlock.Number().Uint64(), err)
 	}
+
+	// Double check: even though we just built the block, make sure it is valid.
 	if err = bc.validator.ValidateState(fullBlock, statedb, receipts, gasUsed); err != nil {
 		bc.reportBlock(fullBlock, receipts, err)
-		return nil, NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
+		return nil,NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
 	}
 
 	writeStatus, err := bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)

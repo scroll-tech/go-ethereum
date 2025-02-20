@@ -51,7 +51,7 @@ func traceCodeWithAddress(l *StructLogger, address common.Address) {
 	keccakCodeHash := l.env.StateDB.GetKeccakCodeHash(address)
 	codeHash := keccakCodeHash
 	poseidonCodeHash := common.Hash{}
-	if !l.env.chainRules.IsEuclid {
+	if !l.env.chainRules.IsEuclid && l.env.chainConfig.Scroll.UseZktrie {
 		poseidonCodeHash = l.env.StateDB.GetPoseidonCodeHash(address)
 		codeHash = poseidonCodeHash
 	}

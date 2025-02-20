@@ -32,6 +32,7 @@ func main() {
 		zkDbPath  = flag.String("zk-db", "", "path to the ZK node DB")
 		mptRoot   = flag.String("mpt-root", "", "root hash of the MPT node")
 		zkRoot    = flag.String("zk-root", "", "root hash of the ZK node")
+		paranoid  = flag.Bool("paranoid", false, "verifies all node contents against their expected hash")
 	)
 	flag.Parse()
 
@@ -50,7 +51,7 @@ func main() {
 	checkTrieEquality(&dbs{
 		zkDb:  zkDb,
 		mptDb: mptDb,
-	}, zkRootHash, mptRootHash, "", checkAccountEquality, true)
+	}, zkRootHash, mptRootHash, "", checkAccountEquality, true, *paranoid)
 
 	for i := 0; i < runtime.GOMAXPROCS(0)*4; i++ {
 		<-trieCheckers
@@ -66,14 +67,14 @@ func panicOnError(err error, label, msg string) {
 func dup(s []byte) []byte {
 	return append([]byte{}, s...)
 }
-func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leafChecker func(string, *dbs, []byte, []byte), top bool) {
+func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leafChecker func(string, *dbs, []byte, []byte, bool), top, paranoid bool) {
 	zkTrie, err := trie.NewZkTrie(zkRoot, trie.NewZktrieDatabaseFromTriedb(trie.NewDatabaseWithConfig(dbs.zkDb, &trie.Config{Preimages: true})))
 	panicOnError(err, label, "failed to create zk trie")
 	mptTrie, err := trie.NewSecureNoTracer(mptRoot, trie.NewDatabaseWithConfig(dbs.mptDb, &trie.Config{Preimages: true}))
 	panicOnError(err, label, "failed to create mpt trie")
 
 	mptLeafCh := loadMPT(mptTrie, top)
-	zkLeafCh := loadZkTrie(zkTrie, top)
+	zkLeafCh := loadZkTrie(zkTrie, top, paranoid)
 
 	mptLeafMap := <-mptLeafCh
 	zkLeafMap := <-zkLeafCh
@@ -107,11 +108,11 @@ func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leaf
 			panic(fmt.Sprintf("%s key %s (preimage %s) not found in mpt", label, hex.EncodeToString([]byte(mptKey)), hex.EncodeToString([]byte(preimageKey))))
 		}
 
-		leafChecker(fmt.Sprintf("%s key: %s", label, hex.EncodeToString([]byte(preimageKey))), dbs, zkValue, mptVal)
+		leafChecker(fmt.Sprintf("%s key: %s", label, hex.EncodeToString([]byte(preimageKey))), dbs, zkValue, mptVal, paranoid)
 	}
 }
 
-func checkAccountEquality(label string, dbs *dbs, zkAccountBytes, mptAccountBytes []byte) {
+func checkAccountEquality(label string, dbs *dbs, zkAccountBytes, mptAccountBytes []byte, paranoid bool) {
 	mptAccount := &types.StateAccount{}
 	panicOnError(rlp.DecodeBytes(mptAccountBytes, mptAccount), label, "failed to decode mpt account")
 	zkAccount, err := types.UnmarshalStateAccount(zkAccountBytes)
@@ -143,7 +144,7 @@ func checkAccountEquality(label string, dbs *dbs, zkAccountBytes, mptAccountByte
 				}
 			}()
 
-			checkTrieEquality(dbs, zkRoot, mptRoot, label, checkStorageEquality, false)
+			checkTrieEquality(dbs, zkRoot, mptRoot, label, checkStorageEquality, false, paranoid)
 			accountsDone.Add(1)
 			fmt.Println("Accounts done:", accountsDone.Load())
 			trieCheckers <- struct{}{}
@@ -154,7 +155,7 @@ func checkAccountEquality(label string, dbs *dbs, zkAccountBytes, mptAccountByte
 	}
 }
 
-func checkStorageEquality(label string, _ *dbs, zkStorageBytes, mptStorageBytes []byte) {
+func checkStorageEquality(label string, _ *dbs, zkStorageBytes, mptStorageBytes []byte, _ bool) {
 	zkValue := common.BytesToHash(zkStorageBytes)
 	_, content, _, err := rlp.Split(mptStorageBytes)
 	panicOnError(err, label, "failed to decode mpt storage")
@@ -214,7 +215,7 @@ func loadMPT(mptTrie *trie.SecureTrie, parallel bool) chan map[string][]byte {
 	return respChan
 }
 
-func loadZkTrie(zkTrie *trie.ZkTrie, parallel bool) chan map[string][]byte {
+func loadZkTrie(zkTrie *trie.ZkTrie, parallel, paranoid bool) chan map[string][]byte {
 	zkLeafMap := make(map[string][]byte, 1000)
 	var zkLeafMutex sync.Mutex
 	zkDone := make(chan map[string][]byte)
@@ -238,7 +239,7 @@ func loadZkTrie(zkTrie *trie.ZkTrie, parallel bool) chan map[string][]byte {
 			if parallel && len(zkLeafMap)%10000 == 0 {
 				fmt.Println("ZK Accounts Loaded:", len(zkLeafMap))
 			}
-		}, parallel)
+		}, parallel, paranoid)
 		zkDone <- zkLeafMap
 	}()
 	return zkDone

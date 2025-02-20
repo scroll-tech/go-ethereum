@@ -239,15 +239,15 @@ func (t *ZkTrie) Witness() map[string]struct{} {
 	panic("not implemented")
 }
 
-func (t *ZkTrie) CountLeaves(cb func(key, value []byte), parallel bool) uint64 {
+func (t *ZkTrie) CountLeaves(cb func(key, value []byte), parallel, verifyNodeHashes bool) uint64 {
 	root, err := t.ZkTrie.Tree().Root()
 	if err != nil {
 		panic("CountLeaves cannot get root")
 	}
-	return t.countLeaves(root, cb, 0, parallel)
+	return t.countLeaves(root, cb, 0, parallel, verifyNodeHashes)
 }
 
-func (t *ZkTrie) countLeaves(root *zkt.Hash, cb func(key, value []byte), depth int, parallel bool) uint64 {
+func (t *ZkTrie) countLeaves(root *zkt.Hash, cb func(key, value []byte), depth int, parallel, verifyNodeHashes bool) uint64 {
 	if root == nil {
 		return 0
 	}
@@ -258,6 +258,16 @@ func (t *ZkTrie) countLeaves(root *zkt.Hash, cb func(key, value []byte), depth i
 	}
 
 	if rootNode.Type == zktrie.NodeTypeLeaf_New {
+		if verifyNodeHashes {
+			calculatedNodeHash, err := rootNode.NodeHash()
+			if err != nil {
+				panic("countLeaves cannot get calculatedNodeHash")
+			}
+			if *calculatedNodeHash != *root {
+				panic("countLeaves node hash mismatch")
+			}
+		}
+
 		cb(append([]byte{}, rootNode.NodeKey.Bytes()...), append([]byte{}, rootNode.Data()...))
 		return 1
 	} else {
@@ -266,14 +276,14 @@ func (t *ZkTrie) countLeaves(root *zkt.Hash, cb func(key, value []byte), depth i
 			leftT := t.Copy()
 			rightT := t.Copy()
 			go func() {
-				count <- leftT.countLeaves(rootNode.ChildL, cb, depth+1, parallel)
+				count <- leftT.countLeaves(rootNode.ChildL, cb, depth+1, parallel, verifyNodeHashes)
 			}()
 			go func() {
-				count <- rightT.countLeaves(rootNode.ChildR, cb, depth+1, parallel)
+				count <- rightT.countLeaves(rootNode.ChildR, cb, depth+1, parallel, verifyNodeHashes)
 			}()
 			return <-count + <-count
 		} else {
-			return t.countLeaves(rootNode.ChildL, cb, depth+1, parallel) + t.countLeaves(rootNode.ChildR, cb, depth+1, parallel)
+			return t.countLeaves(rootNode.ChildL, cb, depth+1, parallel, verifyNodeHashes) + t.countLeaves(rootNode.ChildR, cb, depth+1, parallel, verifyNodeHashes)
 		}
 	}
 }

@@ -55,7 +55,6 @@ func traceCodeWithAddress(l *StructLogger, address common.Address) {
 		poseidonCodeHash = l.env.StateDB.GetPoseidonCodeHash(address)
 		codeHash = poseidonCodeHash
 	}
-
 	codeSize := l.env.StateDB.GetCodeSize(address)
 	l.bytecodes[codeHash] = CodeInfo{
 		codeSize,

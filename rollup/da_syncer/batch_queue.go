@@ -108,7 +108,7 @@ func (bq *BatchQueue) processAndDeleteBatch(batch da.Entry) da.EntryWithBlocks {
 	}
 
 	// sanity check that the next batch is the one we expect
-	if bq.previousBatch.BatchIndex+1 != entryWithBlocks.BatchIndex() {
+	if bq.previousBatch.BatchIndex > 0 && bq.previousBatch.BatchIndex+1 != entryWithBlocks.BatchIndex() {
 		log.Info("BatchQueue: skipping batch ", "currentBatch", entryWithBlocks.BatchIndex(), "previousBatch", bq.previousBatch.BatchIndex)
 		return nil
 	}

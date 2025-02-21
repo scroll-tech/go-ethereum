@@ -77,29 +77,35 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}
 
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Reader, blobClientList, db)
-	var initialL1Block uint64
+	var lastProcessedBatchMeta *rawdb.DAProcessedBatchMeta
 	if config.RecoveryMode {
-		initialL1Block = config.InitialL1Block
-		if initialL1Block == 0 {
+		// TODO: fill lastProcessedBatchMeta with the correct values
+		//  - due to batches not being able to be decoded independently from EuclidV2 we first need to find the correct
+		//    message queue index
+		//  - this can be done by looking at the finalize transaction of the bundle that contains config.InitialBatch
+		if config.InitialL1Block == 0 {
 			return nil, errors.New("sync from DA: initial L1 block must be set in recovery mode")
 		}
 		if config.InitialBatch == 0 {
 			return nil, errors.New("sync from DA: initial batch must be set in recovery mode")
 		}
 
-		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", initialL1Block, "initialBatch", config.InitialBatch)
+		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", config.InitialL1Block, "initialBatch", config.InitialBatch)
 	} else {
-		initialL1Block = l1DeploymentBlock - 1
-		config.InitialL1Block = initialL1Block
-		from := rawdb.ReadDASyncedL1BlockNumber(db)
-		if from != nil {
-			initialL1Block = *from
+		lastProcessedBatchMeta = rawdb.ReadDAProcessedBatchMeta(db)
+		if lastProcessedBatchMeta == nil {
+			lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
+				BatchIndex:            0,
+				L1BlockNumber:         l1DeploymentBlock - 1,
+				TotalL1MessagesPopped: 0,
+			}
+			rawdb.WriteDAProcessedBatchMeta(db, lastProcessedBatchMeta)
 		}
-		log.Info("sync from DA: initializing pipeline", "initialL1Block", initialL1Block)
+		log.Info("sync from DA: initializing pipeline", "BatchIndex", lastProcessedBatchMeta.BatchIndex, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
 	}
 
-	daQueue := NewDAQueue(initialL1Block, config.InitialBatch, dataSourceFactory)
-	batchQueue := NewBatchQueue(daQueue, db)
+	daQueue := NewDAQueue(lastProcessedBatchMeta.L1BlockNumber, config.InitialBatch, dataSourceFactory)
+	batchQueue := NewBatchQueue(daQueue, db, lastProcessedBatchMeta)
 	blockQueue := NewBlockQueue(batchQueue)
 	daSyncer := NewDASyncer(blockchain, config.L2EndBlock)
 
@@ -258,12 +264,21 @@ func (s *SyncingPipeline) Stop() {
 
 func (s *SyncingPipeline) reset(resetCounter int) {
 	amount := 100 * uint64(resetCounter)
-	syncedL1Height := s.config.InitialL1Block
-	from := rawdb.ReadDASyncedL1BlockNumber(s.db)
-	if from != nil && *from+amount > syncedL1Height {
-		syncedL1Height = *from - amount
-		rawdb.WriteDASyncedL1BlockNumber(s.db, syncedL1Height)
+
+	lastProcessedBatchMeta := rawdb.ReadDAProcessedBatchMeta(s.db)
+	if lastProcessedBatchMeta == nil {
+		lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
+			BatchIndex:            0,
+			L1BlockNumber:         s.config.InitialL1Block - amount,
+			TotalL1MessagesPopped: 0,
+		}
 	}
-	log.Info("resetting syncing pipeline", "syncedL1Height", syncedL1Height)
-	s.blockQueue.Reset(syncedL1Height)
+
+	if lastProcessedBatchMeta.L1BlockNumber > amount {
+		lastProcessedBatchMeta.L1BlockNumber -= amount
+		rawdb.WriteDAProcessedBatchMeta(s.db, lastProcessedBatchMeta)
+	}
+
+	log.Info("resetting syncing pipeline", "batch index", lastProcessedBatchMeta.BatchIndex, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
+	s.blockQueue.Reset(lastProcessedBatchMeta)
 }

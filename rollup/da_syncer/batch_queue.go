@@ -7,6 +7,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 )
 
@@ -17,20 +18,23 @@ type BatchQueue struct {
 	lastFinalizedBatchIndex uint64
 	batches                 *common.Heap[da.Entry]
 	batchesMap              *common.ShrinkingMap[uint64, *common.HeapElement[da.Entry]]
+
+	previousBatch *rawdb.DAProcessedBatchMeta
 }
 
-func NewBatchQueue(DAQueue *DAQueue, db ethdb.Database) *BatchQueue {
+func NewBatchQueue(DAQueue *DAQueue, db ethdb.Database, lastProcessedBatch *rawdb.DAProcessedBatchMeta) *BatchQueue {
 	return &BatchQueue{
 		DAQueue:                 DAQueue,
 		db:                      db,
-		lastFinalizedBatchIndex: 0,
+		lastFinalizedBatchIndex: lastProcessedBatch.BatchIndex,
 		batches:                 common.NewHeap[da.Entry](),
 		batchesMap:              common.NewShrinkingMap[uint64, *common.HeapElement[da.Entry]](1000),
+		previousBatch:           lastProcessedBatch,
 	}
 }
 
 // NextBatch finds next finalized batch and returns data, that was committed in that batch
-func (bq *BatchQueue) NextBatch(ctx context.Context) (da.Entry, error) {
+func (bq *BatchQueue) NextBatch(ctx context.Context) (da.EntryWithBlocks, error) {
 	if batch := bq.getFinalizedBatch(); batch != nil {
 		return batch, nil
 	}
@@ -50,7 +54,7 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.Entry, error) {
 		case da.CommitBatchV0Type, da.CommitBatchWithBlobType:
 			bq.addBatch(daEntry)
 		case da.RevertBatchType:
-			bq.deleteBatch(daEntry)
+			bq.processAndDeleteBatch(daEntry)
 		case da.FinalizeBatchType:
 			if daEntry.BatchIndex() > bq.lastFinalizedBatchIndex {
 				bq.lastFinalizedBatchIndex = daEntry.BatchIndex()
@@ -66,15 +70,16 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.Entry, error) {
 }
 
 // getFinalizedBatch returns next finalized batch if there is available
-func (bq *BatchQueue) getFinalizedBatch() da.Entry {
+func (bq *BatchQueue) getFinalizedBatch() da.EntryWithBlocks {
 	if bq.batches.Len() == 0 {
 		return nil
 	}
 
 	batch := bq.batches.Peek().Value()
+	// we process all batches smaller or equal to the last finalized batch index -> this reflects bundles of multiple batches
+	// where we only receive the finalize event for the last batch of the bundle.
 	if batch.BatchIndex() <= bq.lastFinalizedBatchIndex {
-		bq.deleteBatch(batch)
-		return batch
+		return bq.processAndDeleteBatch(batch)
 	} else {
 		return nil
 	}
@@ -85,25 +90,51 @@ func (bq *BatchQueue) addBatch(batch da.Entry) {
 	bq.batchesMap.Set(batch.BatchIndex(), heapElement)
 }
 
-// deleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized
+// processAndDeleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized
 // updates DASyncedL1BlockNumber
-func (bq *BatchQueue) deleteBatch(batch da.Entry) {
+func (bq *BatchQueue) processAndDeleteBatch(batch da.Entry) da.EntryWithBlocks {
 	batchHeapElement, exists := bq.batchesMap.Get(batch.BatchIndex())
 	if !exists {
-		return
+		return nil
 	}
 
 	bq.batchesMap.Delete(batch.BatchIndex())
 	bq.batches.Remove(batchHeapElement)
 
-	// we store here min height of currently loaded batches to be able to start syncing from the same place in case of restart
-	// TODO: we should store this information when the batch is done being processed to avoid inconsistencies
-	rawdb.WriteDASyncedL1BlockNumber(bq.db, batch.L1BlockNumber()-1)
+	entryWithBlocks, ok := batch.(da.EntryWithBlocks)
+	if !ok {
+		// this should only happen if we delete a reverted batch
+		return nil
+	}
+
+	// sanity check that the next batch is the one we expect
+	if bq.previousBatch.BatchIndex+1 != entryWithBlocks.BatchIndex() {
+		log.Info("BatchQueue: skipping batch ", "currentBatch", entryWithBlocks.BatchIndex(), "previousBatch", bq.previousBatch.BatchIndex)
+		return nil
+	}
+
+	// carry forward the total L1 messages popped from the previous batch
+	entryWithBlocks.SetParentTotalL1MessagePopped(bq.previousBatch.TotalL1MessagesPopped)
+
+	// we store the previous batch as it has been completely processed which we know because the next batch is requested within the pipeline.
+	// In case of a restart or crash we can continue from the last processed batch (and its metadata).
+	rawdb.WriteDAProcessedBatchMeta(bq.db, bq.previousBatch)
+
+	log.Info("processing batch", "batchIndex", entryWithBlocks.BatchIndex(), "L1BlockNumber", entryWithBlocks.L1BlockNumber(), "totalL1MessagesPopped", entryWithBlocks.TotalL1MessagesPopped(), "previousBatch", bq.previousBatch.BatchIndex, "previousL1BlockNumber", bq.previousBatch.L1BlockNumber, "previous TotalL1MessagesPopped", bq.previousBatch.TotalL1MessagesPopped)
+
+	bq.previousBatch = &rawdb.DAProcessedBatchMeta{
+		L1BlockNumber:         entryWithBlocks.L1BlockNumber(),
+		BatchIndex:            entryWithBlocks.BatchIndex(),
+		TotalL1MessagesPopped: entryWithBlocks.TotalL1MessagesPopped(),
+	}
+
+	return entryWithBlocks
 }
 
-func (bq *BatchQueue) Reset(height uint64) {
+func (bq *BatchQueue) Reset(lastProcessedBatchMeta *rawdb.DAProcessedBatchMeta) {
 	bq.batches.Clear()
 	bq.batchesMap.Clear()
-	bq.lastFinalizedBatchIndex = 0
-	bq.DAQueue.Reset(height)
+	bq.lastFinalizedBatchIndex = lastProcessedBatchMeta.BatchIndex
+	bq.previousBatch = lastProcessedBatchMeta
+	bq.DAQueue.Reset(lastProcessedBatchMeta)
 }

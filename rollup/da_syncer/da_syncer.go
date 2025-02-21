@@ -33,10 +33,10 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock, override bool, sign bool
 	// we expect blocks to be consecutive. block.PartialHeader.Number == parentBlock.Number+1.
 	// if override is true, we allow blocks to be lower than the current block number and replace the blocks.
 	if !override && block.PartialHeader.Number <= currentBlock.Number().Uint64() {
-		log.Debug("block number is too low", "block number", block.PartialHeader.Number, "parent block number", currentBlock.Number().Uint64())
+		log.Info("block number is too low", "block number", block.PartialHeader.Number, "parent block number", currentBlock.Number().Uint64())
 		return ErrBlockTooLow
 	} else if block.PartialHeader.Number > currentBlock.Number().Uint64()+1 {
-		log.Debug("block number is too high", "block number", block.PartialHeader.Number, "parent block number", currentBlock.Number().Uint64())
+		log.Info("block number is too high", "block number", block.PartialHeader.Number, "parent block number", currentBlock.Number().Uint64())
 		return ErrBlockTooHigh
 	}
 
@@ -68,9 +68,10 @@ func (s *DASyncer) SyncOneBlock(block *da.PartialBlock, override bool, sign bool
 		return fmt.Errorf("failed to insert block: not part of canonical chain, number: %d, hash: %s - canonical: number: %d, hash: %s", fullBlock.NumberU64(), fullBlock.Hash(), currentBlock.Number().Uint64(), currentBlock.Hash())
 	}
 
-	if fullBlock.Number().Uint64()%100 == 0 {
-		log.Info("L1 sync progress", "blockchain height", fullBlock.Number().Uint64(), "block hash", fullBlock.Hash(), "root", fullBlock.Root())
-	}
+	//if fullBlock.Number().Uint64() == 0 {
+	log.Info("L1 sync progress", "blockchain height", fullBlock.Number().Uint64(), "block hash", fullBlock.Hash(), "root", fullBlock.Root())
+	//}
+	fmt.Println(fullBlock.NumberU64(), "root", fullBlock.Root())
 
 	if s.l2EndBlock > 0 && s.l2EndBlock == block.PartialHeader.Number {
 		log.Warn("L1 sync reached L2EndBlock: you can terminate recovery mode now", "L2EndBlock", fullBlock.NumberU64(), "block hash", fullBlock.Hash(), "root", fullBlock.Root())

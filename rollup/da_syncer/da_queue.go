@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
@@ -47,8 +48,10 @@ func (dq *DAQueue) NextDA(ctx context.Context) (da.Entry, error) {
 		daEntry := dq.da[0]
 		dq.da = dq.da[1:]
 
+		// TODO: when addressing recovery mode, we can probably remove this check here and instead handle it via setting
+		//  the last processed batch index in the pipeline. Then the batch will be skipped in the batch queue stage.
 		if daEntry.BatchIndex() < dq.initialBatch {
-			log.Debug("Skipping DA entry due to initial batch requirement", "batchIndex", daEntry.BatchIndex(), "initialBatch", dq.initialBatch)
+			log.Info("Skipping DA entry due to initial batch requirement", "batchIndex", daEntry.BatchIndex(), "initialBatch", dq.initialBatch)
 			continue
 		}
 
@@ -86,8 +89,8 @@ func (dq *DAQueue) DataSource() DataSource {
 	return dq.dataSource
 }
 
-func (dq *DAQueue) Reset(height uint64) {
-	dq.l1height = height
+func (dq *DAQueue) Reset(lastProcessedBatchMeta *rawdb.DAProcessedBatchMeta) {
+	dq.l1height = lastProcessedBatchMeta.L1BlockNumber
 	dq.dataSource = nil
 	dq.da = make(da.Entries, 0)
 }

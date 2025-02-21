@@ -180,7 +180,7 @@ func (m mockEntryWithBlocks) Event() l1.RollupEvent {
 	panic("implement me")
 }
 
-func (m mockEntryWithBlocks) Blocks() []*da.PartialBlock {
+func (m mockEntryWithBlocks) Blocks() ([]*da.PartialBlock, error) {
 	panic("implement me")
 }
 
@@ -190,6 +190,14 @@ func (m mockEntryWithBlocks) Version() encoding.CodecVersion {
 
 func (m mockEntryWithBlocks) Chunks() []*encoding.DAChunkRawTx {
 	return m.chunks
+}
+
+func (m mockEntryWithBlocks) SetParentTotalL1MessagePopped(totalL1MessagePopped uint64) {
+	panic("implement me")
+}
+
+func (m mockEntryWithBlocks) TotalL1MessagesPopped() uint64 {
+	panic("implement me")
 }
 
 func (m mockEntryWithBlocks) BlobVersionedHashes() []common.Hash {

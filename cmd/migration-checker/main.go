@@ -105,7 +105,7 @@ func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leaf
 		mptKey := crypto.Keccak256([]byte(preimageKey))
 		mptVal, ok := mptLeafMap[string(mptKey)]
 		if !ok {
-			panic(fmt.Sprintf("%s key %s (preimage %s) not found in mpt", label, hex.EncodeToString([]byte(mptKey)), hex.EncodeToString([]byte(preimageKey))))
+			panic(fmt.Sprintf("%s key %s (preimage %s) not found in mpt", label, hex.EncodeToString(mptKey), hex.EncodeToString([]byte(preimageKey))))
 		}
 
 		leafChecker(fmt.Sprintf("%s key: %s", label, hex.EncodeToString([]byte(preimageKey))), dbs, zkValue, mptVal, paranoid)

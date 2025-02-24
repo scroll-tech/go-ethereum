@@ -2833,6 +2833,19 @@ func TestSetCodeTransactions(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:    "nonce-gapped-auth-does-not-block-pending-tx",
+			pending: 1,
+			queued:  1,
+			run: func(name string, pool *TxPool, statedb *state.StateDB) {
+				if err := pool.addRemoteSync(setCodeTx(1, keyC, []unsignedAuth{{1, keyA}})); err != nil {
+					t.Fatalf("%s: failed to add nonce-gapped setcode transaction: %v", name, err)
+				}
+				if err := pool.addRemoteSync(pricedTransaction(0, 100000, big.NewInt(1000), keyA)); err != nil {
+					t.Fatalf("%s: failed to add pending transaction: %v", name, err)
+				}
+			},
+		},
 	} {
 		// Create the pool to test the status retrievals with
 		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
@@ -2843,6 +2856,10 @@ func TestSetCodeTransactions(t *testing.T) {
 		testAddBalance(pool, addrA, big.NewInt(params.Ether))
 		testAddBalance(pool, addrB, big.NewInt(params.Ether))
 		testAddBalance(pool, addrC, big.NewInt(params.Ether))
+
+		aa := common.Address{0xaa, 0xaa}
+		statedb.SetCode(addrA, append(types.DelegationPrefix, aa.Bytes()...))
+		statedb.SetCode(aa, []byte{byte(vm.ADDRESS), byte(vm.PUSH0), byte(vm.SSTORE)})
 
 		tt.run(tt.name, pool, statedb)
 		pending, queued := pool.Stats()

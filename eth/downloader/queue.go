@@ -477,7 +477,6 @@ func (q *queue) ReserveReceipts(p *peerConnection, count int) (*fetchRequest, bo
 // to access the queue, so they already need a lock anyway.
 //
 // Returns:
-//
 //	item     - the fetchRequest
 //	progress - whether any progress was made
 //	throttle - if the caller should throttle for a while

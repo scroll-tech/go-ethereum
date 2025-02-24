@@ -81,11 +81,11 @@ func TestSystemContract_AuthorizeCheck(t *testing.T) {
 	})
 
 	// Create a dummy block header.
-	// We only need the block number and extra data length for this test.
+	// We only need the block number and blocksignature data length for this test.
 	header := &types.Header{
 		Number: big.NewInt(100),
 		// We use an extra slice with length equal to extraSeal
-		Extra: make([]byte, extraSeal),
+		BlockSignature: make([]byte, extraSeal),
 	}
 
 	// Call Seal() and expect an error since local signer != authorized signer.
@@ -157,8 +157,8 @@ func TestSystemContract_SignsAfterUpdate(t *testing.T) {
 
 	// Create a dummy header for sealing.
 	header := &types.Header{
-		Number: big.NewInt(100),
-		Extra:  make([]byte, extraSeal),
+		Number:         big.NewInt(100),
+		BlockSignature: make([]byte, extraSeal),
 	}
 
 	// Construct a new block from the header using NewBlock constructor.

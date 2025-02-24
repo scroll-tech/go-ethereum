@@ -277,7 +277,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	}
 
 	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing)
-	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
 	if eth.APIBackend.allowUnprotectedTxs {

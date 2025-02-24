@@ -131,7 +131,7 @@ func (h *Header) Hash() common.Hash {
 	hCopy.BlockSignature = nil
 	if hCopy.IsEuclidV2 {
 		hCopy.IsEuclidV2 = false
-		hCopy.Extra = []byte{}
+		hCopy.Extra = nil
 	}
 	return rlpHash(hCopy)
 }
@@ -199,7 +199,7 @@ func (h *Header) PrepareFromNetwork(isEuclidV2 bool) {
 	if isEuclidV2 {
 		h.IsEuclidV2 = true
 		h.BlockSignature = h.Extra
-		h.Extra = []byte{}
+		h.Extra = nil
 	}
 }
 

@@ -215,7 +215,7 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	header.BlockSignature = make([]byte, extraSeal)
 	header.IsEuclidV2 = true
-	header.Extra = []byte{}
+	header.Extra = nil
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {
@@ -232,7 +232,7 @@ func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 // Finalize implements consensus.Engine. There is no post-transaction
-// consensus rules in clique, therefore no rules here
+// No rules here
 func (s *SystemContract) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
 	// No block rewards in PoA, so the state remains as is
 }
@@ -381,7 +381,7 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 		enc = append(enc, header.BaseFee)
 	}
 	if header.WithdrawalsHash != nil {
-		panic("unexpected withdrawal hash value in clique")
+		panic("unexpected withdrawal hash value")
 	}
 	if err := rlp.Encode(w, enc); err != nil {
 		panic("can't encode: " + err.Error())

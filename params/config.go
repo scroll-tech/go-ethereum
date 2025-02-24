@@ -328,20 +328,25 @@ var (
 		CurieBlock:          big.NewInt(4740239),
 		DarwinTime:          newUint64(1723622400),
 		DarwinV2Time:        newUint64(1724832000),
+		EuclidTime:          newUint64(1800000000), // TODO: update
+		EuclidV2Time:        newUint64(1800000000), // TODO: update
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
 		},
+		// TODO: add system config consensus
 		Scroll: ScrollConfig{
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
 			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			L1Config: &L1Config{
-				L1ChainId:             11155111,
-				L1MessageQueueAddress: common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
-				NumL1MessagesPerBlock: 10,
-				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
+				L1ChainId:                       11155111,
+				L1MessageQueueAddress:           common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
+				L1MessageQueueV2Address:         common.HexToAddress("0xA0673eC0A48aa924f067F1274EcD281A10c5f19F"),
+				L1MessageQueueV2DeploymentBlock: 7773746,
+				NumL1MessagesPerBlock:           10,
+				ScrollChainAddress:              common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
 			},
 			GenesisStateRoot: &ScrollSepoliaGenesisState,
 		},
@@ -689,8 +694,8 @@ type ScrollConfig struct {
 type L1Config struct {
 	L1ChainId                       uint64         `json:"l1ChainId,string,omitempty"`
 	L1MessageQueueAddress           common.Address `json:"l1MessageQueueAddress,omitempty"`
-	L1MessageQueueV2Address         common.Address `json:"l1MessageQueueV2Address,omitempty"`         // TODO: set address once known
-	L1MessageQueueV2DeploymentBlock uint64         `json:"l1MessageQueueV2DeploymentBlock,omitempty"` // TODO: set block number once known
+	L1MessageQueueV2Address         common.Address `json:"l1MessageQueueV2Address,omitempty"`
+	L1MessageQueueV2DeploymentBlock uint64         `json:"l1MessageQueueV2DeploymentBlock,omitempty"`
 	NumL1MessagesPerBlock           uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
 	ScrollChainAddress              common.Address `json:"scrollChainAddress,omitempty"`
 }

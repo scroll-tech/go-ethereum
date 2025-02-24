@@ -114,8 +114,8 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if header.Nonce != (types.BlockNonce{}) {
 		return errInvalidNonce
 	}
-	// Check that the extra-data contains signature
-	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
+	// Check that the BlockSignature contains signature if block is not requested
+	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal && !header.Requested {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -182,8 +182,8 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		return err
 	}
 
-	// only if block header comes from a new block msg, then verify the signature against the current signer
-	if header.IsNewBlock {
+	// only if block header has NOT been requested, then verify the signature against the current signer
+	if !header.Requested {
 		signer, err := ecrecover(header)
 		if err != nil {
 			return err
@@ -216,7 +216,6 @@ func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *type
 	header.BlockSignature = make([]byte, extraSeal)
 	header.IsEuclidV2 = true
 	header.Extra = []byte{}
-	header.IsNewBlock = true
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {

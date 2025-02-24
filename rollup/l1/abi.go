@@ -158,6 +158,26 @@ type FinalizeBatchEvent struct {
 	blockNumber  uint64
 }
 
+func NewFinalizeBatchEvent(
+	batchIndex *big.Int,
+	batchHash common.Hash,
+	stateRoot common.Hash,
+	withdrawRoot common.Hash,
+	txHash common.Hash,
+	blockHash common.Hash,
+	blockNumber uint64,
+) *FinalizeBatchEvent {
+	return &FinalizeBatchEvent{
+		batchIndex:   batchIndex,
+		batchHash:    batchHash,
+		stateRoot:    stateRoot,
+		withdrawRoot: withdrawRoot,
+		txHash:       txHash,
+		blockHash:    blockHash,
+		blockNumber:  blockNumber,
+	}
+}
+
 func (f *FinalizeBatchEvent) TxHash() common.Hash {
 	return f.txHash
 }
@@ -214,6 +234,7 @@ type CommitBatchArgs struct {
 	ParentBatchHeader      []byte
 	Chunks                 [][]byte
 	SkippedL1MessageBitmap []byte
+	BlobHashes             []common.Hash
 }
 
 func newCommitBatchArgs(method *abi.Method, values []interface{}) (*CommitBatchArgs, error) {

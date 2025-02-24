@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/Azure/azure-storage-blob-go v0.7.0
 	github.com/VictoriaMetrics/fastcache v1.12.2
+	github.com/agiledragon/gomonkey/v2 v2.12.0
 	github.com/aws/aws-sdk-go-v2 v1.2.0
 	github.com/aws/aws-sdk-go-v2/config v1.1.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.1.1
@@ -50,7 +51,7 @@ require (
 	github.com/prometheus/tsdb v0.7.1
 	github.com/rjeczalik/notify v0.9.1
 	github.com/rs/cors v1.7.0
-	github.com/scroll-tech/da-codec v0.1.3-0.20241218102542-9852fa4e1be5
+	github.com/scroll-tech/da-codec v0.1.3-0.20250210041951-d028c537b995
 	github.com/scroll-tech/zktrie v0.8.4
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sourcegraph/conc v0.3.0

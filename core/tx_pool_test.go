@@ -2834,11 +2834,11 @@ func TestSetCodeTransactions(t *testing.T) {
 			},
 		},
 		{
-			name:    "nonce-gapped-auth-does-not-block-pending-tx",
+			name:    "nonce-gapped-invalid-auth-does-not-block-pending-tx",
 			pending: 1,
 			queued:  1,
 			run: func(name string, pool *TxPool, statedb *state.StateDB) {
-				if err := pool.addRemoteSync(setCodeTx(1, keyC, []unsignedAuth{{1, keyA}})); err != nil {
+				if err := pool.addRemoteSync(setCodeTx(1, keyC, []unsignedAuth{{0, keyA}})); err != nil {
 					t.Fatalf("%s: failed to add nonce-gapped setcode transaction: %v", name, err)
 				}
 				if err := pool.addRemoteSync(pricedTransaction(0, 100000, big.NewInt(1000), keyA)); err != nil {

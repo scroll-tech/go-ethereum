@@ -371,6 +371,7 @@ func (w *worker) mainLoop() {
 			log.Error("failed to mine block", "err", err)
 			w.current = nil
 		}
+
 		idleStart := time.Now()
 		select {
 		case <-w.startCh:
@@ -560,7 +561,6 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 // tryCommitNewWork
 func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorging bool, reorgReason error) (common.Hash, error) {
 	err := w.newWork(now, parent, reorging, reorgReason)
-
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed creating new work: %w", err)
 	}

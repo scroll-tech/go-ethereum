@@ -153,7 +153,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}
-
 	eth := &Ethereum{
 		config:            config,
 		chainDb:           chainDb,
@@ -279,7 +278,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	}); err != nil {
 		return nil, err
 	}
-  
+
 	config.Miner.SigningDisabled = config.DA.ProduceBlocks
 	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock, config.EnableDASyncing && !config.DA.ProduceBlocks)
   // Some of the extraData is used with Clique consensus (before EuclidV2). After EuclidV2 we use SystemContract consensus where this is overridden when creating a block.

@@ -499,6 +499,8 @@ var (
 		CurieBlock:              big.NewInt(0),
 		DarwinTime:              new(uint64),
 		DarwinV2Time:            new(uint64),
+		EuclidTime:              new(uint64),
+		EuclidV2Time:            new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -687,10 +689,12 @@ type ScrollConfig struct {
 
 // L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer
 type L1Config struct {
-	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
-	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
-	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
-	ScrollChainAddress    common.Address `json:"scrollChainAddress,omitempty"`
+	L1ChainId                       uint64         `json:"l1ChainId,string,omitempty"`
+	L1MessageQueueAddress           common.Address `json:"l1MessageQueueAddress,omitempty"`
+	L1MessageQueueV2Address         common.Address `json:"l1MessageQueueV2Address,omitempty"`         // TODO: set address once known
+	L1MessageQueueV2DeploymentBlock uint64         `json:"l1MessageQueueV2DeploymentBlock,omitempty"` // TODO: set block number once known
+	NumL1MessagesPerBlock           uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+	ScrollChainAddress              common.Address `json:"scrollChainAddress,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -786,7 +790,15 @@ func (c *ChainConfig) String() string {
 	if c.DarwinV2Time != nil {
 		darwinV2Time = fmt.Sprintf("@%v", *c.DarwinV2Time)
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, DarwinV2: %v, Engine: %v, Scroll config: %v}",
+	euclidTime := "<nil>"
+	if c.EuclidTime != nil {
+		euclidTime = fmt.Sprintf("@%v", *c.EuclidTime)
+	}
+	euclidV2Time := "<nil>"
+	if c.EuclidV2Time != nil {
+		euclidV2Time = fmt.Sprintf("@%v", *c.EuclidV2Time)
+	}
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, DarwinV2: %v, Euclid: %v, EuclidV2: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -808,6 +820,8 @@ func (c *ChainConfig) String() string {
 		c.CurieBlock,
 		darwinTime,
 		darwinV2Time,
+		euclidTime,
+		euclidV2Time,
 		engine,
 		c.Scroll,
 	)

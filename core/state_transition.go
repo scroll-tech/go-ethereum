@@ -413,6 +413,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
 		// Apply EIP-7702 authorizations.
+		// Different from the upstream implementation, applyAuthorization returns results of type types.AuthorizationResult
+		// to record the outcomes of the authorization application process.
+		// These results are used to trace the account states in the Tracer's CaptureStart hook.
 		var authorizationResults []types.AuthorizationResult
 		if msg.SetCodeAuthorizations() != nil {
 			for _, auth := range st.msg.SetCodeAuthorizations() {

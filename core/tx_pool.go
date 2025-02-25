@@ -826,6 +826,9 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 			}
 			return have, math.MaxInt
 		}
+		// Transaction takes a new nonce value out of the pool. Ensure it doesn't
+		// overflow the number of permitted transactions from a single account
+		// (i.e. max cancellable via out-of-bound transaction).
 		if used, left := usedAndLeftSlots(from); left <= 0 {
 			return fmt.Errorf("%w: pooled %d txs", ErrAccountLimitExceeded, used)
 		}
@@ -841,6 +844,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 			}
 			return conflicts
 		}
+		// Verify no authorizations will invalidate existing transactions known to
+		// the pool.
 		if conflicts := knownConflicts(tx.SetCodeAuthorities()); len(conflicts) > 0 {
 			return fmt.Errorf("%w: authorization conflicts with other known tx", ErrAuthorityReserved)
 		}

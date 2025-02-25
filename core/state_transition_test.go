@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math/big"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/agiledragon/gomonkey/v2"
@@ -58,6 +59,10 @@ func TestValidateAuthorizations(t *testing.T) {
 	})
 
 	t.Run("Invalid signature", func(t *testing.T) {
+		// gomonkey concurrency issue workaround,
+		// see https://github.com/agiledragon/gomonkey/issues/145
+		defer runtime.GC()
+
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyFunc((*types.SetCodeAuthorization).Authority, func(_ *types.SetCodeAuthorization) (common.Address, error) {
@@ -72,6 +77,10 @@ func TestValidateAuthorizations(t *testing.T) {
 	})
 
 	t.Run("Destination has code", func(t *testing.T) {
+		// gomonkey concurrency issue workaround,
+		// see https://github.com/agiledragon/gomonkey/issues/145
+		defer runtime.GC()
+
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyFunc((*types.SetCodeAuthorization).Authority, func(_ *types.SetCodeAuthorization) (common.Address, error) {
@@ -92,6 +101,10 @@ func TestValidateAuthorizations(t *testing.T) {
 	})
 
 	t.Run("Nonce mismatch", func(t *testing.T) {
+		// gomonkey concurrency issue workaround,
+		// see https://github.com/agiledragon/gomonkey/issues/145
+		defer runtime.GC()
+
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyFunc((*types.SetCodeAuthorization).Authority, func(_ *types.SetCodeAuthorization) (common.Address, error) {
@@ -118,6 +131,10 @@ func TestValidateAuthorizations(t *testing.T) {
 	})
 
 	t.Run("Valid authorization", func(t *testing.T) {
+		// gomonkey concurrency issue workaround,
+		// see https://github.com/agiledragon/gomonkey/issues/145
+		defer runtime.GC()
+
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyFunc((*types.SetCodeAuthorization).Authority, func(_ *types.SetCodeAuthorization) (common.Address, error) {

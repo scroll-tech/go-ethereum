@@ -811,42 +811,15 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	list := pool.pending[from]
 	if list == nil || !list.Overlaps(tx) {
-		usedAndLeftSlots := func(addr common.Address) (int, int) {
-			var have int
-			if list := pool.pending[addr]; list != nil {
-				have += list.Len()
-			}
-			if list := pool.queue[addr]; list != nil {
-				have += list.Len()
-			}
-			if pool.currentState.GetKeccakCodeHash(addr) != codehash.EmptyKeccakCodeHash || len(pool.all.auths[addr]) != 0 {
-				// Allow at most one in-flight tx for delegated accounts or those with
-				// a pending authorization.
-				return have, max(0, 1-have)
-			}
-			return have, math.MaxInt
-		}
 		// Transaction takes a new nonce value out of the pool. Ensure it doesn't
 		// overflow the number of permitted transactions from a single account
 		// (i.e. max cancellable via out-of-bound transaction).
-		if used, left := usedAndLeftSlots(from); left <= 0 {
+		if used, left := usedAndLeftSlots(pool, from); left <= 0 {
 			return fmt.Errorf("%w: pooled %d txs", ErrAccountLimitExceeded, used)
-		}
-		knownConflicts := func(auths []common.Address) []common.Address {
-			var conflicts []common.Address
-			// Authorities cannot conflict with any pending or queued transactions.
-			for _, addr := range auths {
-				if list := pool.pending[addr]; list != nil {
-					conflicts = append(conflicts, addr)
-				} else if list := pool.queue[addr]; list != nil {
-					conflicts = append(conflicts, addr)
-				}
-			}
-			return conflicts
 		}
 		// Verify no authorizations will invalidate existing transactions known to
 		// the pool.
-		if conflicts := knownConflicts(tx.SetCodeAuthorities()); len(conflicts) > 0 {
+		if conflicts := knownConflicts(pool, tx.SetCodeAuthorities()); len(conflicts) > 0 {
 			return fmt.Errorf("%w: authorization conflicts with other known tx", ErrAuthorityReserved)
 		}
 	}
@@ -2244,4 +2217,35 @@ func (t *txLookup) removeAuthorities(hash common.Hash) {
 // numSlots calculates the number of slots needed for a single transaction.
 func numSlots(tx *types.Transaction) int {
 	return int((tx.Size() + txSlotSize - 1) / txSlotSize)
+}
+
+// usedAndLeftSlots returns the number of slots used and left for the given address.
+func usedAndLeftSlots(pool *TxPool, addr common.Address) (int, int) {
+	var have int
+	if list := pool.pending[addr]; list != nil {
+		have += list.Len()
+	}
+	if list := pool.queue[addr]; list != nil {
+		have += list.Len()
+	}
+	if pool.currentState.GetKeccakCodeHash(addr) != codehash.EmptyKeccakCodeHash || len(pool.all.auths[addr]) != 0 {
+		// Allow at most one in-flight tx for delegated accounts or those with
+		// a pending authorization.
+		return have, max(0, 1-have)
+	}
+	return have, math.MaxInt
+}
+
+// knownConflicts returns a list of addresses that conflict with the given authorities.
+func knownConflicts(pool *TxPool, auths []common.Address) []common.Address {
+	var conflicts []common.Address
+	// Authorities cannot conflict with any pending or queued transactions.
+	for _, addr := range auths {
+		if list := pool.pending[addr]; list != nil {
+			conflicts = append(conflicts, addr)
+		} else if list := pool.queue[addr]; list != nil {
+			conflicts = append(conflicts, addr)
+		}
+	}
+	return conflicts
 }

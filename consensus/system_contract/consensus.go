@@ -61,7 +61,7 @@ var ErrUnauthorizedSigner = errors.New("unauthorized signer")
 type SignerFn func(signer accounts.Account, mimeType string, message []byte) ([]byte, error)
 
 // Author implements consensus.Engine, returning the Ethereum address recovered
-// from the signature in the header's extra-data section.
+// from the signature in the header's block-signature section.
 func (s *SystemContract) Author(header *types.Header) (common.Address, error) {
 	return ecrecover(header)
 }

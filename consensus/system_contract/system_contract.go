@@ -2,6 +2,7 @@ package system_contract
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -34,19 +35,19 @@ type SystemContract struct {
 // signers set to the ones provided by the user.
 func New(ctx context.Context, config *params.SystemContractConfig, client sync_service.EthClient) *SystemContract {
 	ctx, cancel := context.WithCancel(ctx)
-	address, err := client.StorageAt(ctx, config.SystemContractAddress, config.SystemContractSlot, nil)
-	if err != nil {
-		log.Error("failed to get signer address from L1 System Contract", "err", err)
-	}
 
-	return &SystemContract{
-		config:          config,
-		client:          client,
-		signerAddressL1: common.BytesToAddress(address),
+	s := &SystemContract{
+		config: config,
+		client: client,
 
 		ctx:    ctx,
 		cancel: cancel,
 	}
+
+	if err := s.fetchAddressFromL1(); err != nil {
+		log.Error("failed to fetch signer address from L1", "err", err)
+	}
+	return s
 }
 
 // Authorize injects a private key into the consensus engine to mint new blocks
@@ -75,20 +76,27 @@ func (s *SystemContract) Start() {
 			case <-s.ctx.Done():
 				return
 			case <-syncTicker.C:
-				s.fetchAddressFromL1()
+				if err := s.fetchAddressFromL1(); err != nil {
+					log.Error("failed to fetch signer address from L1", "err", err)
+				}
 			}
 		}
 	}()
 }
 
-func (s *SystemContract) fetchAddressFromL1() {
+func (s *SystemContract) fetchAddressFromL1() error {
 	address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
 	if err != nil {
-		log.Error("failed to get signer address from L1 System Contract", "err", err)
+		return fmt.Errorf("failed to get signer address from L1 System Contract: %w", err)
 	}
 	bAddress := common.BytesToAddress(address)
 
-	log.Info("Read address from system contract", "address", bAddress.Hex())
+	// Validate the address is not empty
+	if bAddress == (common.Address{}) {
+		return fmt.Errorf("retrieved empty signer address from L1 System Contract")
+	}
+
+	log.Debug("Read address from system contract", "address", bAddress.Hex())
 
 	s.lock.RLock()
 	addressChanged := s.signerAddressL1 != bAddress
@@ -99,6 +107,8 @@ func (s *SystemContract) fetchAddressFromL1() {
 		s.signerAddressL1 = bAddress
 		s.lock.Unlock()
 	}
+
+	return nil
 }
 
 // Close implements consensus.Engine.

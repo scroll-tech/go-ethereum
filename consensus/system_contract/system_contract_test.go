@@ -41,7 +41,7 @@ func TestSystemContract_FetchSigner(t *testing.T) {
 	sys := New(ctx, config, fakeClient)
 	defer sys.Close()
 
-	sys.fetchAddressFromL1()
+	require.NoError(t, sys.fetchAddressFromL1())
 
 	actualSigner := sys.currentSignerAddressL1()
 
@@ -67,7 +67,7 @@ func TestSystemContract_AuthorizeCheck(t *testing.T) {
 	sys := New(ctx, config, fakeClient)
 	defer sys.Close()
 
-	sys.fetchAddressFromL1()
+	require.NoError(t, sys.fetchAddressFromL1())
 
 	// Authorize with a different signer than expected.
 	differentSigner := common.HexToAddress("0xABCDEFabcdefABCDEFabcdefabcdefABCDEFABCD")
@@ -122,7 +122,7 @@ func TestSystemContract_SignsAfterUpdate(t *testing.T) {
 	sys := New(ctx, config, fakeClient)
 	defer sys.Close()
 
-	sys.fetchAddressFromL1()
+	require.NoError(t, sys.fetchAddressFromL1())
 
 	// Verify that initially the fetched signer equals oldSigner.
 	initialSigner := sys.currentSignerAddressL1()
@@ -134,7 +134,7 @@ func TestSystemContract_SignsAfterUpdate(t *testing.T) {
 	fakeClient.mu.Unlock()
 
 	// fetch new value from L1 (simulating a background poll)
-	sys.fetchAddressFromL1()
+	require.NoError(t, sys.fetchAddressFromL1())
 
 	// Verify that system contract's signerAddressL1 is now updated to updatedSigner.
 	newSigner := sys.currentSignerAddressL1()

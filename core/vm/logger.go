@@ -204,13 +204,15 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 		}
 	} else {
 		traceCodeWithAddress(l, to)
+		// only update the statesAffected when it's not a contract creation
+		// because contract creation is not allowed in set code transactions
+		for _, auth := range authorizationResults {
+			l.statesAffected[auth.Authority] = struct{}{}
+		}
 	}
 
 	l.statesAffected[from] = struct{}{}
 	l.statesAffected[to] = struct{}{}
-	for _, auth := range authorizationResults {
-		l.statesAffected[auth.Authority] = struct{}{}
-	}
 }
 
 // CaptureState logs a new structured log message and pushes it out to the environment

@@ -38,7 +38,8 @@ func New(ctx context.Context, config *params.SystemContractConfig, client sync_s
 	if err != nil {
 		log.Error("failed to get signer address from L1 System Contract", "err", err)
 	}
-	systemContract := &SystemContract{
+
+	return &SystemContract{
 		config:          config,
 		client:          client,
 		signerAddressL1: common.BytesToAddress(address),
@@ -46,8 +47,6 @@ func New(ctx context.Context, config *params.SystemContractConfig, client sync_s
 		ctx:    ctx,
 		cancel: cancel,
 	}
-	go systemContract.Start()
-	return systemContract
 }
 
 // Authorize injects a private key into the consensus engine to mint new blocks
@@ -62,34 +61,43 @@ func (s *SystemContract) Authorize(signer common.Address, signFn SignerFn) {
 }
 
 func (s *SystemContract) Start() {
-	log.Info("starting SystemContract")
-	syncTicker := time.NewTicker(defaultSyncInterval)
-	defer syncTicker.Stop()
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		default:
-		}
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-syncTicker.C:
-			address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
-			if err != nil {
-				log.Error("failed to get signer address from L1 System Contract", "err", err)
+	go func() {
+		log.Info("starting SystemContract")
+		syncTicker := time.NewTicker(defaultSyncInterval)
+		defer syncTicker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			default:
 			}
-			bAddress := common.BytesToAddress(address)
-			log.Info("Read address from system contract", "address", bAddress.Hex())
-			s.lock.RLock()
-			addressChanged := s.signerAddressL1 != bAddress
-			s.lock.RUnlock()
-			if addressChanged {
-				s.lock.Lock()
-				s.signerAddressL1 = bAddress
-				s.lock.Unlock()
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-syncTicker.C:
+				s.fetchAddressFromL1()
 			}
 		}
+	}()
+}
+
+func (s *SystemContract) fetchAddressFromL1() {
+	address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
+	if err != nil {
+		log.Error("failed to get signer address from L1 System Contract", "err", err)
+	}
+	bAddress := common.BytesToAddress(address)
+
+	log.Info("Read address from system contract", "address", bAddress.Hex())
+
+	s.lock.RLock()
+	addressChanged := s.signerAddressL1 != bAddress
+	s.lock.RUnlock()
+
+	if addressChanged {
+		s.lock.Lock()
+		s.signerAddressL1 = bAddress
+		s.lock.Unlock()
 	}
 }
 
@@ -97,4 +105,11 @@ func (s *SystemContract) Start() {
 func (s *SystemContract) Close() error {
 	s.cancel()
 	return nil
+}
+
+func (s *SystemContract) currentSignerAddressL1() common.Address {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.signerAddressL1
 }

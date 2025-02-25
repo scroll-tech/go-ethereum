@@ -19,13 +19,14 @@ package ethconfig
 
 import (
 	"context"
-	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"math/big"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -237,6 +238,7 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 	if chainConfig.SystemContract != nil && chainConfig.Clique != nil {
 		cliqueEngine := clique.New(chainConfig.Clique, db)
 		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
+		sysEngine.Start()
 		return wrapper.NewUpgradableEngine(chainConfig.IsEuclidV2, cliqueEngine, sysEngine)
 	}
 
@@ -247,7 +249,9 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 
 	// Case 3: Only the SystemContract engine is defined.
 	if chainConfig.SystemContract != nil {
-		return system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
+		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
+		sysEngine.Start()
+		return sysEngine
 	}
 
 	// Otherwise assume proof-of-work

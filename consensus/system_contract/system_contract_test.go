@@ -2,6 +2,13 @@ package system_contract
 
 import (
 	"context"
+	"math/big"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -10,11 +17,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"github.com/stretchr/testify/require"
-	"math/big"
-	"sync"
-	"testing"
-	"time"
 )
 
 var _ sync_service.EthClient = &fakeEthClient{}
@@ -39,14 +41,9 @@ func TestSystemContract_FetchSigner(t *testing.T) {
 	sys := New(ctx, config, fakeClient)
 	defer sys.Close()
 
-	// Since the SystemContract's Start() routine fetches and updates s.signerAddressL1
-	// in a separate goroutine, wait a bit for that to complete.
-	time.Sleep(2 * time.Second)
+	sys.fetchAddressFromL1()
 
-	// Acquire a read lock to safely read the value.
-	sys.lock.RLock()
-	actualSigner := sys.signerAddressL1
-	sys.lock.RUnlock()
+	actualSigner := sys.currentSignerAddressL1()
 
 	// Verify that the fetched signer equals the expectedSigner from our fake client.
 	require.Equal(t, expectedSigner, actualSigner, "The SystemContract should update signerAddressL1 to the value provided by the client")
@@ -70,8 +67,7 @@ func TestSystemContract_AuthorizeCheck(t *testing.T) {
 	sys := New(ctx, config, fakeClient)
 	defer sys.Close()
 
-	// Wait to ensure that the background routine has updated signerAddressL1.
-	time.Sleep(2 * time.Second)
+	sys.fetchAddressFromL1()
 
 	// Authorize with a different signer than expected.
 	differentSigner := common.HexToAddress("0xABCDEFabcdefABCDEFabcdefabcdefABCDEFABCD")
@@ -126,13 +122,10 @@ func TestSystemContract_SignsAfterUpdate(t *testing.T) {
 	sys := New(ctx, config, fakeClient)
 	defer sys.Close()
 
-	// Wait for the background routine to poll at least once.
-	time.Sleep(2 * time.Second)
+	sys.fetchAddressFromL1()
 
 	// Verify that initially the fetched signer equals oldSigner.
-	sys.lock.RLock()
-	initialSigner := sys.signerAddressL1
-	sys.lock.RUnlock()
+	initialSigner := sys.currentSignerAddressL1()
 	require.Equal(t, oldSigner, initialSigner, "Initial signerAddressL1 should be oldSigner")
 
 	// Now, simulate an update: change the fake client's returned value to updatedSigner.
@@ -140,13 +133,11 @@ func TestSystemContract_SignsAfterUpdate(t *testing.T) {
 	fakeClient.value = updatedSigner
 	fakeClient.mu.Unlock()
 
-	// Wait enough for the background polling routine to fetch the new value.
-	time.Sleep(1 + time.Second + defaultSyncInterval)
+	// fetch new value from L1 (simulating a background poll)
+	sys.fetchAddressFromL1()
 
 	// Verify that system contract's signerAddressL1 is now updated to updatedSigner.
-	sys.lock.RLock()
-	newSigner := sys.signerAddressL1
-	sys.lock.RUnlock()
+	newSigner := sys.currentSignerAddressL1()
 	require.Equal(t, newSigner, updatedSigner, "SignerAddressL1 should update to updatedSigner after polling")
 
 	// Now simulate authorizing with the correct local signer.

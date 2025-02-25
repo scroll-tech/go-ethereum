@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/scroll-tech/go-ethereum/accounts"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -19,7 +21,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/rpc"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -35,8 +36,6 @@ var (
 	// errUnknownBlock is returned when the list of signers is requested for a block
 	// that is not part of the local blockchain.
 	errUnknownBlock = errors.New("unknown block")
-	// errCoinbaseNotEmpty is returned if a coinbase value is non-zero
-	errInvalidCoinbase = errors.New("coinbase not empty nor zero")
 	// errNonceNotEmpty is returned if a nonce value is non-zero
 	errInvalidNonce = errors.New("nonce not empty nor zero")
 	// errMissingSignature is returned if a block's extra-data section doesn't seem

@@ -243,14 +243,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(commitEvents []*l1.CommitBatchEve
 			}
 			blobHash := args.BlobHashes[i]
 
-			var parentBatchHash common.Hash
-			if previousEvent == nil {
-				parentBatchHash = common.BytesToHash(args.ParentBatchHeader)
-			} else {
-				parentBatchHash = previousEvent.BatchHash()
-			}
-
-			if entry, err = NewCommitBatchDAV7(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, blobHash, parentBatchHash, blockHeader.Time); err != nil {
+			if entry, err = NewCommitBatchDAV7(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, blobHash, blockHeader.Time); err != nil {
 				return nil, fmt.Errorf("failed to decode DA, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 			}
 		}

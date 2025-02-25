@@ -38,18 +38,8 @@ func NewCommitBatchDAV7(ctx context.Context, db ethdb.Database,
 	codec encoding.Codec,
 	commitEvent *l1.CommitBatchEvent,
 	blobHash common.Hash,
-	parentBatchHash common.Hash,
 	l1BlockTime uint64,
 ) (*CommitBatchDAV7, error) {
-	calculatedBatch, err := codec.NewDABatchFromParams(commitEvent.BatchIndex().Uint64(), blobHash, parentBatchHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new DA batch from params, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
-	}
-
-	if calculatedBatch.Hash() != commitEvent.BatchHash() {
-		return nil, fmt.Errorf("calculated batch hash is not equal to the one from commit event: %s, calculated hash: %s", commitEvent.BatchHash().Hex(), calculatedBatch.Hash().Hex())
-	}
-
 	blob, err := blobClient.GetBlobByVersionedHashAndBlockTime(ctx, blobHash, l1BlockTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch blob from blob client, err: %w", err)

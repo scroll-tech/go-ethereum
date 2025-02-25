@@ -393,6 +393,11 @@ func (r *Reader) FetchCommitTxData(commitEvent *CommitBatchEvent) (*CommitBatchA
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode calldata into commitBatch args %s, values: %+v, err: %w", commitBatchWithBlobProofMethodName, values, err)
 		}
+	} else if method.Name == commitBatchesV7MethodName {
+		args, err = newCommitBatchArgsFromCommitBatchesV7(method, values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode calldata into commitBatch args %s, values: %+v, err: %w", commitBatchesV7MethodName, values, err)
+		}
 	} else {
 		return nil, fmt.Errorf("unknown method name for commit transaction: %s", method.Name)
 	}

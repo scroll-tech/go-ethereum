@@ -44,6 +44,7 @@ const (
 
 	commitBatchMethodName              = "commitBatch"
 	commitBatchWithBlobProofMethodName = "commitBatchWithBlobProof"
+	commitBatchesV7MethodName          = "commitBatches"
 
 	// the length of method ID at the beginning of transaction data
 	methodIDLength = 4
@@ -311,10 +312,27 @@ func newCommitBatchArgsFromCommitBatchWithProof(method *abi.Method, values []int
 	}, nil
 }
 
+func newCommitBatchArgsFromCommitBatchesV7(method *abi.Method, values []any) (*CommitBatchArgs, error) {
+	var args commitBatchesV7Args
+	err := method.Inputs.Copy(&args, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommitBatchArgs{
+		Version: args.Version,
+	}, nil
+}
+
 type commitBatchWithBlobProofArgs struct {
 	Version                uint8
 	ParentBatchHeader      []byte
 	Chunks                 [][]byte
 	SkippedL1MessageBitmap []byte
 	BlobDataProof          []byte
+}
+
+type commitBatchesV7Args struct {
+	Version       uint8
+	LastBatchHash common.Hash
 }

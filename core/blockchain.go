@@ -1895,7 +1895,7 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	// Double check: even though we just built the block, make sure it is valid.
 	if err = bc.validator.ValidateState(fullBlock, statedb, receipts, gasUsed); err != nil {
 		bc.reportBlock(fullBlock, receipts, err)
-		return nil,NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
+		return nil, NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
 	}
 
 	writeStatus, err := bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)

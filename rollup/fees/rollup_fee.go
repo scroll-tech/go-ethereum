@@ -141,9 +141,8 @@ func asUnsignedDynamicTx(msg Message, chainID *big.Int) *types.Transaction {
 }
 
 func asUnsignedSetCodeTx(msg Message, chainID *big.Int) *types.Transaction {
-	return types.NewTx(&types.SetCodeTx{
+	tx := types.SetCodeTx{
 		Nonce:      msg.Nonce(),
-		To:         *msg.To(),
 		Value:      uint256.MustFromBig(msg.Value()),
 		Gas:        msg.Gas(),
 		GasFeeCap:  uint256.MustFromBig(msg.GasFeeCap()),
@@ -152,7 +151,11 @@ func asUnsignedSetCodeTx(msg Message, chainID *big.Int) *types.Transaction {
 		AccessList: msg.AccessList(),
 		AuthList:   msg.SetCodeAuthorizations(),
 		ChainID:    uint256.MustFromBig(chainID),
-	})
+	}
+	if msg.To() != nil {
+		tx.To = *msg.To()
+	}
+	return types.NewTx(&tx)
 }
 
 func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {

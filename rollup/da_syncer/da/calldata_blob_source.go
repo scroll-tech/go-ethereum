@@ -144,7 +144,7 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 			// add commit event to the list of previous commit events, so we can process events created in the same tx together
 			lastCommitTransactionHash = commitEvent.TxHash()
 			lastCommitEvents = append(lastCommitEvents, commitEvent)
-		case l1.RevertEventType:
+		case l1.RevertEventV0Type, l1.RevertEventV7Type:
 			// if we have any previous commit events, we need to create a new DA before processing the revert event
 			if len(lastCommitEvents) > 0 {
 				if err = getAndAppendCommitBatchDA(); err != nil {
@@ -152,13 +152,7 @@ func (ds *CalldataBlobSource) processRollupEventsToDA(rollupEvents l1.RollupEven
 				}
 			}
 
-			revertEvent, ok := rollupEvent.(*l1.RevertBatchEvent)
-			// this should never happen because we just check event type
-			if !ok {
-				return nil, fmt.Errorf("unexpected type of rollup event: %T", rollupEvent)
-			}
-
-			entry = NewRevertBatch(revertEvent)
+			entry = NewRevertBatch(rollupEvent)
 			entries = append(entries, entry)
 		case l1.FinalizeEventType:
 			// if we have any previous commit events, we need to create a new DA before processing the finalized event

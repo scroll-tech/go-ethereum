@@ -9,6 +9,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
+	"github.com/scroll-tech/go-ethereum/rollup/l1"
 )
 
 // BatchQueue is a pipeline stage that reads all batch events from DAQueue and provides only finalized batches to the next stage.
@@ -54,7 +55,9 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.EntryWithBlocks, error)
 		case da.CommitBatchV0Type, da.CommitBatchWithBlobType:
 			bq.addBatch(daEntry)
 		case da.RevertBatchType:
-			bq.processAndDeleteBatch(daEntry)
+			if err = bq.handleRevertEvent(daEntry.Event()); err != nil {
+				return nil, fmt.Errorf("failed to handle revert event: %w", err)
+			}
 		case da.FinalizeBatchType:
 			if daEntry.BatchIndex() > bq.lastFinalizedBatchIndex {
 				bq.lastFinalizedBatchIndex = daEntry.BatchIndex()
@@ -90,16 +93,50 @@ func (bq *BatchQueue) addBatch(batch da.Entry) {
 	bq.batchesMap.Set(batch.BatchIndex(), heapElement)
 }
 
+func (bq *BatchQueue) handleRevertEvent(event l1.RollupEvent) error {
+	switch event.Type() {
+	case l1.RevertEventV0Type:
+		revertBatch, ok := event.(*l1.RevertBatchEventV0)
+		if !ok {
+			return fmt.Errorf("unexpected type of revert event: %T, expected RevertEventV0Type", event)
+		}
+
+		bq.deleteBatch(revertBatch.BatchIndex().Uint64())
+	case l1.RevertEventV7Type:
+		revertBatch, ok := event.(*l1.RevertBatchEventV7)
+		if !ok {
+			return fmt.Errorf("unexpected type of revert event: %T, expected RevertEventV7Type", event)
+		}
+
+		// delete all batches from revertBatch.StartBatchIndex (inclusive) to revertBatch.FinishBatchIndex (inclusive)
+		for i := revertBatch.StartBatchIndex().Uint64(); i <= revertBatch.FinishBatchIndex().Uint64(); i++ {
+			bq.deleteBatch(i)
+		}
+	default:
+		return fmt.Errorf("unexpected type of revert event: %T", event)
+	}
+
+	return nil
+}
+
+func (bq *BatchQueue) deleteBatch(batchIndex uint64) (deleted bool) {
+	batchHeapElement, exists := bq.batchesMap.Get(batchIndex)
+	if !exists {
+		return false
+	}
+
+	bq.batchesMap.Delete(batchIndex)
+	bq.batches.Remove(batchHeapElement)
+
+	return true
+}
+
 // processAndDeleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized
 // updates DASyncedL1BlockNumber
 func (bq *BatchQueue) processAndDeleteBatch(batch da.Entry) da.EntryWithBlocks {
-	batchHeapElement, exists := bq.batchesMap.Get(batch.BatchIndex())
-	if !exists {
+	if !bq.deleteBatch(batch.BatchIndex()) {
 		return nil
 	}
-
-	bq.batchesMap.Delete(batch.BatchIndex())
-	bq.batches.Remove(batchHeapElement)
 
 	entryWithBlocks, ok := batch.(da.EntryWithBlocks)
 	if !ok {

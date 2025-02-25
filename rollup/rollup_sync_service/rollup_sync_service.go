@@ -238,7 +238,9 @@ func (s *RollupSyncService) updateRollupEvents(daEntries da.Entries) error {
 
 		case da.RevertBatchType:
 			log.Trace("found new RevertBatch event", "batch index", entry.BatchIndex())
-			rawdb.DeleteCommittedBatchMeta(s.db, entry.BatchIndex())
+			if err := s.handleRevertEvent(entry.Event()); err != nil {
+				return fmt.Errorf("failed to handle revert event, batch index: %v, err: %w", entry.BatchIndex(), err)
+			}
 
 		case da.FinalizeBatchType:
 			event, ok := entry.Event().(*l1.FinalizeBatchEvent)
@@ -316,6 +318,33 @@ func (s *RollupSyncService) updateRollupEvents(daEntries da.Entries) error {
 		default:
 			return fmt.Errorf("unknown daEntry, type: %d, batch index: %d", entry.Type(), entry.BatchIndex())
 		}
+	}
+
+	return nil
+}
+
+func (s *RollupSyncService) handleRevertEvent(event l1.RollupEvent) error {
+	switch event.Type() {
+	case l1.RevertEventV0Type:
+		revertBatch, ok := event.(*l1.RevertBatchEventV0)
+		if !ok {
+			return fmt.Errorf("unexpected type of revert event: %T, expected RevertEventV0Type", event)
+		}
+
+		rawdb.DeleteCommittedBatchMeta(s.db, revertBatch.BatchIndex().Uint64())
+
+	case l1.RevertEventV7Type:
+		revertBatch, ok := event.(*l1.RevertBatchEventV7)
+		if !ok {
+			return fmt.Errorf("unexpected type of revert event: %T, expected RevertEventV7Type", event)
+		}
+
+		// delete all batches from revertBatch.StartBatchIndex (inclusive) to revertBatch.FinishBatchIndex (inclusive)
+		for i := revertBatch.StartBatchIndex().Uint64(); i <= revertBatch.FinishBatchIndex().Uint64(); i++ {
+			rawdb.DeleteCommittedBatchMeta(s.db, i)
+		}
+	default:
+		return fmt.Errorf("unexpected type of revert event: %T", event)
 	}
 
 	return nil

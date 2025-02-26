@@ -229,27 +229,43 @@ func (ds *CalldataBlobSource) getCommitBatchDA(commitEvents []*l1.CommitBatchEve
 		}
 
 		switch codec.Version() {
-		case 0:
+		case encoding.CodecV0:
 			if entry, err = NewCommitBatchDAV0(ds.db, codec, commitEvent, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap); err != nil {
 				return nil, fmt.Errorf("failed to decode DA, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 			}
-		case 1, 2, 3, 4, 5, 6:
+		case encoding.CodecV1, encoding.CodecV2, encoding.CodecV3, encoding.CodecV4, encoding.CodecV5, encoding.CodecV6:
 			if entry, err = NewCommitBatchDAV1(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, args.ParentBatchHeader, args.Chunks, args.SkippedL1MessageBitmap, args.BlobHashes, blockHeader.Time); err != nil {
 				return nil, fmt.Errorf("failed to decode DA, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 			}
-		default: // CodecVersion 7 and above
+		default: // CodecV7 and above
 			if i >= len(args.BlobHashes) {
 				return nil, fmt.Errorf("not enough blob hashes for commit transaction: %s, index in tx: %d, batch index: %d, hash: %s", firstCommitEvent.TxHash(), i, commitEvent.BatchIndex().Uint64(), commitEvent.BatchHash().Hex())
 			}
 			blobHash := args.BlobHashes[i]
 
-			if entry, err = NewCommitBatchDAV7(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, blobHash, blockHeader.Time); err != nil {
+			var parentBatchHash common.Hash
+			if previousEvent == nil {
+				parentBatchHash = common.BytesToHash(args.ParentBatchHeader)
+			} else {
+				parentBatchHash = previousEvent.BatchHash()
+			}
+
+			if entry, err = NewCommitBatchDAV7(ds.ctx, ds.db, ds.blobClient, codec, commitEvent, blobHash, parentBatchHash, blockHeader.Time); err != nil {
 				return nil, fmt.Errorf("failed to decode DA, batch index: %d, err: %w", commitEvent.BatchIndex().Uint64(), err)
 			}
 		}
 
 		previousEvent = commitEvent
 		entries = append(entries, entry)
+	}
+
+	if codec.Version() >= encoding.CodecV7 {
+		// sanity check that the last batch hash from the tx is equal to the last batch hash from the commit events.
+		// this means that all batches in the transaction have been successfully processed.
+		lastBatch := entries[len(entries)-1]
+		if args.LastBatchHash != lastBatch.Event().BatchHash() {
+			return nil, fmt.Errorf("last batch hash from tx is not equal to the one from commit events: LastBatchHash in calldata of tx: %s, last batch hash from events: %s", args.LastBatchHash.Hex(), lastBatch.Event().BatchHash().Hex())
+		}
 	}
 
 	return entries, nil

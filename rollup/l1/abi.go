@@ -292,6 +292,10 @@ type CommitBatchArgs struct {
 	Chunks                 [][]byte
 	SkippedL1MessageBitmap []byte
 	BlobHashes             []common.Hash
+
+	// added in CodecV7
+	ParentBatchHash common.Hash
+	LastBatchHash   common.Hash
 }
 
 func newCommitBatchArgs(method *abi.Method, values []interface{}) (*CommitBatchArgs, error) {
@@ -322,7 +326,9 @@ func newCommitBatchArgsFromCommitBatchesV7(method *abi.Method, values []any) (*C
 	}
 
 	return &CommitBatchArgs{
-		Version: args.Version,
+		Version:         args.Version,
+		ParentBatchHash: args.ParentBatchHash,
+		LastBatchHash:   args.LastBatchHash,
 	}, nil
 }
 
@@ -335,8 +341,9 @@ type commitBatchWithBlobProofArgs struct {
 }
 
 type commitBatchesV7Args struct {
-	Version       uint8
-	LastBatchHash common.Hash
+	Version         uint8
+	ParentBatchHash common.Hash
+	LastBatchHash   common.Hash
 }
 
 type FinalizeBatchArgs struct {

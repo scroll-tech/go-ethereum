@@ -19,12 +19,13 @@ package miner
 import (
 	"errors"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"

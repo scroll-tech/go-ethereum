@@ -1,6 +1,9 @@
 package wrapper
 
 import (
+	"math/big"
+	"sync"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/clique"
@@ -8,8 +11,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/rpc"
-	"math/big"
-	"sync"
 )
 
 // UpgradableEngine implements consensus.Engine and acts as a middleware to dispatch

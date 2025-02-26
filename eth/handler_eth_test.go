@@ -18,12 +18,13 @@ package eth
 
 import (
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"math/big"
 	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/scroll-tech/go-ethereum/crypto"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus/ethash"

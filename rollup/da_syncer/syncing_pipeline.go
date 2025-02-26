@@ -118,7 +118,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 		log.Info("sync from DA: initializing pipeline", "BatchIndex", lastProcessedBatchMeta.BatchIndex, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
 	}
 
-	daQueue := NewDAQueue(lastProcessedBatchMeta.L1BlockNumber, config.InitialBatch, dataSourceFactory)
+	daQueue := NewDAQueue(lastProcessedBatchMeta.L1BlockNumber, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db, lastProcessedBatchMeta)
 	blockQueue := NewBlockQueue(batchQueue)
 	daSyncer := NewDASyncer(blockchain, config.L2EndBlock)

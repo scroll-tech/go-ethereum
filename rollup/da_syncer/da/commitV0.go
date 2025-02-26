@@ -159,6 +159,10 @@ func (c *CommitBatchDAV0) TotalL1MessagesPopped() uint64 {
 	return c.parentTotalL1MessagePopped + uint64(c.l1MessagesPopped)
 }
 
+func (c *CommitBatchDAV0) L1MessagesPoppedInBatch() uint64 {
+	return uint64(c.l1MessagesPopped)
+}
+
 func getTotalMessagesPoppedFromChunks(decodedChunks []*encoding.DAChunkRawTx) int {
 	totalL1MessagePopped := 0
 	for _, chunk := range decodedChunks {

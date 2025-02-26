@@ -40,6 +40,7 @@ type EntryWithBlocks interface {
 	BlobVersionedHashes() []common.Hash
 	SetParentTotalL1MessagePopped(uint64)
 	TotalL1MessagesPopped() uint64
+	L1MessagesPoppedInBatch() uint64
 }
 
 type Entries []Entry

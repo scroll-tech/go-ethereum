@@ -81,15 +81,27 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Reader, blobClientList, db)
 	var lastProcessedBatchMeta *rawdb.DAProcessedBatchMeta
 	if config.RecoveryMode {
-		// TODO: fill lastProcessedBatchMeta with the correct values
-		//  - due to batches not being able to be decoded independently from EuclidV2 we first need to find the correct
-		//    message queue index
-		//  - this can be done by looking at the finalize transaction of the bundle that contains config.InitialBatch
 		if config.InitialL1Block == 0 {
 			return nil, errors.New("sync from DA: initial L1 block must be set in recovery mode")
 		}
 		if config.InitialBatch == 0 {
 			return nil, errors.New("sync from DA: initial batch must be set in recovery mode")
+		}
+
+		l1MessageQueueHeightFinder, err := NewL1MessageQueueHeightFinder(ctx, config.InitialL1Block, l1Reader, blobClientList, db)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create L1MessageQueueHeightFinder: %w", err)
+		}
+
+		l1MessageQueueHeightBeforeInitialBatch, err := l1MessageQueueHeightFinder.FindL1MessageQueueHeight(config.InitialBatch)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find L1 message queue height before initial batch: %w", err)
+		}
+
+		lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
+			BatchIndex:            config.InitialBatch,
+			L1BlockNumber:         config.InitialL1Block,
+			TotalL1MessagesPopped: l1MessageQueueHeightBeforeInitialBatch,
 		}
 
 		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", config.InitialL1Block, "initialBatch", config.InitialBatch)

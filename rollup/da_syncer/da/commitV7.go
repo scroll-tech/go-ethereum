@@ -148,6 +148,10 @@ func (c *CommitBatchDAV7) TotalL1MessagesPopped() uint64 {
 	return c.parentTotalL1MessagePopped + c.l1MessagesPopped
 }
 
+func (c *CommitBatchDAV7) L1MessagesPoppedInBatch() uint64 {
+	return c.l1MessagesPopped
+}
+
 func (c *CommitBatchDAV7) Version() encoding.CodecVersion {
 	return c.version
 }

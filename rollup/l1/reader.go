@@ -406,3 +406,36 @@ func (r *Reader) FetchCommitTxData(commitEvent *CommitBatchEvent) (*CommitBatchA
 
 	return args, nil
 }
+
+func (r *Reader) FetchFinalizeTxDataPostEuclidV2(event *FinalizeBatchEvent) (*FinalizeBatchArgs, error) {
+	tx, err := r.fetchTx(event.TxHash(), event.BlockHash())
+	if err != nil {
+		return nil, err
+	}
+	txData := tx.Data()
+
+	if len(txData) < methodIDLength {
+		return nil, fmt.Errorf("transaction data is too short, length of tx data: %v, minimum length required: %v", len(txData), methodIDLength)
+	}
+
+	method, err := r.scrollChainABI.MethodById(txData[:methodIDLength])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:methodIDLength], err)
+	}
+	values, err := method.Inputs.Unpack(txData[methodIDLength:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack transaction data using ABI, tx data: %v, err: %w", txData, err)
+	}
+
+	var args *FinalizeBatchArgs
+	if method.Name == finalizeBundlePostEuclidV2MethodName {
+		args, err = newFinalizeBatchArgs(method, values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode calldata into finalizeBatch args %s, values: %+v, err: %w", finalizeBundlePostEuclidV2MethodName, values, err)
+		}
+	} else {
+		return nil, fmt.Errorf("unknown method name for finalize transaction: %s", method.Name)
+	}
+
+	return args, nil
+}

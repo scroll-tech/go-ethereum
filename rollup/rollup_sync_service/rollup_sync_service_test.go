@@ -161,6 +161,10 @@ type mockEntryWithBlocks struct {
 	versionedHashes []common.Hash
 }
 
+func (m mockEntryWithBlocks) L1MessagesPoppedInBatch() uint64 {
+	panic("implement me")
+}
+
 func (m mockEntryWithBlocks) Type() da.Type {
 	panic("implement me")
 }

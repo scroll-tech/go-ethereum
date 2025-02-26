@@ -46,6 +46,8 @@ const (
 	commitBatchWithBlobProofMethodName = "commitBatchWithBlobProof"
 	commitBatchesV7MethodName          = "commitBatches"
 
+	finalizeBundlePostEuclidV2MethodName = "finalizeBundlePostEuclidV2"
+
 	// the length of method ID at the beginning of transaction data
 	methodIDLength = 4
 )
@@ -335,4 +337,21 @@ type commitBatchWithBlobProofArgs struct {
 type commitBatchesV7Args struct {
 	Version       uint8
 	LastBatchHash common.Hash
+}
+
+type FinalizeBatchArgs struct {
+	BatchHeader                    []byte
+	LastProcessedMessageQueueIndex *big.Int
+	PostStateRoot                  common.Hash
+	WithdrawRoot                   common.Hash
+	AggrProof                      []byte
+}
+
+func newFinalizeBatchArgs(method *abi.Method, values []any) (*FinalizeBatchArgs, error) {
+	var args FinalizeBatchArgs
+	err := method.Inputs.Copy(&args, values)
+	if err != nil {
+		return nil, err
+	}
+	return &args, nil
 }

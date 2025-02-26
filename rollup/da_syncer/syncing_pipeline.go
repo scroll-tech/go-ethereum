@@ -104,7 +104,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 			TotalL1MessagesPopped: l1MessageQueueHeightBeforeInitialBatch,
 		}
 
-		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", config.InitialL1Block, "initialBatch", config.InitialBatch)
+		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", config.InitialL1Block, "initialBatch", config.InitialBatch, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
 	} else {
 		lastProcessedBatchMeta = rawdb.ReadDAProcessedBatchMeta(db)
 		if lastProcessedBatchMeta == nil {

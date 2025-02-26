@@ -1507,7 +1507,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	}
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
-	senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig, chain[0].Number()), chain)
+	senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig, chain[0].Number(), chain[0].Time()), chain)
 
 	var (
 		stats     = insertStats{startTime: mclock.Now()}
@@ -1895,7 +1895,7 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	// Double check: even though we just built the block, make sure it is valid.
 	if err = bc.validator.ValidateState(fullBlock, statedb, receipts, gasUsed); err != nil {
 		bc.reportBlock(fullBlock, receipts, err)
-		return nil,NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
+		return nil, NonStatTy, fmt.Errorf("error validating block %d: %w", fullBlock.Number().Uint64(), err)
 	}
 
 	writeStatus, err := bc.writeBlockWithState(fullBlock, receipts, logs, statedb, false)

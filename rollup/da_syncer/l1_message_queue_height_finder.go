@@ -29,49 +29,16 @@ func NewL1MessageQueueHeightFinder(ctx context.Context, l1height uint64, l1Reade
 	}, nil
 }
 
-// FindL1MessageQueueHeight finds the L1 message queue height for the target batch.
+// TotalL1MessagesPoppedBefore finds the total L1 messages popped (L1 message queue height) before target batch.
 // It does so by:
 // 1. find bundle in which target batch was finalized
 // 2. fetch the tx of the bundle to get the height of the L1 message queue after the bundle
 // 3. with this information we can calculate the L1 message count for each batch from last finalized bundle to the target batch.
-func (f *L1MessageQueueHeightFinder) FindL1MessageQueueHeight(targetBatch uint64) (uint64, error) {
+func (f *L1MessageQueueHeightFinder) TotalL1MessagesPoppedBefore(targetBatch uint64) (uint64, error) {
 	batches := make(map[uint64]da.EntryWithBlocks)
 
-	// 1. find bundle in which target batch was finalized
-	daEntries, err := f.calldataBlobSource.NextData()
+	finalizedBundle, err := f.findFinalizedBundle(targetBatch, batches)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get next data: %w", err)
-	}
-
-	var finalizedBundle *da.FinalizeBatch
-	for _, daEntry := range daEntries {
-		switch daEntry.Type() {
-		case da.CommitBatchV0Type, da.CommitBatchWithBlobType:
-			daEntryWithBlocks, ok := daEntry.(da.EntryWithBlocks)
-			if !ok {
-				return 0, fmt.Errorf("unexpected type of daEntry: %T, expected EntryWithBlocks", daEntry)
-			}
-
-			// save the batch for later use
-			batches[daEntry.BatchIndex()] = daEntryWithBlocks
-		case da.RevertBatchType:
-			if err = f.handleRevertEvent(batches, daEntry.Event()); err != nil {
-				return 0, fmt.Errorf("failed to handle revert event: %w", err)
-			}
-		case da.FinalizeBatchType:
-			// the finalized event is triggered only for the last batch in the bundle:
-			// we found the bundle in which the target batch was finalized
-			if daEntry.BatchIndex() >= targetBatch {
-				finalizedBundle = daEntry.(*da.FinalizeBatch)
-				break
-			}
-
-		default:
-			return 0, fmt.Errorf("unexpected type of daEntry: %T", daEntry)
-		}
-	}
-
-	if finalizedBundle == nil {
 		return 0, fmt.Errorf("failed to find the bundle in which the target batch was finalized")
 	}
 
@@ -98,6 +65,43 @@ func (f *L1MessageQueueHeightFinder) FindL1MessageQueueHeight(targetBatch uint64
 	}
 
 	return l1MessageQueueHeight, nil
+}
+
+func (f *L1MessageQueueHeightFinder) findFinalizedBundle(targetBatch uint64, batches map[uint64]da.EntryWithBlocks) (*da.FinalizeBatch, error) {
+	for {
+		// 1. find bundle in which target batch was finalized
+		daEntries, err := f.calldataBlobSource.NextData()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get next data: %w", err)
+		}
+
+		for _, daEntry := range daEntries {
+			switch daEntry.Type() {
+			case da.CommitBatchV0Type, da.CommitBatchWithBlobType:
+				daEntryWithBlocks, ok := daEntry.(da.EntryWithBlocks)
+				if !ok {
+					return nil, fmt.Errorf("unexpected type of daEntry: %T, expected EntryWithBlocks", daEntry)
+				}
+
+				// save the batch for later use
+				batches[daEntry.BatchIndex()] = daEntryWithBlocks
+			case da.RevertBatchType:
+				if err = f.handleRevertEvent(batches, daEntry.Event()); err != nil {
+					return nil, fmt.Errorf("failed to handle revert event: %w", err)
+				}
+			case da.FinalizeBatchType:
+				// the finalized event is triggered only for the last batch in the bundle:
+				// we found the bundle in which the target batch was finalized
+				if daEntry.BatchIndex() >= targetBatch {
+					return daEntry.(*da.FinalizeBatch), nil
+				}
+
+			default:
+				return nil, fmt.Errorf("unexpected type of daEntry: %T", daEntry)
+			}
+		}
+	}
+
 }
 
 func (f *L1MessageQueueHeightFinder) handleRevertEvent(batches map[uint64]da.EntryWithBlocks, event l1.RollupEvent) error {

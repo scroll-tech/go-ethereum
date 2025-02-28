@@ -93,7 +93,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 			return nil, fmt.Errorf("failed to create L1MessageQueueHeightFinder: %w", err)
 		}
 
-		l1MessageQueueHeightBeforeInitialBatch, err := l1MessageQueueHeightFinder.FindL1MessageQueueHeight(config.InitialBatch)
+		l1MessageQueueHeightBeforeInitialBatch, err := l1MessageQueueHeightFinder.TotalL1MessagesPoppedBefore(config.InitialBatch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find L1 message queue height before initial batch: %w", err)
 		}

@@ -245,7 +245,7 @@ func (ds *CalldataBlobSource) getCommitBatchDA(commitEvents []*l1.CommitBatchEve
 
 			var parentBatchHash common.Hash
 			if previousEvent == nil {
-				parentBatchHash = common.BytesToHash(args.ParentBatchHeader)
+				parentBatchHash = args.ParentBatchHash
 			} else {
 				parentBatchHash = previousEvent.BatchHash()
 			}

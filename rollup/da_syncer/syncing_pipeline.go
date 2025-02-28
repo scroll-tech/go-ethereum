@@ -108,9 +108,13 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	} else {
 		lastProcessedBatchMeta = rawdb.ReadDAProcessedBatchMeta(db)
 		if lastProcessedBatchMeta == nil {
+			var l1BlockNumber uint64
+			if l1DeploymentBlock > 0 {
+				l1BlockNumber = l1DeploymentBlock - 1
+			}
 			lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
 				BatchIndex:            0,
-				L1BlockNumber:         l1DeploymentBlock - 1,
+				L1BlockNumber:         l1BlockNumber,
 				TotalL1MessagesPopped: 0,
 			}
 			rawdb.WriteDAProcessedBatchMeta(db, lastProcessedBatchMeta)

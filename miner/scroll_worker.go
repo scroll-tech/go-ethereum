@@ -363,7 +363,10 @@ func (w *worker) mainLoop() {
 		if errors.As(err, &retryableCommitError) || errors.Is(err, system_contract.ErrUnauthorizedSigner) {
 			log.Warn("failed to commit to a block, retrying", "err", err)
 			if errors.Is(err, system_contract.ErrUnauthorizedSigner) {
-				time.Sleep(5 * time.Second) // half the time it takes for the system contract consensus to read and update the address locally.
+				// half the time it takes for the system contract consensus to read and update the address locally.
+				// note: a blocking wait here might be problematic, since it will prevent progress on
+				// `updateSnapshot` and other functionalities.
+				time.Sleep(5 * time.Second)
 			}
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorging, w.current.reorgReason); err != nil {
 				continue

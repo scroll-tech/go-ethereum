@@ -36,7 +36,7 @@ func NewBatchQueue(DAQueue *DAQueue, db ethdb.Database, lastProcessedBatch *rawd
 
 // NextBatch finds next finalized batch and returns data, that was committed in that batch
 func (bq *BatchQueue) NextBatch(ctx context.Context) (da.EntryWithBlocks, error) {
-	if batch := bq.getFinalizedBatch(); batch != nil {
+	if batch := bq.nextFinalizedBatch(); batch != nil {
 		return batch, nil
 	}
 
@@ -63,7 +63,7 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.EntryWithBlocks, error)
 				bq.lastFinalizedBatchIndex = daEntry.BatchIndex()
 			}
 
-			if batch := bq.getFinalizedBatch(); batch != nil {
+			if batch := bq.nextFinalizedBatch(); batch != nil {
 				return batch, nil
 			}
 		default:
@@ -72,8 +72,8 @@ func (bq *BatchQueue) NextBatch(ctx context.Context) (da.EntryWithBlocks, error)
 	}
 }
 
-// getFinalizedBatch returns next finalized batch if there is available
-func (bq *BatchQueue) getFinalizedBatch() da.EntryWithBlocks {
+// nextFinalizedBatch returns next finalized batch if there is available
+func (bq *BatchQueue) nextFinalizedBatch() da.EntryWithBlocks {
 	if bq.batches.Len() == 0 {
 		return nil
 	}
@@ -131,8 +131,7 @@ func (bq *BatchQueue) deleteBatch(batchIndex uint64) (deleted bool) {
 	return true
 }
 
-// processAndDeleteBatch deletes data committed in the batch from map, because this batch is reverted or finalized
-// updates DASyncedL1BlockNumber
+// processAndDeleteBatch processes a batch and deletes the batch from map. Stores the syncing progress on disk.
 func (bq *BatchQueue) processAndDeleteBatch(batch da.Entry) da.EntryWithBlocks {
 	if !bq.deleteBatch(batch.BatchIndex()) {
 		return nil
@@ -144,7 +143,7 @@ func (bq *BatchQueue) processAndDeleteBatch(batch da.Entry) da.EntryWithBlocks {
 		return nil
 	}
 
-	// sanity check that the next batch is the one we expect
+	// sanity check that the next batch is the one we expect. If not, we skip the batch.
 	if bq.previousBatch.BatchIndex > 0 && bq.previousBatch.BatchIndex+1 != entryWithBlocks.BatchIndex() {
 		log.Info("BatchQueue: skipping batch ", "currentBatch", entryWithBlocks.BatchIndex(), "previousBatch", bq.previousBatch.BatchIndex)
 		return nil

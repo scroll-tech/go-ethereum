@@ -2,6 +2,7 @@ package wrapper
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
@@ -99,7 +100,7 @@ func (ue *UpgradableEngine) VerifyHeaders(chain consensus.ChainHeaderReader, hea
 	systemHeaders := headers[splitIndex:]
 	systemSeals := seals[splitIndex:]
 
-	log.Warn("Verifying EuclidV2 transition header chain", "startBlockNumber", headers[0].Number, "endBlockNumber", headers[len(headers)-1].Number, "transitionBlockNumber", headers[splitIndex].Number)
+	log.Info("Verifying EuclidV2 transition header chain")
 
 	// Do verification concurrently,
 	// but make sure to run Clique first, then SystemContract,
@@ -108,26 +109,43 @@ func (ue *UpgradableEngine) VerifyHeaders(chain consensus.ChainHeaderReader, hea
 		defer close(results)
 
 		// Verify clique headers.
+		log.Info("Start EuclidV2 transition verification in Clique section", "startBlockNumber", cliqueHeaders[0].Number, "endBlockNumber", cliqueHeaders[len(cliqueHeaders)-1].Number)
 		abortClique, cliqueResults := ue.clique.VerifyHeaders(chain, cliqueHeaders, cliqueSeals)
-		for err := range cliqueResults {
+
+		// Note: cliqueResults is not closed so we cannot directly iterate over it
+		for i := 0; i < len(cliqueHeaders); i++ {
 			select {
 			case <-abort:
 				close(abortClique)
+				log.Warn("Aborted EuclidV2 transition verification in Clique section")
 				return
-			case results <- err:
+			case err := <-cliqueResults:
+				results <- err
 			}
 		}
 
+		// Not sure why we need this here, but without this we get err="unknown ancestor"
+		// at the 1st Euclid block. It seems that `VerifyHeaders` start processing the next
+		// header before the previous one was written into `chain`.
+		time.Sleep(2 * time.Second)
+
 		// Verify system contract headers.
+		log.Info("Start EuclidV2 transition verification in SystemContract section", "startBlockNumber", systemHeaders[0].Number, "endBlockNumber", systemHeaders[len(systemHeaders)-1].Number)
 		abortSystem, systemResults := ue.system.VerifyHeaders(chain, systemHeaders, systemSeals)
-		for err := range systemResults {
+
+		// Note: systemResults is not closed so we cannot directly iterate over it
+		for i := 0; i < len(systemHeaders); i++ {
 			select {
 			case <-abort:
 				close(abortSystem)
+				log.Info("Aborted EuclidV2 transition verification in SystemContract section")
 				return
-			case results <- err:
+			case err := <-systemResults:
+				results <- err
 			}
 		}
+
+		log.Info("Completed EuclidV2 transition verification")
 	}()
 
 	return abort, results
@@ -171,10 +189,16 @@ func (ue *UpgradableEngine) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 // Close terminates the consensus engine.
 func (ue *UpgradableEngine) Close() error {
 	// Always close both engines.
-	if err := ue.clique.Close(); err != nil {
-		return err
+	err1 := ue.clique.Close()
+	err2 := ue.system.Close()
+
+	if err1 != nil || err2 != nil {
+		log.Error("Error while closing upgradable engine", "cliqueError", err1, "systemContractError", err2)
 	}
-	return ue.system.Close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

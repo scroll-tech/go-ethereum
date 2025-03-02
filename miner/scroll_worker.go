@@ -463,6 +463,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
 			if len(l1MessagesV1) > 0 {
 				// backdate the block to the parent block's timestamp -> not yet EuclidV2
+				// TODO: might need to re-run Prepare here
 				w.current.header.Time = parent.Time
 				return l1MessagesV1
 			}

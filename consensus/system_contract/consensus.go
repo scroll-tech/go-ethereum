@@ -116,8 +116,12 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Don't waste time checking blocks from the future
-	if header.Time > uint64(time.Now().Unix()) {
-		return consensus.ErrFutureBlock
+	now := time.Now()
+	if header.Time > uint64(now.Unix()) {
+		// Add 100ms leeway since the scroll_worker internal timers might trigger early.
+		if uint64(now.Unix())+1 != header.Time || now.Nanosecond() < 900000000 {
+			return consensus.ErrFutureBlock
+		}
 	}
 	// Ensure that the coinbase is zero
 	if header.Coinbase != (common.Address{}) {

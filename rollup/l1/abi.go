@@ -347,11 +347,11 @@ type commitBatchesV7Args struct {
 }
 
 type FinalizeBatchArgs struct {
-	BatchHeader                    []byte
-	LastProcessedMessageQueueIndex *big.Int
-	PostStateRoot                  common.Hash
-	WithdrawRoot                   common.Hash
-	AggrProof                      []byte
+	BatchHeader                  []byte
+	TotalL1MessagesPoppedOverall *big.Int
+	PostStateRoot                common.Hash
+	WithdrawRoot                 common.Hash
+	AggrProof                    []byte
 }
 
 func newFinalizeBatchArgs(method *abi.Method, values []any) (*FinalizeBatchArgs, error) {

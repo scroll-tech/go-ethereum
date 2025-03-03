@@ -42,7 +42,7 @@ func (f *L1MessageQueueHeightFinder) TotalL1MessagesPoppedBefore(targetBatch uin
 		return 0, fmt.Errorf("failed to find the bundle in which the target batch was finalized")
 	}
 
-	// 2. fetch tx of the bundle to get the LastProcessedMessageQueueIndex after the bundle and the first batch within the bundle.
+	// 2. fetch tx of the bundle to get the TotalL1MessagesPoppedOverall after the bundle and the first batch within the bundle.
 	args, err := f.l1Reader.FetchFinalizeTxDataPostEuclidV2(finalizedBundle.Event().(*l1.FinalizeBatchEvent))
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch finalize tx data: %w", err)
@@ -50,7 +50,12 @@ func (f *L1MessageQueueHeightFinder) TotalL1MessagesPoppedBefore(targetBatch uin
 
 	// 3. with this information we can calculate the L1 message queue height for target batch: for each batch from last finalized batch to the target batch subtract L1 messages popped in the batch from L1 message queue height
 	lastBatchInBundle := finalizedBundle.BatchIndex()
-	l1MessageQueueHeight := args.LastProcessedMessageQueueIndex.Uint64()
+
+	var l1MessageQueueHeight uint64
+	// totalL1MessagesPoppedOverall is the number of messages processed after the bundle -> subtract 1 to get the last message in the bundle
+	if args.TotalL1MessagesPoppedOverall.Uint64() > 0 {
+		l1MessageQueueHeight = args.TotalL1MessagesPoppedOverall.Uint64() - 1
+	}
 
 	for i := lastBatchInBundle; i >= targetBatch; i-- {
 		batch, ok := batches[i]

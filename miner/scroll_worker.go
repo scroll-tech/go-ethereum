@@ -520,7 +520,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		header.Nonce = types.BlockNonce{}
 	} else {
 		prepareStart := time.Now()
-		if err := w.engine.Prepare(w.chain, header); err != nil {
+		if err := w.engine.Prepare(w.chain, header, nil); err != nil {
 			return fmt.Errorf("failed to prepare header for mining: %w", err)
 		}
 		prepareTimer.UpdateSince(prepareStart)

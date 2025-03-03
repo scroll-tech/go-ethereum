@@ -447,8 +447,6 @@ func (w *worker) updateSnapshot() {
 // collectPendingL1Messages reads pending L1 messages from the database.
 // It returns a list of L1 messages that can be included in the block. Depending on the current
 // block time, it reads L1 messages from either L1MessageQueueV1 or L1MessageQueueV2.
-// It also makes sure that all L1 messages V1 are consumed before we activate EuclidV2 fork by backdating the block's time
-// to the parent block's timestamp.
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 
@@ -509,22 +507,23 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		header.Nonce = types.BlockNonce{}
 	} else {
 		prepareStart := time.Now()
+		// Note: this call will set header.Time, among other fields.
 		if err := w.engine.Prepare(w.chain, header, nil); err != nil {
 			return fmt.Errorf("failed to prepare header for mining: %w", err)
 		}
 		prepareTimer.UpdateSince(prepareStart)
 
-		// We found a potential EuclidV2 transition block.
-		// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2
-		// as with EuclidV2 only L1 messages V2 are allowed.
 		if w.chainConfig.IsEuclidV2(header.Time) && !w.chainConfig.IsEuclidV2(parent.Time()) {
+			// We found a potential EuclidV2 transition block.
+			// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2,
+			// since we can only include MessageQueueV2 messages after EuclidV2.
 			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), nextL1MsgIndex, 1)
 			if len(l1MessagesV1) > 0 {
-				// backdate the block to the parent block's timestamp -> not yet EuclidV2
+				// Backdate the block to the parent block's timestamp -> not yet EuclidV2
 				parentTime := parent.Time()
 				log.Warn("Backdating header timestamp to ensure it precedes the EuclidV2 transition", "blockNumber", header.Number, "oldTime", header.Time, "newTime", parentTime)
 
-				// run-prepare again, this time it will use Clique
+				// Run Prepare again, this time we provide a timestamp override, so it will use Clique
 				prepareStart := time.Now()
 				if err := w.engine.Prepare(w.chain, header, &parentTime); err != nil {
 					return fmt.Errorf("failed to prepare header for mining: %w", err)

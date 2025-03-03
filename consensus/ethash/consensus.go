@@ -580,7 +580,7 @@ func (ethash *Ethash) verifySeal(chain consensus.ChainHeaderReader, header *type
 }
 
 func (ue *Ethash) CalcTimestamp(parent *types.Header) uint64 {
-	panic("Called CalcTimestamp in Ethash, not implemented")
+	panic("Called CalcTimestamp on Ethash, not implemented")
 }
 
 // Prepare implements consensus.Engine, initializing the difficulty field of a

@@ -152,7 +152,7 @@ func (ue *UpgradableEngine) VerifyHeaders(chain consensus.ChainHeaderReader, hea
 }
 
 func (ue *UpgradableEngine) CalcTimestamp(parent *types.Header) uint64 {
-	panic("Called CalcTimestamp in UpgradableEngine, not implemented")
+	panic("Called CalcTimestamp on UpgradableEngine, not implemented")
 }
 
 // Prepare prepares a block header for sealing.

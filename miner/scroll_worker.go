@@ -454,22 +454,6 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 
 	// If we are on EuclidV2, we need to read L1 messages from L1MessageQueueV2.
 	if w.chainConfig.IsEuclidV2(w.current.header.Time) {
-		parent := w.chain.CurrentHeader()
-
-		// w.current would be the first block in the EuclidV2 fork
-		if !w.chainConfig.IsEuclidV2(parent.Time) {
-			// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2 as with EuclidV2
-			// only L1 messages V2 are allowed.
-			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
-			if len(l1MessagesV1) > 0 {
-				// backdate the block to the parent block's timestamp -> not yet EuclidV2
-				// TODO: might need to re-run Prepare here
-				log.Warn("Back-labeling header timestamp to ensure it precedes the EuclidV2 transition", "blockNumber", w.current.header.Number, "oldTime", w.current.header.Time, "newTime", parent.Time)
-				w.current.header.Time = parent.Time
-				return l1MessagesV1
-			}
-		}
-
 		return rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
 	}
 
@@ -512,6 +496,11 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		header.Coinbase = w.coinbase
 	}
 
+	var nextL1MsgIndex uint64
+	if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
+		nextL1MsgIndex = *dbVal
+	}
+
 	if w.config.SigningDisabled {
 		// Need to make sure to set difficulty so that a new canonical chain is detected in Blockchain
 		header.Difficulty = new(big.Int).SetUint64(1)
@@ -524,11 +513,27 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 			return fmt.Errorf("failed to prepare header for mining: %w", err)
 		}
 		prepareTimer.UpdateSince(prepareStart)
-	}
 
-	var nextL1MsgIndex uint64
-	if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
-		nextL1MsgIndex = *dbVal
+		// We found a potential EuclidV2 transition block.
+		// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2
+		// as with EuclidV2 only L1 messages V2 are allowed.
+		if w.chainConfig.IsEuclidV2(header.Time) && !w.chainConfig.IsEuclidV2(parent.Time()) {
+			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), nextL1MsgIndex, 1)
+			if len(l1MessagesV1) > 0 {
+				// backdate the block to the parent block's timestamp -> not yet EuclidV2
+				parentTime := parent.Time()
+				log.Warn("Backdating header timestamp to ensure it precedes the EuclidV2 transition", "blockNumber", header.Number, "oldTime", header.Time, "newTime", parentTime)
+
+				// run-prepare again, this time it will use Clique
+				prepareStart := time.Now()
+				if err := w.engine.Prepare(w.chain, header, &parentTime); err != nil {
+					return fmt.Errorf("failed to prepare header for mining: %w", err)
+				}
+				prepareTimer.UpdateSince(prepareStart)
+			} else {
+				log.Info("All MessageQueueV1 messages processed, creating EuclidV2 transition block", "blockNumber", header.Number, "blockTime", header.Time, "firstV2MsgIndex", nextL1MsgIndex)
+			}
+		}
 	}
 
 	vmConfig := *w.chain.GetVMConfig()

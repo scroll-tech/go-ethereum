@@ -383,6 +383,9 @@ func ReadFirstQueueIndexNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *
 
 // WriteL1MessageV2StartIndex writes the start index of L1 messages that are from L1MessageQueueV2.
 func WriteL1MessageV2StartIndex(db ethdb.KeyValueWriter, queueIndex uint64) {
+	// Write with binary.BigEndian.PutUint64 to ensure that 0 values are written as 8 bytes.
+	// big.NewInt(0).SetUint64(l1BlockNumber).Bytes() would write 0 as empty slice which leads to problems when reading
+	// the value as non-existent and 0 are not distinguishable.
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], queueIndex)
 

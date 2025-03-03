@@ -334,7 +334,11 @@ var (
 			Period: 3,
 			Epoch:  30000,
 		},
-		// TODO: add system config consensus
+		SystemContract: &SystemContractConfig{
+			Period:                3,
+			SystemContractAddress: common.HexToAddress("0xC706Ba9fa4fedF4507CB7A898b4766c1bbf9be57"),
+			SystemContractSlot:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000067"),
+		},
 		Scroll: ScrollConfig{
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,

@@ -101,6 +101,8 @@ func (bq *BatchQueue) handleRevertEvent(event l1.RollupEvent) error {
 			return fmt.Errorf("unexpected type of revert event: %T, expected RevertEventV0Type", event)
 		}
 
+		log.Info("reverting batch due to RevertEventV0Type", "batchIndex", revertBatch.BatchIndex())
+
 		bq.deleteBatch(revertBatch.BatchIndex().Uint64())
 	case l1.RevertEventV7Type:
 		revertBatch, ok := event.(*l1.RevertBatchEventV7)
@@ -110,6 +112,7 @@ func (bq *BatchQueue) handleRevertEvent(event l1.RollupEvent) error {
 
 		// delete all batches from revertBatch.StartBatchIndex (inclusive) to revertBatch.FinishBatchIndex (inclusive)
 		for i := revertBatch.StartBatchIndex().Uint64(); i <= revertBatch.FinishBatchIndex().Uint64(); i++ {
+			log.Info("reverting batch due to RevertEventV7Type", "batchIndex", i)
 			bq.deleteBatch(i)
 		}
 	default:

@@ -526,6 +526,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
 
+	// Unset EuclidV2-related fields
+	header.BlockSignature = nil
+	header.IsEuclidV2 = false
+
 	number := header.Number.Uint64()
 	// Assemble the voting snapshot to check which votes make sense
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)

@@ -519,11 +519,16 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 			// since we can only include MessageQueueV2 messages after EuclidV2.
 			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), nextL1MsgIndex, 1)
 			if len(l1MessagesV1) > 0 {
+				// Reset Extra (it was unset by SystemContract)
+				header.Extra = w.extra
+
 				// Backdate the block to the parent block's timestamp -> not yet EuclidV2
 				parentTime := parent.Time()
 				log.Warn("Backdating header timestamp to ensure it precedes the EuclidV2 transition", "blockNumber", header.Number, "oldTime", header.Time, "newTime", parentTime)
 
-				// Run Prepare again, this time we provide a timestamp override, so it will use Clique
+				// Run Prepare again, this time we provide a timestamp override, so it will use Clique.
+				// Note: Clique should correctly unset or overwrite any fields previously set by SystemConfig,
+				// with the exception of Extra that was reset above.
 				prepareStart := time.Now()
 				if err := w.engine.Prepare(w.chain, header, &parentTime); err != nil {
 					return fmt.Errorf("failed to prepare header for mining: %w", err)

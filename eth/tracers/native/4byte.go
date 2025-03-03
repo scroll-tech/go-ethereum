@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
 )
@@ -37,14 +38,15 @@ func init() {
 // a reversed signature can be matched against the size of the data.
 //
 // Example:
-//   > debug.traceTransaction( "0x214e597e35da083692f5386141e69f47e973b2c56e7a8073b1ea08fd7571e9de", {tracer: "4byteTracer"})
-//   {
-//     0x27dc297e-128: 1,
-//     0x38cc4831-0: 2,
-//     0x524f3889-96: 1,
-//     0xadf59f99-288: 1,
-//     0xc281d19e-0: 1
-//   }
+//
+//	> debug.traceTransaction( "0x214e597e35da083692f5386141e69f47e973b2c56e7a8073b1ea08fd7571e9de", {tracer: "4byteTracer"})
+//	{
+//	  0x27dc297e-128: 1,
+//	  0x38cc4831-0: 2,
+//	  0x524f3889-96: 1,
+//	  0xadf59f99-288: 1,
+//	  0xc281d19e-0: 1
+//	}
 type fourByteTracer struct {
 	env               *vm.EVM
 	ids               map[string]int   // ids aggregates the 4byte ids found
@@ -79,7 +81,7 @@ func (t *fourByteTracer) store(id []byte, size int) {
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (t *fourByteTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+func (t *fourByteTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int, authorizationResults []types.AuthorizationResult) {
 	t.env = env
 
 	// Update list of precompiles based on current block

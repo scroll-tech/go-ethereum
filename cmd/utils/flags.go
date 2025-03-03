@@ -890,21 +890,45 @@ var (
 	}
 
 	// DA syncing settings
-	DASyncEnabledFlag = &cli.BoolFlag{
+	DASyncEnabledFlag = cli.BoolFlag{
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
 	}
-	DABlobScanAPIEndpointFlag = &cli.StringFlag{
+	DABlobScanAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blobscan",
 		Usage: "BlobScan blob API endpoint",
 	}
-	DABlockNativeAPIEndpointFlag = &cli.StringFlag{
+	DABlockNativeAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blocknative",
 		Usage: "BlockNative blob API endpoint",
 	}
-	DABeaconNodeAPIEndpointFlag = &cli.StringFlag{
+	DABeaconNodeAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.beaconnode",
 		Usage: "Beacon node API endpoint",
+	}
+	DARecoveryModeFlag = cli.BoolFlag{
+		Name:  "da.recovery",
+		Usage: "Enable recovery mode for DA syncing",
+	}
+	DARecoveryInitialL1BlockFlag = cli.Uint64Flag{
+		Name:  "da.recovery.initiall1block",
+		Usage: "Initial L1 block to start recovery from",
+	}
+	DARecoveryInitialBatchFlag = cli.Uint64Flag{
+		Name:  "da.recovery.initialbatch",
+		Usage: "Initial batch to start recovery from",
+	}
+	DARecoverySignBlocksFlag = cli.BoolFlag{
+		Name:  "da.recovery.signblocks",
+		Usage: "Sign blocks during recovery (requires correct Clique signer key and history of blocks with Clique signatures)",
+	}
+	DARecoveryL2EndBlockFlag = cli.Uint64Flag{
+		Name:  "da.recovery.l2endblock",
+		Usage: "End L2 block to recover to",
+	}
+	DARecoveryProduceBlocksFlag = cli.BoolFlag{
+		Name:  "da.recovery.produceblocks",
+		Usage: "Produce unsigned blocks after L1 recovery for permissionless batch submission",
 	}
 )
 
@@ -1658,6 +1682,24 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.IsSet(DABeaconNodeAPIEndpointFlag.Name) {
 		cfg.DA.BeaconNodeAPIEndpoint = ctx.String(DABeaconNodeAPIEndpointFlag.Name)
 	}
+	if ctx.IsSet(DARecoveryModeFlag.Name) {
+		cfg.DA.RecoveryMode = ctx.Bool(DARecoveryModeFlag.Name)
+	}
+	if ctx.IsSet(DARecoveryInitialL1BlockFlag.Name) {
+		cfg.DA.InitialL1Block = ctx.Uint64(DARecoveryInitialL1BlockFlag.Name)
+	}
+	if ctx.IsSet(DARecoveryInitialBatchFlag.Name) {
+		cfg.DA.InitialBatch = ctx.Uint64(DARecoveryInitialBatchFlag.Name)
+	}
+	if ctx.IsSet(DARecoverySignBlocksFlag.Name) {
+		cfg.DA.SignBlocks = ctx.Bool(DARecoverySignBlocksFlag.Name)
+	}
+	if ctx.IsSet(DARecoveryL2EndBlockFlag.Name) {
+		cfg.DA.L2EndBlock = ctx.Uint64(DARecoveryL2EndBlockFlag.Name)
+	}
+	if ctx.IsSet(DARecoveryProduceBlocksFlag.Name) {
+		cfg.DA.ProduceBlocks = ctx.Bool(DARecoveryProduceBlocksFlag.Name)
+	}
 }
 
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -2006,16 +2048,6 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 // The second return value is the full node instance, which may be nil if the
 // node is running as a light client.
 func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend, *eth.Ethereum) {
-	if cfg.SyncMode == downloader.LightSync {
-		backend, err := les.New(stack, cfg)
-		if err != nil {
-			Fatalf("Failed to register the Ethereum service: %v", err)
-		}
-		scrollTracerWrapper := tracing.NewTracerWrapper()
-		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, scrollTracerWrapper))
-		return backend.ApiBackend, nil
-	}
-
 	// initialize L1 client for sync service
 	// note: we need to do this here to avoid circular dependency
 	l1EndpointUrl := stack.Config().L1Endpoint
@@ -2029,6 +2061,16 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 		}
 
 		log.Info("Initialized L1 client", "endpoint", l1EndpointUrl)
+	}
+
+	if cfg.SyncMode == downloader.LightSync {
+		backend, err := les.New(stack, cfg, l1Client)
+		if err != nil {
+			Fatalf("Failed to register the Ethereum service: %v", err)
+		}
+		scrollTracerWrapper := tracing.NewTracerWrapper()
+		stack.RegisterAPIs(tracers.APIs(backend.ApiBackend, scrollTracerWrapper))
+		return backend.ApiBackend, nil
 	}
 
 	backend, err := eth.New(stack, cfg, l1Client)

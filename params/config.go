@@ -504,6 +504,8 @@ var (
 		CurieBlock:              big.NewInt(0),
 		DarwinTime:              new(uint64),
 		DarwinV2Time:            new(uint64),
+		EuclidTime:              new(uint64),
+		EuclidV2Time:            new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -651,8 +653,9 @@ type ChainConfig struct {
 	TerminalTotalDifficulty *big.Int `json:"terminalTotalDifficulty,omitempty"`
 
 	// Various consensus engines
-	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
+	Ethash         *EthashConfig         `json:"ethash,omitempty"`
+	Clique         *CliqueConfig         `json:"clique,omitempty"`
+	SystemContract *SystemContractConfig `json:"systemContract,omitempty"`
 
 	// Scroll genesis extension: enable scroll rollup-related traces & state transition
 	Scroll ScrollConfig `json:"scroll,omitempty"`
@@ -774,14 +777,33 @@ func (c *CliqueConfig) String() string {
 	return "clique"
 }
 
+// SystemContractConfig is the consensus engine configs for rollup sequencer sealing.
+type SystemContractConfig struct {
+	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
+
+	SystemContractAddress common.Address `json:"system_contract_address"` // address of system contract on L1
+	SystemContractSlot    common.Hash    `json:"system_contract_slot"`    // slot of signer address in system contract on L1
+
+	RelaxedPeriod bool `json:"relaxed_period"` // Relaxes the period to be just an upper bound
+}
+
+// String implements the stringer interface, returning the consensus engine details.
+func (c *SystemContractConfig) String() string {
+	return "system_contract"
+}
+
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
 	var engine interface{}
 	switch {
 	case c.Ethash != nil:
 		engine = c.Ethash
+	case c.Clique != nil && c.SystemContract != nil:
+		engine = "upgradable (clique + system_contract)"
 	case c.Clique != nil:
 		engine = c.Clique
+	case c.SystemContract != nil:
+		engine = c.SystemContract
 	default:
 		engine = "unknown"
 	}

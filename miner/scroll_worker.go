@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
@@ -358,8 +360,14 @@ func (w *worker) mainLoop() {
 		}
 
 		var retryableCommitError *retryableCommitError
-		if errors.As(err, &retryableCommitError) {
+		if errors.As(err, &retryableCommitError) || errors.Is(err, system_contract.ErrUnauthorizedSigner) {
 			log.Warn("failed to commit to a block, retrying", "err", err)
+			if errors.Is(err, system_contract.ErrUnauthorizedSigner) {
+				// half the time it takes for the system contract consensus to read and update the address locally.
+				// note: a blocking wait here might be problematic, since it will prevent progress on
+				// `updateSnapshot` and other functionalities.
+				time.Sleep(5 * time.Second)
+			}
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorging, w.current.reorgReason); err != nil {
 				continue
 			}
@@ -455,6 +463,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
 			if len(l1MessagesV1) > 0 {
 				// backdate the block to the parent block's timestamp -> not yet EuclidV2
+				// TODO: might need to re-run Prepare here
 				w.current.header.Time = parent.Time
 				return l1MessagesV1
 			}
@@ -502,11 +511,19 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		header.Coinbase = w.coinbase
 	}
 
-	prepareStart := time.Now()
-	if err := w.engine.Prepare(w.chain, header); err != nil {
-		return fmt.Errorf("failed to prepare header for mining: %w", err)
+	if w.config.SigningDisabled {
+		// Need to make sure to set difficulty so that a new canonical chain is detected in Blockchain
+		header.Difficulty = new(big.Int).SetUint64(1)
+		header.MixDigest = common.Hash{}
+		header.Coinbase = common.Address{}
+		header.Nonce = types.BlockNonce{}
+	} else {
+		prepareStart := time.Now()
+		if err := w.engine.Prepare(w.chain, header); err != nil {
+			return fmt.Errorf("failed to prepare header for mining: %w", err)
+		}
+		prepareTimer.UpdateSince(prepareStart)
 	}
-	prepareTimer.UpdateSince(prepareStart)
 
 	var nextL1MsgIndex uint64
 	if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
@@ -648,7 +665,7 @@ func (w *worker) processTxPool() (bool, error) {
 		}
 	}
 
-	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number, w.current.header.Time)
 	if w.prioritizedTx != nil && w.current.header.Number.Uint64() > w.prioritizedTx.blockNumber {
 		w.prioritizedTx = nil
 	}
@@ -688,7 +705,7 @@ func (w *worker) processTxPool() (bool, error) {
 // processTxnSlice
 func (w *worker) processTxnSlice(txns types.Transactions) (bool, error) {
 	txsMap := make(map[common.Address]types.Transactions)
-	signer := types.MakeSigner(w.chainConfig, w.current.header.Number)
+	signer := types.MakeSigner(w.chainConfig, w.current.header.Number, w.current.header.Time)
 	for _, tx := range txns {
 		acc, _ := types.Sender(signer, tx)
 		txsMap[acc] = append(txsMap[acc], tx)
@@ -853,28 +870,33 @@ func (w *worker) commit() (common.Hash, error) {
 		return common.Hash{}, err
 	}
 
-	sealHash := w.engine.SealHash(block.Header())
-	log.Info("Committing new mining work", "number", block.Number(), "sealhash", sealHash,
-		"txs", w.current.txs.Len(),
-		"gas", block.GasUsed(), "fees", totalFees(block, w.current.receipts))
+	var sealHash common.Hash
+	if w.config.SigningDisabled {
+		sealHash = block.Hash()
+	} else {
+		sealHash = w.engine.SealHash(block.Header())
+		log.Info("Committing new mining work", "number", block.Number(), "sealhash", sealHash,
+			"txs", w.current.txs.Len(),
+			"gas", block.GasUsed(), "fees", totalFees(block, w.current.receipts))
 
-	resultCh, stopCh := make(chan *types.Block), make(chan struct{})
-	if err := w.engine.Seal(w.chain, block, resultCh, stopCh); err != nil {
-		return common.Hash{}, err
-	}
-	// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
-	// or a call that blocks between the call to Seal and the line below. Seal might introduce some delay, so we keep track of
-	// that artificially added delay and subtract it from overall runtime of commit().
-	sealStart := time.Now()
-	block = <-resultCh
-	sealDelay = time.Since(sealStart)
-	if block == nil {
-		return common.Hash{}, errors.New("missed seal response from consensus engine")
-	}
+		resultCh, stopCh := make(chan *types.Block), make(chan struct{})
+		if err := w.engine.Seal(w.chain, block, resultCh, stopCh); err != nil {
+			return common.Hash{}, err
+		}
+		// Clique.Seal() will only wait for a second before giving up on us. So make sure there is nothing computational heavy
+		// or a call that blocks between the call to Seal and the line below. Seal might introduce some delay, so we keep track of
+		// that artificially added delay and subtract it from overall runtime of commit().
+		sealStart := time.Now()
+		block = <-resultCh
+		sealDelay = time.Since(sealStart)
+		if block == nil {
+			return common.Hash{}, errors.New("missed seal response from consensus engine")
+		}
 
-	// verify the generated block with local consensus engine to make sure everything is as expected
-	if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
-		return common.Hash{}, retryableCommitError{inner: err}
+		// verify the generated block with local consensus engine to make sure everything is as expected
+		if err = w.engine.VerifyHeader(w.chain, block.Header(), true); err != nil {
+			return common.Hash{}, retryableCommitError{inner: err}
+		}
 	}
 
 	blockHash := block.Hash()

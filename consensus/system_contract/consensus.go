@@ -115,8 +115,10 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errUnknownBlock
 	}
 
-	// Don't waste time checking blocks from the future
-	if header.Time > uint64(time.Now().Unix()) {
+	// Don't waste time checking blocks from the future.
+	// We add 100ms leeway since the scroll_worker internal timers might trigger early.
+	now := time.Now()
+	if header.Time > uint64(now.Unix()) && time.Unix(int64(header.Time), 0).Sub(now) > 100*time.Millisecond {
 		return consensus.ErrFutureBlock
 	}
 	// Ensure that the coinbase is zero
@@ -223,9 +225,21 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
+func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
+	timestamp := parent.Time + s.config.Period
+
+	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
+	// we don't know when it will be sealed
+	if s.config.RelaxedPeriod || timestamp < uint64(time.Now().Unix()) {
+		timestamp = uint64(time.Now().Unix())
+	}
+
+	return timestamp
+}
+
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
-func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
+func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header, timeOverride *uint64) error {
 	// Make sure unused fields are empty
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
@@ -241,11 +255,10 @@ func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *type
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + s.config.Period
-	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
-	// we don't know when it will be sealed
-	if s.config.RelaxedPeriod || header.Time < uint64(time.Now().Unix()) {
-		header.Time = uint64(time.Now().Unix())
+	if timeOverride != nil {
+		header.Time = *timeOverride
+	} else {
+		header.Time = s.CalcTimestamp(parent)
 	}
 
 	// Difficulty must be 1

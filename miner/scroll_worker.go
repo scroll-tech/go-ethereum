@@ -535,7 +535,10 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 				}
 				prepareTimer.UpdateSince(prepareStart)
 			} else {
-				log.Info("All MessageQueueV1 messages processed, creating EuclidV2 transition block", "blockNumber", header.Number, "blockTime", header.Time, "firstV2MsgIndex", nextL1MsgIndex)
+				// Only print log if we are the sequencer -- otherwise we will print confusing logs for the pending block.
+				if w.isRunning() {
+					log.Info("All MessageQueueV1 messages processed, creating EuclidV2 transition block", "blockNumber", header.Number, "blockTime", header.Time, "firstV2MsgIndex", nextL1MsgIndex)
+				}
 			}
 		}
 	}

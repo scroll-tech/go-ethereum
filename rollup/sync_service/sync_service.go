@@ -84,8 +84,7 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 	// otherwise there's no way for the node to know if it missed any messages of the V2 queue (as it was not querying it before)
 	// but continued to query the V1 queue (which after V2 deployment does not contain any messages anymore).
 	// this is a one-time operation and will not be repeated on subsequent restarts.
-	if genesisConfig.IsEuclidV2(uint64(time.Now().Unix())) &&
-		genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock > 0 &&
+	if genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock > 0 &&
 		genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock < latestProcessedBlock { // node synced after V2 deployment
 
 		// this means the node has never synced V2 messages before -> we need to reset the synced height to re-fetch V2 messages.
@@ -290,7 +289,7 @@ func (s *SyncService) fetchMessages() {
 
 			// compare with stored message in database, abort if not equal, ignore if already exists
 			if msg.QueueIndex < queueIndex {
-				log.Info("Duplicate queue index in SyncService", "expected", queueIndex, "got", msg.QueueIndex)
+				log.Warn("Duplicate queue index in SyncService", "expected", queueIndex, "got", msg.QueueIndex)
 
 				receivedMsgBytes, err := rlp.EncodeToBytes(msg)
 				if err != nil {

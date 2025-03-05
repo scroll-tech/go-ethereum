@@ -1,6 +1,7 @@
 package sync_service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -15,6 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 const (
@@ -82,7 +84,8 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 	// otherwise there's no way for the node to know if it missed any messages of the V2 queue (as it was not querying it before)
 	// but continued to query the V1 queue (which after V2 deployment does not contain any messages anymore).
 	// this is a one-time operation and will not be repeated on subsequent restarts.
-	if genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock > 0 &&
+	if genesisConfig.IsEuclidV2(uint64(time.Now().Unix())) &&
+		genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock > 0 &&
 		genesisConfig.Scroll.L1Config.L1MessageQueueV2DeploymentBlock < latestProcessedBlock { // node synced after V2 deployment
 
 		// this means the node has never synced V2 messages before -> we need to reset the synced height to re-fetch V2 messages.
@@ -272,19 +275,43 @@ func (s *SyncService) fetchMessages() {
 
 		if len(msgs) > 0 {
 			log.Debug("Received new L1 events", "fromBlock", from, "toBlock", to, "count", len(msgs))
-			rawdb.WriteL1Messages(batchWriter, msgs) // collect messages in memory
-			numMsgsCollected += len(msgs)
 		}
 
 		for _, msg := range msgs {
 			if msg.QueueIndex > 0 {
 				queueIndex++
 			}
+
 			// check if received queue index matches expected queue index
-			if msg.QueueIndex != queueIndex {
+			if msg.QueueIndex > queueIndex {
 				log.Error("Unexpected queue index in SyncService", "expected", queueIndex, "got", msg.QueueIndex, "msg", msg)
 				return // do not flush inconsistent data to disk
 			}
+
+			// compare with stored message in database, abort if not equal, ignore if already exists
+			if msg.QueueIndex < queueIndex {
+				log.Info("Duplicate queue index in SyncService", "expected", queueIndex, "got", msg.QueueIndex)
+
+				receivedMsgBytes, err := rlp.EncodeToBytes(msg)
+				if err != nil {
+					log.Error("Failed to encode message", "err", err)
+					return
+				}
+				storedMsgBytes := rawdb.ReadL1MessageRLP(s.db, msg.QueueIndex)
+				if !bytes.Equal(storedMsgBytes, receivedMsgBytes) {
+					storedL1Message := rawdb.ReadL1Message(s.db, msg.QueueIndex)
+					log.Error("Stored message at same queue index does not match received message", "queueIndex", msg.QueueIndex, "expected", storedL1Message, "got", msg)
+					return
+				}
+
+				// already exists, ignore
+				queueIndex--
+				continue
+			}
+
+			// store message to database (collected in memory and flushed periodically)
+			rawdb.WriteL1Message(batchWriter, msg)
+			numMsgsCollected++
 		}
 
 		numBlocksPendingDbWrite += to - from + 1

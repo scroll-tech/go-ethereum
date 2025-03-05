@@ -2,7 +2,6 @@ package system_contract
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -47,9 +46,9 @@ func New(ctx context.Context, config *params.SystemContractConfig, client sync_s
 		cancel: cancel,
 	}
 
-	if err := s.fetchAddressFromL1(); err != nil {
-		log.Error("failed to fetch signer address from L1", "err", err)
-	}
+	// Try to initialize authorized signer address.
+	s.fetchAddressFromL1()
+
 	return s
 }
 
@@ -79,37 +78,42 @@ func (s *SystemContract) Start() {
 			case <-s.ctx.Done():
 				return
 			case <-syncTicker.C:
-				if err := s.fetchAddressFromL1(); err != nil {
-					log.Error("failed to fetch signer address from L1", "err", err)
-				}
+				s.fetchAddressFromL1()
 			}
 		}
 	}()
 }
 
-func (s *SystemContract) fetchAddressFromL1() error {
+func (s *SystemContract) fetchAddressFromL1() {
 	address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
 	if err != nil {
-		return fmt.Errorf("failed to get signer address from L1 System Contract: %w", err)
+		log.Error("failed to get signer address from L1 System Contract", "err", err)
+		return
 	}
 	bAddress := common.BytesToAddress(address)
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	// Validate the address is not empty
 	if bAddress == (common.Address{}) {
-		return fmt.Errorf("retrieved empty signer address from L1 System Contract: contract=%s, slot=%s", s.config.SystemContractAddress.Hex(), s.config.SystemContractSlot.Hex())
+		log.Debug("retrieved empty signer address from L1 System Contract", "contract", s.config.SystemContractAddress.Hex(), "slot", s.config.SystemContractSlot.Hex())
+
+		if s.signerAddressL1 == (common.Address{}) {
+			log.Warn("System Contract signer address not initialized")
+			return
+		}
+
+		log.Error("retrieved empty signer address from L1 System Contract")
+		return
 	}
 
 	log.Debug("Read address from system contract", "address", bAddress.Hex())
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	if s.signerAddressL1 != bAddress {
 		s.signerAddressL1 = bAddress
 		log.Info("Updated new signer from L1 system contract", "signer", bAddress.Hex())
 	}
-
-	return nil
 }
 
 // Close implements consensus.Engine.

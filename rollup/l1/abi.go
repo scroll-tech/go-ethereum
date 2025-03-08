@@ -45,6 +45,7 @@ const (
 	commitBatchMethodName              = "commitBatch"
 	commitBatchWithBlobProofMethodName = "commitBatchWithBlobProof"
 	commitBatchesV7MethodName          = "commitBatches"
+	commitAndFinalizeBatch             = "commitAndFinalizeBatch"
 
 	finalizeBundlePostEuclidV2MethodName = "finalizeBundlePostEuclidV2"
 
@@ -360,5 +361,21 @@ func newFinalizeBatchArgs(method *abi.Method, values []any) (*FinalizeBatchArgs,
 	if err != nil {
 		return nil, err
 	}
+	return &args, nil
+}
+
+type commitAndFinalizeBatchArgs struct {
+	Version         uint8
+	ParentBatchHash common.Hash
+	FinalizeStruct  FinalizeBatchArgs
+}
+
+func newCommitAndFinalizeBatchArgs(method *abi.Method, values []any) (*commitAndFinalizeBatchArgs, error) {
+	var args commitAndFinalizeBatchArgs
+	err := method.Inputs.Copy(&args, values)
+	if err != nil {
+		return nil, err
+	}
+
 	return &args, nil
 }

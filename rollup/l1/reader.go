@@ -99,7 +99,7 @@ func (r *Reader) FinalizedL1MessageQueueIndex(blockNumber uint64) (uint64, error
 	return next - 1, nil
 }
 
-func (r *Reader) LatestFinalizedBatch(blockNumber uint64) (uint64, error) {
+func (r *Reader) LatestFinalizedBatchIndex(blockNumber uint64) (uint64, error) {
 	data, err := r.scrollChainABI.Pack(lastFinalizedBatchIndex)
 	if err != nil {
 		return 0, fmt.Errorf("failed to pack %s: %w", lastFinalizedBatchIndex, err)

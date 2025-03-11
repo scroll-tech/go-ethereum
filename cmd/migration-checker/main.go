@@ -20,7 +20,7 @@ import (
 )
 
 var accountsDone atomic.Uint64
-var trieCheckers = make(chan struct{}, runtime.GOMAXPROCS(0)*4)
+var trieCheckers chan struct{}
 
 type dbs struct {
 	zkDb  *leveldb.Database
@@ -29,11 +29,12 @@ type dbs struct {
 
 func main() {
 	var (
-		mptDbPath = flag.String("mpt-db", "", "path to the MPT node DB")
-		zkDbPath  = flag.String("zk-db", "", "path to the ZK node DB")
-		mptRoot   = flag.String("mpt-root", "", "root hash of the MPT node")
-		zkRoot    = flag.String("zk-root", "", "root hash of the ZK node")
-		paranoid  = flag.Bool("paranoid", false, "verifies all node contents against their expected hash")
+		mptDbPath            = flag.String("mpt-db", "", "path to the MPT node DB")
+		zkDbPath             = flag.String("zk-db", "", "path to the ZK node DB")
+		mptRoot              = flag.String("mpt-root", "", "root hash of the MPT node")
+		zkRoot               = flag.String("zk-root", "", "root hash of the ZK node")
+		paranoid             = flag.Bool("paranoid", false, "verifies all node contents against their expected hash")
+		parallelismMultipler = flag.Int("parallelism-multiplier", 4, "multiplier for the number of parallel workers")
 	)
 	flag.Parse()
 
@@ -45,7 +46,9 @@ func main() {
 	zkRootHash := common.HexToHash(*zkRoot)
 	mptRootHash := common.HexToHash(*mptRoot)
 
-	for i := 0; i < runtime.GOMAXPROCS(0)*4; i++ {
+	numTrieCheckers := runtime.GOMAXPROCS(0) * (*parallelismMultipler)
+	trieCheckers = make(chan struct{}, numTrieCheckers)
+	for i := 0; i < numTrieCheckers; i++ {
 		trieCheckers <- struct{}{}
 	}
 
@@ -68,7 +71,7 @@ func main() {
 		mptDb: mptDb,
 	}, zkRootHash, mptRootHash, "", checkAccountEquality, true, *paranoid)
 
-	for i := 0; i < runtime.GOMAXPROCS(0)*4; i++ {
+	for i := 0; i < numTrieCheckers; i++ {
 		<-trieCheckers
 	}
 }

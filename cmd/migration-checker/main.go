@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -48,6 +49,20 @@ func main() {
 		trieCheckers <- struct{}{}
 	}
 
+	done := make(chan struct{})
+	totalCheckers := len(trieCheckers)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-time.After(time.Minute):
+				fmt.Println("Active checkers:", totalCheckers-len(trieCheckers))
+			}
+		}
+	}()
+	defer close(done)
+
 	checkTrieEquality(&dbs{
 		zkDb:  zkDb,
 		mptDb: mptDb,
@@ -68,6 +83,22 @@ func dup(s []byte) []byte {
 	return append([]byte{}, s...)
 }
 func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leafChecker func(string, *dbs, []byte, []byte, bool), top, paranoid bool) {
+	done := make(chan struct{})
+	start := time.Now()
+	if !top {
+		go func() {
+			for {
+				select {
+				case <-done:
+					return
+				case <-time.After(time.Minute):
+					fmt.Println("Checking trie", label, "for", time.Since(start))
+				}
+			}
+		}()
+	}
+	defer close(done)
+
 	zkTrie, err := trie.NewZkTrie(zkRoot, trie.NewZktrieDatabaseFromTriedb(trie.NewDatabaseWithConfig(dbs.zkDb, &trie.Config{Preimages: true})))
 	panicOnError(err, label, "failed to create zk trie")
 	mptTrie, err := trie.NewSecureNoTracer(mptRoot, trie.NewDatabaseWithConfig(dbs.mptDb, &trie.Config{Preimages: true}))

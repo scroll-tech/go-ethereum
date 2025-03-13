@@ -544,10 +544,11 @@ func validateBatch(batchIndex uint64, event *l1.FinalizeBatchEvent, parentFinali
 
 	daBatch, err := codec.NewDABatch(batch)
 	if err != nil {
-		// This is hotfix for the L1 message hash mismatch issue which lead to wrong committedBatchMeta.PostL1MessageQueueHash
-		// hashes. These in turn lead to a wrongly computed batch hash locally.
-		// This happened after upgrading to EuclidV2 where da-codec was not updated in l2geth.
-		// If the batch hash is the same as the hardcoded one, this means the node ran into this issue.
+		// This is hotfix for the L1 message hash mismatch issue which lead to wrong committedBatchMeta.PostL1MessageQueueHash hashes.
+		// These in turn lead to a wrongly computed batch hash locally. This happened after upgrading to EuclidV2
+		// where da-codec was not updated to the latest version in l2geth.
+		// If the error message due to mismatching PostL1MessageQueueHash contains the same hash as the hardcoded one,
+		// this means the node ran into this issue.
 		// We need to reset the sync height to 1 block before the L1 block in which the last batch in CodecV6 was committed.
 		// The node will overwrite the wrongly computed message queue hashes.
 		if strings.Contains(err.Error(), "0xaa16faf2a1685fe1d7e0f2810b1a0e98c2841aef96596d10456a6d0f00000000") {

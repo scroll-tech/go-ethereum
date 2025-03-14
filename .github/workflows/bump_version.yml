@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-          persist-credentials: true
+          persist-credentials: false
 
       - name: check diff
         id: check_diff
@@ -70,3 +70,4 @@ jobs:
           skip_fetch: true # already did fetch in check diff
           file_pattern: "params/version.go"
           commit_message: "chore: auto version bump [bot]"
+          commit_author: "bump-version-bot"

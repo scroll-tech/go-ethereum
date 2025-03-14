@@ -70,4 +70,4 @@ jobs:
           skip_fetch: true # already did fetch in check diff
           file_pattern: "params/version.go"
           commit_message: "chore: auto version bump [bot]"
-          commit_author: "bump-version-bot"
+          commit_author: "bump-version-bot <actions@github.com>"

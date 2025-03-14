@@ -14,6 +14,8 @@ jobs:
   try-to-bump:
     if: contains(github.event.pull_request.labels.*.name, 'bump-version')
     runs-on: ubuntu-latest
+    permissions: {}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -29,7 +31,7 @@ jobs:
           # fetch develop branch so that we can diff against later
           git fetch origin develop
 
-          echo 'checking verion changes in diff...'
+          echo 'checking version changes in diff...'
 
           # check if version changed in version.go
           # note: the grep will fail if use \d instead of [0-9]

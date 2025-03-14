@@ -14,7 +14,8 @@ jobs:
   try-to-bump:
     if: contains(github.event.pull_request.labels.*.name, 'bump-version')
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      content: write
 
     steps:
       - name: Checkout code

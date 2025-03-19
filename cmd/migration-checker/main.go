@@ -199,11 +199,11 @@ func checkStorageEquality(label string, _ *dbs, zkStorageBytes, mptStorageBytes 
 	}
 }
 
-func loadMPT(mptTrie *trie.SecureTrie, parallel bool) chan map[string][]byte {
+func loadMPT(mptTrie *trie.SecureTrie, top bool) chan map[string][]byte {
 	startKey := make([]byte, 32)
 	workers := 1 << 5
-	if !parallel {
-		workers = 1
+	if !top {
+		workers = 1 << 3
 	}
 	step := byte(0xFF) / byte(workers)
 
@@ -219,9 +219,7 @@ func loadMPT(mptTrie *trie.SecureTrie, parallel bool) chan map[string][]byte {
 		go func() {
 			defer mptWg.Done()
 			for trieIt.Next() {
-				if parallel {
-					mptLeafMutex.Lock()
-				}
+				mptLeafMutex.Lock()
 
 				if _, ok := mptLeafMap[string(trieIt.Key)]; ok {
 					mptLeafMutex.Unlock()
@@ -230,11 +228,9 @@ func loadMPT(mptTrie *trie.SecureTrie, parallel bool) chan map[string][]byte {
 
 				mptLeafMap[string(dup(trieIt.Key))] = dup(trieIt.Value)
 
-				if parallel {
-					mptLeafMutex.Unlock()
-				}
+				mptLeafMutex.Unlock()
 
-				if parallel && len(mptLeafMap)%10000 == 0 {
+				if top && len(mptLeafMap)%10000 == 0 {
 					fmt.Println("MPT Accounts Loaded:", len(mptLeafMap))
 				}
 			}
@@ -249,7 +245,7 @@ func loadMPT(mptTrie *trie.SecureTrie, parallel bool) chan map[string][]byte {
 	return respChan
 }
 
-func loadZkTrie(zkTrie *trie.ZkTrie, parallel, paranoid bool) chan map[string][]byte {
+func loadZkTrie(zkTrie *trie.ZkTrie, top, paranoid bool) chan map[string][]byte {
 	zkLeafMap := make(map[string][]byte, 1000)
 	var zkLeafMutex sync.Mutex
 	zkDone := make(chan map[string][]byte)
@@ -260,20 +256,16 @@ func loadZkTrie(zkTrie *trie.ZkTrie, parallel, paranoid bool) chan map[string][]
 				panic(fmt.Sprintf("preimage not found zk trie %s", hex.EncodeToString(key)))
 			}
 
-			if parallel {
-				zkLeafMutex.Lock()
-			}
+			zkLeafMutex.Lock()
 
 			zkLeafMap[string(dup(preimageKey))] = value
 
-			if parallel {
-				zkLeafMutex.Unlock()
-			}
+			zkLeafMutex.Unlock()
 
-			if parallel && len(zkLeafMap)%10000 == 0 {
+			if top && len(zkLeafMap)%10000 == 0 {
 				fmt.Println("ZK Accounts Loaded:", len(zkLeafMap))
 			}
-		}, parallel, paranoid)
+		}, top, paranoid)
 		zkDone <- zkLeafMap
 	}()
 	return zkDone

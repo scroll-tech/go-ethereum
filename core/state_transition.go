@@ -275,6 +275,9 @@ func (st *StateTransition) preCheck() error {
 		code := st.state.GetCode(st.msg.From())
 		_, delegated := types.ParseDelegation(code)
 		if len(code) > 0 && !delegated {
+			// If the sender on L1 is a (delegated) EOA, then it must be a (delegated) EOA on L2, too.
+			// If the sender on L1 is a contract, then we apply address aliasing.
+			// The probability that the aliased address happens to be a smart contract on L2 is negligible.
 			return fmt.Errorf("%w: address %v, len(code): %d", ErrSenderNoEOA, st.msg.From().Hex(), len(code))
 		}
 	}

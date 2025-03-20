@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -110,39 +110,16 @@ func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leaf
 	mptLeafCh := loadMPT(mptTrie, top)
 	zkLeafCh := loadZkTrie(zkTrie, top, paranoid)
 
-	mptLeafMap := <-mptLeafCh
-	zkLeafMap := <-zkLeafCh
+	mptLeafs := <-mptLeafCh
+	zkLeafs := <-zkLeafCh
 
-	if len(mptLeafMap) != len(zkLeafMap) {
-		panic(fmt.Sprintf("%s MPT and ZK trie leaf count mismatch: MPT: %d, ZK: %d", label, len(mptLeafMap), len(zkLeafMap)))
+	if len(mptLeafs) != len(zkLeafs) {
+		panic(fmt.Sprintf("%s MPT and ZK trie leaf count mismatch: MPT: %d, ZK: %d", label, len(mptLeafs), len(zkLeafs)))
 	}
 
-	for preimageKey, zkValue := range zkLeafMap {
-		if top {
-			// ZkTrie pads preimages with 0s to make them 32 bytes.
-			// So we might need to clear those zeroes here since we need 20 byte addresses at top level (ie state trie)
-			if len(preimageKey) > 20 {
-				for _, b := range []byte(preimageKey)[20:] {
-					if b != 0 {
-						panic(fmt.Sprintf("%s padded byte is not 0 (preimage %s)", label, hex.EncodeToString([]byte(preimageKey))))
-					}
-				}
-				preimageKey = preimageKey[:20]
-			}
-		} else if len(preimageKey) != 32 {
-			// storage leafs should have 32 byte keys, pad them if needed
-			zeroes := make([]byte, 32)
-			copy(zeroes, []byte(preimageKey))
-			preimageKey = string(zeroes)
-		}
-
-		mptKey := crypto.Keccak256([]byte(preimageKey))
-		mptVal, ok := mptLeafMap[string(mptKey)]
-		if !ok {
-			panic(fmt.Sprintf("%s key %s (preimage %s) not found in mpt", label, hex.EncodeToString(mptKey), hex.EncodeToString([]byte(preimageKey))))
-		}
-
-		leafChecker(fmt.Sprintf("%s key: %s", label, hex.EncodeToString([]byte(preimageKey))), dbs, zkValue, mptVal, paranoid)
+	for index, zkKv := range zkLeafs {
+		mptKv := mptLeafs[index]
+		leafChecker(fmt.Sprintf("%s key: %s", label, hex.EncodeToString([]byte(zkKv.key))), dbs, zkKv.value, mptKv.value, paranoid)
 	}
 }
 
@@ -199,7 +176,11 @@ func checkStorageEquality(label string, _ *dbs, zkStorageBytes, mptStorageBytes 
 	}
 }
 
-func loadMPT(mptTrie *trie.SecureTrie, top bool) chan map[string][]byte {
+type kv struct {
+	key, value []byte
+}
+
+func loadMPT(mptTrie *trie.SecureTrie, top bool) chan []kv {
 	startKey := make([]byte, 32)
 	workers := 1 << 5
 	if !top {
@@ -207,7 +188,7 @@ func loadMPT(mptTrie *trie.SecureTrie, top bool) chan map[string][]byte {
 	}
 	step := byte(0xFF) / byte(workers)
 
-	mptLeafMap := make(map[string][]byte, 1000)
+	mptLeafs := make([]kv, 0, 1000)
 	var mptLeafMutex sync.Mutex
 
 	var mptWg sync.WaitGroup
@@ -215,40 +196,45 @@ func loadMPT(mptTrie *trie.SecureTrie, top bool) chan map[string][]byte {
 		startKey[0] = byte(i) * step
 		trieIt := trie.NewIterator(mptTrie.NodeIterator(startKey))
 
+		stopKey := byte(i+1) * step
 		mptWg.Add(1)
 		go func() {
 			defer mptWg.Done()
 			for trieIt.Next() {
-				mptLeafMutex.Lock()
-
-				if _, ok := mptLeafMap[string(trieIt.Key)]; ok {
-					mptLeafMutex.Unlock()
+				if trieIt.Key[0] >= stopKey {
 					break
 				}
 
-				mptLeafMap[string(dup(trieIt.Key))] = dup(trieIt.Value)
+				preimageKey := mptTrie.GetKey(trieIt.Key)
+				if len(preimageKey) == 0 {
+					panic(fmt.Sprintf("preimage not found mpt trie %s", hex.EncodeToString(trieIt.Key)))
+				}
 
+				mptLeafMutex.Lock()
+				mptLeafs = append(mptLeafs, kv{key: preimageKey, value: dup(trieIt.Value)})
 				mptLeafMutex.Unlock()
-
-				if top && len(mptLeafMap)%10000 == 0 {
-					fmt.Println("MPT Accounts Loaded:", len(mptLeafMap))
+				if top && len(mptLeafs)%10000 == 0 {
+					fmt.Println("MPT Accounts Loaded:", len(mptLeafs))
 				}
 			}
 		}()
 	}
 
-	respChan := make(chan map[string][]byte)
+	respChan := make(chan []kv)
 	go func() {
 		mptWg.Wait()
-		respChan <- mptLeafMap
+		sort.Slice(mptLeafs, func(i, j int) bool {
+			return bytes.Compare(mptLeafs[i].key, mptLeafs[j].key) < 0
+		})
+		respChan <- mptLeafs
 	}()
 	return respChan
 }
 
-func loadZkTrie(zkTrie *trie.ZkTrie, top, paranoid bool) chan map[string][]byte {
-	zkLeafMap := make(map[string][]byte, 1000)
+func loadZkTrie(zkTrie *trie.ZkTrie, top, paranoid bool) chan []kv {
+	zkLeafs := make([]kv, 0, 1000)
 	var zkLeafMutex sync.Mutex
-	zkDone := make(chan map[string][]byte)
+	zkDone := make(chan []kv)
 	go func() {
 		zkTrie.CountLeaves(func(key, value []byte) {
 			preimageKey := zkTrie.GetKey(key)
@@ -256,17 +242,37 @@ func loadZkTrie(zkTrie *trie.ZkTrie, top, paranoid bool) chan map[string][]byte 
 				panic(fmt.Sprintf("preimage not found zk trie %s", hex.EncodeToString(key)))
 			}
 
+			if top {
+				// ZkTrie pads preimages with 0s to make them 32 bytes.
+				// So we might need to clear those zeroes here since we need 20 byte addresses at top level (ie state trie)
+				if len(preimageKey) > 20 {
+					for _, b := range []byte(preimageKey)[20:] {
+						if b != 0 {
+							panic(fmt.Sprintf("padded byte is not 0 (preimage %s)", hex.EncodeToString([]byte(preimageKey))))
+						}
+					}
+					preimageKey = preimageKey[:20]
+				}
+			} else if len(preimageKey) != 32 {
+				// storage leafs should have 32 byte keys, pad them if needed
+				zeroes := make([]byte, 32)
+				copy(zeroes, []byte(preimageKey))
+				preimageKey = zeroes
+			}
+
 			zkLeafMutex.Lock()
-
-			zkLeafMap[string(dup(preimageKey))] = value
-
+			zkLeafs = append(zkLeafs, kv{key: preimageKey, value: value})
 			zkLeafMutex.Unlock()
 
-			if top && len(zkLeafMap)%10000 == 0 {
-				fmt.Println("ZK Accounts Loaded:", len(zkLeafMap))
+			if top && len(zkLeafs)%10000 == 0 {
+				fmt.Println("ZK Accounts Loaded:", len(zkLeafs))
 			}
 		}, top, paranoid)
-		zkDone <- zkLeafMap
+
+		sort.Slice(zkLeafs, func(i, j int) bool {
+			return bytes.Compare(zkLeafs[i].key, zkLeafs[j].key) < 0
+		})
+		zkDone <- zkLeafs
 	}()
 	return zkDone
 }

@@ -36,6 +36,7 @@ func main() {
 		zkRoot               = flag.String("zk-root", "", "root hash of the ZK node")
 		paranoid             = flag.Bool("paranoid", false, "verifies all node contents against their expected hash")
 		parallelismMultipler = flag.Int("parallelism-multiplier", 4, "multiplier for the number of parallel workers")
+		startFrom            = flag.Int("start-form", 0, "start checking from account at the given index")
 	)
 	flag.Parse()
 
@@ -67,10 +68,16 @@ func main() {
 	}()
 	defer close(done)
 
+	startFromSafe := *startFrom - len(trieCheckers)
+	if startFromSafe < 0 {
+		startFromSafe = 0
+	}
+	accountsDone.Add(uint64(startFromSafe))
+
 	checkTrieEquality(&dbs{
 		zkDb:  zkDb,
 		mptDb: mptDb,
-	}, zkRootHash, mptRootHash, "", checkAccountEquality, true, *paranoid)
+	}, zkRootHash, mptRootHash, "", checkAccountEquality, true, *paranoid, startFromSafe)
 
 	for i := 0; i < numTrieCheckers; i++ {
 		<-trieCheckers
@@ -86,7 +93,7 @@ func panicOnError(err error, label, msg string) {
 func dup(s []byte) []byte {
 	return append([]byte{}, s...)
 }
-func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leafChecker func(string, *dbs, []byte, []byte, bool), top, paranoid bool) {
+func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leafChecker func(string, *dbs, []byte, []byte, bool), top, paranoid bool, startFrom int) {
 	done := make(chan struct{})
 	start := time.Now()
 	if !top {
@@ -120,8 +127,9 @@ func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leaf
 		totalAccounts = len(mptLeafs)
 	}
 
-	for index, zkKv := range zkLeafs {
-		mptKv := mptLeafs[index]
+	for i := startFrom; i < len(zkLeafs); i++ {
+		zkKv := zkLeafs[i]
+		mptKv := mptLeafs[i]
 		leafChecker(fmt.Sprintf("%s key: %s", label, hex.EncodeToString([]byte(zkKv.key))), dbs, zkKv.value, mptKv.value, paranoid)
 	}
 }
@@ -158,7 +166,7 @@ func checkAccountEquality(label string, dbs *dbs, zkAccountBytes, mptAccountByte
 				}
 			}()
 
-			checkTrieEquality(dbs, zkRoot, mptRoot, label, checkStorageEquality, false, paranoid)
+			checkTrieEquality(dbs, zkRoot, mptRoot, label, checkStorageEquality, false, paranoid, 0)
 			accountsDone.Add(1)
 			fmt.Println("Accounts done:", accountsDone.Load(), "/", totalAccounts)
 			trieCheckers <- struct{}{}

@@ -386,7 +386,7 @@ var (
 		},
 		SystemContract: &SystemContractConfig{
 			Period:                3,
-			SystemContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // TODO
+			SystemContractAddress: common.HexToAddress("0x8432728A257646449245558B8b7Dbe51A16c7a4D"),
 			SystemContractSlot:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000067"),
 		},
 		Scroll: ScrollConfig{
@@ -397,8 +397,8 @@ var (
 			L1Config: &L1Config{
 				L1ChainId:                       1,
 				L1MessageQueueAddress:           common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
-				L1MessageQueueV2Address:         common.HexToAddress("0x0000000000000000000000000000000000000000"), // TODO
-				L1MessageQueueV2DeploymentBlock: 0,                                                                 // TODO
+				L1MessageQueueV2Address:         common.HexToAddress("0x56971da63A3C0205184FEF096E9ddFc7A8C2D18a"),
+				L1MessageQueueV2DeploymentBlock: 22088276,
 				NumL1MessagesPerBlock:           10,
 				ScrollChainAddress:              common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
 			},

@@ -20,6 +20,7 @@ import (
 )
 
 var accountsDone atomic.Uint64
+var totalAccounts int
 var trieCheckers chan struct{}
 
 type dbs struct {
@@ -115,6 +116,8 @@ func checkTrieEquality(dbs *dbs, zkRoot, mptRoot common.Hash, label string, leaf
 
 	if len(mptLeafs) != len(zkLeafs) {
 		panic(fmt.Sprintf("%s MPT and ZK trie leaf count mismatch: MPT: %d, ZK: %d", label, len(mptLeafs), len(zkLeafs)))
+	} else if top {
+		totalAccounts = len(mptLeafs)
 	}
 
 	for index, zkKv := range zkLeafs {
@@ -157,12 +160,12 @@ func checkAccountEquality(label string, dbs *dbs, zkAccountBytes, mptAccountByte
 
 			checkTrieEquality(dbs, zkRoot, mptRoot, label, checkStorageEquality, false, paranoid)
 			accountsDone.Add(1)
-			fmt.Println("Accounts done:", accountsDone.Load())
+			fmt.Println("Accounts done:", accountsDone.Load(), "/", totalAccounts)
 			trieCheckers <- struct{}{}
 		}()
 	} else {
 		accountsDone.Add(1)
-		fmt.Println("Accounts done:", accountsDone.Load())
+		fmt.Println("Accounts done:", accountsDone.Load(), "/", totalAccounts)
 	}
 }
 

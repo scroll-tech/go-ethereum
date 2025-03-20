@@ -309,8 +309,8 @@ web3._extend({
 			params: 1,
 		}),
 		new web3._extend.Method({
-			name: 'SetMemoryLimit',
-			call: 'debug_SetMemoryLimit',
+			name: 'setMemoryLimit',
+			call: 'debug_setMemoryLimit',
 			params: 1,
 		}),
 		new web3._extend.Method({

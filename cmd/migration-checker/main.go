@@ -186,7 +186,7 @@ func loadMPT(mptTrie *trie.SecureTrie, top bool) chan []kv {
 	if !top {
 		workers = 1 << 3
 	}
-	step := byte(0xFF) / byte(workers)
+	step := byte(256 / workers)
 
 	mptLeafs := make([]kv, 0, 1000)
 	var mptLeafMutex sync.Mutex
@@ -196,12 +196,12 @@ func loadMPT(mptTrie *trie.SecureTrie, top bool) chan []kv {
 		startKey[0] = byte(i) * step
 		trieIt := trie.NewIterator(mptTrie.NodeIterator(startKey))
 
-		stopKey := byte(i+1) * step
+		stopKey := (i + 1) * int(step)
 		mptWg.Add(1)
 		go func() {
 			defer mptWg.Done()
 			for trieIt.Next() {
-				if trieIt.Key[0] >= stopKey {
+				if int(trieIt.Key[0]) >= stopKey {
 					break
 				}
 

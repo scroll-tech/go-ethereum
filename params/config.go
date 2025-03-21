@@ -378,7 +378,7 @@ var (
 		CurieBlock:          big.NewInt(7096836),
 		DarwinTime:          newUint64(1724227200),
 		DarwinV2Time:        newUint64(1725264000),
-		EuclidTime:          newUint64(1744786800),
+		EuclidTime:          newUint64(1744815600),
 		EuclidV2Time:        newUint64(1745305200),
 		Clique: &CliqueConfig{
 			Period: 3,

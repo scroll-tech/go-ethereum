@@ -36,7 +36,7 @@ func main() {
 		zkRoot               = flag.String("zk-root", "", "root hash of the ZK node")
 		paranoid             = flag.Bool("paranoid", false, "verifies all node contents against their expected hash")
 		parallelismMultipler = flag.Int("parallelism-multiplier", 4, "multiplier for the number of parallel workers")
-		startFrom            = flag.Int("start-form", 0, "start checking from account at the given index")
+		startFrom            = flag.Int("start-from", 0, "start checking from account at the given index")
 	)
 	flag.Parse()
 
@@ -53,20 +53,6 @@ func main() {
 	for i := 0; i < numTrieCheckers; i++ {
 		trieCheckers <- struct{}{}
 	}
-
-	done := make(chan struct{})
-	totalCheckers := len(trieCheckers)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-time.After(time.Minute):
-				fmt.Println("Active checkers:", totalCheckers-len(trieCheckers))
-			}
-		}
-	}()
-	defer close(done)
 
 	startFromSafe := *startFrom - len(trieCheckers)
 	if startFromSafe < 0 {

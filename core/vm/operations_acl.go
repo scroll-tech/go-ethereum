@@ -35,7 +35,7 @@ func makeGasSStoreFunc(clearingRefund uint64) gasFunc {
 			cost    = uint64(0)
 		)
 
-		// Get the witness of SSTORE at first to align with reth's witness implementation.
+		// Try updating the witness of SSTORE at first to align with reth's witness implementation.
 		original := evm.StateDB.GetCommittedState(contract.Address(), x.Bytes32())
 
 		// If we fail the minimum gas availability invariant, fail (0)
@@ -115,7 +115,7 @@ func gasSLoadEIP2929(evm *EVM, contract *Contract, stack *Stack, mem *Memory, me
 		// If he does afford it, we can skip checking the same thing later on, during execution
 		evm.StateDB.AddSlotToAccessList(contract.Address(), slot)
 
-		// Get the witness of SLOAD at first to align with reth's witness implementation.
+		// Try updating the witness of SLOAD to align with reth's witness implementation.
 		// Another place that needs to change is when calculating the gas cost after Frontier and before EIP-2929.
 		// Frontier gas cost simply uses params.SloadGasFrontier (i.e., 50 gas), so changing the gas cost there
 		// might affect code cleanliness. Usually, this won't be a problem because EIP-2929 is enabled by default.

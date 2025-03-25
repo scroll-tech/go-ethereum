@@ -369,6 +369,8 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 		return nil, fmt.Errorf("failed to validate block %d: %w", block.Number(), err)
 	}
 
+	// FIXME: testWitness will fail from time to time, the problem is caused by occasional state root mismatch
+	// after processing the block based on witness. We need to investigate the root cause and fix it.
 	for retries := 0; retries < 5; retries++ {
 		if err = testWitness(blockchain, block, witness); err == nil {
 			return witness, nil

@@ -679,7 +679,7 @@ type StorageResult struct {
 
 // GetProof returns the Merkle-proof for a given account and optionally some storage keys.
 func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Address, storageKeys []string, blockNrOrHash rpc.BlockNumberOrHash) (*AccountResult, error) {
-	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	state, header, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -721,7 +721,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		return nil, proofErr
 	}
 
-	return &AccountResult{
+	result := &AccountResult{
 		Address:        address,
 		AccountProof:   toHexSlice(accountProof),
 		Balance:        (*hexutil.Big)(state.GetBalance(address)),
@@ -730,7 +730,17 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		Nonce:          hexutil.Uint64(state.GetNonce(address)),
 		StorageHash:    storageHash,
 		StorageProof:   storageProof,
-	}, state.Error()
+	}
+
+	if !s.b.ChainConfig().IsEuclid(header.Time) {
+		if storageTrie != nil {
+			result.PoseidonCodeHash = state.GetPoseidonCodeHash(address)
+		} else {
+			result.PoseidonCodeHash = codehash.EmptyPoseidonCodeHash
+		}
+	}
+
+	return result, state.Error()
 }
 
 // GetHeaderByNumber returns the requested canonical block header.

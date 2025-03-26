@@ -374,6 +374,8 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 	for retries := 0; retries < 5; retries++ {
 		if err = testWitness(blockchain, block, witness); err == nil {
 			return witness, nil
+		} else {
+			log.Warn("Failed to validate witness", "block", block.Number(), "error", err)
 		}
 	}
 	return witness, err

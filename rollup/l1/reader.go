@@ -72,7 +72,7 @@ func NewReader(ctx context.Context, config Config, l1Client Client) (*Reader, er
 	return &reader, nil
 }
 
-func (r *Reader) FinalizedL1MessageQueueIndex(blockNumber uint64) (uint64, error) {
+func (r *Reader) NextUnfinalizedL1MessageQueueIndex(blockNumber uint64) (uint64, error) {
 	data, err := r.l1MessageQueueABI.Pack(nextUnfinalizedQueueIndex)
 	if err != nil {
 		return 0, fmt.Errorf("failed to pack %s: %w", nextUnfinalizedQueueIndex, err)
@@ -92,11 +92,7 @@ func (r *Reader) FinalizedL1MessageQueueIndex(blockNumber uint64) (uint64, error
 	}
 
 	next := parsedResult.Uint64()
-	if next == 0 {
-		return 0, nil
-	}
-
-	return next - 1, nil
+	return next, nil
 }
 
 func (r *Reader) LatestFinalizedBatchIndex(blockNumber uint64) (uint64, error) {

@@ -132,12 +132,12 @@ func (r *Reader) GetFinalizedStateRootByBatchIndex(blockNumber uint64, batchInde
 		return common.Hash{}, fmt.Errorf("failed to call %s: %w", finalizedStateRoots, err)
 	}
 
-	var parsedResult *common.Hash
+	var parsedResult common.Hash
 	if err = r.scrollChainABI.UnpackIntoInterface(&parsedResult, finalizedStateRoots, result); err != nil {
 		return common.Hash{}, fmt.Errorf("failed to unpack result: %w", err)
 	}
 
-	return *parsedResult, nil
+	return parsedResult, nil
 }
 
 // GetLatestFinalizedBlockNumber fetches the block number of the latest finalized block from the L1 chain.

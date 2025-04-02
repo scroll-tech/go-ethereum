@@ -119,7 +119,7 @@ func (r *Reader) LatestFinalizedBatchIndex(blockNumber uint64) (uint64, error) {
 }
 
 func (r *Reader) GetFinalizedStateRootByBatchIndex(blockNumber uint64, batchIndex uint64) (common.Hash, error) {
-	data, err := r.scrollChainABI.Pack(finalizedStateRoots, batchIndex)
+	data, err := r.scrollChainABI.Pack(finalizedStateRoots, big.NewInt(int64(batchIndex)))
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to pack %s: %w", finalizedStateRoots, err)
 	}

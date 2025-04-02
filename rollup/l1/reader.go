@@ -23,6 +23,7 @@ const (
 	finalizeBatchEventName    = "FinalizeBatch"
 	nextUnfinalizedQueueIndex = "nextUnfinalizedQueueIndex"
 	lastFinalizedBatchIndex   = "lastFinalizedBatchIndex"
+	finalizedStateRoots       = "finalizedStateRoots"
 
 	defaultRollupEventsFetchBlockRange = 100
 )
@@ -115,6 +116,28 @@ func (r *Reader) LatestFinalizedBatchIndex(blockNumber uint64) (uint64, error) {
 
 	var parsedResult *big.Int
 	if err = r.scrollChainABI.UnpackIntoInterface(&parsedResult, lastFinalizedBatchIndex, result); err != nil {
+		return 0, fmt.Errorf("failed to unpack result: %w", err)
+	}
+
+	return parsedResult.Uint64(), nil
+}
+
+func (r *Reader) GetFinalizedStateRootByBatchIndex(blockNumber uint64, batchIndex uint64) (uint64, error) {
+	data, err := r.scrollChainABI.Pack(finalizedStateRoots, batchIndex)
+	if err != nil {
+		return 0, fmt.Errorf("failed to pack %s: %w", finalizedStateRoots, err)
+	}
+
+	result, err := r.client.CallContract(r.ctx, ethereum.CallMsg{
+		To:   &r.config.ScrollChainAddress,
+		Data: data,
+	}, new(big.Int).SetUint64(blockNumber))
+	if err != nil {
+		return 0, fmt.Errorf("failed to call %s: %w", finalizedStateRoots, err)
+	}
+
+	var parsedResult *big.Int
+	if err = r.scrollChainABI.UnpackIntoInterface(&parsedResult, finalizedStateRoots, result); err != nil {
 		return 0, fmt.Errorf("failed to unpack result: %w", err)
 	}
 

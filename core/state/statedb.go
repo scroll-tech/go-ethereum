@@ -18,9 +18,11 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"time"
 
@@ -969,8 +971,17 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 			s.trie = trie
 		}
 	}
-	usedAddrs := make([][]byte, 0, len(s.stateObjectsPending))
+
+	sortedPendingAddrs := make([]common.Address, 0, len(s.stateObjectsPending))
 	for addr := range s.stateObjectsPending {
+		sortedPendingAddrs = append(sortedPendingAddrs, addr)
+	}
+	slices.SortFunc(sortedPendingAddrs, func(a, b common.Address) int {
+		return bytes.Compare(a[:], b[:])
+	})
+
+	usedAddrs := make([][]byte, 0, len(s.stateObjectsPending))
+	for _, addr := range sortedPendingAddrs {
 		if obj := s.stateObjects[addr]; obj.deleted {
 			s.deleteStateObject(obj)
 			s.AccountDeleted += 1

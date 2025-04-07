@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -44,7 +46,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rpc"
 	"github.com/scroll-tech/go-ethereum/trie"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // PublicEthereumAPI provides an API to access Ethereum full node-related

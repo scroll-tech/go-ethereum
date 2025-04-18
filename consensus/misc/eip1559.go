@@ -57,10 +57,10 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 	l2SequencerFee := big.NewInt(1000000) // 0.001 Gwei
 	provingFee := big.NewInt(14680000)    // 0.01468 Gwei
 
-	// L1_base_fee * 0.0000155
+	// L1_base_fee * 0.000034
 	verificationFee := parentL1BaseFee
-	verificationFee = new(big.Int).Mul(verificationFee, big.NewInt(155))
-	verificationFee = new(big.Int).Div(verificationFee, big.NewInt(10000000))
+	verificationFee = new(big.Int).Mul(verificationFee, big.NewInt(34))
+	verificationFee = new(big.Int).Div(verificationFee, big.NewInt(1000000))
 
 	baseFee := big.NewInt(0)
 	baseFee.Add(baseFee, l2SequencerFee)

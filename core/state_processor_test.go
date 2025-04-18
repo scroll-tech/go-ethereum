@@ -389,13 +389,13 @@ func TestStateProcessorErrors(t *testing.T) {
 				txs: []*types.Transaction{
 					mkDynamicCreationTx(0, 500000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), tooBigInitCode[:]),
 				},
-				want: "could not apply tx 0 [0xdafff4b339f58272aa15a1b332dc88c039503c60d893047e86b2d31f5fcfcffa]: max initcode size exceeded: code size 49153 limit 49152",
+				want: "could not apply tx 0 [0x9fff9d187a68f9dce9664475ed9a01a5178992f15b44ce88ee7b1129a183e6af]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{
 					mkDynamicCreationTx(0, 54299, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), smallInitCode[:]),
 				},
-				want: "could not apply tx 0 [0x01a67f1a7cf29cc91da9ca3cd7793ca7bc47516da5bec74c79727dde31a60651]: intrinsic gas too low: have 54299, want 54300",
+				want: "could not apply tx 0 [0x272eefb0eeb3b973e933ae5dba17e7ecf6bfded5ce358f2a78426153c247f677]: intrinsic gas too low: have 54299, want 54300",
 			},
 		} {
 			block := GenerateBadBlock(genesis, ethash.NewFaker(), tt.txs, gspec.Config)

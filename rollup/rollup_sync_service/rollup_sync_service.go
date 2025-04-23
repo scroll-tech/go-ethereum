@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	finalizedBlockGauge = metrics.NewRegisteredGauge("chain/head/finalized", nil)
+	finalizedBlockGauge      = metrics.NewRegisteredGauge("chain/head/finalized", nil)
 	ErrShouldResetSyncHeight = errors.New("ErrShouldResetSyncHeight")
 )
 
@@ -139,13 +139,11 @@ func (s *RollupSyncService) Start() {
 
 	log.Info("Starting rollup event sync background service", "latest processed block", s.callDataBlobSource.L1Height())
 
-
-	
 	finalizedBlockHeightPtr := rawdb.ReadFinalizedL2BlockNumber(s.db)
 	if finalizedBlockHeightPtr != nil {
 		finalizedBlockGauge.Update(int64(*finalizedBlockHeightPtr))
 	}
-	
+
 	go func() {
 		syncTicker := time.NewTicker(defaultSyncInterval)
 		defer syncTicker.Stop()

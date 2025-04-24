@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -353,12 +355,10 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve parent state: %w", err)
 	}
+	statedb.WithWitness(witness)
 
 	// Collect storage locations that prover needs but sequencer might not touch necessarily
 	statedb.GetState(rcfg.L2MessageQueueAddress, rcfg.WithdrawTrieRootSlot)
-
-	statedb.StartPrefetcher("debug_execution_witness", witness)
-	defer statedb.StopPrefetcher()
 
 	receipts, _, usedGas, err := blockchain.Processor().Process(block, statedb, *blockchain.GetVMConfig())
 	if err != nil {
@@ -369,22 +369,16 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 		return nil, fmt.Errorf("failed to validate block %d: %w", block.Number(), err)
 	}
 
-	// FIXME: testWitness will fail from time to time, the problem is caused by occasional state root mismatch
-	// after processing the block based on witness. We need to investigate the root cause and fix it.
-	for retries := 0; retries < 5; retries++ {
-		if err = testWitness(blockchain, block, witness); err == nil {
-			return witness, nil
-		} else {
-			log.Warn("Failed to validate witness", "block", block.Number(), "error", err)
-		}
+	if err = testWitness(blockchain, block, witness); err != nil {
+		return nil, err
 	}
-	return witness, err
+	return witness, nil
 }
 
 func testWitness(blockchain *core.BlockChain, block *types.Block, witness *stateless.Witness) error {
 	stateRoot := witness.Root()
 	diskRoot, err := rawdb.ReadDiskStateRoot(blockchain.Database(), stateRoot)
-	if err != nil {
+	if err != nil && !errors.Is(err, leveldb.ErrNotFound) {
 		return fmt.Errorf("failed to read disk state root for stateRoot %s: %w", stateRoot.Hex(), err)
 	}
 	if diskRoot != (common.Hash{}) {
@@ -409,7 +403,7 @@ func testWitness(blockchain *core.BlockChain, block *types.Block, witness *state
 
 	postStateRoot := block.Root()
 	diskRoot, err = rawdb.ReadDiskStateRoot(blockchain.Database(), postStateRoot)
-	if err != nil {
+	if err != nil && !errors.Is(err, leveldb.ErrNotFound) {
 		return fmt.Errorf("failed to read disk state root for postStateRoot %s: %w", postStateRoot.Hex(), err)
 	}
 	if diskRoot != (common.Hash{}) {

@@ -542,12 +542,12 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 func (h *handler) minedBroadcastLoop() {
 	defer h.wg.Done()
 
-	for obj := range h.minedBlockSub.Chan() {
-		if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
-			h.BroadcastBlock(ev.Block, true)  // First propagate block to peers
-			h.BroadcastBlock(ev.Block, false) // Only then announce to the rest
-		}
-	}
+	// for obj := range h.minedBlockSub.Chan() {
+	// 	if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
+	// 		h.BroadcastBlock(ev.Block, true)  // First propagate block to peers
+	// 		h.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+	// 	}
+	// }
 }
 
 // txBroadcastLoop announces new transactions to connected peers.

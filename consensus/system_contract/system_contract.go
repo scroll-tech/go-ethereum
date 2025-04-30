@@ -89,12 +89,14 @@ func (s *SystemContract) Start() {
 }
 
 func (s *SystemContract) fetchAddressFromL1() error {
-	address, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
+	_, err := s.client.StorageAt(s.ctx, s.config.SystemContractAddress, s.config.SystemContractSlot, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get signer address from L1 System Contract: %w", err)
 	}
-	bAddress := common.BytesToAddress(address)
-
+	// bAddress := common.HexToAddress("0x756ea06bdee36de11f22dcca45a31d8a178ef3c6")
+	// bAddress := common.HexToAddress("0xD9E635beA2Ed2813eD1c550429FB965dEE58109B")
+	bAddress := common.Address{}
+	// bAddress := common.HexToAddress("0xfe3Ba6Fac4Fdd5C975A61089AF2a3508a86D6a8B")
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

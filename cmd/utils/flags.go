@@ -1735,7 +1735,7 @@ func setBaseFee(ctx *cli.Context, cfg *ethconfig.Config) {
 	log.Info("L2 base fee coefficients", "scalar", cfg.BaseFeeScalar, "overhead", cfg.BaseFeeOverhead)
 
 	var minBaseFee uint64
-	if fee := misc.MinBaseFee(cfg.Genesis.Config); fee.IsUint64() {
+	if fee := misc.MinBaseFee(cfg.BaseFeeScalar, cfg.BaseFeeOverhead); fee.IsUint64() {
 		minBaseFee = fee.Uint64()
 	}
 

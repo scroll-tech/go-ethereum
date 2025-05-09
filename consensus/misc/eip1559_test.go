@@ -150,14 +150,11 @@ func TestCalcBaseFee(t *testing.T) {
 
 // TestMinBaseFee assumes all blocks are 1559-blocks
 func TestMinBaseFee(t *testing.T) {
-	config := config()
-	if have, want := MinBaseFee(config), big.NewInt(15680000); have.Cmp(want) != 0 {
+	if have, want := MinBaseFee(DefaultBaseFeeScalar, DefaultBaseFeeOverhead), big.NewInt(15680000); have.Cmp(want) != 0 {
 		t.Errorf("have %d  want %d, ", have, want)
 	}
 
-	config.Scroll.BaseFeeScalar = big.NewInt(10000000)
-	config.Scroll.BaseFeeOverhead = big.NewInt(1)
-	if have, want := MinBaseFee(config), big.NewInt(1); have.Cmp(want) != 0 {
+	if have, want := MinBaseFee(big.NewInt(10000000), big.NewInt(1)), big.NewInt(1); have.Cmp(want) != 0 {
 		t.Errorf("have %d  want %d, ", have, want)
 	}
 }

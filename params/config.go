@@ -760,12 +760,12 @@ func (s ScrollConfig) String() string {
 
 	baseFeeScalar := "<nil>"
 	if s.BaseFeeScalar != nil {
-		baseFeeScalar = fmt.Sprintf("%v", *s.BaseFeeScalar)
+		baseFeeScalar = s.BaseFeeScalar.String()
 	}
 
 	baseFeeOverhead := "<nil>"
 	if s.BaseFeeOverhead != nil {
-		baseFeeOverhead = fmt.Sprintf("%v", *s.BaseFeeOverhead)
+		baseFeeOverhead = s.BaseFeeOverhead.String()
 	}
 
 	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, l1Config: %v, genesisStateRoot: %v, baseFeeScalar: %v, baseFeeOverhead: %v}",

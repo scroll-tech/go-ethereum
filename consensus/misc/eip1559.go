@@ -61,11 +61,6 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
-	return calcBaseFee(config, parentL1BaseFee)
-}
-
-// l2BaseFee = (l1BaseFee * scalar) / PRECISION + overhead
-func calcBaseFee(config *params.ChainConfig, parentL1BaseFee *big.Int) *big.Int {
 	scalar := config.Scroll.BaseFeeScalar
 	if scalar == nil {
 		scalar = DefaultBaseFeeScalar
@@ -75,7 +70,12 @@ func calcBaseFee(config *params.ChainConfig, parentL1BaseFee *big.Int) *big.Int 
 		overhead = DefaultBaseFeeOverhead
 	}
 
-	baseFee := parentL1BaseFee
+	return calcBaseFee(scalar, overhead, parentL1BaseFee)
+}
+
+// l2BaseFee = (l1BaseFee * scalar) / PRECISION + overhead
+func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {
+	baseFee := new(big.Int).Set(parentL1BaseFee)
 	baseFee.Mul(baseFee, scalar)
 	baseFee.Div(baseFee, BaseFeePrecision)
 	baseFee.Add(baseFee, overhead)
@@ -88,6 +88,6 @@ func calcBaseFee(config *params.ChainConfig, parentL1BaseFee *big.Int) *big.Int 
 }
 
 // MinBaseFee calculates the minimum L2 base fee based on the configured coefficients.
-func MinBaseFee(config *params.ChainConfig) *big.Int {
-	return calcBaseFee(config, big.NewInt(0))
+func MinBaseFee(scalar, overhead *big.Int) *big.Int {
+	return calcBaseFee(scalar, overhead, big.NewInt(0))
 }

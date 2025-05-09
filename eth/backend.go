@@ -150,6 +150,12 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
+	// Hacky workaround:
+	// It's hard to pass these fields to `CalcBaseFee`, etc.
+	// So pass them as part of the genesis config instead.
+	chainConfig.Scroll.BaseFeeScalar = config.BaseFeeScalar
+	chainConfig.Scroll.BaseFeeOverhead = config.BaseFeeOverhead
+
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}

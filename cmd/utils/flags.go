@@ -939,12 +939,12 @@ var (
 	// L2 base fee settings
 	L2BaseFeeScalarFlag = BigFlag{
 		Name:  "basefee.scalar",
-		Usage: "Scalar used in l2 base fee formula. Signer nodes will use this for computing the next block's base fee. Follower nodes will use this in RPC.",
+		Usage: "Scalar used in the l2 base fee formula. Signer nodes will use this for computing the next block's base fee. Follower nodes will use this in RPC.",
 		Value: misc.DefaultBaseFeeScalar,
 	}
 	L2BaseFeeOverheadFlag = BigFlag{
 		Name:  "basefee.overhead",
-		Usage: "Overhead used in l2 base fee formula. Signer nodes will use this for computing the next block's base fee. Follower nodes will use this in RPC.",
+		Usage: "Overhead used in the l2 base fee formula. Signer nodes will use this for computing the next block's base fee. Follower nodes will use this in RPC.",
 		Value: misc.DefaultBaseFeeOverhead,
 	}
 )

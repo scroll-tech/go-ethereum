@@ -28,6 +28,10 @@ import (
 // We would only go above this if L1 base fee hits 2931 Gwei.
 const MaximumL2BaseFee = 10000000000
 
+// L2 base fee formula constants and defaults.
+// l2BaseFee = (l1BaseFee * scalar) / PRECISION + overhead.
+// `scalar` accounts for finalization costs. `overhead` accounts for sequencing and proving costs.
+// we use 1e18 for precision to match the contract implementation.
 var (
 	BaseFeePrecision       = new(big.Int).SetUint64(1e18)
 	DefaultBaseFeeScalar   = new(big.Int).SetUint64(34000000000000)
@@ -73,7 +77,11 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 	return calcBaseFee(scalar, overhead, parentL1BaseFee)
 }
 
-// l2BaseFee = (l1BaseFee * scalar) / PRECISION + overhead
+// MinBaseFee calculates the minimum L2 base fee based on the configured coefficients.
+func MinBaseFee(scalar, overhead *big.Int) *big.Int {
+	return calcBaseFee(scalar, overhead, big.NewInt(0))
+}
+
 func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {
 	baseFee := new(big.Int).Set(parentL1BaseFee)
 	baseFee.Mul(baseFee, scalar)
@@ -85,9 +93,4 @@ func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {
 	}
 
 	return baseFee
-}
-
-// MinBaseFee calculates the minimum L2 base fee based on the configured coefficients.
-func MinBaseFee(scalar, overhead *big.Int) *big.Int {
-	return calcBaseFee(scalar, overhead, big.NewInt(0))
 }

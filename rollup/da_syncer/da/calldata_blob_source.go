@@ -32,6 +32,9 @@ type CalldataBlobSource struct {
 	scrollChainABI *abi.ABI
 	db             ethdb.Database
 
+	lastCommittedL1Height   uint64
+	lastCommittedBatchIndex uint64
+
 	l1Finalized uint64
 }
 
@@ -47,6 +50,9 @@ func NewCalldataBlobSource(ctx context.Context, l1height uint64, l1Reader *l1.Re
 		l1Height:       l1height,
 		scrollChainABI: scrollChainABI,
 		db:             db,
+
+		lastCommittedL1Height:   l1height,
+		lastCommittedBatchIndex: 0,
 	}, nil
 }
 
@@ -80,6 +86,48 @@ func (ds *CalldataBlobSource) NextData() (Entries, error) {
 	if err != nil {
 		return nil, serrors.NewTemporaryError(fmt.Errorf("failed to process rollup events to DA, error: %v", err))
 	}
+
+	currentLastCommittedBatchIndex := ds.lastCommittedBatchIndex
+	currentLastCommittedL1Height := ds.lastCommittedL1Height
+	// If ds.lastCommittedBatchIndex is 0 (after restart/initial sync), sanity checks are skipped
+	// and the first committed batch index (if any) in the following loop will be used as the start batch index of sanity checks.
+	for _, entry := range da {
+		switch entry.Type() {
+		case CommitBatchV0Type, CommitBatchWithBlobType:
+			commitEvent := entry.Event()
+			batchIndex := commitEvent.BatchIndex().Uint64()
+
+			if currentLastCommittedBatchIndex != 0 && currentLastCommittedBatchIndex+1 != batchIndex {
+				// Discontinuous batch index detected - exit early and adjust l1Height to resume syncing
+				// from the block after the last successfully committed batch.
+				ds.l1Height = ds.lastCommittedL1Height + 1
+				return nil, fmt.Errorf("failed sanity check: discontinuous batch index, expected %d but got %d", ds.lastCommittedBatchIndex+1, batchIndex)
+			}
+
+			currentLastCommittedBatchIndex = batchIndex
+			currentLastCommittedL1Height = commitEvent.BlockNumber()
+
+		case RevertBatchType:
+			revertEvent := entry.Event()
+			revertBatchIndex := revertEvent.BatchIndex().Uint64()
+
+			if currentLastCommittedBatchIndex != 0 && revertBatchIndex < ds.lastCommittedBatchIndex {
+				currentLastCommittedBatchIndex = revertBatchIndex
+			}
+
+		case FinalizeBatchType:
+			finalizeEvent := entry.Event()
+			finalizeBatchIndex := finalizeEvent.BatchIndex().Uint64()
+
+			if currentLastCommittedBatchIndex != 0 && currentLastCommittedBatchIndex < finalizeBatchIndex {
+				ds.l1Height = ds.lastCommittedL1Height + 1
+				return nil, fmt.Errorf("failed sanity check: commit batch index %d is less than finalize batch index %d", ds.lastCommittedBatchIndex, finalizeBatchIndex)
+			}
+		}
+	}
+
+	ds.lastCommittedBatchIndex = currentLastCommittedBatchIndex
+	ds.lastCommittedL1Height = currentLastCommittedL1Height
 
 	ds.l1Height = to + 1
 	return da, nil

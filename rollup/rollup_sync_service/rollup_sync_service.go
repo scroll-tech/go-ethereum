@@ -228,13 +228,19 @@ func (s *RollupSyncService) fetchRollupEvents() error {
 				return nil
 			}
 			if errors.Is(err, ErrMissingBatchEvent) {
+				// make sure no underflow
+				var rewindTo uint64
+				if prevL1Height > rewindL1Height {
+					rewindTo = prevL1Height - rewindL1Height
+				}
+
 				// If there's a missing batch event, rewind the L1 sync height by some blocks to re-fetch from L1 RPC and
 				// replay creating corresponding CommittedBatchMeta in local DB.
 				// This happens recursively until the missing event has been recovered as we will call fetchRollupEvents again
 				// with the `L1Height = prevL1Height - rewindL1Height`.
-				s.callDataBlobSource.SetL1Height(prevL1Height - rewindL1Height)
+				s.callDataBlobSource.SetL1Height(rewindTo)
 
-				return fmt.Errorf("missing batch event, rewinding L1 sync height by %d blocks to %d: %w", rewindL1Height, prevL1Height-rewindL1Height, err)
+				return fmt.Errorf("missing batch event, rewinding L1 sync height by %d blocks to %d: %w", rewindL1Height, rewindTo, err)
 			}
 
 			// Reset the L1 height to the previous value to retry fetching the same data.

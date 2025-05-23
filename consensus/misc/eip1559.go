@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
@@ -44,15 +45,23 @@ var (
 )
 
 func UpdateL2BaseFeeOverhead(newOverhead *big.Int) {
+	if newOverhead == nil {
+		log.Error("Failed to set L2 base fee overhead, new value is <nil>")
+		return
+	}
 	lock.Lock()
 	defer lock.Unlock()
-	baseFeeOverhead = newOverhead
+	baseFeeOverhead.Set(newOverhead)
 }
 
 func UpdateL2BaseFeeScalar(newScalar *big.Int) {
+	if newScalar == nil {
+		log.Error("Failed to set L2 base fee scalar, new value is <nil>")
+		return
+	}
 	lock.Lock()
 	defer lock.Unlock()
-	baseFeeScalar = newScalar
+	baseFeeScalar.Set(newScalar)
 }
 
 // VerifyEip1559Header verifies some header attributes which were changed in EIP-1559,

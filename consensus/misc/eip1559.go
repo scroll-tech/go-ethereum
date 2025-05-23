@@ -79,7 +79,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 	}
 
 	lock.RLock()
-	defer lock.Unlock()
+	defer lock.RUnlock()
 	return calcBaseFee(baseFeeScalar, baseFeeOverhead, parentL1BaseFee)
 }
 

@@ -112,6 +112,26 @@ func TestCalcBaseFee(t *testing.T) {
 		parentL1BaseFee   int64
 		expectedL2BaseFee int64
 	}{
+		{0, 1},
+		{1000000000, 1},
+		{2000000000, 1},
+		{100000000000, 2},
+		{111111111111, 2},
+		{2164000000000, 22},
+		{644149677419355, 6442},
+	}
+	for i, test := range tests {
+		config := config()
+		UpdateL2BaseFeeParams(big.NewInt(10000000), big.NewInt(1))
+		if have, want := CalcBaseFee(config, nil, big.NewInt(test.parentL1BaseFee)), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
+			t.Errorf("test %d: have %d  want %d, ", i, have, want)
+		}
+	}
+
+	testsWithDefaults := []struct {
+		parentL1BaseFee   int64
+		expectedL2BaseFee int64
+	}{
 		{0, 15680000},
 		{1000000000, 15714000},
 		{2000000000, 15748000},
@@ -120,7 +140,8 @@ func TestCalcBaseFee(t *testing.T) {
 		{2164000000000, 89256000},
 		{644149677419355, 10000000000}, // cap at max L2 base fee
 	}
-	for i, test := range tests {
+	for i, test := range testsWithDefaults {
+		UpdateL2BaseFeeParams(big.NewInt(34000000000000), big.NewInt(15680000))
 		if have, want := CalcBaseFee(config(), nil, big.NewInt(test.parentL1BaseFee)), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
 			t.Errorf("test %d: have %d  want %d, ", i, have, want)
 		}
@@ -129,6 +150,10 @@ func TestCalcBaseFee(t *testing.T) {
 
 // TestMinBaseFee assumes all blocks are 1559-blocks
 func TestMinBaseFee(t *testing.T) {
+	if have, want := MinBaseFee(big.NewInt(34000000000000), big.NewInt(15680000)), big.NewInt(15680000); have.Cmp(want) != 0 {
+		t.Errorf("have %d  want %d, ", have, want)
+	}
+
 	if have, want := MinBaseFee(big.NewInt(10000000), big.NewInt(1)), big.NewInt(1); have.Cmp(want) != 0 {
 		t.Errorf("have %d  want %d, ", have, want)
 	}

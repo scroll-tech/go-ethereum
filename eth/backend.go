@@ -32,6 +32,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/clique"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -60,6 +61,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -211,6 +213,21 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 			log.Warn("block failed CCC check, it will be reorged by the sequencer", "hash", b.Hash().Hex(), "err", err)
 		})
 		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
+	}
+
+	// initialize L2 base fee coefficients
+	state, err := eth.blockchain.State()
+	if err != nil {
+		return nil, err
+	}
+	if l2SystemConfig := chainConfig.Scroll.L2SystemConfigAddress(); l2SystemConfig != (common.Address{}) {
+		l2BaseFeeOverhead := state.GetState(chainConfig.Scroll.L2SystemConfigAddress(), rcfg.L2BaseFeeOverheadSlot).Big()
+		l2BaseFeeScalar := state.GetState(chainConfig.Scroll.L2SystemConfigAddress(), rcfg.L2BaseFeeScalarSlot).Big()
+		misc.UpdateL2BaseFeeOverhead(l2BaseFeeOverhead)
+		misc.UpdateL2BaseFeeScalar(l2BaseFeeScalar)
+		log.Info("Initialized L2 base fee coefficients", "overhead", l2BaseFeeOverhead, "scalar", l2BaseFeeScalar)
+	} else {
+		log.Warn("L2SystemConfig address is not configured")
 	}
 
 	// Rewind the chain in case of an incompatible config upgrade.

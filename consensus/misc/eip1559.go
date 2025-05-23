@@ -37,8 +37,8 @@ var (
 	BaseFeePrecision = new(big.Int).SetUint64(1e18)
 
 	// scalar and overhead are updated automatically in `Blockchain.writeBlockWithState`.
-	baseFeeScalar   = new(big.Int).SetUint64(34000000000000)
-	baseFeeOverhead = new(big.Int).SetUint64(15680000)
+	baseFeeScalar   = big.NewInt(0)
+	baseFeeOverhead = big.NewInt(0)
 
 	lock sync.RWMutex
 )

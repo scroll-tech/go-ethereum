@@ -185,8 +185,6 @@ var (
 		utils.DARecoverySignBlocksFlag,
 		utils.DARecoveryL2EndBlockFlag,
 		utils.DARecoveryProduceBlocksFlag,
-		utils.L2BaseFeeScalarFlag,
-		utils.L2BaseFeeOverheadFlag,
 	}
 
 	rpcFlags = []cli.Flag{

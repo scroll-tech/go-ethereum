@@ -351,6 +351,7 @@ var (
 				L1MessageQueueV2DeploymentBlock: 7773746,
 				NumL1MessagesPerBlock:           10,
 				ScrollChainAddress:              common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
+				L2SystemConfigAddress:           common.Address{}, // TODO
 			},
 			GenesisStateRoot: &ScrollSepoliaGenesisState,
 		},
@@ -401,6 +402,7 @@ var (
 				L1MessageQueueV2DeploymentBlock: 22088276,
 				NumL1MessagesPerBlock:           10,
 				ScrollChainAddress:              common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
+				L2SystemConfigAddress:           common.Address{}, // TODO
 			},
 			GenesisStateRoot: &ScrollMainnetGenesisState,
 		},
@@ -714,6 +716,7 @@ type L1Config struct {
 	L1MessageQueueV2DeploymentBlock uint64         `json:"l1MessageQueueV2DeploymentBlock,omitempty"`
 	NumL1MessagesPerBlock           uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
 	ScrollChainAddress              common.Address `json:"scrollChainAddress,omitempty"`
+	L2SystemConfigAddress           common.Address `json:"l2SystemConfigAddress,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -721,8 +724,8 @@ func (c *L1Config) String() string {
 		return "<nil>"
 	}
 
-	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, l1MessageQueueV2Address: %v, l1MessageQueueV2DeploymentBlock: %v, numL1MessagesPerBlock: %v, ScrollChainAddress: %v}",
-		c.L1ChainId, c.L1MessageQueueAddress.Hex(), c.L1MessageQueueV2Address.Hex(), c.L1MessageQueueV2DeploymentBlock, c.NumL1MessagesPerBlock, c.ScrollChainAddress.Hex())
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, l1MessageQueueV2Address: %v, l1MessageQueueV2DeploymentBlock: %v, numL1MessagesPerBlock: %v, ScrollChainAddress: %v, L2SystemConfigAddress: %v}",
+		c.L1ChainId, c.L1MessageQueueAddress.Hex(), c.L1MessageQueueV2Address.Hex(), c.L1MessageQueueV2DeploymentBlock, c.NumL1MessagesPerBlock, c.ScrollChainAddress.Hex(), c.L2SystemConfigAddress.Hex())
 }
 
 func (s ScrollConfig) FeeVaultEnabled() bool {

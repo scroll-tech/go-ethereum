@@ -228,6 +228,28 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		Flags: metricsFlags,
 	},
 	{
+		Name: "ROLLUP",
+		Flags: []cli.Flag{
+			utils.L1EndpointFlag,
+			utils.L1ConfirmationsFlag,
+			utils.L1DeploymentBlockFlag,
+			utils.L1DisableMessageQueueV2Flag,
+			utils.RollupVerifyEnabledFlag,
+			utils.DASyncEnabledFlag,
+			utils.DABlobScanAPIEndpointFlag,
+			utils.DABlockNativeAPIEndpointFlag,
+			utils.DABeaconNodeAPIEndpointFlag,
+			utils.DARecoveryModeFlag,
+			utils.DARecoveryInitialL1BlockFlag,
+			utils.DARecoveryInitialBatchFlag,
+			utils.DARecoverySignBlocksFlag,
+			utils.DARecoveryL2EndBlockFlag,
+			utils.DARecoveryProduceBlocksFlag,
+			utils.CircuitCapacityCheckEnabledFlag,
+			utils.CircuitCapacityCheckWorkersFlag,
+		},
+	},
+	{
 		Name: "ALIASED (deprecated)",
 		Flags: []cli.Flag{
 			utils.NoUSBFlag,

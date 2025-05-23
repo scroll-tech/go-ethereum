@@ -34,6 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/mclock"
 	"github.com/scroll-tech/go-ethereum/common/prque"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/state/snapshot"
@@ -45,6 +46,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -55,7 +57,8 @@ var (
 	headTimeGapGauge   = metrics.NewRegisteredGauge("chain/head/timegap", nil)
 	headL1MessageGauge = metrics.NewRegisteredGauge("chain/head/l1msg", nil)
 
-	l2BaseFeeGauge = metrics.NewRegisteredGauge("chain/fees/l2basefee", nil)
+	l2BaseFeeGauge       = metrics.NewRegisteredGauge("chain/fees/l2basefee", nil)
+	l2BaseFeeUpdateTimer = metrics.NewRegisteredTimer("chain/fees/updates", nil)
 
 	accountReadTimer   = metrics.NewRegisteredTimer("chain/account/reads", nil)
 	accountHashTimer   = metrics.NewRegisteredTimer("chain/account/hashes", nil)
@@ -1268,6 +1271,25 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	} else {
 		l2BaseFeeGauge.Update(0)
 	}
+
+	// Update L2 base fee coefficients.
+	// Coefficient updates are written into L2 state and emit an event.
+	// We could use either here; we read from the event to avoid state reads.
+	// In the future, if the base fee setting becomes part of block validation,
+	// reading from state will be more appropriate.
+	l2SystemConfigAddress := bc.Config().Scroll.L1Config.L2SystemConfigAddress
+	start := time.Now()
+
+	for _, r := range logs {
+		if r.Address == l2SystemConfigAddress && r.Topics[0] == rcfg.L2BaseFeeUpdateTopic {
+			scalar := r.Topics[1].Big()
+			overhead := r.Topics[2].Big()
+			misc.UpdateL2BaseFeeParams(scalar, overhead)
+			log.Info("Updated L2 base fee coefficients", "blockNumber", block.NumberU64(), "blockHash", block.Hash().Hex(), "scalar", scalar, "overhead", overhead)
+		}
+	}
+
+	l2BaseFeeUpdateTimer.Update(time.Since(start))
 
 	// Note the latest relayed L1 message queue index (if any)
 	updateHeadL1msgGauge(block)

@@ -1277,7 +1277,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// We could use either here; we read from the event to avoid state reads.
 	// In the future, if the base fee setting becomes part of block validation,
 	// reading from state will be more appropriate.
-	l2SystemConfigAddress := bc.Config().Scroll.L1Config.L2SystemConfigAddress
+	l2SystemConfigAddress := bc.Config().Scroll.L2SystemConfigAddress()
 	start := time.Now()
 
 	for _, r := range logs {

@@ -776,6 +776,14 @@ func (s ScrollConfig) IsValidBlockSizeForMining(size common.StorageSize) bool {
 	return s.IsValidBlockSize(size * (1.0 / 0.95))
 }
 
+// L2SystemConfigAddress returns the configured l2 system config address, or the zero address if it is not configured.
+func (s ScrollConfig) L2SystemConfigAddress() common.Address {
+	if s.L1Config == nil {
+		return common.Address{} // only in tests
+	}
+	return s.L1Config.L2SystemConfigAddress
+}
+
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
 type EthashConfig struct{}
 

@@ -43,12 +43,16 @@ var (
 	lock sync.RWMutex
 )
 
-func UpdateL2BaseFeeParams(newScalar, newOverhead *big.Int) {
+func UpdateL2BaseFeeOverhead(newOverhead *big.Int) {
 	lock.Lock()
 	defer lock.Unlock()
-
-	baseFeeScalar = newScalar
 	baseFeeOverhead = newOverhead
+}
+
+func UpdateL2BaseFeeScalar(newScalar *big.Int) {
+	lock.Lock()
+	defer lock.Unlock()
+	baseFeeScalar = newScalar
 }
 
 // VerifyEip1559Header verifies some header attributes which were changed in EIP-1559,

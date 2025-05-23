@@ -1281,11 +1281,20 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	start := time.Now()
 
 	for _, r := range logs {
-		if r.Address == l2SystemConfigAddress && r.Topics[0] == rcfg.L2BaseFeeUpdateTopic {
-			scalar := r.Topics[1].Big()
-			overhead := r.Topics[2].Big()
-			misc.UpdateL2BaseFeeParams(scalar, overhead)
-			log.Info("Updated L2 base fee coefficients", "blockNumber", block.NumberU64(), "blockHash", block.Hash().Hex(), "scalar", scalar, "overhead", overhead)
+		if r.Address != l2SystemConfigAddress {
+			continue
+		}
+		switch r.Topics[0] {
+		case rcfg.BaseFeeOverheadUpdatedTopic:
+			old := r.Topics[1].Big()
+			new := r.Topics[2].Big()
+			misc.UpdateL2BaseFeeOverhead(new)
+			log.Info("Updated L2 base fee overhead", "blockNumber", block.NumberU64(), "blockHash", block.Hash().Hex(), "old", old, "new", new)
+		case rcfg.BaseFeeScalarUpdatedTopic:
+			old := r.Topics[1].Big()
+			new := r.Topics[2].Big()
+			misc.UpdateL2BaseFeeScalar(new)
+			log.Info("Updated L2 base fee scalar", "blockNumber", block.NumberU64(), "blockHash", block.Hash().Hex(), "old", old, "new", new)
 		}
 	}
 

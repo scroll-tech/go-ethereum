@@ -96,9 +96,11 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 	return calcBaseFee(baseFeeScalar, baseFeeOverhead, parentL1BaseFee)
 }
 
-// MinBaseFee calculates the minimum L2 base fee based on the configured coefficients.
-func MinBaseFee(scalar, overhead *big.Int) *big.Int {
-	return calcBaseFee(scalar, overhead, big.NewInt(0))
+// MinBaseFee calculates the minimum L2 base fee based on the current coefficients.
+func MinBaseFee() *big.Int {
+	lock.RLock()
+	defer lock.RUnlock()
+	return calcBaseFee(baseFeeScalar, baseFeeOverhead, big.NewInt(0))
 }
 
 func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {

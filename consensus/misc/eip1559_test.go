@@ -152,11 +152,15 @@ func TestCalcBaseFee(t *testing.T) {
 
 // TestMinBaseFee assumes all blocks are 1559-blocks
 func TestMinBaseFee(t *testing.T) {
-	if have, want := MinBaseFee(big.NewInt(34000000000000), big.NewInt(15680000)), big.NewInt(15680000); have.Cmp(want) != 0 {
+	UpdateL2BaseFeeScalar(big.NewInt(34000000000000))
+	UpdateL2BaseFeeOverhead(big.NewInt(15680000))
+	if have, want := MinBaseFee(), big.NewInt(15680000); have.Cmp(want) != 0 {
 		t.Errorf("have %d  want %d, ", have, want)
 	}
 
-	if have, want := MinBaseFee(big.NewInt(10000000), big.NewInt(1)), big.NewInt(1); have.Cmp(want) != 0 {
+	UpdateL2BaseFeeScalar(big.NewInt(10000000))
+	UpdateL2BaseFeeOverhead(big.NewInt(1))
+	if have, want := MinBaseFee(), big.NewInt(1); have.Cmp(want) != 0 {
 		t.Errorf("have %d  want %d, ", have, want)
 	}
 }

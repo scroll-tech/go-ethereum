@@ -46,7 +46,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rollup/l2_system_config"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -160,6 +160,40 @@ func updateHeadL1msgGauge(block *types.Block) {
 		} else {
 			// No more L1 messages in this block.
 			break
+		}
+	}
+}
+
+// updateL2BaseFeeCoefficients updates the global L2 base fee coefficients.
+// Coefficient updates are written into L2 state and emit an event.
+// We could use either here; we read from the event to avoid state reads.
+// In the future, if the base fee setting becomes part of block validation,
+// reading from state will be more appropriate.
+func updateL2BaseFeeCoefficients(l2SystemConfigAddress common.Address, logs []*types.Log) {
+	start := time.Now()
+	defer func() { l2BaseFeeUpdateTimer.Update(time.Since(start)) }()
+
+	for _, l := range logs {
+		if l.Address != l2SystemConfigAddress {
+			continue
+		}
+		switch l.Topics[0] {
+		case l2_system_config.BaseFeeOverheadUpdatedTopic:
+			event, err := l2_system_config.UnpackBaseFeeOverheadUpdatedEvent(*l)
+			if err != nil {
+				log.Error("failed to unpack base fee overhead updated event log", "err", err, "log", *l)
+				break // break from switch, continue loop
+			}
+			misc.UpdateL2BaseFeeOverhead(event.NewBaseFeeOverhead)
+			log.Info("Updated L2 base fee overhead", "blockNumber", l.BlockNumber, "blockHash", l.BlockHash, "old", event.OldBaseFeeOverhead, "new", event.NewBaseFeeOverhead)
+		case l2_system_config.BaseFeeScalarUpdatedTopic:
+			event, err := l2_system_config.UnpackBaseFeeScalarUpdatedEvent(*l)
+			if err != nil {
+				log.Error("failed to unpack base fee scalar updated event log", "err", err, "log", *l)
+				break // break from switch, continue loop
+			}
+			misc.UpdateL2BaseFeeScalar(event.NewBaseFeeScalar)
+			log.Info("Updated L2 base fee scalar", "blockNumber", l.BlockNumber, "blockHash", l.BlockHash, "old", event.OldBaseFeeScalar, "new", event.NewBaseFeeScalar)
 		}
 	}
 }
@@ -1272,36 +1306,11 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		l2BaseFeeGauge.Update(0)
 	}
 
-	// Update L2 base fee coefficients.
-	// Coefficient updates are written into L2 state and emit an event.
-	// We could use either here; we read from the event to avoid state reads.
-	// In the future, if the base fee setting becomes part of block validation,
-	// reading from state will be more appropriate.
-	l2SystemConfigAddress := bc.Config().Scroll.L2SystemConfigAddress()
-	start := time.Now()
-
-	for _, r := range logs {
-		if r.Address != l2SystemConfigAddress {
-			continue
-		}
-		switch r.Topics[0] {
-		case rcfg.BaseFeeOverheadUpdatedTopic:
-			old := r.Topics[1].Big()
-			new := r.Topics[2].Big()
-			misc.UpdateL2BaseFeeOverhead(new)
-			log.Info("Updated L2 base fee overhead", "blockNumber", block.NumberU64(), "blockHash", block.Hash().Hex(), "old", old, "new", new)
-		case rcfg.BaseFeeScalarUpdatedTopic:
-			old := r.Topics[1].Big()
-			new := r.Topics[2].Big()
-			misc.UpdateL2BaseFeeScalar(new)
-			log.Info("Updated L2 base fee scalar", "blockNumber", block.NumberU64(), "blockHash", block.Hash().Hex(), "old", old, "new", new)
-		}
-	}
-
-	l2BaseFeeUpdateTimer.Update(time.Since(start))
-
 	// Note the latest relayed L1 message queue index (if any)
 	updateHeadL1msgGauge(block)
+
+	// Execute L2 base fee coefficient updates (if any)
+	updateL2BaseFeeCoefficients(bc.Config().Scroll.L2SystemConfigAddress(), logs)
 
 	parent := bc.GetHeaderByHash(block.ParentHash())
 	// block.Time is guaranteed to be larger than parent.Time,

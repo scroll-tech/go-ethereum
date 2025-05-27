@@ -33,7 +33,7 @@ var (
 )
 
 func NewBeaconNodeClient(apiEndpoint string) (*BeaconNodeClient, error) {
-	client := &http.Client{Timeout: BlobScanDefaultTimeout}
+	client := &http.Client{Timeout: BeaconNodeDefaultTimeout}
 
 	// get genesis time
 	genesisPath, err := url.JoinPath(apiEndpoint, beaconNodeGenesisEndpoint)

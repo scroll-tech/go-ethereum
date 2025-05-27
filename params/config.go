@@ -351,7 +351,7 @@ var (
 				L1MessageQueueV2DeploymentBlock: 7773746,
 				NumL1MessagesPerBlock:           10,
 				ScrollChainAddress:              common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
-				L2SystemConfigAddress:           common.Address{}, // TODO
+				L2SystemConfigAddress:           common.HexToAddress("0xF444cF06A3E3724e20B35c2989d3942ea8b59124"),
 			},
 			GenesisStateRoot: &ScrollSepoliaGenesisState,
 		},
@@ -402,7 +402,7 @@ var (
 				L1MessageQueueV2DeploymentBlock: 22088276,
 				NumL1MessagesPerBlock:           10,
 				ScrollChainAddress:              common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
-				L2SystemConfigAddress:           common.Address{}, // TODO
+				L2SystemConfigAddress:           common.HexToAddress("0x331A873a2a85219863d80d248F9e2978fE88D0Ea"),
 			},
 			GenesisStateRoot: &ScrollMainnetGenesisState,
 		},

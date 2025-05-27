@@ -229,6 +229,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
+	eth.txPool.SetGasPrice(misc.MinBaseFee())
 
 	// Initialize and start DA syncing pipeline before SyncService as SyncService is blocking until all L1 messages are loaded.
 	// We need SyncService to load the L1 messages for DA syncing, but since both sync from last known L1 state, we can

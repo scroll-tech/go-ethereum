@@ -79,6 +79,7 @@ var (
 	// |-----------------+-------------+------+--------+-------+------------------------------------------|
 	// | baseFeeScalar   | uint256     | 102  | 0      | 32    | src/L2/L2SystemConfig.sol:L2SystemConfig |
 	// ╰-----------------+-------------+------+--------+-------+------------------------------------------╯
+
 	L2BaseFeeOverheadSlot = common.BigToHash(big.NewInt(101))
 	L2BaseFeeScalarSlot   = common.BigToHash(big.NewInt(102))
 )

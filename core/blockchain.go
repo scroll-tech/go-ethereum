@@ -1333,7 +1333,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if queueIndex == nil {
 		// We expect that we only insert contiguous chain segments,
 		// so the parent will always be inserted first.
-		log.Crit("Queue index in DB is nil", "parent", block.ParentHash(), "hash", block.Hash())
+		log.Crit("Queue index in DB is nil", "parent", block.ParentHash().Hex(), "hash", block.Hash().Hex())
 	}
 	numProcessed := uint64(block.NumL1MessagesProcessed(*queueIndex))
 	// do not overwrite the index written by the miner worker

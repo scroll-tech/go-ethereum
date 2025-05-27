@@ -447,7 +447,7 @@ func (pool *TxPool) loop() {
 
 			newMinBaseFee := misc.MinBaseFee()
 			if minBaseFee.Cmp(newMinBaseFee) != 0 {
-				log.Trace("Updating min base fee", "old", minBaseFee, "new", newMinBaseFee)
+				log.Debug("Updating min base fee in txpool", "old", minBaseFee, "new", newMinBaseFee)
 				minBaseFee = newMinBaseFee
 				pool.SetGasPrice(minBaseFee)
 			}

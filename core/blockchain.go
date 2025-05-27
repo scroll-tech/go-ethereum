@@ -185,7 +185,7 @@ func updateL2BaseFeeCoefficients(l2SystemConfigAddress common.Address, logs []*t
 				break // break from switch, continue loop
 			}
 			misc.UpdateL2BaseFeeOverhead(event.NewBaseFeeOverhead)
-			log.Info("Updated L2 base fee overhead", "blockNumber", l.BlockNumber, "blockHash", l.BlockHash, "old", event.OldBaseFeeOverhead, "new", event.NewBaseFeeOverhead)
+			log.Info("Updated L2 base fee overhead", "blockNumber", l.BlockNumber, "blockHash", l.BlockHash.Hex(), "old", event.OldBaseFeeOverhead, "new", event.NewBaseFeeOverhead)
 		case l2_system_config.BaseFeeScalarUpdatedTopic:
 			event, err := l2_system_config.UnpackBaseFeeScalarUpdatedEvent(*l)
 			if err != nil {
@@ -193,7 +193,7 @@ func updateL2BaseFeeCoefficients(l2SystemConfigAddress common.Address, logs []*t
 				break // break from switch, continue loop
 			}
 			misc.UpdateL2BaseFeeScalar(event.NewBaseFeeScalar)
-			log.Info("Updated L2 base fee scalar", "blockNumber", l.BlockNumber, "blockHash", l.BlockHash, "old", event.OldBaseFeeScalar, "new", event.NewBaseFeeScalar)
+			log.Info("Updated L2 base fee scalar", "blockNumber", l.BlockNumber, "blockHash", l.BlockHash.Hex(), "old", event.OldBaseFeeScalar, "new", event.NewBaseFeeScalar)
 		}
 	}
 }

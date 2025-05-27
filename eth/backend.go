@@ -556,10 +556,11 @@ func (s *Ethereum) StartMining(threads int) error {
 	// If the miner was not running, initialize it
 	if !s.IsMining() {
 		// Propagate the initial price point to the transaction pool
-		s.lock.RLock()
-		price := s.gasPrice
-		s.lock.RUnlock()
-		s.txPool.SetGasPrice(price)
+		// Disabled, we now update min gas price automatically via L2 base fee.
+		// s.lock.RLock()
+		// price := s.gasPrice
+		// s.lock.RUnlock()
+		// s.txPool.SetGasPrice(price)
 
 		// Configure the local mining address
 		eb, err := s.Etherbase()

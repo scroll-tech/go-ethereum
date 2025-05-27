@@ -170,8 +170,7 @@ func updateHeadL1msgGauge(block *types.Block) {
 // In the future, if the base fee setting becomes part of block validation,
 // reading from state will be more appropriate.
 func updateL2BaseFeeCoefficients(l2SystemConfigAddress common.Address, logs []*types.Log) {
-	start := time.Now()
-	defer func() { l2BaseFeeUpdateTimer.Update(time.Since(start)) }()
+	defer func(start time.Time) { l2BaseFeeUpdateTimer.Update(time.Since(start)) }(time.Now())
 
 	for _, l := range logs {
 		if l.Address != l2SystemConfigAddress {

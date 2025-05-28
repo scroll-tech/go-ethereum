@@ -57,7 +57,7 @@ var (
 func ReadL2BaseFeeCoefficients() (scalar *big.Int, overhead *big.Int) {
 	lock.RLock()
 	defer lock.RUnlock()
-	return baseFeeScalar, baseFeeOverhead
+	return new(big.Int).Set(baseFeeScalar), new(big.Int).Set(baseFeeOverhead)
 }
 
 func UpdateL2BaseFeeOverhead(newOverhead *big.Int) {

@@ -61,7 +61,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
-	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -215,7 +214,11 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
 	}
 
-	initializeL2BaseFeeCoefficients(chainConfig, eth.blockchain)
+	state, err := eth.blockchain.State()
+	if err != nil {
+		return nil, err
+	}
+	misc.InitializeL2BaseFeeCoefficients(chainConfig, state)
 
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
@@ -349,37 +352,6 @@ func makeExtraData(extra []byte) []byte {
 		extra = nil
 	}
 	return extra
-}
-
-func initializeL2BaseFeeCoefficients(chainConfig *params.ChainConfig, blockchain *core.BlockChain) error {
-	state, err := blockchain.State()
-	if err != nil {
-		return err
-	}
-
-	l2BaseFeeOverhead := common.Big0
-	l2BaseFeeScalar := common.Big0
-
-	if l2SystemConfig := chainConfig.Scroll.L2SystemConfigAddress(); l2SystemConfig != (common.Address{}) {
-		l2BaseFeeOverhead = state.GetState(l2SystemConfig, rcfg.L2BaseFeeOverheadSlot).Big()
-		l2BaseFeeScalar = state.GetState(l2SystemConfig, rcfg.L2BaseFeeScalarSlot).Big()
-	} else {
-		log.Warn("L2SystemConfig address is not configured")
-	}
-
-	// fallback to default if contract is not deployed or configured yet
-	if l2BaseFeeOverhead.Cmp(common.Big0) == 0 {
-		l2BaseFeeOverhead = big.NewInt(15680000)
-	}
-	if l2BaseFeeScalar.Cmp(common.Big0) == 0 {
-		l2BaseFeeScalar = big.NewInt(34000000000000)
-	}
-
-	// update local view of coefficients
-	misc.UpdateL2BaseFeeOverhead(l2BaseFeeOverhead)
-	misc.UpdateL2BaseFeeScalar(l2BaseFeeScalar)
-	log.Info("Initialized L2 base fee coefficients", "overhead", l2BaseFeeOverhead, "scalar", l2BaseFeeScalar)
-	return nil
 }
 
 // APIs return the collection of RPC services the ethereum package offers.

@@ -21,20 +21,29 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
-// Protocol-enforced maximum L2 base fee.
-// We would only go above this if L1 base fee hits 2931 Gwei.
-const MaximumL2BaseFee = 10000000000
+const (
+	// Protocol-enforced maximum L2 base fee.
+	// We would only go above this if L1 base fee hits 2931 Gwei.
+	MaximumL2BaseFee = 10000000000
+
+	// L2 base fee fallback values, in case the L2 system contract
+	// is not deployed on not configured yet.
+	DefaultBaseFeeOverhead = 15680000
+	DefaultBaseFeeScalar   = 34000000000000
+)
 
 // L2 base fee formula constants and defaults.
 // l2BaseFee = (l1BaseFee * scalar) / PRECISION + overhead.
 // `scalar` accounts for finalization costs. `overhead` accounts for sequencing and proving costs.
-// we use 1e18 for precision to match the contract implementation.
 var (
+	// We use 1e18 for precision to match the contract implementation.
 	BaseFeePrecision = new(big.Int).SetUint64(1e18)
 
 	// scalar and overhead are updated automatically in `Blockchain.writeBlockWithState`.
@@ -114,4 +123,36 @@ func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {
 	}
 
 	return baseFee
+}
+
+type State interface {
+	GetState(addr common.Address, hash common.Hash) common.Hash
+}
+
+func InitializeL2BaseFeeCoefficients(chainConfig *params.ChainConfig, state State) error {
+	overhead := common.Big0
+	scalar := common.Big0
+
+	if l2SystemConfig := chainConfig.Scroll.L2SystemConfigAddress(); l2SystemConfig != (common.Address{}) {
+		overhead = state.GetState(l2SystemConfig, rcfg.L2BaseFeeOverheadSlot).Big()
+		scalar = state.GetState(l2SystemConfig, rcfg.L2BaseFeeScalarSlot).Big()
+	} else {
+		log.Warn("L2SystemConfig address is not configured")
+	}
+
+	// fallback to default if contract is not deployed or configured yet
+	if overhead.Cmp(common.Big0) == 0 {
+		overhead = big.NewInt(DefaultBaseFeeOverhead)
+	}
+	if scalar.Cmp(common.Big0) == 0 {
+		scalar = big.NewInt(DefaultBaseFeeScalar)
+	}
+
+	// update local view of coefficients
+	lock.Lock()
+	defer lock.Unlock()
+	baseFeeOverhead.Set(overhead)
+	baseFeeScalar.Set(scalar)
+	log.Info("Initialized L2 base fee coefficients", "overhead", overhead, "scalar", scalar)
+	return nil
 }

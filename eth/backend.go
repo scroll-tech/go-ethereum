@@ -362,6 +362,9 @@ func (s *Ethereum) APIs() []rpc.API {
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, s.engine.APIs(s.BlockChain())...)
 
+	// Append L2 base fee APIs.
+	apis = append(apis, misc.APIs()...)
+
 	if !s.config.EnableDASyncing {
 		apis = append(apis, rpc.API{
 			Namespace: "eth",

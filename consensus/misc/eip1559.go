@@ -26,6 +26,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
+	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 const (
@@ -52,6 +53,12 @@ var (
 
 	lock sync.RWMutex
 )
+
+func ReadL2BaseFeeCoefficients() (scalar *big.Int, overhead *big.Int) {
+	lock.RLock()
+	defer lock.RUnlock()
+	return baseFeeScalar, baseFeeOverhead
+}
 
 func UpdateL2BaseFeeOverhead(newOverhead *big.Int) {
 	if newOverhead == nil {
@@ -100,16 +107,14 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
-	lock.RLock()
-	defer lock.RUnlock()
-	return calcBaseFee(baseFeeScalar, baseFeeOverhead, parentL1BaseFee)
+	scalar, overhead := ReadL2BaseFeeCoefficients()
+	return calcBaseFee(scalar, overhead, parentL1BaseFee)
 }
 
 // MinBaseFee calculates the minimum L2 base fee based on the current coefficients.
 func MinBaseFee() *big.Int {
-	lock.RLock()
-	defer lock.RUnlock()
-	return calcBaseFee(baseFeeScalar, baseFeeOverhead, big.NewInt(0))
+	scalar, overhead := ReadL2BaseFeeCoefficients()
+	return calcBaseFee(scalar, overhead, big.NewInt(0))
 }
 
 func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {
@@ -155,4 +160,29 @@ func InitializeL2BaseFeeCoefficients(chainConfig *params.ChainConfig, state Stat
 	baseFeeScalar.Set(scalar)
 	log.Info("Initialized L2 base fee coefficients", "overhead", overhead, "scalar", scalar)
 	return nil
+}
+
+type API struct{}
+
+type L2BaseFeeConfig struct {
+	Scalar   *big.Int `json:"scalar,omitempty"`
+	Overhead *big.Int `json:"overhead,omitempty"`
+}
+
+func (api *API) GetL2BaseFeeConfig() *L2BaseFeeConfig {
+	scalar, overhead := ReadL2BaseFeeCoefficients()
+
+	return &L2BaseFeeConfig{
+		Scalar:   scalar,
+		Overhead: overhead,
+	}
+}
+
+func APIs() []rpc.API {
+	return []rpc.API{{
+		Namespace: "scroll",
+		Version:   "1.0",
+		Service:   &API{},
+		Public:    false,
+	}}
 }

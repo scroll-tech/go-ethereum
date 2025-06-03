@@ -16,7 +16,11 @@
 
 package params
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/scroll-tech/go-ethereum/common"
+)
 
 const (
 	GasLimitBoundDivisor uint64 = 1024    // The bound divisor of the gas limit, used in update calculations.
@@ -168,6 +172,8 @@ const (
 	BlobTxBlobGaspriceUpdateFraction = 3338477 // Controls the maximum rate of change for blob gas price
 
 	BlobTxTargetBlobGasPerBlock = 3 * BlobTxBlobGasPerBlob // Target consumable blob gas for data blobs per block (for 1559-like pricing)
+
+	HistoryServeWindow = 8192 // Number of blocks to serve historical block hashes for, EIP-2935.
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations
@@ -178,4 +184,11 @@ var (
 	GenesisDifficulty      = big.NewInt(131072) // Difficulty of the Genesis block.
 	MinimumDifficulty      = big.NewInt(131072) // The minimum that the difficulty may ever be.
 	DurationLimit          = big.NewInt(13)     // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
+
+	// SystemAddress is where the system-transaction is sent from as per EIP-4788
+	SystemAddress = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
+	// HistoryStorageAddress is where the historical block hashes are stored.
+	HistoryStorageAddress = common.HexToAddress("0x0aae40965e6800cd9b1f4b05ff21581047e3f91e")
+	// HistoryStorageCode is the code with getters for historical block hashes.
+	HistoryStorageCode = common.FromHex("3373fffffffffffffffffffffffffffffffffffffffe1460575767ffffffffffffffff5f3511605357600143035f3511604b575f35612000014311604b57611fff5f3516545f5260205ff35b5f5f5260205ff35b5f5ffd5b5f35611fff60014303165500")
 )

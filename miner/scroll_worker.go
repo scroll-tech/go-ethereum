@@ -636,6 +636,13 @@ func (w *worker) handleForks() (bool, error) {
 		parent := w.chain.GetBlockByHash(w.current.header.ParentHash)
 		return parent != nil && !w.chainConfig.IsEuclid(parent.Time()), nil
 	}
+
+	if w.chainConfig.IsFeynman(w.current.header.Time) {
+		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)
+		vmenv := vm.NewEVM(context, vm.TxContext{}, w.current.state, w.chainConfig, vm.Config{})
+		core.ProcessParentBlockHash(w.current.header.ParentHash, vmenv, w.current.state)
+	}
+
 	return false, nil
 }
 

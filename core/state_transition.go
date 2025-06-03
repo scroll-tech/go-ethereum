@@ -401,6 +401,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, err
 	}
 	if st.gas < gas {
+		// Note: The L1 message queue contract ensures that this cannot happen for L1 messages.
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
 	}
 	// Gas limit suffices for the floor data cost (EIP-7623)
@@ -410,7 +411,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			return nil, err
 		}
 		if st.gas < floorDataGas {
-			// TODO: consider L1 messages
+			// Note: The L1 message queue contract ensures that this cannot happen for L1 messages.
 			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, st.gas, floorDataGas)
 		}
 	}

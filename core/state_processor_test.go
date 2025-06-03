@@ -67,6 +67,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			DarwinV2Time:        new(uint64),
 			EuclidTime:          new(uint64),
 			EuclidV2Time:        new(uint64),
+			FeynmanTime:         new(uint64),
 			Ethash:              new(params.EthashConfig),
 		}
 		signer  = types.LatestSigner(config)
@@ -390,9 +391,9 @@ func TestStateProcessorErrors(t *testing.T) {
 		}{
 			{ // ErrMaxInitCodeSizeExceeded
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 500000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), tooBigInitCode[:]),
+					mkDynamicCreationTx(0, 520000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), tooBigInitCode[:]),
 				},
-				want: "could not apply tx 0 [0x7b33776d375660694a23ef992c090265682f3687607e0099b14503fdb65d73e3]: max initcode size exceeded: code size 49153 limit 49152",
+				want: "could not apply tx 0 [0xe0d03426cecc04467410064cb4de02012fc069d2462282735d7dfcb9dea9f63b]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{

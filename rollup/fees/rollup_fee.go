@@ -166,7 +166,7 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	gpoState.overhead = state.GetState(addr, rcfg.OverheadSlot).Big()
 	gpoState.scalar = state.GetState(addr, rcfg.ScalarSlot).Big()
 	gpoState.l1BlobBaseFee = state.GetState(addr, rcfg.L1BlobBaseFeeSlot).Big()
-	gpoState.execScalar = state.GetState(addr, rcfg.CommitScalarSlot).Big()
+	gpoState.execScalar = state.GetState(addr, rcfg.ExecScalarSlot).Big()
 	gpoState.blobScalar = state.GetState(addr, rcfg.BlobScalarSlot).Big()
 	return gpoState
 }

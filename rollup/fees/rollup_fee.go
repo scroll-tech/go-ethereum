@@ -51,7 +51,7 @@ type gpoState struct {
 	overhead      *big.Int
 	scalar        *big.Int
 	l1BlobBaseFee *big.Int
-	commitScalar  *big.Int
+	execScalar    *big.Int
 	blobScalar    *big.Int
 }
 
@@ -78,8 +78,10 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 
 	if !config.IsCurie(blockNumber) {
 		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
+	} else if !config.IsFeynman(blockNumber) {
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	}
 
 	return l1DataFee, nil
@@ -164,7 +166,7 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	gpoState.overhead = state.GetState(addr, rcfg.OverheadSlot).Big()
 	gpoState.scalar = state.GetState(addr, rcfg.ScalarSlot).Big()
 	gpoState.l1BlobBaseFee = state.GetState(addr, rcfg.L1BlobBaseFeeSlot).Big()
-	gpoState.commitScalar = state.GetState(addr, rcfg.CommitScalarSlot).Big()
+	gpoState.execScalar = state.GetState(addr, rcfg.CommitScalarSlot).Big()
 	gpoState.blobScalar = state.GetState(addr, rcfg.BlobScalarSlot).Big()
 	return gpoState
 }
@@ -191,6 +193,36 @@ func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseF
 	l1DataFee = new(big.Int).Quo(l1DataFee, rcfg.Precision)
 
 	return l1DataFee
+}
+
+// calculateEncodedL1DataFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
+func calculateEncodedL1DataFeeFeynman(
+	data []byte,
+	l1BaseFee *big.Int,
+	l1BlobBaseFee *big.Int,
+	execScalar *big.Int,
+	blobScalar *big.Int,
+) *big.Int {
+	// tx size (RLP-encoded)
+	txSize := big.NewInt(int64(len(data)))
+
+	// compression_ratio(tx) = 1 (placeholder)
+	compressionRatio := big.NewInt(1)
+
+	// compute gas components
+	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
+	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
+
+	// fee per byte = execGas + blobGas
+	feePerByte := new(big.Int).Add(execGas, blobGas)
+
+	// fee = compression_ratio * tx_size * (execGas + blobGas)
+	rollupFee := new(big.Int).Mul(compressionRatio, txSize)
+	rollupFee.Mul(rollupFee, feePerByte)
+
+	rollupFee = new(big.Int).Quo(rollupFee, rcfg.Precision)
+
+	return rollupFee
 }
 
 // calculateL1GasUsed computes the L1 gas used based on the calldata and
@@ -242,8 +274,10 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 
 	if !config.IsCurie(blockNumber) {
 		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
+	} else if !config.IsFeynman(blockNumber) {
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	}
 
 	// ensure l1DataFee fits into uint64 for circuit compatibility

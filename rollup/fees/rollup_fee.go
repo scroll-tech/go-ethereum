@@ -2,6 +2,8 @@ package fees
 
 import (
 	"bytes"
+	"github.com/scroll-tech/da-codec/encoding/zstd"
+	"github.com/scroll-tech/go-ethereum/log"
 	"math"
 	"math/big"
 
@@ -203,11 +205,22 @@ func calculateEncodedRollupFeeFeeFeynman(
 	execScalar *big.Int,
 	blobScalar *big.Int,
 ) *big.Int {
-	// tx size (RLP-encoded)
 	txSize := big.NewInt(int64(len(data)))
 
-	// compression_ratio(tx) = 1 (placeholder, scaled to match scalars precision)
-	compressionRatio := big.NewInt(rcfg.Precision.Int64())
+	// Default compression ratio is 1.0 (no compression)
+	compressionRatioInt := big.NewInt(rcfg.Precision.Int64())
+
+	if len(data) != 0 {
+		compressedBytes, err := zstd.CompressScrollBatchBytes(data)
+		if err != nil {
+			log.Error("Compress batch compress failed, using 1.0", "err", err)
+		} else {
+			compressedSize := big.NewInt(int64(len(compressedBytes)))
+			// compressionRatioInt = (compressedSize * precision) / txSize
+			compressionRatioInt.Mul(compressedSize, rcfg.Precision)
+			compressionRatioInt.Div(compressionRatioInt, txSize)
+		}
+	}
 
 	// compute gas components
 	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
@@ -217,7 +230,7 @@ func calculateEncodedRollupFeeFeeFeynman(
 	feePerByte := new(big.Int).Add(execGas, blobGas)
 
 	// rollupFee = compression_ratio * tx_size * feePerByte
-	rollupFee := new(big.Int).Mul(compressionRatio, txSize)
+	rollupFee := new(big.Int).Mul(compressionRatioInt, txSize)
 	rollupFee.Mul(rollupFee, feePerByte)
 
 	// Divide by rcfg.Precision (once for ratio, once for scalar)

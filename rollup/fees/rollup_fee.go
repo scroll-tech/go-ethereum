@@ -74,17 +74,17 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 
 	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
-	var l1DataFee *big.Int
+	var rollupFee *big.Int
 
 	if !config.IsCurie(blockNumber) {
-		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
+		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
 	} else if !config.IsFeynman(blockNumber) {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		rollupFee = calculateEncodedRollupFeeFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	}
 
-	return l1DataFee, nil
+	return rollupFee, nil
 }
 
 // asUnsignedTx turns a Message into a types.Transaction
@@ -195,8 +195,8 @@ func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseF
 	return l1DataFee
 }
 
-// calculateEncodedL1DataFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
-func calculateEncodedL1DataFeeFeynman(
+// calculateEncodedRollupFeeFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
+func calculateEncodedRollupFeeFeeFeynman(
 	data []byte,
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
@@ -270,23 +270,23 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 
 	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
-	var l1DataFee *big.Int
+	var rollupFee *big.Int
 
 	if !config.IsCurie(blockNumber) {
-		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
+		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
 	} else if !config.IsFeynman(blockNumber) {
-		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		rollupFee = calculateEncodedRollupFeeFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
 	}
 
-	// ensure l1DataFee fits into uint64 for circuit compatibility
+	// ensure rollupFee fits into uint64 for circuit compatibility
 	// (note: in practice this value should never be this big)
-	if !l1DataFee.IsUint64() {
-		l1DataFee.SetUint64(math.MaxUint64)
+	if !rollupFee.IsUint64() {
+		rollupFee.SetUint64(math.MaxUint64)
 	}
 
-	return l1DataFee, nil
+	return rollupFee, nil
 }
 
 func GetL1BaseFee(state StateDB) *big.Int {

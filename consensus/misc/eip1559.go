@@ -92,11 +92,13 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 	if header.BaseFee == nil {
 		return fmt.Errorf("header is missing baseFee")
 	}
-	// note: we do not verify L2 base fee, the sequencer has the
-	// right to set any base fee below the maximum. L2 base fee
-	// is not subject to L2 consensus or zk verification.
-	if header.BaseFee.Cmp(big.NewInt(MaximumL2BaseFee)) > 0 {
-		return fmt.Errorf("invalid baseFee: have %s, maximum %d", header.BaseFee, MaximumL2BaseFee)
+	scalar, overhead := ReadL2BaseFeeCoefficients()
+
+	expectedEIP1559 := calcBaseFeeEIP1559(config, parent, scalar, overhead)
+	expectedHeaderBaseFee := calcBaseFee(scalar, overhead, expectedEIP1559)
+
+	if header.BaseFee.Cmp(expectedHeaderBaseFee) != 0 {
+		return fmt.Errorf("invalid baseFee: got %s, want %s", header.BaseFee, expectedHeaderBaseFee)
 	}
 	return nil
 }
@@ -176,8 +178,8 @@ func MinBaseFee() *big.Int {
 	return calcBaseFee(scalar, overhead, big.NewInt(0))
 }
 
-func calcBaseFee(scalar, overhead, parentL1BaseFee *big.Int) *big.Int {
-	baseFee := new(big.Int).Set(parentL1BaseFee)
+func calcBaseFee(scalar, overhead, l2BaseFee *big.Int) *big.Int {
+	baseFee := new(big.Int).Set(l2BaseFee)
 	baseFee.Mul(baseFee, scalar)
 	baseFee.Div(baseFee, BaseFeePrecision)
 	baseFee.Add(baseFee, overhead)

@@ -108,7 +108,66 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 	}
 
 	scalar, overhead := ReadL2BaseFeeCoefficients()
-	return calcBaseFee(scalar, overhead, parentL1BaseFee)
+	if !config.IsFeynman(big.NewInt(0).Add(parent.Number, common.Big1)) {
+		return calcBaseFee(scalar, overhead, parentL1BaseFee)
+	}
+	baseFeeEIP1559 := calcBaseFeeEIP1559(config, parent, scalar, overhead)
+	return calcBaseFee(scalar, overhead, baseFeeEIP1559)
+}
+
+// CalcBaseFee calculates the basefee of the header.
+func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header, scalar *big.Int, overhead *big.Int) *big.Int {
+	// If the current block is the first EIP-1559 block, return the InitialBaseFee.
+	if !config.IsFeynman(parent.Number) {
+		return new(big.Int).SetUint64(params.InitialBaseFee)
+	}
+
+	parentBaseFeeEIP1559 := extractBaseFeeEIP1559(parent.BaseFee, scalar, overhead)
+	parentGasTarget := parent.GasLimit / config.ElasticityMultiplier()
+	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
+	if parent.GasUsed == parentGasTarget {
+		return new(big.Int).Set(parentBaseFeeEIP1559)
+	}
+
+	var (
+		num   = new(big.Int)
+		denom = new(big.Int)
+	)
+
+	if parent.GasUsed > parentGasTarget {
+		// If the parent block used more gas than its target, the baseFee should increase.
+		// max(1, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
+		num.SetUint64(parent.GasUsed - parentGasTarget)
+		num.Mul(num, parentBaseFeeEIP1559)
+		num.Div(num, denom.SetUint64(parentGasTarget))
+		num.Div(num, denom.SetUint64(config.BaseFeeChangeDenominator()))
+		if num.Cmp(common.Big1) < 0 {
+			return num.Add(parentBaseFeeEIP1559, common.Big1)
+		}
+		return num.Add(parentBaseFeeEIP1559, num)
+	} else {
+		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
+		// max(0, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
+		num.SetUint64(parentGasTarget - parent.GasUsed)
+		num.Mul(num, parentBaseFeeEIP1559)
+		num.Div(num, denom.SetUint64(parentGasTarget))
+		num.Div(num, denom.SetUint64(config.BaseFeeChangeDenominator()))
+
+		baseFee := num.Sub(parentBaseFeeEIP1559, num)
+		if baseFee.Cmp(common.Big0) < 0 {
+			baseFee = common.Big0
+		}
+		return baseFee
+	}
+}
+
+func extractBaseFeeEIP1559(baseFee *big.Int, scalar *big.Int, overhead *big.Int) *big.Int {
+	baseFeeEIP := new(big.Int).Set(baseFee)
+	baseFeeEIP.Sub(baseFeeEIP, overhead)
+	baseFeeEIP.Mul(baseFeeEIP, BaseFeePrecision)
+	baseFeeEIP.Div(baseFeeEIP, scalar)
+
+	return baseFeeEIP
 }
 
 // MinBaseFee calculates the minimum L2 base fee based on the current coefficients.

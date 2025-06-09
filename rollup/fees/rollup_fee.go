@@ -206,8 +206,8 @@ func calculateEncodedRollupFeeFeeFeynman(
 	// tx size (RLP-encoded)
 	txSize := big.NewInt(int64(len(data)))
 
-	// compression_ratio(tx) = 1 (placeholder)
-	compressionRatio := big.NewInt(1)
+	// compression_ratio(tx) = 1 (placeholder, scaled to match scalars precision)
+	compressionRatio := big.NewInt(rcfg.Precision.Int64())
 
 	// compute gas components
 	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
@@ -216,11 +216,13 @@ func calculateEncodedRollupFeeFeeFeynman(
 	// fee per byte = execGas + blobGas
 	feePerByte := new(big.Int).Add(execGas, blobGas)
 
-	// fee = compression_ratio * tx_size * (execGas + blobGas)
+	// rollupFee = compression_ratio * tx_size * feePerByte
 	rollupFee := new(big.Int).Mul(compressionRatio, txSize)
 	rollupFee.Mul(rollupFee, feePerByte)
 
-	rollupFee = new(big.Int).Quo(rollupFee, rcfg.Precision)
+	// Divide by rcfg.Precision (once for ratio, once for scalar)
+	rollupFee.Div(rollupFee, rcfg.Precision)
+	rollupFee.Div(rollupFee, rcfg.Precision)
 
 	return rollupFee
 }

@@ -485,7 +485,6 @@ func opBlockhashPostFeynman(pc *uint64, interpreter *EVMInterpreter, scope *Scop
 		lower = upper - 256
 	}
 	if num64 >= lower && num64 < upper {
-		// TODO: consider if we need to add block hash to state witness
 		res := interpreter.evm.Context.GetHash(num64)
 		num.SetBytes(res[:])
 	} else {

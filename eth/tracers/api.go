@@ -595,7 +595,6 @@ func (api *API) StandardTraceBadBlockToFile(ctx context.Context, hash common.Has
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requestd tracer.
 func (api *API) traceBlock(ctx context.Context, block *types.Block, config *TraceConfig) ([]*txTraceResult, error) {
-	// TODO: consider EIP-2935
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable")
 	}

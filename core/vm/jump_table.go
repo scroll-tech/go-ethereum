@@ -69,7 +69,7 @@ var (
 type JumpTable [256]*operation
 
 // newFeynmanInstructionSet returns the frontier, homestead, byzantium,
-// contantinople, istanbul, petersburg, berlin, london, shanghai, curie, darwin, EuclidV2,
+// contantinople, istanbul, petersburg, berlin, london, shanghai, curie, darwin, euclidV2,
 // and feynman instructions.
 func newFeynmanInstructionSet() JumpTable {
 	instructionSet := newEuclidV2InstructionSet()

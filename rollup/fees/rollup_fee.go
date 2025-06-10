@@ -213,7 +213,7 @@ func calculateEncodedL1DataFeeFeynman(
 	if len(data) != 0 {
 		compressedBytes, err := zstd.CompressScrollBatchBytes(data)
 		if err != nil {
-			log.Error("Compress batch compress failed, using 1.0", "err", err)
+			log.Error("Batch compression failed, using 1.0 compression ratio", "err", err)
 		} else {
 			compressedSize := big.NewInt(int64(len(compressedBytes)))
 			// compressionRatioInt = (compressedSize * precision) / txSize

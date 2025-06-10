@@ -208,18 +208,16 @@ func calculateEncodedL1DataFeeFeynman(
 	txSize := big.NewInt(int64(len(data)))
 
 	// Default compression ratio is 1.0 (no compression)
-	compressionRatioInt := big.NewInt(rcfg.Precision.Int64())
+	compressionRatio := big.NewInt(rcfg.Precision.Int64())
 
-	if len(data) != 0 {
-		compressedBytes, err := zstd.CompressScrollBatchBytes(data)
-		if err != nil {
-			log.Error("Batch compression failed, using 1.0 compression ratio", "err", err)
-		} else {
-			compressedSize := big.NewInt(int64(len(compressedBytes)))
-			// compressionRatioInt = (compressedSize * precision) / txSize
-			compressionRatioInt.Mul(compressedSize, rcfg.Precision)
-			compressionRatioInt.Div(compressionRatioInt, txSize)
-		}
+	compressedBytes, err := zstd.CompressScrollBatchBytes(data)
+	if err != nil {
+		log.Error("Batch compression failed, using 1.0 compression ratio", "err", err)
+	} else if len(compressedBytes) < len(data) {
+		compressedSize := big.NewInt(int64(len(compressedBytes)))
+		// compressionRatio = (compressedSize * precision) / txSize
+		compressionRatio.Mul(compressedSize, rcfg.Precision)
+		compressionRatio.Div(compressionRatio, txSize)
 	}
 
 	// compute gas components
@@ -230,7 +228,7 @@ func calculateEncodedL1DataFeeFeynman(
 	feePerByte := new(big.Int).Add(execGas, blobGas)
 
 	// l1DataFee = compression_ratio * tx_size * feePerByte
-	l1DataFee := new(big.Int).Mul(compressionRatioInt, txSize)
+	l1DataFee := new(big.Int).Mul(compressionRatio, txSize)
 	l1DataFee.Mul(l1DataFee, feePerByte)
 
 	// Divide by rcfg.Precision (once for ratio, once for scalar)

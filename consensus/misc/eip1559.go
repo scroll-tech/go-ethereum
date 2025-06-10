@@ -107,22 +107,30 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
-	scalar, overhead := ReadL2BaseFeeCoefficients()
 	if !config.IsFeynman(big.NewInt(0).Add(parent.Number, common.Big1)) {
+		scalar, overhead := ReadL2BaseFeeCoefficients()
 		return calcBaseFee(scalar, overhead, parentL1BaseFee)
 	}
-	baseFeeEIP1559 := calcBaseFeeEIP1559(config, parent, scalar, overhead)
-	return calcBaseFee(scalar, overhead, baseFeeEIP1559)
+	return calcBaseFeeFeynman(config, parent)
+}
+
+// calcBaseFeeFeynman calculates the basefee of the header for Feynman fork.
+func calcBaseFeeFeynman(config *params.ChainConfig, parent *types.Header) *big.Int {
+	baseFeeEIP1559 := calcBaseFeeEIP1559(config, parent)
+	baseFee := new(big.Int).Set(baseFeeEIP1559)
+	baseFee.Add(baseFee, config.ProvingBaseFee)
+
+	return baseFee
 }
 
 // CalcBaseFee calculates the basefee of the header.
-func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header, scalar *big.Int, overhead *big.Int) *big.Int {
+func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.Int {
 	// If the current block is the first EIP-1559 block, return the InitialBaseFee.
 	if !config.IsFeynman(parent.Number) {
 		return new(big.Int).SetUint64(params.InitialBaseFee)
 	}
 
-	parentBaseFeeEIP1559 := extractBaseFeeEIP1559(parent.BaseFee, scalar, overhead)
+	parentBaseFeeEIP1559 := extractBaseFeeEIP1559(config, parent.BaseFee)
 	parentGasTarget := parent.GasLimit / config.ElasticityMultiplier()
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
 	if parent.GasUsed == parentGasTarget {
@@ -161,13 +169,10 @@ func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header, scalar
 	}
 }
 
-func extractBaseFeeEIP1559(baseFee *big.Int, scalar *big.Int, overhead *big.Int) *big.Int {
+func extractBaseFeeEIP1559(config *params.ChainConfig, baseFee *big.Int) *big.Int {
 	baseFee := new(big.Int).Set(baseFee)
-	baseFeeEIP.Sub(baseFeeEIP, overhead)
-	baseFeeEIP.Mul(baseFeeEIP, BaseFeePrecision)
-	baseFeeEIP.Div(baseFeeEIP, scalar)
-
-	return baseFeeEIP
+	baseFee.Sub(baseFee, config.ProvingBaseFee)
+	return baseFee
 }
 
 // MinBaseFee calculates the minimum L2 base fee based on the current coefficients.

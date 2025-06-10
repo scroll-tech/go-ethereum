@@ -18,6 +18,6 @@ func ApplyCurieHardFork(statedb *state.StateDB) {
 	// initialize new storage slots
 	statedb.SetState(rcfg.L1GasPriceOracleAddress, rcfg.IsCurieSlot, common.BytesToHash([]byte{1}))
 	statedb.SetState(rcfg.L1GasPriceOracleAddress, rcfg.L1BlobBaseFeeSlot, common.BytesToHash([]byte{1}))
-	statedb.SetState(rcfg.L1GasPriceOracleAddress, rcfg.ExecScalarSlot, common.BigToHash(rcfg.InitialCommitScalar))
+	statedb.SetState(rcfg.L1GasPriceOracleAddress, rcfg.CommitScalarSlot, common.BigToHash(rcfg.InitialCommitScalar))
 	statedb.SetState(rcfg.L1GasPriceOracleAddress, rcfg.BlobScalarSlot, common.BigToHash(rcfg.InitialBlobScalar))
 }

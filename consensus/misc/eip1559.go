@@ -162,7 +162,7 @@ func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header, scalar
 }
 
 func extractBaseFeeEIP1559(baseFee *big.Int, scalar *big.Int, overhead *big.Int) *big.Int {
-	baseFeeEIP := new(big.Int).Set(baseFee)
+	baseFee := new(big.Int).Set(baseFee)
 	baseFeeEIP.Sub(baseFeeEIP, overhead)
 	baseFeeEIP.Mul(baseFeeEIP, BaseFeePrecision)
 	baseFeeEIP.Div(baseFeeEIP, scalar)

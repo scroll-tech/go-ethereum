@@ -207,8 +207,6 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // ProcessParentBlockHash stores the parent block hash in the history storage contract
 // as per EIP-2935.
 func ProcessParentBlockHash(prevHash common.Hash, vmenv *vm.EVM, statedb *state.StateDB) {
-	// TODO: consider tracers
-
 	msg := types.NewMessage(
 		params.SystemAddress,          // from
 		&params.HistoryStorageAddress, // to

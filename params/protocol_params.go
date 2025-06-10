@@ -171,9 +171,9 @@ const (
 
 	BlobTxBlobGasPerBlob             = 1 << 17 // Gas consumption of a single data blob (== blob byte size)
 	BlobTxMinBlobGasprice            = 1       // Minimum gas price for data blobs
-	BlobTxBlobGaspriceUpdateFraction = 3338477 // Controls the maximum rate of change for blob gas price
+	BlobTxBlobGaspriceUpdateFraction = 5007716 // Controls the maximum rate of change for blob gas price, using Prague parameters
 
-	BlobTxTargetBlobGasPerBlock = 3 * BlobTxBlobGasPerBlob // Target consumable blob gas for data blobs per block (for 1559-like pricing)
+	BlobTxTargetBlobGasPerBlock = 6 * BlobTxBlobGasPerBlob // Target consumable blob gas for data blobs per block (for 1559-like pricing), using Prague parameters
 
 	HistoryServeWindow = 8192 // Number of blocks to serve historical block hashes for, EIP-2935.
 )

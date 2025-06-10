@@ -3757,7 +3757,7 @@ func TestCurieTransition(t *testing.T) {
 		poseidonCodeHash := statedb.GetPoseidonCodeHash(rcfg.L1GasPriceOracleAddress)
 
 		l1BlobBaseFee := statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.L1BlobBaseFeeSlot)
-		commitScalar := statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.ExecScalarSlot)
+		commitScalar := statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.CommitScalarSlot)
 		blobScalar := statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.BlobScalarSlot)
 		isCurie := statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.IsCurieSlot)
 

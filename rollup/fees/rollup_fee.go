@@ -51,7 +51,7 @@ type gpoState struct {
 	overhead      *big.Int
 	scalar        *big.Int
 	l1BlobBaseFee *big.Int
-	execScalar    *big.Int
+	commitScalar  *big.Int
 	blobScalar    *big.Int
 }
 
@@ -79,9 +79,9 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 	if !config.IsCurie(blockNumber) {
 		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
 	} else if !config.IsFeynman(blockNumber) {
-		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
-		rollupFee = calculateEncodedRollupFeeFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		rollupFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	}
 
 	return rollupFee, nil
@@ -166,7 +166,7 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	gpoState.overhead = state.GetState(addr, rcfg.OverheadSlot).Big()
 	gpoState.scalar = state.GetState(addr, rcfg.ScalarSlot).Big()
 	gpoState.l1BlobBaseFee = state.GetState(addr, rcfg.L1BlobBaseFeeSlot).Big()
-	gpoState.execScalar = state.GetState(addr, rcfg.ExecScalarSlot).Big()
+	gpoState.commitScalar = state.GetState(addr, rcfg.CommitScalarSlot).Big()
 	gpoState.blobScalar = state.GetState(addr, rcfg.BlobScalarSlot).Big()
 	return gpoState
 }
@@ -195,8 +195,8 @@ func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseF
 	return l1DataFee
 }
 
-// calculateEncodedRollupFeeFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
-func calculateEncodedRollupFeeFeeFeynman(
+// calculateEncodedL1DataFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
+func calculateEncodedL1DataFeeFeynman(
 	data []byte,
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
@@ -216,15 +216,15 @@ func calculateEncodedRollupFeeFeeFeynman(
 	// fee per byte = execGas + blobGas
 	feePerByte := new(big.Int).Add(execGas, blobGas)
 
-	// rollupFee = compression_ratio * tx_size * feePerByte
-	rollupFee := new(big.Int).Mul(compressionRatio, txSize)
-	rollupFee.Mul(rollupFee, feePerByte)
+	// l1DataFee = compression_ratio * tx_size * feePerByte
+	l1DataFee := new(big.Int).Mul(compressionRatio, txSize)
+	l1DataFee.Mul(l1DataFee, feePerByte)
 
 	// Divide by rcfg.Precision (once for ratio, once for scalar)
-	rollupFee.Div(rollupFee, rcfg.Precision)
-	rollupFee.Div(rollupFee, rcfg.Precision)
+	l1DataFee.Div(l1DataFee, rcfg.Precision)
+	l1DataFee.Div(l1DataFee, rcfg.Precision)
 
-	return rollupFee
+	return l1DataFee
 }
 
 // calculateL1GasUsed computes the L1 gas used based on the calldata and
@@ -272,23 +272,23 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 
 	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
 
-	var rollupFee *big.Int
+	var l1DataFee *big.Int
 
 	if !config.IsCurie(blockNumber) {
-		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
+		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
 	} else if !config.IsFeynman(blockNumber) {
-		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
-		rollupFee = calculateEncodedRollupFeeFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.execScalar, gpoState.blobScalar)
+		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	}
 
-	// ensure rollupFee fits into uint64 for circuit compatibility
+	// ensure l1DataFee fits into uint64 for circuit compatibility
 	// (note: in practice this value should never be this big)
-	if !rollupFee.IsUint64() {
-		rollupFee.SetUint64(math.MaxUint64)
+	if !l1DataFee.IsUint64() {
+		l1DataFee.SetUint64(math.MaxUint64)
 	}
 
-	return rollupFee, nil
+	return l1DataFee, nil
 }
 
 func GetL1BaseFee(state StateDB) *big.Int {

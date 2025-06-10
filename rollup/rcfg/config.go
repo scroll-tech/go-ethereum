@@ -32,7 +32,7 @@ var (
 
 	// New fields added in the Curie hard fork
 	L1BlobBaseFeeSlot = common.BigToHash(big.NewInt(5))
-	ExecScalarSlot    = common.BigToHash(big.NewInt(6))
+	CommitScalarSlot  = common.BigToHash(big.NewInt(6))
 	BlobScalarSlot    = common.BigToHash(big.NewInt(7))
 	IsCurieSlot       = common.BigToHash(big.NewInt(8))
 

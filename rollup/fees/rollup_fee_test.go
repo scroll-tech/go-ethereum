@@ -42,7 +42,8 @@ func TestL1DataFeeFeynman(t *testing.T) {
 
 	// feePerByte = execScalar * l1BaseFee + blobScalar * l1BlobBaseFee = 10_000_000_000 + 20_000_000_000 = 30_000_000_000
 	// l1DataFee = precision * txSize * feePerByte / precision / precision
-	//           = 1_000_000 * 10 * 30_000_000_000 / 1_000_000 / 1_000_000 = 300_000_000_000_000_000 / 1_000_000 / 1_000_000_000 = 300
+	//           = 1_000_000_000 * 10 * 30_000_000_000 / 1_000_000_000 / 1_000_000 = 300_000_000_000_000_000 / 1_000_000_000 / 1_000_000_000 = 300
+	//TODO for now compression_ratio = precision, placeholder
 
 	expected := new(big.Int).SetInt64(300)
 

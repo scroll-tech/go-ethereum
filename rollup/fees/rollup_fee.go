@@ -62,7 +62,7 @@ type gpoState struct {
 	blobScalar    *big.Int
 }
 
-func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.ChainConfig, signer types.Signer, state StateDB, blockNumber *big.Int) (*big.Int, error) {
+func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.ChainConfig, signer types.Signer, state StateDB, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
 	if msg.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}
@@ -85,7 +85,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 
 	if !config.IsCurie(blockNumber) {
 		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
-	} else if !config.IsFeynman(blockNumber) {
+	} else if !config.IsFeynman(blockTime) {
 		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
 		rollupFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
@@ -267,7 +267,7 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
-func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int) (*big.Int, error) {
+func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
 	if tx.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}
@@ -283,7 +283,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 
 	if !config.IsCurie(blockNumber) {
 		l1DataFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
-	} else if !config.IsFeynman(blockNumber) {
+	} else if !config.IsFeynman(blockTime) {
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
 		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)

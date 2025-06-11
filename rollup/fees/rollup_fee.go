@@ -256,7 +256,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	// ensure l1DataFee fits into uint64 for circuit compatibility
 	// (note: in practice this value should never be this big)
 	if l1DataFee.Cmp(l1DataFeeCap) > 0 {
-		l1DataFee.Set(l1DataFeeCap)
+		l1DataFee = new(big.Int).Set(l1DataFeeCap)
 	}
 
 	return l1DataFee, nil

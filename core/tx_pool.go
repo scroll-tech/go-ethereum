@@ -844,7 +844,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		}
 		// Reject transactions that require the max data fee amount.
 		// This can only happen if the L1 gas oracle is updated incorrectly.
-		if l1DataFee.Cmp(fees.MaxL1DataFee) >= 0 {
+		if l1DataFee.Cmp(fees.MaxL1DataFee()) >= 0 {
 			return errors.New("invalid transaction: invalid L1 data fee")
 		}
 		// Transactor should have enough funds to cover the costs

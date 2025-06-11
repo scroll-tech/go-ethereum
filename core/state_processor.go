@@ -206,7 +206,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 // ProcessParentBlockHash stores the parent block hash in the history storage contract
 // as per EIP-2935.
-func ProcessParentBlockHash(prevHash common.Hash, vmenv *vm.EVM, statedb *state.StateDB) {
+func ProcessParentBlockHash(prevHash common.Hash, evm *vm.EVM, statedb *state.StateDB) {
 	msg := types.NewMessage(
 		params.SystemAddress,          // from
 		&params.HistoryStorageAddress, // to
@@ -222,8 +222,11 @@ func ProcessParentBlockHash(prevHash common.Hash, vmenv *vm.EVM, statedb *state.
 		nil,                           // setCodeAuthorizations
 	)
 
-	vmenv.Reset(NewEVMTxContext(msg), statedb)
+	evm.Reset(NewEVMTxContext(msg), statedb)
 	statedb.AddAddressToAccessList(params.HistoryStorageAddress)
-	_, _, _ = vmenv.Call(vm.AccountRef(msg.From()), *msg.To(), msg.Data(), 30_000_000, common.Big0, nil)
+	_, _, err := evm.Call(vm.AccountRef(msg.From()), *msg.To(), msg.Data(), 30_000_000, common.Big0, nil)
+	if err != nil {
+		panic(err)
+	}
 	statedb.Finalise(true)
 }

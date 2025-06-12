@@ -297,9 +297,11 @@ type TxPool struct {
 	eip1559  bool // Fork indicator whether we are using EIP-1559 type transactions.
 	shanghai bool // Fork indicator whether we are in the Shanghai stage.
 	eip7702  bool // Fork indicator whether we are using EIP-7702 type transactions.
+	feynman  bool // Fork indicator whether we are in the Feynman stage.
 
 	currentState  *state.StateDB // Current state in the blockchain head
 	currentHead   *big.Int       // Current blockchain head
+	currentTime   uint64         // Current blockchain head time
 	pendingNonces *txNoncer      // Pending state tracking virtual nonces
 	currentMaxGas uint64         // Current gas limit for transaction caps
 
@@ -837,9 +839,14 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.
 	if pool.chainconfig.Scroll.FeeVaultEnabled() {
 		// Get L1 data fee in current state
-		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead, pool.currentTime)
 		if err != nil {
 			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+		}
+		// Reject transactions that require the max data fee amount.
+		// This can only happen if the L1 gas oracle is updated incorrectly.
+		if l1DataFee.Cmp(fees.MaxL1DataFee()) >= 0 {
+			return errors.New("invalid transaction: invalid L1 data fee")
 		}
 		// Transactor should have enough funds to cover the costs
 		// cost == L1 data fee + V + GP * GL
@@ -854,6 +861,16 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	if tx.Gas() < intrGas {
 		return ErrIntrinsicGas
+	}
+	// Ensure the transaction can cover floor data gas.
+	if pool.feynman {
+		floorDataGas, err := FloorDataGas(tx.Data())
+		if err != nil {
+			return err
+		}
+		if tx.Gas() < floorDataGas {
+			return fmt.Errorf("%w: gas %v, minimum needed %v", ErrFloorDataGas, tx.Gas(), floorDataGas)
+		}
 	}
 	return nil
 }
@@ -931,7 +948,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	from, _ := types.Sender(pool.signer, tx) // already validated
 	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
 		// Nonce already pending, check if required price bump is met
-		inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+		inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead, pool.currentTime)
 		if !inserted {
 			log.Debug("Discarding underpriced pending transaction", "hash", hash.Hex(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
 			pendingDiscardMeter.Mark(1)
@@ -985,7 +1002,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 		pool.queue[from] = newTxList(false)
 	}
 
-	inserted, old := pool.queue[from].Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+	inserted, old := pool.queue[from].Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead, pool.currentTime)
 	if !inserted {
 		// An older transaction was better, discard this
 		log.Debug("Discarding underpriced queued transaction", "hash", hash.Hex(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
@@ -1052,7 +1069,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		return false
 	}
 
-	inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+	inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead, pool.currentTime)
 	if !inserted {
 		// An older transaction was better, discard this
 		log.Debug("Discarding underpriced pending transaction", "hash", hash.Hex(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
@@ -1583,9 +1600,11 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.eip1559 = pool.chainconfig.IsCurie(next)
 	pool.shanghai = pool.chainconfig.IsShanghai(next)
 	pool.eip7702 = pool.chainconfig.IsEuclidV2(newHead.Time)
+	pool.feynman = pool.chainconfig.IsFeynman(newHead.Time)
 
 	// Update current head
 	pool.currentHead = next
+	pool.currentTime = newHead.Time
 }
 
 // promoteExecutables moves transactions that have become processable from the
@@ -1673,7 +1692,7 @@ func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transa
 
 		if pool.chainconfig.Scroll.FeeVaultEnabled() {
 			// recheck L1 data fee, as the oracle price may have changed
-			l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+			l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead, pool.currentTime)
 			if err != nil {
 				log.Error("Failed to calculate L1 data fee", "err", err, "tx", tx)
 				return false

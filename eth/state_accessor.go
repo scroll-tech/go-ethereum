@@ -176,6 +176,12 @@ func (eth *Ethereum) stateAtTransaction(block *types.Block, txIndex int, reexec 
 	if err != nil {
 		return nil, vm.BlockContext{}, nil, err
 	}
+	// If feynman hardfork, insert parent block hash in the state as per EIP-2935.
+	if eth.blockchain.Config().IsFeynman(block.Time()) {
+		context := core.NewEVMBlockContext(block.Header(), eth.blockchain, eth.blockchain.Config(), nil)
+		vmenv := vm.NewEVM(context, vm.TxContext{}, statedb, eth.blockchain.Config(), vm.Config{})
+		core.ProcessParentBlockHash(block.ParentHash(), vmenv, statedb)
+	}
 	if txIndex == 0 && len(block.Transactions()) == 0 {
 		return nil, vm.BlockContext{}, statedb, nil
 	}
@@ -192,7 +198,7 @@ func (eth *Ethereum) stateAtTransaction(block *types.Block, txIndex int, reexec 
 		// Not yet the searched for transaction, execute on top of the current state
 		vmenv := vm.NewEVM(context, txContext, statedb, eth.blockchain.Config(), vm.Config{})
 		statedb.SetTxContext(tx.Hash(), idx)
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, eth.blockchain.Config(), block.Number())
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, eth.blockchain.Config(), block.Number(), block.Time())
 		if err != nil {
 			return nil, vm.BlockContext{}, nil, err
 		}

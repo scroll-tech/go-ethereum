@@ -2,10 +2,12 @@ package fees
 
 import (
 	"bytes"
-	"github.com/scroll-tech/da-codec/encoding/zstd"
-	"github.com/scroll-tech/go-ethereum/log"
 	"math"
 	"math/big"
+
+	"github.com/scroll-tech/da-codec/encoding/zstd"
+
+	"github.com/scroll-tech/go-ethereum/log"
 
 	"github.com/holiman/uint256"
 

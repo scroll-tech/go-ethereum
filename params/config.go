@@ -665,7 +665,7 @@ type ChainConfig struct {
 	DarwinV2Time        *uint64  `json:"darwinv2Time,omitempty"`        // DarwinV2 switch time (nil = no fork, 0 = already on darwinv2)
 	EuclidTime          *uint64  `json:"euclidTime,omitempty"`          // Euclid switch time (nil = no fork, 0 = already on euclid)
 	EuclidV2Time        *uint64  `json:"euclidv2Time,omitempty"`        // EuclidV2 switch time (nil = no fork, 0 = already on euclidv2)
-  FeynmanTime         *uint64  `json:"feynmanTime,omitempty"`         // Feynman switch time (nil = no fork, 0 = already on feynman)
+	FeynmanTime         *uint64  `json:"feynmanTime,omitempty"`         // Feynman switch time (nil = no fork, 0 = already on feynman)
 	ProvingBaseFee      *big.Int `json:"provingFee,omitempty"`          // Proving base fee to be added to EIP1559 l2 base fee to account for proving costs
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by

@@ -524,6 +524,7 @@ var (
 		EuclidTime:              new(uint64),
 		EuclidV2Time:            new(uint64),
 		FeynmanTime:             new(uint64),
+		ProvingBaseFee:          new(big.Int),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,

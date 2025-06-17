@@ -68,6 +68,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			EuclidTime:          new(uint64),
 			EuclidV2Time:        new(uint64),
 			FeynmanTime:         new(uint64),
+			ProvingBaseFee:      new(big.Int),
 			Ethash:              new(params.EthashConfig),
 		}
 		signer  = types.LatestSigner(config)

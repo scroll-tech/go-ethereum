@@ -107,8 +107,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
-	if parent == nil || parent.Number == nil ||
-		!config.IsFeynman(big.NewInt(0).Add(parent.Number, common.Big1)) {
+	if parent == nil || parent.Number == nil || !config.IsFeynman(parent.Time+1) {
 		scalar, overhead := ReadL2BaseFeeCoefficients()
 		return calcBaseFee(scalar, overhead, parentL1BaseFee)
 	}
@@ -127,7 +126,7 @@ func calcBaseFeeFeynman(config *params.ChainConfig, parent *types.Header) *big.I
 // CalcBaseFee calculates the basefee of the header.
 func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.Int {
 	// If the current block is the first EIP-1559 block, return the InitialBaseFee.
-	if !config.IsFeynman(parent.Number) {
+	if !config.IsFeynman(parent.Time) {
 		return new(big.Int).SetUint64(params.InitialBaseFee)
 	}
 

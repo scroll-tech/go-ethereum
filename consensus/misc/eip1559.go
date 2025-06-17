@@ -107,7 +107,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
-	if parent == nil || parent.Number == nil || !config.IsFeynman(parent.Time+1) {
+	if parent == nil || parent.Number == nil || !config.IsFeynman(parent.Time) {
 		scalar, overhead := ReadL2BaseFeeCoefficients()
 		return calcBaseFee(scalar, overhead, parentL1BaseFee)
 	}

@@ -360,7 +360,6 @@ var (
 	big3      = big.NewInt(3)
 	big4      = big.NewInt(4)
 	big7      = big.NewInt(7)
-	big8      = big.NewInt(8)
 	big16     = big.NewInt(16)
 	big20     = big.NewInt(20)
 	big32     = big.NewInt(32)

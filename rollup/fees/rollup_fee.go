@@ -5,15 +5,13 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/scroll-tech/da-codec/encoding/zstd"
-
-	"github.com/scroll-tech/go-ethereum/log"
-
 	"github.com/holiman/uint256"
+	"github.com/scroll-tech/da-codec/encoding/zstd"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )

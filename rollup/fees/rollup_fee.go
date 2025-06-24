@@ -213,9 +213,9 @@ func calculateEncodedL1DataFeeFeynman(
 	// Default compression ratio is 1.0 (no compression)
 	compressionRatio := big.NewInt(rcfg.Precision.Int64())
 
-	compressedBytes, err := zstd.CompressScrollBatchBytes(data)
+	compressedBytes, err := zstd.CompressScrollBatchBytesStandard(data)
 	if err != nil {
-		log.Error("Batch compression failed, using 1.0 compression ratio", "err", err)
+		log.Error("Batch compression failed, using 1.0 compression ratio", "error", err, "data size", len(data), "data", common.Bytes2Hex(data))
 	} else if len(compressedBytes) < len(data) {
 		compressedSize := big.NewInt(int64(len(compressedBytes)))
 		// compressionRatio = (compressedSize * precision) / txSize

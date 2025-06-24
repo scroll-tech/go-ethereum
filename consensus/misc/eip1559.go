@@ -102,12 +102,12 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 }
 
 // CalcBaseFee calculates the basefee of the header.
-func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseFee *big.Int) *big.Int {
+func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseFee *big.Int, currentHeaderTime uint64) *big.Int {
 	if config.Clique != nil && config.Clique.ShadowForkHeight != 0 && parent.Number.Uint64() >= config.Clique.ShadowForkHeight {
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
-	if parent == nil || parent.Number == nil || !config.IsFeynman(parent.Time) {
+	if parent == nil || parent.Number == nil || !config.IsFeynman(currentHeaderTime) {
 		scalar, overhead := ReadL2BaseFeeCoefficients()
 		return calcBaseFee(scalar, overhead, parentL1BaseFee)
 	}

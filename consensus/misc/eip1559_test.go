@@ -124,7 +124,7 @@ func TestCalcBaseFee(t *testing.T) {
 		config := config()
 		UpdateL2BaseFeeScalar(big.NewInt(10000000))
 		UpdateL2BaseFeeOverhead(big.NewInt(1))
-		if have, want := CalcBaseFee(config, nil, big.NewInt(test.parentL1BaseFee)), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
+		if have, want := CalcBaseFee(config, nil, big.NewInt(test.parentL1BaseFee), 0), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
 			t.Errorf("test %d: have %d  want %d, ", i, have, want)
 		}
 	}
@@ -144,7 +144,7 @@ func TestCalcBaseFee(t *testing.T) {
 	for i, test := range testsWithDefaults {
 		UpdateL2BaseFeeScalar(big.NewInt(34000000000000))
 		UpdateL2BaseFeeOverhead(big.NewInt(15680000))
-		if have, want := CalcBaseFee(config(), nil, big.NewInt(test.parentL1BaseFee)), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
+		if have, want := CalcBaseFee(config(), nil, big.NewInt(test.parentL1BaseFee), 0), big.NewInt(test.expectedL2BaseFee); have.Cmp(want) != 0 {
 			t.Errorf("test %d: have %d  want %d, ", i, have, want)
 		}
 	}

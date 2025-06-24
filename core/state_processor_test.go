@@ -392,13 +392,13 @@ func TestStateProcessorErrors(t *testing.T) {
 		}{
 			{ // ErrMaxInitCodeSizeExceeded
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 520000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), tooBigInitCode[:]),
+					mkDynamicCreationTx(0, 520000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee, 0), tooBigInitCode[:]),
 				},
 				want: "could not apply tx 0 [0xe0d03426cecc04467410064cb4de02012fc069d2462282735d7dfcb9dea9f63b]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 54299, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), smallInitCode[:]),
+					mkDynamicCreationTx(0, 54299, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee, 0), smallInitCode[:]),
 				},
 				want: "could not apply tx 0 [0x98e54c5ecfa7986a66480d65ba32f2c6a2a6aedc3a67abb91b1e118b0717ed2d]: intrinsic gas too low: have 54299, want 54300",
 			},
@@ -437,7 +437,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 
 	if config.IsCurie(header.Number) {
 		parentL1BaseFee := big.NewInt(1000000000) // 1 gwei
-		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee, header.Time)
 	}
 	var receipts []*types.Receipt
 	// The post-state result doesn't need to be correct (this is a bad block), but we do need something there

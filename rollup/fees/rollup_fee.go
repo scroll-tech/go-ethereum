@@ -203,7 +203,7 @@ func calculateEncodedL1DataFeeFeynman(
 	data []byte,
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
-	commitScalar *big.Int,
+	execScalar *big.Int,
 	blobScalar *big.Int,
 ) *big.Int {
 	// tx size (RLP-encoded)
@@ -213,7 +213,7 @@ func calculateEncodedL1DataFeeFeynman(
 	compressionRatio := big.NewInt(rcfg.Precision.Int64())
 
 	// compute gas components
-	execGas := new(big.Int).Mul(commitScalar, l1BaseFee)
+	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
 
 	// fee per byte = execGas + blobGas
@@ -282,6 +282,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	} else if !config.IsFeynman(blockTime) {
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
+		// The contract slot for commitScalar is changed to execScalar in Feynman
 		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	}
 

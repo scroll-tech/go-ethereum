@@ -171,7 +171,7 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
 func calculateCompressionRatio(data []byte) *big.Int {
 	if len(data) == 0 {
-		return big.NewInt(rcfg.Precision.Int64())
+		return rcfg.Precision
 	}
 
 	// Compress data using zstd
@@ -182,15 +182,14 @@ func calculateCompressionRatio(data []byte) *big.Int {
 
 	if len(compressed) == 0 {
 		log.Error("Compressed data is empty, using 1.0 compression ratio", "data size", len(data), "data", common.Bytes2Hex(data))
-		return big.NewInt(rcfg.Precision.Int64())
+		return rcfg.Precision
 	}
 
 	// compression_ratio = size(tx) * PRECISION / size(zstd(tx))
-	originalSize := big.NewInt(int64(len(data)))
-	compressedSize := big.NewInt(int64(len(compressed)))
-	precision := new(big.Int).Set(rcfg.Precision)
+	originalSize := new(big.Int).SetUint64(uint64(len(data)))
+	compressedSize := new(big.Int).SetUint64(uint64(len(compressed)))
 
-	ratio := new(big.Int).Mul(originalSize, precision)
+	ratio := new(big.Int).Mul(originalSize, rcfg.Precision)
 	ratio.Div(ratio, compressedSize)
 
 	return ratio

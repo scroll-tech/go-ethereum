@@ -278,7 +278,7 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
-func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
+func CalculateRollupFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
 	if tx.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}

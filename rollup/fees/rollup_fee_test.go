@@ -32,8 +32,6 @@ func TestL1DataFeeAfterCurie(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 func TestL1DataFeeFeynman(t *testing.T) {
-	// You may want to import rcfg in your test file
-
 	l1BaseFee := new(big.Int).SetInt64(1_000_000_000)
 	l1BlobBaseFee := new(big.Int).SetInt64(1_000_000_000)
 	execScalar := new(big.Int).SetInt64(10)

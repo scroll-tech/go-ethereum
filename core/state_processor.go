@@ -92,6 +92,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if p.config.CurieBlock != nil && p.config.CurieBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyCurieHardFork(statedb)
 	}
+	// Apply Feynman hard fork
+	parent := p.bc.GetHeaderByHash(block.ParentHash())
+	if p.config.IsFeynmanTransitionBlock(block.Time(), parent.Time) {
+		misc.ApplyFeynmanHardFork(statedb)
+	}
 	blockContext := NewEVMBlockContext(header, p.bc, p.config, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 	processorBlockTransactionGauge.Update(int64(block.Transactions().Len()))
@@ -130,7 +135,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, bc ChainCon
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
 
-	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, config, blockNumber, blockTime)
+	l1DataFee, err := fees.CalculateRollupFee(tx, statedb, config, blockNumber, blockTime)
 	if err != nil {
 		return nil, err
 	}

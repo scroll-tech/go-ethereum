@@ -76,24 +76,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 		return nil, err
 	}
 
-	raw, err := tx.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-
-	var rollupFee *big.Int
-
-	if !config.IsCurie(blockNumber) {
-		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
-	} else if !config.IsFeynman(blockTime) {
-		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
-	} else {
-		rollupFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
-	}
-
-	return rollupFee, nil
+	return CalculateL1DataFee(tx, state, config, blockNumber, blockTime)
 }
 
 // asUnsignedTx turns a Message into a types.Transaction
@@ -205,11 +188,24 @@ func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseF
 }
 
 // calculateEncodedL1DataFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
+//
+// Post Feynman formula:
+// rollup_fee(tx) = est_compression_ratio(tx) * tx_size * (
+//
+//	exec_scalar * l1_base_fee +
+//	blob_scalar * l1_blob_base_fee
+//
+// )
+//
+// Where:
+// - est_compression_ratio(tx) = 1 (placeholder for future implementation)
+// - exec_scalar = compression_scalar + commit_scalar + verification_scalar
+// - blob_scalar = compression_scalar + blob_scalar
 func calculateEncodedL1DataFeeFeynman(
 	data []byte,
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
-	execScalar *big.Int,
+	commitScalar *big.Int,
 	blobScalar *big.Int,
 ) *big.Int {
 	txSize := big.NewInt(int64(len(data)))
@@ -228,7 +224,7 @@ func calculateEncodedL1DataFeeFeynman(
 	}
 
 	// compute gas components
-	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
+	execGas := new(big.Int).Mul(commitScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
 
 	// fee per byte = execGas + blobGas
@@ -278,7 +274,7 @@ func mulAndScale(x *big.Int, y *big.Int, precision *big.Int) *big.Int {
 	return new(big.Int).Quo(z, precision)
 }
 
-func CalculateRollupFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
+func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
 	if tx.IsL1MessageTx() {
 		return big.NewInt(0), nil
 	}

@@ -410,7 +410,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.
 	if pool.config.Scroll.FeeVaultEnabled() {
 		// Get L1 data fee in current state
-		l1DataFee, err := fees.CalculateRollupFee(tx, currentState, pool.config, pool.currentHead, pool.currentTime)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, currentState, pool.config, pool.currentHead, pool.currentTime)
 		if err != nil {
 			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
 		}

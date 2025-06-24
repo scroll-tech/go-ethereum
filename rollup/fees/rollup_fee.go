@@ -74,24 +74,7 @@ func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.C
 		return nil, err
 	}
 
-	raw, err := tx.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	gpoState := readGPOStorageSlots(rcfg.L1GasPriceOracleAddress, state)
-
-	var rollupFee *big.Int
-
-	if !config.IsCurie(blockNumber) {
-		rollupFee = calculateEncodedL1DataFee(raw, gpoState.overhead, gpoState.l1BaseFee, gpoState.scalar)
-	} else if !config.IsFeynman(blockTime) {
-		rollupFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
-	} else {
-		rollupFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
-	}
-
-	return rollupFee, nil
+	return CalculateL1DataFee(tx, state, config, blockNumber, blockTime)
 }
 
 // asUnsignedTx turns a Message into a types.Transaction

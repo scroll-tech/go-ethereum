@@ -170,8 +170,30 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 // calculateCompressionRatio computes the compression ratio of the data using zstd
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
 func calculateCompressionRatio(data []byte) *big.Int {
-	// FIXME: This is a placeholder for the actual compression ratio calculation in another PR.
-	return big.NewInt(1_000_000_000) // 1 * PRECISION
+	if len(data) == 0 {
+		return big.NewInt(rcfg.Precision.Int64())
+	}
+
+	// Compress data using zstd
+	compressed, err := zstd.CompressScrollBatchBytesStandard(data)
+	if err != nil {
+		log.Error("Batch compression failed, using 1.0 compression ratio", "error", err, "data size", len(data), "data", common.Bytes2Hex(data))
+	}
+
+	if len(compressed) == 0 {
+		log.Error("Compressed data is empty, using 1.0 compression ratio", "data size", len(data), "data", common.Bytes2Hex(data))
+		return big.NewInt(rcfg.Precision.Int64())
+	}
+
+	// compression_ratio = size(tx) * PRECISION / size(zstd(tx))
+	originalSize := big.NewInt(int64(len(data)))
+	compressedSize := big.NewInt(int64(len(compressed)))
+	precision := new(big.Int).Set(rcfg.Precision)
+
+	ratio := new(big.Int).Mul(originalSize, precision)
+	ratio.Div(ratio, compressedSize)
+
+	return ratio
 }
 
 // calculatePenalty computes the penalty multiplier based on compression ratio

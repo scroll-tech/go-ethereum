@@ -36,22 +36,56 @@ func TestL1DataFeeFeynman(t *testing.T) {
 	l1BlobBaseFee := new(big.Int).SetInt64(1_000_000_000)
 	execScalar := new(big.Int).SetInt64(10)
 	blobScalar := new(big.Int).SetInt64(20)
-	data := make([]byte, 10) // txSize = 10
+	penaltyThreshold := new(big.Int).SetInt64(1_000_000_000) // 1 * PRECISION
+	penaltyFactor := new(big.Int).SetInt64(2_000_000_000)    // 2 * PRECISION (200% penalty)
 
-	// feePerByte = execScalar * l1BaseFee + blobScalar * l1BlobBaseFee = 10_000_000_000 + 20_000_000_000 = 30_000_000_000
-	// l1DataFee = precision * txSize * feePerByte / precision / precision
-	//           = 1_000_000_000 * 10 * 30_000_000_000 / 1_000_000_000 / 1_000_000 = 300_000_000_000_000_000 / 1_000_000_000 / 1_000_000_000 = 300
-	//TODO for now compression_ratio = precision, placeholder
+	// Test case 1: No penalty (compression ratio >= threshold)
+	t.Run("no penalty case", func(t *testing.T) {
+		data := make([]byte, 10) // txSize = 10
 
-	expected := new(big.Int).SetInt64(300)
+		// Since compression ratio will be >= penaltyThreshold, penalty = 1 * PRECISION
+		// feePerByte = execScalar * l1BaseFee + blobScalar * l1BlobBaseFee = 10 * 1_000_000_000 + 20 * 1_000_000_000 = 30_000_000_000
+		// l1DataFee = feePerByte * txSize * penalty / PRECISION / PRECISION
+		//           = 30_000_000_000 * 10 * 1_000_000_000 / 1_000_000_000 / 1_000_000_000 = 300
 
-	actual := calculateEncodedL1DataFeeFeynman(
-		data,
-		l1BaseFee,
-		l1BlobBaseFee,
-		execScalar,
-		blobScalar,
-	)
+		expected := new(big.Int).SetInt64(300)
 
-	assert.Equal(t, expected, actual)
+		actual := calculateEncodedL1DataFeeFeynman(
+			data,
+			l1BaseFee,
+			l1BlobBaseFee,
+			execScalar,
+			blobScalar,
+			penaltyThreshold,
+			penaltyFactor,
+		)
+
+		assert.Equal(t, expected, actual)
+	})
+
+	// Test case 2: With penalty (compression ratio < threshold)
+	t.Run("with penalty case", func(t *testing.T) {
+		data := make([]byte, 100) // txSize = 100
+
+		// Set a high penalty threshold to force penalty application
+		highPenaltyThreshold := new(big.Int).SetInt64(1000_000_000_000) // 1000 * PRECISION
+
+		// feePerByte = execScalar * l1BaseFee + blobScalar * l1BlobBaseFee = 30_000_000_000
+		// l1DataFee = feePerByte * txSize * penaltyFactor / PRECISION / PRECISION
+		//           = 30_000_000_000 * 100 * 2_000_000_000 / 1_000_000_000 / 1_000_000_000 = 6000
+
+		expected := new(big.Int).SetInt64(6000)
+
+		actual := calculateEncodedL1DataFeeFeynman(
+			data,
+			l1BaseFee,
+			l1BlobBaseFee,
+			execScalar,
+			blobScalar,
+			highPenaltyThreshold,
+			penaltyFactor,
+		)
+
+		assert.Equal(t, expected, actual)
+	})
 }

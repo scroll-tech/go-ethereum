@@ -56,12 +56,14 @@ type StateDB interface {
 }
 
 type gpoState struct {
-	l1BaseFee     *big.Int
-	overhead      *big.Int
-	scalar        *big.Int
-	l1BlobBaseFee *big.Int
-	commitScalar  *big.Int
-	blobScalar    *big.Int
+	l1BaseFee        *big.Int
+	overhead         *big.Int
+	scalar           *big.Int
+	l1BlobBaseFee    *big.Int
+	commitScalar     *big.Int
+	blobScalar       *big.Int
+	penaltyThreshold *big.Int
+	penaltyFactor    *big.Int
 }
 
 func EstimateL1DataFeeForMessage(msg Message, baseFee *big.Int, config *params.ChainConfig, signer types.Signer, state StateDB, blockNumber *big.Int, blockTime uint64) (*big.Int, error) {
@@ -160,7 +162,27 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	gpoState.l1BlobBaseFee = state.GetState(addr, rcfg.L1BlobBaseFeeSlot).Big()
 	gpoState.commitScalar = state.GetState(addr, rcfg.CommitScalarSlot).Big()
 	gpoState.blobScalar = state.GetState(addr, rcfg.BlobScalarSlot).Big()
+	gpoState.penaltyThreshold = state.GetState(addr, rcfg.PenaltyThresholdSlot).Big()
+	gpoState.penaltyFactor = state.GetState(addr, rcfg.PenaltyFactorSlot).Big()
 	return gpoState
+}
+
+// calculateCompressionRatio computes the compression ratio of the data using zstd
+// compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
+func calculateCompressionRatio(data []byte) *big.Int {
+	// FIXME: This is a placeholder for the actual compression ratio calculation in another PR.
+	return big.NewInt(1_000_000_000) // 1 * PRECISION
+}
+
+// calculatePenalty computes the penalty multiplier based on compression ratio
+// penalty(tx) = compression_ratio(tx) >= penalty_threshold ? 1 * PRECISION : penalty_factor
+func calculatePenalty(compressionRatio, penaltyThreshold, penaltyFactor *big.Int) *big.Int {
+	if compressionRatio.Cmp(penaltyThreshold) >= 0 {
+		// No penalty
+		return new(big.Int).Set(rcfg.Precision)
+	}
+	// Apply penalty
+	return new(big.Int).Set(penaltyFactor)
 }
 
 // calculateEncodedL1DataFee computes the L1 fee for an RLP-encoded tx
@@ -190,49 +212,42 @@ func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseF
 // calculateEncodedL1DataFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
 //
 // Post Feynman formula:
-// rollup_fee(tx) = est_compression_ratio(tx) * tx_size * (
-//
-//	exec_scalar * l1_base_fee +
-//	blob_scalar * l1_blob_base_fee
-//
-// )
+// rollup_fee(tx) = (execScalar * l1BaseFee + blobScalar * l1BlobBaseFee) * size(tx) * penalty(tx) / PRECISION / PRECISION
 //
 // Where:
-// - est_compression_ratio(tx) = 1 (placeholder for future implementation)
-// - exec_scalar = compression_scalar + commit_scalar + verification_scalar
-// - blob_scalar = compression_scalar + blob_scalar
+// penalty(tx) = compression_ratio(tx) >= penalty_threshold ? 1 * PRECISION : penalty_factor
+//
+// compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
+// exec_scalar = compression_scalar * (commit_scalar + verification_scalar)
+// blob_scalar = compression_scalar * blob_scalar
 func calculateEncodedL1DataFeeFeynman(
 	data []byte,
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
-	commitScalar *big.Int,
+	execScalar *big.Int,
 	blobScalar *big.Int,
+	penaltyThreshold *big.Int,
+	penaltyFactor *big.Int,
 ) *big.Int {
+	// Calculate compression ratio
+	compressionRatio := calculateCompressionRatio(data)
+
+	// Calculate penalty multiplier
+	penalty := calculatePenalty(compressionRatio, penaltyThreshold, penaltyFactor)
+
+	// Transaction size (RLP-encoded)
 	txSize := big.NewInt(int64(len(data)))
 
-	// Default compression ratio is 1.0 (no compression)
-	compressionRatio := big.NewInt(rcfg.Precision.Int64())
-
-	compressedBytes, err := zstd.CompressScrollBatchBytesStandard(data)
-	if err != nil {
-		log.Error("Batch compression failed, using 1.0 compression ratio", "error", err, "data size", len(data), "data", common.Bytes2Hex(data))
-	} else if len(compressedBytes) < len(data) {
-		compressedSize := big.NewInt(int64(len(compressedBytes)))
-		// compressionRatio = (compressedSize * precision) / txSize
-		compressionRatio.Mul(compressedSize, rcfg.Precision)
-		compressionRatio.Div(compressionRatio, txSize)
-	}
-
-	// compute gas components
-	execGas := new(big.Int).Mul(commitScalar, l1BaseFee)
+	// Compute gas components
+	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
 
 	// fee per byte = execGas + blobGas
 	feePerByte := new(big.Int).Add(execGas, blobGas)
 
-	// l1DataFee = compression_ratio * tx_size * feePerByte
-	l1DataFee := new(big.Int).Mul(compressionRatio, txSize)
-	l1DataFee.Mul(l1DataFee, feePerByte)
+	// l1DataFee = feePerByte * txSize * penalty
+	l1DataFee := new(big.Int).Mul(feePerByte, txSize)
+	l1DataFee.Mul(l1DataFee, penalty)
 
 	// Divide by rcfg.Precision (once for ratio, once for scalar)
 	l1DataFee.Div(l1DataFee, rcfg.Precision)
@@ -293,7 +308,16 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	} else if !config.IsFeynman(blockTime) {
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
-		l1DataFee = calculateEncodedL1DataFeeFeynman(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
+		// The contract slot for commitScalar is changed to execScalar in Feynman
+		l1DataFee = calculateEncodedL1DataFeeFeynman(
+			raw,
+			gpoState.l1BaseFee,
+			gpoState.l1BlobBaseFee,
+			gpoState.commitScalar, // now represents execScalar
+			gpoState.blobScalar,
+			gpoState.penaltyThreshold,
+			gpoState.penaltyFactor,
+		)
 	}
 
 	// ensure l1DataFee fits into uint64 for circuit compatibility

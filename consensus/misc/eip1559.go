@@ -170,8 +170,7 @@ func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.I
 }
 
 func extractBaseFeeEIP1559(config *params.ChainConfig, baseFee *big.Int) *big.Int {
-	aux := new(big.Int).Set(baseFee)
-	return aux.Sub(baseFee, config.ProvingBaseFee)
+	return new(big.Int).Sub(baseFee, config.ProvingBaseFee)
 }
 
 // MinBaseFee calculates the minimum L2 base fee based on the current coefficients.

@@ -186,11 +186,24 @@ func calculateEncodedL1DataFeeCurie(data []byte, l1BaseFee *big.Int, l1BlobBaseF
 }
 
 // calculateEncodedL1DataFeeFeynman computes the L1 fee for an RLP-encoded tx, post Feynman
+//
+// Post Feynman formula:
+// rollup_fee(tx) = est_compression_ratio(tx) * tx_size * (
+//
+//	exec_scalar * l1_base_fee +
+//	blob_scalar * l1_blob_base_fee
+//
+// )
+//
+// Where:
+// - est_compression_ratio(tx) = 1 (placeholder for future implementation)
+// - exec_scalar = compression_scalar + commit_scalar + verification_scalar
+// - blob_scalar = compression_scalar + blob_scalar
 func calculateEncodedL1DataFeeFeynman(
 	data []byte,
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
-	execScalar *big.Int,
+	commitScalar *big.Int,
 	blobScalar *big.Int,
 ) *big.Int {
 	// tx size (RLP-encoded)
@@ -200,7 +213,7 @@ func calculateEncodedL1DataFeeFeynman(
 	compressionRatio := big.NewInt(rcfg.Precision.Int64())
 
 	// compute gas components
-	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
+	execGas := new(big.Int).Mul(commitScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
 
 	// fee per byte = execGas + blobGas

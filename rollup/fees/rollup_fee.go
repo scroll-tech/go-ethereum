@@ -200,10 +200,10 @@ func calculateCompressionRatio(data []byte) *big.Int {
 func calculatePenalty(compressionRatio, penaltyThreshold, penaltyFactor *big.Int) *big.Int {
 	if compressionRatio.Cmp(penaltyThreshold) >= 0 {
 		// No penalty
-		return new(big.Int).Set(rcfg.Precision)
+		return rcfg.Precision
 	}
 	// Apply penalty
-	return new(big.Int).Set(penaltyFactor)
+	return penaltyFactor
 }
 
 // calculateEncodedL1DataFee computes the L1 fee for an RLP-encoded tx

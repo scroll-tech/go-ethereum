@@ -638,11 +638,6 @@ func (w *worker) handleForks(parent *types.Block) (bool, error) {
 		misc.ApplyFeynmanHardFork(w.current.state)
 	}
 
-	// Apply Feynman hard fork
-	if w.chainConfig.IsFeynmanTransitionBlock(w.current.header.Time, parent.Time()) {
-		misc.ApplyFeynmanHardFork(w.current.state)
-	}
-
 	// Apply EIP-2935
 	if w.chainConfig.IsFeynman(w.current.header.Time) {
 		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)

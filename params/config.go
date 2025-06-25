@@ -524,7 +524,6 @@ var (
 		EuclidTime:              new(uint64),
 		EuclidV2Time:            new(uint64),
 		FeynmanTime:             new(uint64),
-		ProvingBaseFee:          new(big.Int),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -667,7 +666,6 @@ type ChainConfig struct {
 	EuclidTime          *uint64  `json:"euclidTime,omitempty"`          // Euclid switch time (nil = no fork, 0 = already on euclid)
 	EuclidV2Time        *uint64  `json:"euclidv2Time,omitempty"`        // EuclidV2 switch time (nil = no fork, 0 = already on euclidv2)
 	FeynmanTime         *uint64  `json:"feynmanTime,omitempty"`         // Feynman switch time (nil = no fork, 0 = already on feynman)
-	ProvingBaseFee      *big.Int `json:"provingFee,omitempty"`          // Proving base fee to be added to EIP1559 l2 base fee to account for proving costs
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.

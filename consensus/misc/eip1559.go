@@ -107,18 +107,20 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, parentL1BaseF
 		return big.NewInt(10000000) // 0.01 Gwei
 	}
 
+	scalar, overhead := ReadL2BaseFeeCoefficients()
+
 	if parent == nil || parent.Number == nil || !config.IsFeynman(currentHeaderTime) {
-		scalar, overhead := ReadL2BaseFeeCoefficients()
 		return calcBaseFee(scalar, overhead, parentL1BaseFee)
 	}
-	return calcBaseFeeFeynman(config, parent)
+	// In Feynman base fee calculation, we reuse the contract's baseFeeOverhead slot as the proving base fee.
+	return calcBaseFeeFeynman(config, parent, overhead)
 }
 
 // calcBaseFeeFeynman calculates the basefee of the header for Feynman fork.
-func calcBaseFeeFeynman(config *params.ChainConfig, parent *types.Header) *big.Int {
+func calcBaseFeeFeynman(config *params.ChainConfig, parent *types.Header, overhead *big.Int) *big.Int {
 	baseFeeEIP1559 := calcBaseFeeEIP1559(config, parent)
 	baseFee := new(big.Int).Set(baseFeeEIP1559)
-	baseFee.Add(baseFee, config.ProvingBaseFee)
+	baseFee.Add(baseFee, overhead)
 
 	return baseFee
 }
@@ -170,7 +172,9 @@ func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.I
 }
 
 func extractBaseFeeEIP1559(config *params.ChainConfig, baseFee *big.Int) *big.Int {
-	return new(big.Int).Sub(baseFee, config.ProvingBaseFee)
+	_, overhead := ReadL2BaseFeeCoefficients()
+	// In Feynman base fee calculation, we reuse the contract's baseFeeOverhead slot as the proving base fee.
+	return new(big.Int).Sub(baseFee, overhead)
 }
 
 // MinBaseFee calculates the minimum L2 base fee based on the current coefficients.

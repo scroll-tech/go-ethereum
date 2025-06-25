@@ -510,9 +510,17 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 		header.Coinbase = common.Address{}
 		header.Nonce = types.BlockNonce{}
 	} else {
+		var timeOverride *uint64
+		if w.chainConfig.IsFeynmanTransitionBlock(header.Time, parent.Time()) {
+			// current candidate timestamp suggests that this block is the Feynman transition block,
+			// we forcibly set timestamp to the exact upgrade timestamp.
+			timeOverride = new(uint64)
+			*timeOverride = *w.chainConfig.FeynmanTime // IsFeynmanTransitionBlock guarantees that this is not nil
+		}
+
 		prepareStart := time.Now()
 		// Note: this call will set header.Time, among other fields.
-		if err := w.engine.Prepare(w.chain, header, nil); err != nil {
+		if err := w.engine.Prepare(w.chain, header, timeOverride); err != nil {
 			return fmt.Errorf("failed to prepare header for mining: %w", err)
 		}
 		prepareTimer.UpdateSince(prepareStart)

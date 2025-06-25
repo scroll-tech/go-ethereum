@@ -37,19 +37,19 @@ func TestL1DataFeeFeynman(t *testing.T) {
 	l1BlobBaseFee := new(big.Int).SetInt64(1_000_000_000)
 	execScalar := new(big.Int).SetInt64(10)
 	blobScalar := new(big.Int).SetInt64(20)
-	penaltyThreshold := new(big.Int).SetInt64(1_000_000_000) // 1 * PRECISION
+	penaltyThreshold := new(big.Int).SetInt64(6_000_000_000) // 6 * PRECISION
 	penaltyFactor := new(big.Int).SetInt64(2_000_000_000)    // 2 * PRECISION (200% penalty)
 
 	// Test case 1: No penalty (compression ratio >= threshold)
 	t.Run("no penalty case", func(t *testing.T) {
-		data := make([]byte, 10) // txSize = 10
+		data := make([]byte, 100) // txSize = 100
 
 		// Since compression ratio will be >= penaltyThreshold, penalty = 1 * PRECISION
 		// feePerByte = execScalar * l1BaseFee + blobScalar * l1BlobBaseFee = 10 * 1_000_000_000 + 20 * 1_000_000_000 = 30_000_000_000
 		// l1DataFee = feePerByte * txSize * penalty / PRECISION / PRECISION
-		//           = 30_000_000_000 * 10 * 1_000_000_000 / 1_000_000_000 / 1_000_000_000 = 300
+		//           = 30_000_000_000 * 100 * 1_000_000_000 / 1_000_000_000 / 1_000_000_000 = 3000
 
-		expected := new(big.Int).SetInt64(300)
+		expected := new(big.Int).SetInt64(3000)
 
 		actual := calculateEncodedL1DataFeeFeynman(
 			data,

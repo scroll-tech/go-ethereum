@@ -6,10 +6,12 @@ import (
 	"math/big"
 
 	"github.com/holiman/uint256"
+	"github.com/scroll-tech/da-codec/encoding/zstd"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
@@ -168,8 +170,36 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 // calculateCompressionRatio computes the compression ratio of the data using zstd
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
 func calculateCompressionRatio(data []byte) *big.Int {
-	// FIXME: This is a placeholder for the actual compression ratio calculation in another PR.
-	return rcfg.Precision
+	if len(data) == 0 {
+		return rcfg.Precision
+	}
+
+	// Compress data using zstd
+	compressed, err := zstd.CompressScrollBatchBytesStandard(data)
+	if err != nil {
+		log.Error("Batch compression failed, using 1.0 compression ratio", "error", err, "data size", len(data), "data", common.Bytes2Hex(data))
+	}
+
+	if len(compressed) == 0 {
+		log.Error("Compressed data is empty, using 1.0 compression ratio", "data size", len(data), "data", common.Bytes2Hex(data))
+		return rcfg.Precision
+	}
+
+	// compression_ratio = size(tx) * PRECISION / size(zstd(tx))
+	originalSize := new(big.Int).SetUint64(uint64(len(data)))
+	compressedSize := new(big.Int).SetUint64(uint64(len(compressed)))
+
+	// Make sure compression ratio >= 1 by checking if compressed data is bigger or equal to original data
+	// This behavior is consistent with DA Batch compression in codecv7 and later versions
+	if len(compressed) >= len(data) {
+		log.Debug("Compressed data is bigger or equal to the original data, using 1.0 compression ratio", "original size", len(data), "compressed size", len(compressed))
+		return rcfg.Precision
+	}
+
+	ratio := new(big.Int).Mul(originalSize, rcfg.Precision)
+	ratio.Div(ratio, compressedSize)
+
+	return ratio
 }
 
 // calculatePenalty computes the penalty multiplier based on compression ratio

@@ -148,7 +148,6 @@ func (api *consensusAPI) AssembleBlock(params assembleBlockParams) (*executableD
 			return nil, err
 		}
 		parentL1BaseFee := fees.GetL1BaseFee(stateDb)
-		// Use time.Now() as the current block time to calculate the pending base fee.
 		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee, header.Time)
 	}
 	err = api.eth.Engine().Prepare(bc, header, nil)

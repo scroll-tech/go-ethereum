@@ -31,6 +31,7 @@ func TestL1DataFeeAfterCurie(t *testing.T) {
 	actual := calculateEncodedL1DataFeeCurie(data, l1BaseFee, l1BlobBaseFee, commitScalar, blobScalar)
 	assert.Equal(t, expected, actual)
 }
+
 func TestL1DataFeeFeynman(t *testing.T) {
 	l1BaseFee := new(big.Int).SetInt64(1_000_000_000)
 	l1BlobBaseFee := new(big.Int).SetInt64(1_000_000_000)

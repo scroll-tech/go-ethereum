@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/holiman/uint256"
-	"github.com/scroll-tech/da-codec/encoding/zstd"
+	"github.com/scroll-tech/da-codec/encoding"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -167,17 +167,18 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	return gpoState
 }
 
-// calculateCompressionRatio computes the compression ratio of the data using zstd
+// estimateTxCompressionRatio estimates the compression ratio for transaction data using da-codec
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
-func calculateCompressionRatio(data []byte) *big.Int {
+func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) *big.Int {
 	if len(data) == 0 {
 		return rcfg.Precision
 	}
 
-	// Compress data using zstd
-	compressed, err := zstd.CompressScrollBatchBytesStandard(data)
+	// Compress data using da-codec
+	compressed, err := encoding.CompressScrollBatchBytes(data, blockNumber, blockTime, config)
 	if err != nil {
 		log.Error("Batch compression failed, using 1.0 compression ratio", "error", err, "data size", len(data), "data", common.Bytes2Hex(data))
+		return rcfg.Precision
 	}
 
 	if len(compressed) == 0 {
@@ -256,10 +257,8 @@ func calculateEncodedL1DataFeeFeynman(
 	blobScalar *big.Int,
 	penaltyThreshold *big.Int,
 	penaltyFactor *big.Int,
+	compressionRatio *big.Int,
 ) *big.Int {
-	// Calculate compression ratio
-	compressionRatio := calculateCompressionRatio(data)
-
 	// Calculate penalty multiplier
 	penalty := calculatePenalty(compressionRatio, penaltyThreshold, penaltyFactor)
 
@@ -336,6 +335,9 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 	} else if !config.IsFeynman(blockTime) {
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
+		// Calculate compression ratio for Feynman
+		compressionRatio := estimateTxCompressionRatio(raw, blockNumber.Uint64(), blockTime, config)
+
 		// The contract slot for commitScalar is changed to execScalar in Feynman
 		l1DataFee = calculateEncodedL1DataFeeFeynman(
 			raw,
@@ -345,6 +347,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 			gpoState.blobScalar,
 			gpoState.penaltyThreshold,
 			gpoState.penaltyFactor,
+			compressionRatio,
 		)
 	}
 

@@ -2,6 +2,7 @@ package fees
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"math/big"
 
@@ -169,21 +170,21 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 
 // estimateTxCompressionRatio estimates the compression ratio for transaction data using da-codec
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
-func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) *big.Int {
+func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) (*big.Int, error) {
 	if len(data) == 0 {
-		return rcfg.Precision
+		return nil, fmt.Errorf("raw data is empty")
 	}
 
 	// Compress data using da-codec
 	compressed, err := encoding.CompressScrollBatchBytes(data, blockNumber, blockTime, config)
 	if err != nil {
 		log.Error("Batch compression failed, using 1.0 compression ratio", "error", err, "data size", len(data), "data", common.Bytes2Hex(data))
-		return rcfg.Precision
+		return nil, fmt.Errorf("batch compression failed: %w", err)
 	}
 
 	if len(compressed) == 0 {
 		log.Error("Compressed data is empty, using 1.0 compression ratio", "data size", len(data), "data", common.Bytes2Hex(data))
-		return rcfg.Precision
+		return nil, fmt.Errorf("compressed data is empty")
 	}
 
 	// compression_ratio = size(tx) * PRECISION / size(zstd(tx))
@@ -194,13 +195,13 @@ func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint6
 	// This behavior is consistent with DA Batch compression in codecv7 and later versions
 	if len(compressed) >= len(data) {
 		log.Debug("Compressed data is bigger or equal to the original data, using 1.0 compression ratio", "original size", len(data), "compressed size", len(compressed))
-		return rcfg.Precision
+		return rcfg.Precision, nil
 	}
 
 	ratio := new(big.Int).Mul(originalSize, rcfg.Precision)
 	ratio.Div(ratio, compressedSize)
 
-	return ratio
+	return ratio, nil
 }
 
 // calculatePenalty computes the penalty multiplier based on compression ratio
@@ -336,7 +337,10 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
 		// Calculate compression ratio for Feynman
-		compressionRatio := estimateTxCompressionRatio(raw, blockNumber.Uint64(), blockTime, config)
+		compressionRatio, err := estimateTxCompressionRatio(raw, blockNumber.Uint64(), blockTime, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to estimate compression ratio: tx hash=%s: %w", tx.Hash().Hex(), err)
+		}
 
 		// The contract slot for commitScalar is changed to execScalar in Feynman
 		l1DataFee = calculateEncodedL1DataFeeFeynman(

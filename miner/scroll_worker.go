@@ -633,10 +633,9 @@ func (w *worker) handleForks(parent *types.Block) (bool, error) {
 		return true, nil
 	}
 
-	// Stop/start miner at Euclid fork boundary on zktrie/mpt nodes
-	if w.chainConfig.IsEuclid(w.current.header.Time) {
-		parent := w.chain.GetBlockByHash(w.current.header.ParentHash)
-		return parent != nil && !w.chainConfig.IsEuclid(parent.Time()), nil
+	// Apply Feynman hard fork
+	if w.chainConfig.IsFeynmanTransitionBlock(w.current.header.Time, parent.Time()) {
+		misc.ApplyFeynmanHardFork(w.current.state)
 	}
 
 	// Apply Feynman hard fork
@@ -649,6 +648,12 @@ func (w *worker) handleForks(parent *types.Block) (bool, error) {
 		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)
 		vmenv := vm.NewEVM(context, vm.TxContext{}, w.current.state, w.chainConfig, vm.Config{})
 		core.ProcessParentBlockHash(w.current.header.ParentHash, vmenv, w.current.state)
+	}
+
+	// Stop/start miner at Euclid fork boundary on zktrie/mpt nodes
+	if w.chainConfig.IsEuclid(w.current.header.Time) {
+		parent := w.chain.GetBlockByHash(w.current.header.ParentHash)
+		return parent != nil && !w.chainConfig.IsEuclid(parent.Time()), nil
 	}
 
 	return false, nil

@@ -189,6 +189,13 @@ func calculateCompressionRatio(data []byte) *big.Int {
 	originalSize := new(big.Int).SetUint64(uint64(len(data)))
 	compressedSize := new(big.Int).SetUint64(uint64(len(compressed)))
 
+	// Make sure compression ratio >= 1 by checking if compressed data is bigger or equal to original data
+	// This behavior is consistent with DA Batch compression in codecv7 and later versions
+	if len(compressed) >= len(data) {
+		log.Debug("Compressed data is bigger or equal to the original data, using 1.0 compression ratio", "original size", len(data), "compressed size", len(compressed))
+		return rcfg.Precision
+	}
+
 	ratio := new(big.Int).Mul(originalSize, rcfg.Precision)
 	ratio.Div(ratio, compressedSize)
 

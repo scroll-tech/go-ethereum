@@ -247,9 +247,9 @@ func calculateEncodedL1DataFeeFeynman(
 	l1DataFee := new(big.Int).Mul(feePerByte, txSize)
 	l1DataFee.Mul(l1DataFee, penalty)
 
-	// Divide by rcfg.Precision (once for ratio, once for scalar)
-	l1DataFee.Div(l1DataFee, rcfg.Precision)
-	l1DataFee.Div(l1DataFee, rcfg.Precision)
+	// Divide by rcfg.Precision (once for scalars, once for penalty)
+	l1DataFee.Div(l1DataFee, rcfg.Precision) // account for scalars
+	l1DataFee.Div(l1DataFee, rcfg.Precision) // accounts for penalty
 
 	return l1DataFee
 }

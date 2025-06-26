@@ -129,6 +129,9 @@ func calcBaseFeeFeynman(config *params.ChainConfig, parent *types.Header, overhe
 func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.Int {
 	// If the current block is the first EIP-1559 block, return the InitialBaseFee.
 	if !config.IsFeynman(parent.Time) {
+		if parent.BaseFee != nil {
+			return new(big.Int).Set(parent.BaseFee)
+		}
 		return new(big.Int).SetUint64(params.InitialBaseFee)
 	}
 

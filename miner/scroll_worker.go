@@ -840,7 +840,7 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 
 	// Reject transactions that require the max data fee amount.
 	// This can only happen if the L1 gas oracle is updated incorrectly.
-	l1DataFee, err := fees.CalculateL1DataFee(tx, w.current.state, w.chain.Config(), w.current.header.Number)
+	l1DataFee, err := fees.CalculateL1DataFee(tx, w.current.state, w.chain.Config(), w.current.header.Number, w.current.header.Time)
 	if err != nil {
 		return false, fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
 	}

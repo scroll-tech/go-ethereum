@@ -158,7 +158,11 @@ func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.I
 		if num.Cmp(common.Big1) < 0 {
 			return num.Add(parentBaseFeeEIP1559, common.Big1)
 		}
-		return num.Add(parentBaseFeeEIP1559, num)
+		baseFee := num.Add(parentBaseFeeEIP1559, num)
+		if baseFee.Cmp(big.NewInt(MaximumL2BaseFee)) > 0 {
+			baseFee = big.NewInt(MaximumL2BaseFee)
+		}
+		return baseFee
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
 		// max(0, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)

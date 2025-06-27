@@ -102,11 +102,10 @@ func TestEstimateTxCompressionRatio(t *testing.T) {
 
 	t.Run("empty data", func(t *testing.T) {
 		data := []byte{}
-		// Should return 1.0 ratio (PRECISION)
 		ratio, err := estimateTxCompressionRatio(data, 1000000, 1700000000, params.TestChainConfig)
-		assert.Error(t, err, "raw data is empty")
-		assert.Nil(t, ratio)
-		// The exact value depends on rcfg.Precision, but should be the "1.0" equivalent
+		assert.NoError(t, err)
+		assert.NotNil(t, ratio)
+		assert.Equal(t, U256MAX, ratio) // empty data has max compression ratio by definition
 	})
 
 	t.Run("non-empty data", func(t *testing.T) {

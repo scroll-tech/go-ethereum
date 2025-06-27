@@ -17,6 +17,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
+var U256MAX *big.Int
+
+func init() {
+	U256MAX, _ = new(big.Int).SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+}
+
 var (
 	// txExtraDataBytes is the number of bytes that we commit to L1 in addition
 	// to the RLP-encoded signed transaction. Note that these are all assumed
@@ -172,7 +178,7 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
 func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) (*big.Int, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("raw data is empty")
+		return U256MAX, nil
 	}
 
 	// Compress data using da-codec
@@ -337,7 +343,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
 		// Calculate compression ratio for Feynman
-		compressionRatio, err := estimateTxCompressionRatio(raw, blockNumber.Uint64(), blockTime, config)
+		compressionRatio, err := estimateTxCompressionRatio(tx.Data(), blockNumber.Uint64(), blockTime, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to estimate compression ratio: tx hash=%s: %w", tx.Hash().Hex(), err)
 		}

@@ -191,6 +191,8 @@ func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint6
 	originalSize := new(big.Int).SetUint64(uint64(len(data)))
 	compressedSize := new(big.Int).SetUint64(uint64(len(compressed)))
 
+	fmt.Println("Original size:", originalSize, "Compressed size:", compressedSize, "Compression ratio:", float64(originalSize.Uint64())/float64(compressedSize.Uint64()))
+
 	// Make sure compression ratio >= 1 by checking if compressed data is bigger or equal to original data
 	// This behavior is consistent with DA Batch compression in codecv7 and later versions
 	if len(compressed) >= len(data) {

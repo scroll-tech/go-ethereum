@@ -2,12 +2,16 @@ package fees
 
 import (
 	"math/big"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/scroll-tech/da-codec/encoding"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/params"
+	"github.com/scroll-tech/go-ethereum/core/types"
 )
 
 func TestL1DataFeeBeforeCurie(t *testing.T) {
@@ -194,3 +198,133 @@ func TestCalculatePenalty(t *testing.T) {
 		assert.Equal(t, penaltyFactor, penalty)
 	})
 }
+
+func TestBatchCompressionRatio(t *testing.T) {	
+	t.Run("multiple eth transfers from same account", func(t *testing.T) {
+		var allTxData []byte
+		signer := types.NewLondonSigner(big.NewInt(534352))
+		privateKey, _ := crypto.GenerateKey()
+		
+		// Create 0 ETH transfers from the same account with different nonces
+		for i := 0; i < 1000; i++ {
+			// Random recipient address from random private key
+			recipientKey, _ := crypto.GenerateKey()
+			toAddr := crypto.PubkeyToAddress(recipientKey.PublicKey)
+			
+			// Random gas between 21000 and 1021000
+			randomGas := uint64(21000 + rand.Intn(1000000))
+
+			// Random gas fee cap between 0.02 gwei (20000000) and 0.03 gwei (30000000)
+			randomGasFeeCap := int64(20000000 + rand.Intn(10000000)) // 20M to 30M wei
+			
+			txData := &types.DynamicFeeTx{
+				ChainID:   big.NewInt(534352),
+				Nonce:     uint64(i),
+				GasTipCap: big.NewInt(1), // 1 wei tip
+				GasFeeCap: big.NewInt(randomGasFeeCap),
+				Gas:       randomGas,
+				To:        &toAddr,
+				Value:     big.NewInt(0),
+				Data:      []byte{},
+			}
+			
+			tx := types.NewTx(txData)
+			signedTx, _ := types.SignTx(tx, signer, privateKey)
+			encoded, _ := signedTx.MarshalBinary()
+			allTxData = append(allTxData, encoded...)
+		}
+		
+		// feynman enabled
+		compressed, err := encoding.CompressScrollBatchBytes(allTxData, 0, 0, params.TestChainConfig)
+		assert.NoError(t, err)
+		
+		compressionRatio := float64(len(allTxData)) / float64(len(compressed))
+		t.Logf("Multiple ETH transfers (same account): original=%d, compressed=%d, ratio=%.3f", len(allTxData), len(compressed), compressionRatio)
+	})
+	
+	t.Run("multiple eth transfers from different accounts", func(t *testing.T) {
+		var allTxData []byte
+		signer := types.NewLondonSigner(big.NewInt(534352))
+		
+		// Create 0 ETH transfers from different accounts
+		for i := 0; i < 1000; i++ {
+			privateKey, _ := crypto.GenerateKey()
+			
+			// Random recipient address from random private key
+			recipientKey, _ := crypto.GenerateKey()
+			toAddr := crypto.PubkeyToAddress(recipientKey.PublicKey)
+			
+			// Random gas between 21000 and 1021000
+			randomGas := uint64(21000 + rand.Intn(1000000))
+
+			// Random gas fee cap between 0.02 gwei (20000000) and 0.03 gwei (30000000)
+			randomGasFeeCap := int64(20000000 + rand.Intn(10000000)) // 20M to 30M wei
+			
+			txData := &types.DynamicFeeTx{
+				ChainID:   big.NewInt(534352),
+				Nonce:     0,
+				GasTipCap: big.NewInt(1), // 1 wei tip
+				GasFeeCap: big.NewInt(randomGasFeeCap),
+				Gas:       randomGas,
+				To:        &toAddr,
+				Value:     big.NewInt(0),
+				Data:      []byte{},
+			}
+			
+			tx := types.NewTx(txData)
+			signedTx, _ := types.SignTx(tx, signer, privateKey)
+			encoded, _ := signedTx.MarshalBinary()
+			allTxData = append(allTxData, encoded...)
+		}
+		
+		// feynman enabled
+		compressed, err := encoding.CompressScrollBatchBytes(allTxData, 0, 0, params.TestChainConfig)
+		assert.NoError(t, err)
+		
+		compressionRatio := float64(len(allTxData)) / float64(len(compressed))
+		t.Logf("Multiple ETH transfers (different accounts): original=%d, compressed=%d, ratio=%.3f", len(allTxData), len(compressed), compressionRatio)
+	})
+}
+
+func TestSmallTxSizeThreshold(t *testing.T) {
+	testCases := []struct {
+		name        string
+		dataPattern func(size int) []byte
+	}{
+		{"random data", func(size int) []byte {
+			data := make([]byte, size)
+			for i := range data {
+				data[i] = byte(i * 137 % 256)
+			}
+			return data
+		}},
+		{"all zeros", func(size int) []byte {
+			return make([]byte, size)
+		}},
+		{"all ones", func(size int) []byte {
+			data := make([]byte, size)
+			for i := range data {
+				data[i] = 0xFF
+			}
+			return data
+		}},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for size := 10; size <= 50; size += 10 {
+				data := tc.dataPattern(size)
+
+				// feynman enabled
+				compressed, err := encoding.CompressScrollBatchBytes(data, 0, 0, params.TestChainConfig)
+				if err != nil {
+					continue
+				}
+				
+				compressionRatio := float64(len(data)) / float64(len(compressed))
+				t.Logf("%s - size=%d: original=%d, compressed=%d, ratio=%.3f", tc.name, size, len(data), len(compressed), compressionRatio)
+			}
+		})
+	}
+}
+

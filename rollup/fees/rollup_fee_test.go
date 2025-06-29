@@ -130,7 +130,7 @@ func TestEstimateTxCompressionRatio(t *testing.T) {
 		ratio, err := calcCompressionRatio(data)
 		assert.NoError(t, err)
 		assert.NotNil(t, ratio)
-		assert.Equal(t, U256MAX, ratio) // empty data is infinitely compressible by default
+		assert.Equal(t, U256MAX, ratio) // empty data is infinitely compressible by definition
 	})
 
 	t.Run("scr-transfer", func(t *testing.T) {

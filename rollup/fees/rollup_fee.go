@@ -174,9 +174,10 @@ func readGPOStorageSlots(addr common.Address, state StateDB) gpoState {
 	return gpoState
 }
 
-// estimateTxCompressionRatio estimates the compression ratio for transaction data using da-codec
+// estimateTxCompressionRatio estimates the compression ratio for `data` using da-codec
 // compression_ratio(tx) = size(tx) * PRECISION / size(zstd(tx))
 func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) (*big.Int, error) {
+	// By definition, the compression ratio of empty data is infinity
 	if len(data) == 0 {
 		return U256MAX, nil
 	}
@@ -193,16 +194,15 @@ func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint6
 		return nil, fmt.Errorf("compressed data is empty")
 	}
 
-	// compression_ratio = size(tx) * PRECISION / size(zstd(tx))
-	originalSize := new(big.Int).SetUint64(uint64(len(data)))
-	compressedSize := new(big.Int).SetUint64(uint64(len(compressed)))
-
 	// Make sure compression ratio >= 1 by checking if compressed data is bigger or equal to original data
 	// This behavior is consistent with DA Batch compression in codecv7 and later versions
 	if len(compressed) >= len(data) {
-		log.Debug("Compressed data is bigger or equal to the original data, using 1.0 compression ratio", "original size", len(data), "compressed size", len(compressed))
 		return rcfg.Precision, nil
 	}
+
+	// compression_ratio = size(tx) * PRECISION / size(zstd(tx))
+	originalSize := new(big.Int).SetUint64(uint64(len(data)))
+	compressedSize := new(big.Int).SetUint64(uint64(len(compressed)))
 
 	ratio := new(big.Int).Mul(originalSize, rcfg.Precision)
 	ratio.Div(ratio, compressedSize)
@@ -343,6 +343,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 		l1DataFee = calculateEncodedL1DataFeeCurie(raw, gpoState.l1BaseFee, gpoState.l1BlobBaseFee, gpoState.commitScalar, gpoState.blobScalar)
 	} else {
 		// Calculate compression ratio for Feynman
+		// Note: We compute the transaction ratio on tx.data, not on the full encoded transaction.
 		compressionRatio, err := estimateTxCompressionRatio(tx.Data(), blockNumber.Uint64(), blockTime, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to estimate compression ratio: tx hash=%s: %w", tx.Hash().Hex(), err)

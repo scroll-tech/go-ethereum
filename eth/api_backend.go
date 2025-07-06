@@ -269,7 +269,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 		return types.ErrTxTypeNotSupported
 	}
 
-	// OP-Stack: forward to remote sequencer RPC
+	// Forward to remote sequencer RPC
 	var seqRPCErr error
 	if b.eth.seqRPCService != nil {
 		signedTxData, err := signedTx.MarshalBinary()

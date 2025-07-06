@@ -464,8 +464,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 }
 
 // newWork
-func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, reorgReason error) error {
-	parent := w.chain.GetBlockByHash(parentHash)
+func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reorgReason error) error {
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
@@ -489,7 +488,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(parentState)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee, header.Time)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -586,13 +585,14 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 }
 
 // tryCommitNewWork
-func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorging bool, reorgReason error) (common.Hash, error) {
+func (w *worker) tryCommitNewWork(now time.Time, parentHash common.Hash, reorging bool, reorgReason error) (common.Hash, error) {
+	parent := w.chain.GetBlockByHash(parentHash)
 	err := w.newWork(now, parent, reorging, reorgReason)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed creating new work: %w", err)
 	}
 
-	shouldCommit, err := w.handleForks()
+	shouldCommit, err := w.handleForks(parent)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed handling forks: %w", err)
 	}
@@ -626,17 +626,16 @@ func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorging bo
 }
 
 // handleForks
-func (w *worker) handleForks() (bool, error) {
+func (w *worker) handleForks(parent *types.Block) (bool, error) {
 	// Apply Curie predeployed contract update
 	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(w.current.header.Number) == 0 {
 		misc.ApplyCurieHardFork(w.current.state)
 		return true, nil
 	}
 
-	// Stop/start miner at Euclid fork boundary on zktrie/mpt nodes
-	if w.chainConfig.IsEuclid(w.current.header.Time) {
-		parent := w.chain.GetBlockByHash(w.current.header.ParentHash)
-		return parent != nil && !w.chainConfig.IsEuclid(parent.Time()), nil
+	// Apply Feynman hard fork
+	if w.chainConfig.IsFeynmanTransitionBlock(w.current.header.Time, parent.Time()) {
+		misc.ApplyFeynmanHardFork(w.current.state)
 	}
 
 	// Apply EIP-2935
@@ -644,6 +643,12 @@ func (w *worker) handleForks() (bool, error) {
 		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)
 		vmenv := vm.NewEVM(context, vm.TxContext{}, w.current.state, w.chainConfig, vm.Config{})
 		core.ProcessParentBlockHash(w.current.header.ParentHash, vmenv, w.current.state)
+	}
+
+	// Stop/start miner at Euclid fork boundary on zktrie/mpt nodes
+	if w.chainConfig.IsEuclid(w.current.header.Time) {
+		parent := w.chain.GetBlockByHash(w.current.header.ParentHash)
+		return parent != nil && !w.chainConfig.IsEuclid(parent.Time()), nil
 	}
 
 	return false, nil
@@ -831,6 +836,16 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSizeForMining(w.current.blockSize+tx.Size()) {
 		// can't fit this txn in this block, silently ignore and continue looking for more txns
 		return false, errors.New("tx too big")
+	}
+
+	// Reject transactions that require the max data fee amount.
+	// This can only happen if the L1 gas oracle is updated incorrectly.
+	l1DataFee, err := fees.CalculateL1DataFee(tx, w.current.state, w.chain.Config(), w.current.header.Number, w.current.header.Time)
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+	}
+	if l1DataFee.Cmp(fees.MaxL1DataFee()) >= 0 {
+		return false, errors.New("invalid transaction: invalid L1 data fee")
 	}
 
 	// Start executing the transaction

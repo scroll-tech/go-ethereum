@@ -1002,6 +1002,11 @@ func (c *ChainConfig) IsFeynman(now uint64) bool {
 	return isForkedTime(now, c.FeynmanTime)
 }
 
+// IsFeynmanTransitionBlock returns whether the given block timestamp corresponds to the first Feynman block.
+func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
+	return isForkedTime(blockTimestamp, c.FeynmanTime) && !isForkedTime(parentTimestamp, c.FeynmanTime)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
@@ -1026,6 +1031,16 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 		bhead.SetUint64(err.RewindTo)
 	}
 	return lasterr
+}
+
+// BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
+func (c *ChainConfig) BaseFeeChangeDenominator() uint64 {
+	return DefaultBaseFeeChangeDenominator
+}
+
+// ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
+func (c *ChainConfig) ElasticityMultiplier() uint64 {
+	return DefaultElasticityMultiplier
 }
 
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough

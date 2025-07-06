@@ -249,6 +249,9 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.CurieBlock != nil && config.CurieBlock.Cmp(b.header.Number) == 0 {
 			misc.ApplyCurieHardFork(statedb)
 		}
+		if config.IsFeynmanTransitionBlock(b.Time(), parent.Time()) {
+			misc.ApplyFeynmanHardFork(statedb)
+		}
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
@@ -305,7 +308,7 @@ func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.S
 	}
 	if chain.Config().IsCurie(header.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(state)
-		header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header(), parentL1BaseFee, header.Time)
 	}
 	return header
 }

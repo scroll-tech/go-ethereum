@@ -1806,15 +1806,15 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	}
 	if ctx.GlobalIsSet(GossipTxBroadcastDisabledFlag.Name) {
 		cfg.GossipTxBroadcastDisabled = ctx.GlobalBool(GossipTxBroadcastDisabledFlag.Name)
-		log.Info("Transaction gossip broadcast disabled", "disabled", cfg.GossipTxBroadcastDisabled)
+		log.Info("Gossip transaction broadcast disabled", "disabled", cfg.GossipTxBroadcastDisabled)
 	}
 	if ctx.GlobalIsSet(GossipTxReceivingDisabledFlag.Name) {
 		cfg.GossipTxReceivingDisabled = ctx.GlobalBool(GossipTxReceivingDisabledFlag.Name)
-		log.Info("Transaction gossip receiving disabled", "disabled", cfg.GossipTxReceivingDisabled)
+		log.Info("Gossip transaction receiving disabled", "disabled", cfg.GossipTxReceivingDisabled)
 	}
 	if ctx.GlobalIsSet(GossipBroadcastToAllEnabledFlag.Name) {
-		cfg.GossipTxReceivingDisabled = ctx.GlobalBool(GossipBroadcastToAllEnabledFlag.Name)
-		log.Info("Transaction gossip receiving disabled", "disabled", cfg.GossipTxReceivingDisabled)
+		cfg.GossipBroadcastToAllEnabled = ctx.GlobalBool(GossipBroadcastToAllEnabledFlag.Name)
+		log.Info("Gossip broadcast to all enabled", "enabled", cfg.GossipBroadcastToAllEnabled)
 	}
 
 	// Cap the cache allowance and tune the garbage collector

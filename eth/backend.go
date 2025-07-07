@@ -273,18 +273,19 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		checkpoint = params.TrustedCheckpoints[genesisHash]
 	}
 	if eth.handler, err = newHandler(&handlerConfig{
-		Database:           chainDb,
-		Chain:              eth.blockchain,
-		TxPool:             eth.txPool,
-		Network:            config.NetworkId,
-		Sync:               config.SyncMode,
-		BloomCache:         uint64(cacheLimit),
-		EventMux:           eth.eventMux,
-		Checkpoint:         checkpoint,
-		Whitelist:          config.Whitelist,
-		ShadowForkPeerIDs:  config.ShadowForkPeerIDs,
-		DisableTxBroadcast: config.TxGossipBroadcastDisabled,
-		DisableTxReceiving: config.TxGossipReceivingDisabled,
+		Database:             chainDb,
+		Chain:                eth.blockchain,
+		TxPool:               eth.txPool,
+		Network:              config.NetworkId,
+		Sync:                 config.SyncMode,
+		BloomCache:           uint64(cacheLimit),
+		EventMux:             eth.eventMux,
+		Checkpoint:           checkpoint,
+		Whitelist:            config.Whitelist,
+		ShadowForkPeerIDs:    config.ShadowForkPeerIDs,
+		DisableTxBroadcast:   config.GossipTxBroadcastDisabled,
+		DisableTxReceiving:   config.GossipTxReceivingDisabled,
+		EnableBroadcastToAll: config.GossipBroadcastToAllEnabled,
 	}); err != nil {
 		return nil, err
 	}

@@ -899,7 +899,7 @@ var (
 		Usage: "Disable gossip broadcast transactions to other peers",
 	}
 	GossipTxReceivingDisabledFlag = cli.BoolFlag{
-		Name:  "txgossip.disabletxreceiving",
+		Name:  "gossip.disabletxreceiving",
 		Usage: "Disable gossip receiving transactions from other peers",
 	}
 	GossipBroadcastToAllEnabledFlag = cli.BoolFlag{

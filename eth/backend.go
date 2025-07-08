@@ -111,7 +111,7 @@ type Ethereum struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
 	// Scroll additions
-	seqRPCService        *rpc.Client
+	seqRPCService *rpc.Client
 }
 
 // New creates a new Ethereum object (including the

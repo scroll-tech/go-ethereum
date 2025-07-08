@@ -183,6 +183,7 @@ var (
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,
 		utils.DABeaconNodeAPIEndpointFlag,
+		utils.DAAwsS3BlobAPIEndpointFlag,
 		utils.DARecoveryModeFlag,
 		utils.DARecoveryInitialL1BlockFlag,
 		utils.DARecoveryInitialBatchFlag,

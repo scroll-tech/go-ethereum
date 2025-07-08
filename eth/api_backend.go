@@ -46,7 +46,7 @@ import (
 type EthAPIBackend struct {
 	extRPCEnabled       bool
 	allowUnprotectedTxs bool
-	disableTxPool		bool
+	disableTxPool       bool
 	eth                 *Ethereum
 	gpo                 *gasprice.Oracle
 }

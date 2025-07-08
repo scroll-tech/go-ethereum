@@ -179,6 +179,7 @@ var (
 		utils.GossipTxBroadcastDisabledFlag,
 		utils.GossipTxReceivingDisabledFlag,
 		utils.GossipBroadcastToAllEnabledFlag,
+		utils.GossipBroadcastToAllCapFlag,
 		utils.DASyncEnabledFlag,
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,

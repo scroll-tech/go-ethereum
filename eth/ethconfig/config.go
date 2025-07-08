@@ -234,6 +234,7 @@ type Config struct {
 	GossipTxBroadcastDisabled   bool
 	GossipTxReceivingDisabled   bool
 	GossipBroadcastToAllEnabled bool
+	GossipBroadcastToAllCap     int
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

@@ -906,6 +906,10 @@ var (
 		Name:  "gossip.enablebroadcasttoall",
 		Usage: "Enable gossip broadcast blocks and transactions to all peers",
 	}
+	GossipBroadcastToAllCapFlag = cli.IntFlag{
+		Name:  "gossip.broadcasttoallcap",
+		Usage: "Maximum number of peers for broadcasting blocks and transactions (effective only when gossip.enablebroadcasttoall is enabled)",
+	}
 
 	// DA syncing settings
 	DASyncEnabledFlag = cli.BoolFlag{
@@ -1823,6 +1827,12 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.GossipBroadcastToAllEnabled = ctx.GlobalBool(GossipBroadcastToAllEnabledFlag.Name)
 		log.Info("Gossip broadcast to all enabled", "enabled", cfg.GossipBroadcastToAllEnabled)
 	}
+	// Only configure the gossip broadcast-to-all flag if --gossip.enablebroadcasttoall is set to true.
+	if ctx.GlobalIsSet(GossipBroadcastToAllCapFlag.Name) && cfg.GossipBroadcastToAllEnabled {
+		cfg.GossipBroadcastToAllCap = ctx.GlobalInt(GossipBroadcastToAllCapFlag.Name)
+		log.Info("Maximum number of peers for broadcasting blocks and transactions is set", "cap", cfg.GossipBroadcastToAllCap)
+	}
+	
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()

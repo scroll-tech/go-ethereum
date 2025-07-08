@@ -94,9 +94,11 @@ type handlerConfig struct {
 	Whitelist         map[uint64]common.Hash    // Hard coded whitelist for sync challenged
 	ShadowForkPeerIDs []string                  // List of peer ids that take part in the shadow-fork
 
+	// Gossip configs
 	DisableTxBroadcast   bool
 	DisableTxReceiving   bool
 	EnableBroadcastToAll bool
+	BroadcastToAllCap    int
 }
 
 type handler struct {
@@ -139,6 +141,7 @@ type handler struct {
 	disableTxBroadcast   bool
 	disableTxReceiving   bool
 	enableBroadcastToAll bool
+	broadcastToAllCap    int
 }
 
 // newHandler returns a handler for all Ethereum chain management protocol.
@@ -161,6 +164,11 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		disableTxBroadcast:   config.DisableTxBroadcast,
 		disableTxReceiving:   config.DisableTxReceiving,
 		enableBroadcastToAll: config.EnableBroadcastToAll,
+	}
+	h.broadcastToAllCap = config.BroadcastToAllCap
+	if config.BroadcastToAllCap == 0 && config.EnableBroadcastToAll {
+		// Set default broadcast cap to 30 if not specified
+		h.broadcastToAllCap = 30
 	}
 	if config.Sync == downloader.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the fast
@@ -483,7 +491,7 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 		numDirect := int(math.Sqrt(float64(len(peers))))
 		// If enableBroadcastToAll is true, broadcast blocks directly to all peers (capped at 100).
 		if h.enableBroadcastToAll {
-			numDirect = min(100, len(peers))
+			numDirect = min(h.broadcastToAllCap, len(peers))
 		}
 		transfer := peers[:numDirect]
 		for _, peer := range transfer {
@@ -528,7 +536,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		numDirect := int(math.Sqrt(float64(len(peers))))
 		// If enableBroadcastToAll is true, broadcast transactions directly to all peers (capped at 100).
 		if h.enableBroadcastToAll {
-			numDirect = min(100, len(peers))
+			numDirect = min(h.broadcastToAllCap, len(peers))
 		}
 		for _, peer := range peers[:numDirect] {
 			txset[peer] = append(txset[peer], tx.Hash())

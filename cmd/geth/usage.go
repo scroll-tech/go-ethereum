@@ -252,6 +252,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.GossipTxBroadcastDisabledFlag,
 			utils.GossipTxReceivingDisabledFlag,
 			utils.GossipBroadcastToAllEnabledFlag,
+			utils.GossipBroadcastToAllCapFlag,
 		},
 	},
 	{

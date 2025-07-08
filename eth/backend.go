@@ -286,6 +286,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		DisableTxBroadcast:   config.GossipTxBroadcastDisabled,
 		DisableTxReceiving:   config.GossipTxReceivingDisabled,
 		EnableBroadcastToAll: config.GossipBroadcastToAllEnabled,
+		BroadcastToAllCap:    config.GossipBroadcastToAllCap,
 	}); err != nil {
 		return nil, err
 	}

@@ -181,6 +181,7 @@ var (
 		utils.GossipBroadcastToAllEnabledFlag,
 		utils.GossipBroadcastToAllCapFlag,
 		utils.DASyncEnabledFlag,
+		utils.DAMissingHeaderFieldsBaseURLFlag,
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,
 		utils.DABeaconNodeAPIEndpointFlag,

@@ -916,6 +916,12 @@ var (
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
 	}
+	DAMissingHeaderFieldsBaseURLFlag = cli.StringFlag{
+		Name:  "da.missingheaderfields.baseurl",
+		Usage: "Base URL for fetching missing header fields for pre-EuclidV2 blocks",
+		Value: "https://scroll-block-missing-metadata.s3.us-west-2.amazonaws.com/",
+	}
+
 	DABlobScanAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blobscan",
 		Usage: "BlobScan blob API endpoint",
@@ -1403,6 +1409,8 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.IsSet(DASyncEnabledFlag.Name) {
 		cfg.DaSyncingEnabled = ctx.Bool(DASyncEnabledFlag.Name)
 	}
+
+	cfg.DAMissingHeaderFieldsBaseURL = ctx.GlobalString(DAMissingHeaderFieldsBaseURLFlag.Name)
 
 	if ctx.GlobalIsSet(ExternalSignerFlag.Name) {
 		cfg.ExternalSigner = ctx.GlobalString(ExternalSignerFlag.Name)

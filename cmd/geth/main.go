@@ -180,6 +180,7 @@ var (
 		utils.TxGossipReceivingDisabledFlag,
 		utils.TxGossipSequencerHTTPFlag,
 		utils.DASyncEnabledFlag,
+		utils.DAMissingHeaderFieldsBaseURLFlag,
 		utils.DABlockNativeAPIEndpointFlag,
 		utils.DABlobScanAPIEndpointFlag,
 		utils.DABeaconNodeAPIEndpointFlag,

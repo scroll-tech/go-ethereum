@@ -72,7 +72,7 @@ func (m *Manager) initialize() error {
 	}
 	computedChecksum := h.Sum(nil)
 	if !bytes.Equal(computedChecksum, m.expectedChecksum[:]) {
-		return fmt.Errorf("expectedChecksum mismatch, expected %x, got %x", m.expectedChecksum, computedChecksum)
+		return fmt.Errorf("expectedChecksum mismatch, expected %x, got %x. Please delete %s to restart file download", m.expectedChecksum, computedChecksum, m.filePath)
 	}
 
 	// finally initialize the reader
@@ -84,6 +84,7 @@ func (m *Manager) initialize() error {
 	m.reader = reader
 	return nil
 }
+
 func (m *Manager) Close() error {
 	if m.reader != nil {
 		return m.reader.Close()

@@ -1881,6 +1881,7 @@ func (bc *BlockChain) BuildAndWriteBlock(parentBlock *types.Block, header *types
 	header.ParentHash = parentBlock.Hash()
 
 	// sanitize base fee
+	// Note: setting the base fee to 0 will cause problems as nil != 0 when serializing the header and thus block hash will be different.
 	if header.BaseFee != nil && header.BaseFee.Cmp(common.Big0) == 0 {
 		header.BaseFee = nil
 	}

@@ -164,11 +164,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		disableTxBroadcast:   config.DisableTxBroadcast,
 		disableTxReceiving:   config.DisableTxReceiving,
 		enableBroadcastToAll: config.EnableBroadcastToAll,
-	}
-	h.broadcastToAllCap = config.BroadcastToAllCap
-	if config.BroadcastToAllCap == 0 && config.EnableBroadcastToAll {
-		// Set default broadcast cap to 30 if not specified
-		h.broadcastToAllCap = 30
+		broadcastToAllCap:    config.BroadcastToAllCap,
 	}
 	if config.Sync == downloader.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the fast
@@ -489,7 +485,7 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 		}
 		// Send the block to a subset of our peers
 		numDirect := int(math.Sqrt(float64(len(peers))))
-		// If enableBroadcastToAll is true, broadcast blocks directly to all peers (capped at 100).
+		// If enableBroadcastToAll is true, broadcast blocks directly to all peers (capped at broadcastToAllCap).
 		if h.enableBroadcastToAll {
 			numDirect = min(h.broadcastToAllCap, len(peers))
 		}

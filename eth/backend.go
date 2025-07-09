@@ -111,7 +111,7 @@ type Ethereum struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
 	// Scroll additions
-	seqRPCService *rpc.Client
+	sequencerRPCService *rpc.Client
 }
 
 // New creates a new Ethereum object (including the
@@ -315,7 +315,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize rollup sequencer client: %w", err)
 		}
-		eth.seqRPCService = client
+		eth.sequencerRPCService = client
 	}
 
 	// Setup DNS discovery iterators.
@@ -690,8 +690,8 @@ func (s *Ethereum) Stop() error {
 	}
 	s.blockchain.Stop()
 	s.engine.Close()
-	if s.seqRPCService != nil {
-		s.seqRPCService.Close()
+	if s.sequencerRPCService != nil {
+		s.sequencerRPCService.Close()
 	}
 	rawdb.PopUncleanShutdownMarker(s.chainDb)
 	s.chainDb.Close()

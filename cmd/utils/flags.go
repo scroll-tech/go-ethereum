@@ -895,15 +895,15 @@ var (
 
 	// Tx gossip settings
 	TxGossipBroadcastDisabledFlag = cli.BoolFlag{
-		Name:  "txgossip.disablebroadcast",
+		Name:  "gossip.disablebroadcast",
 		Usage: "Disable gossip broadcast transactions to other peers",
 	}
 	TxGossipReceivingDisabledFlag = cli.BoolFlag{
-		Name:  "txgossip.disablereceiving",
+		Name:  "gossip.disablereceiving",
 		Usage: "Disable gossip receiving transactions from other peers",
 	}
 	TxGossipSequencerHTTPFlag = &cli.StringFlag{
-		Name:  "txgossip.sequencerhttp",
+		Name:  "gossip.sequencerhttp",
 		Usage: "Sequencer mempool HTTP endpoint",
 	}
 

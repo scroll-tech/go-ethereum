@@ -269,31 +269,27 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 		return types.ErrTxTypeNotSupported
 	}
 
+	// Retain tx in local tx pool before forwarding to sequencer rpc, for local RPC usage.
+	err := b.sendTx(signedTx)
+	if err != nil {
+		return err
+	}
+
 	// Forward to remote sequencer RPC
-	var seqRPCErr error
 	if b.eth.sequencerRPCService != nil {
 		signedTxData, err := signedTx.MarshalBinary()
 		if err != nil {
 			return err
 		}
-		if seqRPCErr = b.eth.sequencerRPCService.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(signedTxData)); seqRPCErr != nil {
-			log.Warn("failed to send tx to sequencer", "tx", signedTx.Hash())
+		if err = b.eth.sequencerRPCService.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(signedTxData)); err != nil {
+			log.Warn("failed to forward tx to sequencer", "tx", signedTx.Hash(), "err", err)
 			if b.disableTxPool {
-				return seqRPCErr
+				return err
 			}
 		}
 	}
-	if b.disableTxPool {
-		return nil
-	}
 
-	// Retain tx in local tx pool after forwarding, for local RPC usage.
-	err := b.sendTx(signedTx)
-	if err != nil && b.eth.sequencerRPCService != nil && seqRPCErr == nil {
-		log.Warn("successfully sent tx to sequencer, but failed to persist in local tx pool", "err", err, "tx", signedTx.Hash())
-		return nil
-	}
-	return err
+	return nil
 }
 
 func (b *EthAPIBackend) sendTx(signedTx *types.Transaction) error {

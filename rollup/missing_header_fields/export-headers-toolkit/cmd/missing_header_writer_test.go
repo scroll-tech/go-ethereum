@@ -5,9 +5,10 @@ import (
 	"crypto/rand"
 	"testing"
 
-	coreTypes "github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	coreTypes "github.com/scroll-tech/go-ethereum/core/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
 

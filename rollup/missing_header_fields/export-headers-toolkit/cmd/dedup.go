@@ -16,8 +16,8 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	coreTypes "github.com/scroll-tech/go-ethereum/core/types"
-
 	"github.com/scroll-tech/go-ethereum/export-headers-toolkit/types"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 // dedupCmd represents the dedup command
@@ -48,6 +48,9 @@ The binary layout of the deduplicated file is as follows:
 		if err != nil {
 			log.Fatalf("Error reading verify flag: %v", err)
 		}
+
+		// uncomment the following line to copy from the verify file to the input file. This is useful to generate a deduplicated header file for testing purposes.
+		// copyFromVerifyFile(verifyFile, inputFile)
 
 		if verifyFile != "" {
 			verifyInputFile(verifyFile, inputFile)
@@ -251,6 +254,20 @@ func (h *csvHeaderReader) close() {
 	h.file.Close()
 }
 
+func copyFromVerifyFile(verifyFile, inputFile string) {
+	fmt.Println("Copying from", verifyFile, "to", inputFile)
+
+	csvReader := newCSVHeaderReader(verifyFile)
+	defer csvReader.close()
+
+	writer := newFilesWriter(inputFile, "")
+	defer writer.close()
+
+	for header := csvReader.readNext(); header != nil; header = csvReader.readNext() {
+		writer.write(header)
+	}
+}
+
 func verifyInputFile(verifyFile, inputFile string) {
 	csvReader := newCSVHeaderReader(verifyFile)
 	defer csvReader.close()
@@ -273,7 +290,7 @@ func verifyOutputFile(verifyFile, outputFile string) {
 	csvReader := newCSVHeaderReader(verifyFile)
 	defer csvReader.close()
 
-	dedupReader, err := NewReader(outputFile)
+	dedupReader, err := missing_header_fields.NewReader(outputFile)
 	if err != nil {
 		log.Fatalf("Error opening dedup file: %v", err)
 	}
@@ -282,7 +299,7 @@ func verifyOutputFile(verifyFile, outputFile string) {
 	for {
 		header := csvReader.readNext()
 		if header == nil {
-			if _, _, _, _, err = dedupReader.ReadNext(); err == nil {
+			if err = dedupReader.ReadNext(); err == nil {
 				log.Fatalf("Expected EOF, got more headers")
 			}
 			break

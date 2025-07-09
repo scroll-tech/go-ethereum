@@ -999,7 +999,7 @@ func EstimateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, bloc
 	}()
 
 	signer := types.MakeSigner(config, header.Number, header.Time)
-	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config, signer, evm.StateDB, header.Number)
+	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config, signer, evm.StateDB, header.Number, header.Time)
 }
 
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
@@ -1447,7 +1447,8 @@ func newRPCPendingTransaction(tx *types.Transaction, current *types.Header, conf
 	blockNumber := uint64(0)
 	blockTime := uint64(0)
 	if current != nil {
-		baseFee = misc.CalcBaseFee(config, current, l1BaseFee)
+		// Use time.Now() as the current block time to calculate the pending base fee.
+		baseFee = misc.CalcBaseFee(config, current, l1BaseFee, uint64(time.Now().Unix()))
 		blockNumber = current.Number.Uint64()
 		blockTime = current.Time
 	}
@@ -1595,7 +1596,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 			return nil, 0, nil, err
 		}
 		signer := types.MakeSigner(b.ChainConfig(), header.Number, header.Time)
-		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig(), signer, statedb, header.Number)
+		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig(), signer, statedb, header.Number, header.Time)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}

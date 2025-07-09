@@ -241,6 +241,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.DABlobScanAPIEndpointFlag,
 			utils.DABlockNativeAPIEndpointFlag,
 			utils.DABeaconNodeAPIEndpointFlag,
+			utils.DAAwsS3BlobAPIEndpointFlag,
 			utils.DARecoveryModeFlag,
 			utils.DARecoveryInitialL1BlockFlag,
 			utils.DARecoveryInitialBatchFlag,
@@ -249,6 +250,8 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.DARecoveryProduceBlocksFlag,
 			utils.CircuitCapacityCheckEnabledFlag,
 			utils.CircuitCapacityCheckWorkersFlag,
+			utils.TxGossipBroadcastDisabledFlag,
+			utils.TxGossipReceivingDisabledFlag,
 		},
 	},
 	{

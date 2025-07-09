@@ -530,7 +530,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		peers := onlyShadowForkPeers(h.shadowForkPeerIDs, h.peers.peersWithoutTransaction(tx.Hash()))
 		// Send the tx unconditionally to a subset of our peers
 		numDirect := int(math.Sqrt(float64(len(peers))))
-		// If enableBroadcastToAll is true, broadcast transactions directly to all peers (capped at 100).
+		// If enableBroadcastToAll is true, broadcast transactions directly to all peers (capped at broadcastToAllCap).
 		if h.enableBroadcastToAll {
 			numDirect = min(h.broadcastToAllCap, len(peers))
 		}

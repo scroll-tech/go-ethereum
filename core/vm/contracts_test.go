@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/validium"
+	"github.com/scroll-tech/go-ethereum/crypto"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -41,6 +43,19 @@ type precompiledFailureTest struct {
 	Input         string
 	ExpectedError string
 	Name          string
+}
+
+// mockStateDB is a mock implementation of the stateDB interface
+// used for testing the ecies decrypt precompiled contract.
+type mockStateDB map[common.Address]map[common.Hash]common.Hash
+
+func (m *mockStateDB) GetState(addr common.Address, key common.Hash) common.Hash {
+	if addrState, ok := (*m)[addr]; ok {
+		if val, ok := addrState[key]; ok {
+			return val
+		}
+	}
+	return common.Hash{}
 }
 
 // allPrecompiles does not map to the actual set of precompiles, as it also contains
@@ -97,11 +112,15 @@ var blake2FMalformedInputTests = []precompiledFailureTest{
 }
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
+	testPrecompiledWithState(addr, test, nil, t)
+}
+
+func testPrecompiledWithState(addr string, test precompiledTest, state stateDB, t *testing.T) {
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
 	gas := p.RequiredGas(in)
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
-		if res, _, err := RunPrecompiledContract(p, nil, in, gas); err != nil {
+		if res, _, err := RunPrecompiledContract(p, state, in, gas); err != nil {
 			t.Error(err)
 		} else if common.Bytes2Hex(res) != test.Expected {
 			t.Errorf("Expected %v, got %v", test.Expected, common.Bytes2Hex(res))
@@ -136,11 +155,15 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 }
 
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
+	testPrecompiledFailureWithState(addr, test, nil, t)
+}
+
+func testPrecompiledFailureWithState(addr string, test precompiledFailureTest, state stateDB, t *testing.T) {
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
 	gas := p.RequiredGas(in)
 	t.Run(test.Name, func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, nil, in, gas)
+		_, _, err := RunPrecompiledContract(p, state, in, gas)
 		if err == nil {
 			t.Errorf("Expected error [%v], got nil", test.ExpectedError)
 		}
@@ -415,4 +438,65 @@ func BenchmarkPrecompiledP256Verify(bench *testing.B) {
 
 func TestPrecompiledP256Verify(t *testing.T) {
 	testJson("p256Verify", "100", t)
+}
+
+func TestPrecompiledEciesDecryptCurrentPubkey(t *testing.T) {
+	testcase := precompiledTest{
+		Input:    "040a8df01d04f193e175c468a034e057076a9d62dafa0917134f496b1fade97296a3936706206d5d5742849dd303fa1155df026fe59e8014ac44720085cccc0e7a8db689efa7fe30e32ed826fe4f0e4dcad865e3a133f4dd1b47b0e3e614fb4edf43bcb853e6c87ff5a5deb33ffc1c4d7d7ee8d5c253c0c445bc6076bf7403a2cbe9c5285c86a6852a6a70cb2ce6e0e38324df",
+		Expected: common.Bytes2Hex([]byte("127b15f37acbeaa4188a3388689445ae892787bcrandomSeed")),
+		Name:     "",
+	}
+
+	sk := "f5cee12961c0b9b25fd406ee87383a48b275b227050481892e57e9e836f3d38e"
+	pk := validium.DerivePubkey(common.Hex2Bytes(sk))
+	commitment := crypto.Keccak256(pk.Bytes(true))
+
+	state := &mockStateDB{
+		validium.ValidiumBridgeAddress: {
+			validium.CurrentPubkeySlot: common.BytesToHash(commitment),
+		},
+	}
+
+	testPrecompiledWithState("200", testcase, state, t)
+}
+
+func TestPrecompiledEciesDecryptPrevPubkey(t *testing.T) {
+	testcase := precompiledTest{
+		Input:    "040a8df01d04f193e175c468a034e057076a9d62dafa0917134f496b1fade97296a3936706206d5d5742849dd303fa1155df026fe59e8014ac44720085cccc0e7a8db689efa7fe30e32ed826fe4f0e4dcad865e3a133f4dd1b47b0e3e614fb4edf43bcb853e6c87ff5a5deb33ffc1c4d7d7ee8d5c253c0c445bc6076bf7403a2cbe9c5285c86a6852a6a70cb2ce6e0e38324df",
+		Expected: common.Bytes2Hex([]byte("127b15f37acbeaa4188a3388689445ae892787bcrandomSeed")),
+		Name:     "",
+	}
+
+	sk := "f5cee12961c0b9b25fd406ee87383a48b275b227050481892e57e9e836f3d38e"
+	pk := validium.DerivePubkey(common.Hex2Bytes(sk))
+	commitment := crypto.Keccak256(pk.Bytes(true))
+	random := crypto.Keccak256([]byte("random"))
+
+	state := &mockStateDB{
+		validium.ValidiumBridgeAddress: {
+			validium.CurrentPubkeySlot: common.BytesToHash(random),
+			validium.PrevPubkeySlot:    common.BytesToHash(commitment),
+		},
+	}
+
+	testPrecompiledWithState("200", testcase, state, t)
+}
+
+func TestPrecompiledEciesDecryptUnknownPubkey(t *testing.T) {
+	testcase := precompiledFailureTest{
+		Input:         "040a8df01d04f193e175c468a034e057076a9d62dafa0917134f496b1fade97296a3936706206d5d5742849dd303fa1155df026fe59e8014ac44720085cccc0e7a8db689efa7fe30e32ed826fe4f0e4dcad865e3a133f4dd1b47b0e3e614fb4edf43bcb853e6c87ff5a5deb33ffc1c4d7d7ee8d5c253c0c445bc6076bf7403a2cbe9c5285c86a6852a6a70cb2ce6e0e38324df",
+		ExpectedError: errEciesDecryptUnknownSequencerKey.Error(),
+		Name:          "",
+	}
+
+	random := crypto.Keccak256([]byte("random"))
+
+	state := &mockStateDB{
+		validium.ValidiumBridgeAddress: {
+			validium.CurrentPubkeySlot: common.BytesToHash(random),
+			validium.PrevPubkeySlot:    common.BytesToHash(random),
+		},
+	}
+
+	testPrecompiledFailureWithState("200", testcase, state, t)
 }

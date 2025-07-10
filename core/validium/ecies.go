@@ -36,12 +36,6 @@ func PrevPubkey(state stateDB) []byte {
 	return val[:]
 }
 
-// DerivePubkey derives the public key from a given private key.
-func DerivePubkey(privateKey []byte) *ecies.PublicKey {
-	k := ecies.NewPrivateKeyFromBytes(privateKey)
-	return k.PublicKey
-}
-
 // DecryptEcies decrypts the given ciphertext using the provided private key.
 // It returns the plaintext bytes or an error if decryption fails.
 func DecryptEcies(ciphertext []byte, k *ecies.PrivateKey) ([]byte, error) {

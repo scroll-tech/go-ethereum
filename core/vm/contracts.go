@@ -1248,9 +1248,6 @@ func (c *eciesDecrypt) Run(ciphertext []byte) ([]byte, error) {
 		return nil, errEciesDecryptInvalidCiphertextLength
 	}
 
-	// // TODO: Read secret key from configuration
-	// sk := common.Hex2Bytes("f5cee12961c0b9b25fd406ee87383a48b275b227050481892e57e9e836f3d38e")
-
 	plaintext, err := c.decrypt(ciphertext)
 	if err != nil {
 		return nil, err

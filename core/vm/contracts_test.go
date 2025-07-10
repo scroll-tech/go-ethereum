@@ -53,19 +53,6 @@ type precompiledFailureTest struct {
 	Name          string
 }
 
-// mockStateDB is a mock implementation of the stateDB interface
-// used for testing the ecies decrypt precompiled contract.
-type mockStateDB map[common.Address]map[common.Hash]common.Hash
-
-func (m *mockStateDB) GetState(addr common.Address, key common.Hash) common.Hash {
-	if addrState, ok := (*m)[addr]; ok {
-		if val, ok := addrState[key]; ok {
-			return val
-		}
-	}
-	return common.Hash{}
-}
-
 // allPrecompiles does not map to the actual set of precompiles, as it also contains
 // repriced versions of precompiles at certain slots
 var allPrecompiles = map[common.Address]PrecompiledContract{
@@ -473,17 +460,32 @@ func TestPrecompiledEciesDecryptUnknownKey(t *testing.T) {
 	testPrecompiledFailure("200", testcase, t)
 }
 
+func privkeyToCommitment(privkey string) common.Hash {
+	sk := ecies.NewPrivateKeyFromBytes(common.Hex2Bytes(privkey))
+	pk := sk.PublicKey
+	compressed := pk.Bytes(true)
+	return crypto.Keccak256Hash(compressed)
+}
+
+type mockStateDB map[common.Address]map[common.Hash]common.Hash
+
+func (m *mockStateDB) GetState(addr common.Address, key common.Hash) common.Hash {
+	if addrState, ok := (*m)[addr]; ok {
+		if val, ok := addrState[key]; ok {
+			return val
+		}
+	}
+	return common.Hash{}
+}
+
 func TestPrecompiledEciesDecryptCheckKeys(t *testing.T) {
 	precompile := allPrecompiles[common.HexToAddress("200")].(*eciesDecrypt)
-
-	currentCommitment := crypto.Keccak256(validium.DerivePubkey(common.Hex2Bytes(currentPrivkey)).Bytes(true))
-	prevCommitment := crypto.Keccak256(validium.DerivePubkey(common.Hex2Bytes(prevPrivkey)).Bytes(true))
 
 	// both correct
 	state := &mockStateDB{
 		validium.ValidiumBridgeAddress: {
-			validium.CurrentPubkeySlot: common.BytesToHash(currentCommitment),
-			validium.PrevPubkeySlot:    common.BytesToHash(prevCommitment),
+			validium.CurrentPubkeySlot: privkeyToCommitment(currentPrivkey),
+			validium.PrevPubkeySlot:    privkeyToCommitment(prevPrivkey),
 		},
 	}
 
@@ -492,10 +494,10 @@ func TestPrecompiledEciesDecryptCheckKeys(t *testing.T) {
 		t.Fatalf("checkKeys failed: %v", err)
 	}
 
-	// current wrong
+	// prev wrong
 	state = &mockStateDB{
 		validium.ValidiumBridgeAddress: {
-			validium.PrevPubkeySlot: common.BytesToHash(prevCommitment),
+			validium.CurrentPubkeySlot: privkeyToCommitment(currentPrivkey),
 		},
 	}
 
@@ -504,10 +506,10 @@ func TestPrecompiledEciesDecryptCheckKeys(t *testing.T) {
 		t.Fatalf("expected error, got nil")
 	}
 
-	// prev wrong
+	// current wrong
 	state = &mockStateDB{
 		validium.ValidiumBridgeAddress: {
-			validium.CurrentPubkeySlot: common.BytesToHash(currentCommitment),
+			validium.PrevPubkeySlot: privkeyToCommitment(prevPrivkey),
 		},
 	}
 

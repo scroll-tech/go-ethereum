@@ -44,9 +44,7 @@ func DerivePubkey(privateKey []byte) *ecies.PublicKey {
 
 // DecryptEcies decrypts the given ciphertext using the provided private key.
 // It returns the plaintext bytes or an error if decryption fails.
-func DecryptEcies(ciphertext, privateKey []byte) ([]byte, error) {
-	k := ecies.NewPrivateKeyFromBytes(privateKey)
-
+func DecryptEcies(ciphertext []byte, k *ecies.PrivateKey) ([]byte, error) {
 	plaintext, err := ecies.Decrypt(k, ciphertext)
 	if err != nil {
 		log.Warn("failed to decrypt ECIES ciphertext", "ciphertext", common.Bytes2Hex(ciphertext), "error", err)

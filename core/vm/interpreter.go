@@ -23,6 +23,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/log"
+
+	ecies "github.com/scroll-tech/ecies-go/v2"
 )
 
 // Config are the configuration options for the Interpreter
@@ -36,6 +38,9 @@ type Config struct {
 	JumpTable [256]*operation // EVM instruction table, automatically populated if unset
 
 	ExtraEips []int // Additional EIPS that are to be enabled
+
+	currentPrivkey *ecies.PrivateKey
+	prevPrivkey    *ecies.PrivateKey
 }
 
 // ScopeContext contains the things that are per-call, such as stack and memory,

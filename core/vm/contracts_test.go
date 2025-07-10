@@ -27,6 +27,14 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/validium"
 	"github.com/scroll-tech/go-ethereum/crypto"
+
+	ecies "github.com/scroll-tech/ecies-go/v2"
+)
+
+// Ecies decrypt precompiled contract test private keys.
+var (
+	currentPrivkey string = "f5cee12961c0b9b25fd406ee87383a48b275b227050481892e57e9e836f3d38e"
+	prevPrivkey    string = "a5c811150e0fe937db4f3cef00316a4763d9017630c0789c697432092dab930f"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -84,7 +92,10 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 
 	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
 
-	common.BytesToAddress([]byte{0x02, 0x00}): &eciesDecrypt{},
+	common.BytesToAddress([]byte{0x02, 0x00}): &eciesDecrypt{
+		currentPrivkey: ecies.NewPrivateKeyFromBytes(common.Hex2Bytes(currentPrivkey)),
+		prevPrivkey:    ecies.NewPrivateKeyFromBytes(common.Hex2Bytes(prevPrivkey)),
+	},
 }
 
 // EIP-152 test vectors
@@ -112,15 +123,11 @@ var blake2FMalformedInputTests = []precompiledFailureTest{
 }
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
-	testPrecompiledWithState(addr, test, nil, t)
-}
-
-func testPrecompiledWithState(addr string, test precompiledTest, state stateDB, t *testing.T) {
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
 	gas := p.RequiredGas(in)
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
-		if res, _, err := RunPrecompiledContract(p, state, in, gas); err != nil {
+		if res, _, err := RunPrecompiledContract(p, in, gas); err != nil {
 			t.Error(err)
 		} else if common.Bytes2Hex(res) != test.Expected {
 			t.Errorf("Expected %v, got %v", test.Expected, common.Bytes2Hex(res))
@@ -142,7 +149,7 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 	gas := p.RequiredGas(in) - 1
 
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, nil, in, gas)
+		_, _, err := RunPrecompiledContract(p, in, gas)
 		if err.Error() != "out of gas" {
 			t.Errorf("Expected error [out of gas], got [%v]", err)
 		}
@@ -155,15 +162,11 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 }
 
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
-	testPrecompiledFailureWithState(addr, test, nil, t)
-}
-
-func testPrecompiledFailureWithState(addr string, test precompiledFailureTest, state stateDB, t *testing.T) {
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
 	gas := p.RequiredGas(in)
 	t.Run(test.Name, func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, state, in, gas)
+		_, _, err := RunPrecompiledContract(p, in, gas)
 		if err == nil {
 			t.Errorf("Expected error [%v], got nil", test.ExpectedError)
 		}
@@ -198,7 +201,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
 			copy(data, in)
-			res, _, err = RunPrecompiledContract(p, nil, data, reqGas)
+			res, _, err = RunPrecompiledContract(p, data, reqGas)
 		}
 		bench.StopTimer()
 		elapsed := uint64(time.Since(start))
@@ -440,63 +443,76 @@ func TestPrecompiledP256Verify(t *testing.T) {
 	testJson("p256Verify", "100", t)
 }
 
-func TestPrecompiledEciesDecryptCurrentPubkey(t *testing.T) {
+func TestPrecompiledEciesDecryptCurrentKey(t *testing.T) {
 	testcase := precompiledTest{
 		Input:    "040a8df01d04f193e175c468a034e057076a9d62dafa0917134f496b1fade97296a3936706206d5d5742849dd303fa1155df026fe59e8014ac44720085cccc0e7a8db689efa7fe30e32ed826fe4f0e4dcad865e3a133f4dd1b47b0e3e614fb4edf43bcb853e6c87ff5a5deb33ffc1c4d7d7ee8d5c253c0c445bc6076bf7403a2cbe9c5285c86a6852a6a70cb2ce6e0e38324df",
 		Expected: common.Bytes2Hex([]byte("127b15f37acbeaa4188a3388689445ae892787bcrandomSeed")),
 		Name:     "",
 	}
 
-	sk := "f5cee12961c0b9b25fd406ee87383a48b275b227050481892e57e9e836f3d38e"
-	pk := validium.DerivePubkey(common.Hex2Bytes(sk))
-	commitment := crypto.Keccak256(pk.Bytes(true))
-
-	state := &mockStateDB{
-		validium.ValidiumBridgeAddress: {
-			validium.CurrentPubkeySlot: common.BytesToHash(commitment),
-		},
-	}
-
-	testPrecompiledWithState("200", testcase, state, t)
+	testPrecompiled("200", testcase, t)
 }
 
-func TestPrecompiledEciesDecryptPrevPubkey(t *testing.T) {
+func TestPrecompiledEciesDecryptPrevKey(t *testing.T) {
 	testcase := precompiledTest{
-		Input:    "040a8df01d04f193e175c468a034e057076a9d62dafa0917134f496b1fade97296a3936706206d5d5742849dd303fa1155df026fe59e8014ac44720085cccc0e7a8db689efa7fe30e32ed826fe4f0e4dcad865e3a133f4dd1b47b0e3e614fb4edf43bcb853e6c87ff5a5deb33ffc1c4d7d7ee8d5c253c0c445bc6076bf7403a2cbe9c5285c86a6852a6a70cb2ce6e0e38324df",
+		Input:    "04cfb22f8e343747949e1d31a27b3787cfbf659c583eaf99141fc06285e357b30b9ce2d19cdab55ee9eba840e63a8bec7da6fb1927239348176622f87d9497ee68a58237c4a55cb5ae94b14b65168d7527ee0c4c2aaa2c671c4839975391145687ef01645feb3e475e61538421644d100971f05bfc94617381b0b4504c57d89513e10bb4b33f42af6d89529605f96f27b7c1f0",
 		Expected: common.Bytes2Hex([]byte("127b15f37acbeaa4188a3388689445ae892787bcrandomSeed")),
 		Name:     "",
 	}
 
-	sk := "f5cee12961c0b9b25fd406ee87383a48b275b227050481892e57e9e836f3d38e"
-	pk := validium.DerivePubkey(common.Hex2Bytes(sk))
-	commitment := crypto.Keccak256(pk.Bytes(true))
-	random := crypto.Keccak256([]byte("random"))
-
-	state := &mockStateDB{
-		validium.ValidiumBridgeAddress: {
-			validium.CurrentPubkeySlot: common.BytesToHash(random),
-			validium.PrevPubkeySlot:    common.BytesToHash(commitment),
-		},
-	}
-
-	testPrecompiledWithState("200", testcase, state, t)
+	testPrecompiled("200", testcase, t)
 }
 
-func TestPrecompiledEciesDecryptUnknownPubkey(t *testing.T) {
+func TestPrecompiledEciesDecryptUnknownKey(t *testing.T) {
 	testcase := precompiledFailureTest{
-		Input:         "040a8df01d04f193e175c468a034e057076a9d62dafa0917134f496b1fade97296a3936706206d5d5742849dd303fa1155df026fe59e8014ac44720085cccc0e7a8db689efa7fe30e32ed826fe4f0e4dcad865e3a133f4dd1b47b0e3e614fb4edf43bcb853e6c87ff5a5deb33ffc1c4d7d7ee8d5c253c0c445bc6076bf7403a2cbe9c5285c86a6852a6a70cb2ce6e0e38324df",
-		ExpectedError: errEciesDecryptUnknownSequencerKey.Error(),
+		Input:         "04edfb66aa2a390a6a843eff688adfac354f959e69b3ca7bdd9dc7b9e498eb393b7982fa1e89eaed1a3cec83fe289145992899bfd958d5fafd943bbef0ef393da0df52598bc218304f7e2234b0a34b76c6ef2f603dda1ef38f0f149208014eed936db546c9c92c469fd1866a8bb286185d8390cd9a914acbfae1acb58c6eb8affe8b6d2ef72c61617cc8371e0273e4eda0a8ea",
+		ExpectedError: errEciesDecryptDecryptionFailed.Error(),
 		Name:          "",
 	}
 
-	random := crypto.Keccak256([]byte("random"))
+	testPrecompiledFailure("200", testcase, t)
+}
 
+func TestPrecompiledEciesDecryptCheckKeys(t *testing.T) {
+	precompile := allPrecompiles[common.HexToAddress("200")].(*eciesDecrypt)
+
+	currentCommitment := crypto.Keccak256(validium.DerivePubkey(common.Hex2Bytes(currentPrivkey)).Bytes(true))
+	prevCommitment := crypto.Keccak256(validium.DerivePubkey(common.Hex2Bytes(prevPrivkey)).Bytes(true))
+
+	// both correct
 	state := &mockStateDB{
 		validium.ValidiumBridgeAddress: {
-			validium.CurrentPubkeySlot: common.BytesToHash(random),
-			validium.PrevPubkeySlot:    common.BytesToHash(random),
+			validium.CurrentPubkeySlot: common.BytesToHash(currentCommitment),
+			validium.PrevPubkeySlot:    common.BytesToHash(prevCommitment),
 		},
 	}
 
-	testPrecompiledFailureWithState("200", testcase, state, t)
+	err := precompile.checkKeys(state)
+	if err != nil {
+		t.Fatalf("checkKeys failed: %v", err)
+	}
+
+	// current wrong
+	state = &mockStateDB{
+		validium.ValidiumBridgeAddress: {
+			validium.PrevPubkeySlot: common.BytesToHash(prevCommitment),
+		},
+	}
+
+	err = precompile.checkKeys(state)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	// prev wrong
+	state = &mockStateDB{
+		validium.ValidiumBridgeAddress: {
+			validium.CurrentPubkeySlot: common.BytesToHash(currentCommitment),
+		},
+	}
+
+	err = precompile.checkKeys(state)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
 }

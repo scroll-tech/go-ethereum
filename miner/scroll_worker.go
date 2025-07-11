@@ -35,6 +35,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/validium"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
@@ -689,6 +690,13 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
+		// Decrypt L1 message payloads.
+		for _, msg := range l1Messages {
+			if decrypted, err := validium.DecryptTxData(msg.Data); err == nil {
+				msg.Data = decrypted
+			}
+		}
+
 		log.Trace("Processing L1 messages for inclusion", "count", len(l1Messages))
 		txs, err := types.NewL1MessagesByQueueIndex(l1Messages)
 		if err != nil {

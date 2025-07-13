@@ -26,7 +26,7 @@ import (
 
 func TestGetCommittedBatchMetaCodecV0(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
-		Scroll: params.ScrollConfig{
+		Scroll: &params.ScrollConfig{
 			L1Config: &params.L1Config{
 				L1ChainId:             11155111,
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
@@ -75,7 +75,7 @@ func TestGetCommittedBatchMetaCodecV0(t *testing.T) {
 
 func TestGetCommittedBatchMetaCodecV1(t *testing.T) {
 	genesisConfig := &params.ChainConfig{
-		Scroll: params.ScrollConfig{
+		Scroll: &params.ScrollConfig{
 			L1Config: &params.L1Config{
 				L1ChainId:             11155111,
 				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),

@@ -294,7 +294,7 @@ var (
 			Period: 3,
 			Epoch:  30000,
 		},
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
@@ -342,7 +342,7 @@ var (
 			SystemContractAddress: common.HexToAddress("0xC706Ba9fa4fedF4507CB7A898b4766c1bbf9be57"),
 			SystemContractSlot:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000067"),
 		},
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
@@ -395,7 +395,7 @@ var (
 			SystemContractAddress: common.HexToAddress("0x8432728A257646449245558B8b7Dbe51A16c7a4D"),
 			SystemContractSlot:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000067"),
 		},
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 true,
 			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
@@ -445,7 +445,7 @@ var (
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
@@ -489,7 +489,7 @@ var (
 		TerminalTotalDifficulty: nil,
 		Ethash:                  nil,
 		Clique:                  &CliqueConfig{Period: 0, Epoch: 30000},
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
@@ -531,7 +531,7 @@ var (
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           &common.Address{123},
 			MaxTxPerBlock:             nil,
@@ -571,7 +571,7 @@ var (
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
-		Scroll: ScrollConfig{
+		Scroll: &ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
 			MaxTxPerBlock:             nil,
@@ -681,7 +681,7 @@ type ChainConfig struct {
 	SystemContract *SystemContractConfig `json:"systemContract,omitempty"`
 
 	// Scroll genesis extension: enable scroll rollup-related traces & state transition
-	Scroll ScrollConfig `json:"scroll,omitempty"`
+	Scroll *ScrollConfig `json:"scroll,omitempty"`
 }
 
 func (c *ChainConfig) Clone() *ChainConfig {
@@ -1017,6 +1017,11 @@ func (c *ChainConfig) IsFeynman(now uint64) bool {
 // IsFeynmanTransitionBlock returns whether the given block timestamp corresponds to the first Feynman block.
 func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
 	return isForkedTime(blockTimestamp, c.FeynmanTime) && !isForkedTime(parentTimestamp, c.FeynmanTime)
+}
+
+// IsScroll returns whether the node is an scroll node or not.
+func (c *ChainConfig) IsScroll() bool {
+	return c.Scroll != nil
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

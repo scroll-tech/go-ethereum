@@ -17,7 +17,6 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		suggestion = oracle.defaultBasePrice
 	}
 
-
 	// find the maximum gas used by any of the transactions in the block to use as the gas limit
 	// capacity margin
 	receipts, err := oracle.backend.GetReceipts(ctx, header.Hash())
@@ -34,7 +33,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		}
 	}
 
-	// find the maximum transaction size by any of the transactions in the block to use as the block 
+	// find the maximum transaction size by any of the transactions in the block to use as the block
 	// size limit capacity margin
 	var (
 		maxTxSizeUsed   common.StorageSize

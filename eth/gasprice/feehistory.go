@@ -248,14 +248,14 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	// If the suggestedGasPrice equels to oracle.defaultGasTipCap, means the latest block is out of capaticy. we consider the network
 	// to be non-congested and suggest a minimal tip cap. This is to prevent users from overpaying for gas when the network is not
 	// congested and a few high-priced txs are causing the suggested tip cap to be high.
-	var outCapaticyGasPrice *big.Int
+	var nonCongestedPrice *big.Int
 	suggestedGasPrice := oracle.CalculateSuggestPriorityFee(ctx, headHeader)
 	if suggestedGasPrice.Cmp(oracle.defaultGasTipCap) == 0 {
 		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
 		// as the base fee is set separately or added manually for legacy transactions.
-		outCapaticyGasPrice = oracle.defaultGasTipCap
+		nonCongestedPrice = oracle.defaultGasTipCap
 		if !oracle.backend.ChainConfig().IsCurie(headHeader.Number) {
-			outCapaticyGasPrice = oracle.defaultBasePrice
+			nonCongestedPrice = oracle.defaultBasePrice
 		}
 	}
 
@@ -282,7 +282,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 				if pendingBlock != nil && blockNumber >= pendingBlock.NumberU64() {
 					fees.block, fees.receipts = pendingBlock, pendingReceipts
 					fees.header = fees.block.Header()
-					oracle.processBlock(fees, rewardPercentiles, outCapaticyGasPrice)
+					oracle.processBlock(fees, rewardPercentiles, nonCongestedPrice)
 					results <- fees
 				} else {
 					cacheKey := struct {
@@ -304,7 +304,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 							fees.header, fees.err = oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNumber))
 						}
 						if fees.header != nil && fees.err == nil {
-							oracle.processBlock(fees, rewardPercentiles, outCapaticyGasPrice)
+							oracle.processBlock(fees, rewardPercentiles, nonCongestedPrice)
 							if fees.err == nil {
 								oracle.historyCache.Add(cacheKey, fees.results)
 							}

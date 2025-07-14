@@ -1837,6 +1837,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.GossipBroadcastToAllCap = ctx.GlobalInt(GossipBroadcastToAllCapFlag.Name)
 		log.Info("Gossip broadcast to all enabled", "enabled", cfg.GossipBroadcastToAllEnabled, "cap", cfg.GossipBroadcastToAllCap)
 	}
+	// Only configure sequencer http flag if we're running in verifier mode i.e. --mine is disabled.
+	if ctx.IsSet(TxGossipSequencerHTTPFlag.Name) && !ctx.IsSet(MiningEnabledFlag.Name) {
+		cfg.TxGossipSequencerHTTP = ctx.String(TxGossipSequencerHTTPFlag.Name)
+	}
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()

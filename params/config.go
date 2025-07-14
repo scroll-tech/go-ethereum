@@ -1021,8 +1021,7 @@ func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTime
 
 // IsScroll returns whether the node is an scroll node or not.
 func (c *ChainConfig) IsScroll() bool {
-	// return c.Scroll != nil
-	return true
+	return c.Scroll.L1Config != nil
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

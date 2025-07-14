@@ -65,23 +65,27 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 	}
 
 	if header.GasUsed+maxTxGasUsed > header.GasLimit ||
-		!oracle.backend.ChainConfig().Scroll.IsValidTxCount(len(txs)+1) ||
 		!oracle.backend.ChainConfig().Scroll.IsValidBlockSizeForMining(totalTxSizeUsed+maxTxSizeUsed) {
-		// There are three cases represent a block is "at capacity":
-		// 1. when it is built, there is a pending tx in the txpool that could not be included because the block's gas limit would be exceeded.
-		// 2. The transaction number in a block reach the MaxTxPerBlock limit
-		// 3. when it is built, there is a pending tx in the txpool that could not be included because the block's transaction payload size would be exceeded.
-		// Since we don't have access to the txpool, we instead adopt the following heuristic: consider a block as
-		// at capacity if the total gas consumed by its transactions is within max-tx-gas-used of
-		// the block limit, where max-tx-gas-used is the most gas used by any one transaction
-		// within the block. This heuristic is almost perfectly accurate when transactions always
-		// consume the same amount of gas, but becomes less accurate as tx gas consumption begins
-		// to vary. The typical error is we assume a block is at capacity when it was not because
-		// max-tx-gas-used will in most cases over-estimate the "capacity margin". But it's better
-		// to err on the side of returning a higher-than-needed suggestion than a lower-than-needed
-		// one in order to satisfy our desire for high chance of inclusion and rising fees under
-		// high demand.
-
+		// There are two cases that represent a block is "at capacity":
+		//   1. When building the block, there is a pending transaction in the txpool that could not be
+		//      included because adding it would exceed the block's gas limit.
+		//   2. Or, there is a pending transaction that could not be included because adding it would
+		//      exceed the block's transaction payload size (block size limit).
+		//
+		// Since we don't have access to the txpool, we instead adopt the following heuristic:
+		// consider a block as at capacity if either:
+		//   - the total gas consumed by its transactions is within max-tx-gas-used of the block gas
+		//     limit, where max-tx-gas-used is the most gas used by any one transaction within the block, or
+		//   - the total transaction payload size is within max-tx-size-used of the block size limit,
+		//     where max-tx-size-used is the largest transaction size in the block.
+		//
+		// This heuristic is almost perfectly accurate when transactions always consume the same amount
+		// of gas and have similar sizes, but becomes less accurate as gas usage or payload size varies
+		// between transactions. The typical error is that we assume a block is at capacity when it was
+		// not, because max-tx-gas-used or max-tx-size-used will in most cases over-estimate the
+		// "capacity margin". But it's better to err on the side of returning a higher-than-needed
+		// suggestion than a lower-than-needed one, in order to satisfy our desire for high chance of
+		// inclusion and rising fees under high demand.
 		baseFee := block.BaseFee()
 		if len(txs) == 0 {
 			log.Error("block was at capacity but doesn't have transactions")

@@ -12,7 +12,11 @@ import (
 )
 
 func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *types.Header) *big.Int {
-	suggestion := new(big.Int).Set(oracle.defaultGasTipCap)
+	suggestion := oracle.defaultGasTipCap
+	if !oracle.backend.ChainConfig().IsCurie(header.Number) {
+		suggestion = oracle.defaultBasePrice
+	}
+
 
 	// find the maximum gas used by any of the transactions in the block to use as the gas limit
 	// capacity margin

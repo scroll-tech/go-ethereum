@@ -259,7 +259,6 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 		}
 	}
 
-
 	var (
 		next    = oldestBlock
 		results = make(chan *blockFees, blocks)

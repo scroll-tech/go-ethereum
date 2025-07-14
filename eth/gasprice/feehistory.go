@@ -245,18 +245,18 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	}
 	oldestBlock := lastBlock + 1 - uint64(blocks)
 
-	// If the suggestedGasPrice equals to oracle.defaultGasTipCap, means the latest block is out of capacity. we consider the network
-	// to be non-congested and suggest a minimal tip cap. This is to prevent users from overpaying for gas when the network is not
-	// congested and a few high-priced txs are causing the suggested tip cap to be high.
+	// If the suggestedGasPrice equals to oracle.defaultGasTipCap or oracle.defaultBasePrice (before Curie (EIP-1559)),
+	// it means the latest block is out of capacity. We consider the network to be non-congested and suggest a minimal
+	// tip cap. This is to prevent users from overpaying for gas when the network is not congested and a few high-priced
+	// transactions are causing the suggested tip cap to be high.
 	var nonCongestedPrice *big.Int
 	suggestedGasPrice := oracle.CalculateSuggestPriorityFee(ctx, headHeader)
-	if suggestedGasPrice.Cmp(oracle.defaultGasTipCap) == 0 {
-		// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
-		// as the base fee is set separately or added manually for legacy transactions.
+	// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
+	// as the base fee is set separately or added manually for legacy transactions.
+	if oracle.backend.ChainConfig().IsCurie(headHeader.Number) && suggestedGasPrice.Cmp(oracle.defaultBasePrice) == 0 {
 		nonCongestedPrice = oracle.defaultGasTipCap
-		if !oracle.backend.ChainConfig().IsCurie(headHeader.Number) {
-			nonCongestedPrice = oracle.defaultBasePrice
-		}
+	} else if !oracle.backend.ChainConfig().IsCurie(headHeader.Number) && suggestedGasPrice.Cmp(oracle.defaultGasTipCap) == 0 {
+		nonCongestedPrice = oracle.defaultBasePrice
 	}
 
 	var (

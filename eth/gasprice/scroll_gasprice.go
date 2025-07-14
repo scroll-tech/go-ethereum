@@ -64,9 +64,11 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 	if header.GasUsed+maxTxGasUsed > header.GasLimit ||
 		!oracle.backend.ChainConfig().Scroll.IsValidTxCount(len(txs)+1) ||
 		!oracle.backend.ChainConfig().Scroll.IsValidBlockSizeForMining(totalTxSizeUsed+maxTxSizeUsed) {
-		// A block is "at capacity" if, when it is built, there is a pending tx in the txpool that
-		// could not be included because the block's gas limit would be exceeded. Since we don't
-		// have access to the txpool, we instead adopt the following heuristic: consider a block as
+		// There are three cases represent a block is "at capacity":
+		// 1. when it is built, there is a pending tx in the txpool that could not be included because the block's gas limit would be exceeded.
+		// 2. The transaction number in a block reach the MaxTxPerBlock limit
+		// 3. when it is built, there is a pending tx in the txpool that could not be included because the block's transaction payload size would be exceeded.
+		// Since we don't have access to the txpool, we instead adopt the following heuristic: consider a block as
 		// at capacity if the total gas consumed by its transactions is within max-tx-gas-used of
 		// the block limit, where max-tx-gas-used is the most gas used by any one transaction
 		// within the block. This heuristic is almost perfectly accurate when transactions always
@@ -76,15 +78,6 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		// to err on the side of returning a higher-than-needed suggestion than a lower-than-needed
 		// one in order to satisfy our desire for high chance of inclusion and rising fees under
 		// high demand.
-
-		// testing logs
-		if header.GasUsed+maxTxGasUsed > header.GasLimit {
-			log.Info("Morty: header.GasUsed+maxTxGasUsed > header.GasLimit")
-		} else if !oracle.backend.ChainConfig().Scroll.IsValidTxCount(len(txs)+1) {
-			log.Info("Morty: !oracle.backend.ChainConfig().Scroll.IsValidTxCount(len(txs)+1)")
-		} else if !oracle.backend.ChainConfig().Scroll.IsValidBlockSizeForMining(totalTxSizeUsed+maxTxSizeUsed) {
-			log.Info("Morty: !oracle.backend.ChainConfig().Scroll.IsValidBlockSizeForMining(totalTxSizeUsed+maxTxSizeUsed)")
-		}
 
 		baseFee := block.BaseFee()
 		if len(txs) == 0 {

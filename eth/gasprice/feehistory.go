@@ -245,20 +245,6 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	}
 	oldestBlock := lastBlock + 1 - uint64(blocks)
 
-	// // If pending txs are less than oracle.congestedThreshold, we consider the network to be non-congested and suggest
-	// // a minimal tip cap. This is to prevent users from overpaying for gas when the network is not congested and a few
-	// // high-priced txs are causing the suggested tip cap to be high.
-	// var nonCongestedPrice *big.Int
-	// pendingTxCount, _ := oracle.backend.StatsWithMinBaseFee(headHeader.BaseFee)
-	// if pendingTxCount < oracle.congestedThreshold {
-	// 	// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
-	// 	// as the base fee is set separately or added manually for legacy transactions.
-	// 	nonCongestedPrice = oracle.defaultGasTipCap
-	// 	if !oracle.backend.ChainConfig().IsCurie(headHeader.Number) {
-	// 		nonCongestedPrice = oracle.defaultBasePrice
-	// 	}
-	// }
-
 	// If the suggestedGasPrice equels to oracle.defaultGasTipCap, means the latest block is out of capaticy. we consider the network
 	// to be non-congested and suggest a minimal tip cap. This is to prevent users from overpaying for gas when the network is not
 	// congested and a few high-priced txs are causing the suggested tip cap to be high.

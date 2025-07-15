@@ -252,6 +252,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.CircuitCapacityCheckWorkersFlag,
 			utils.GossipTxBroadcastDisabledFlag,
 			utils.GossipTxReceivingDisabledFlag,
+			utils.GossipSequencerHTTPFlag,
 			utils.GossipBroadcastToAllEnabledFlag,
 			utils.GossipBroadcastToAllCapFlag,
 		},

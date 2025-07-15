@@ -178,6 +178,7 @@ var (
 		utils.ShadowforkPeersFlag,
 		utils.GossipTxBroadcastDisabledFlag,
 		utils.GossipTxReceivingDisabledFlag,
+		utils.GossipSequencerHTTPFlag,
 		utils.GossipBroadcastToAllEnabledFlag,
 		utils.GossipBroadcastToAllCapFlag,
 		utils.DASyncEnabledFlag,

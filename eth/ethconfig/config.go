@@ -233,6 +233,7 @@ type Config struct {
 
 	GossipTxBroadcastDisabled   bool
 	GossipTxReceivingDisabled   bool
+	GossipSequencerHTTP         string
 	GossipBroadcastToAllEnabled bool
 	GossipBroadcastToAllCap     int
 }

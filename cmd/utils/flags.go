@@ -902,6 +902,10 @@ var (
 		Name:  "gossip.disabletxreceiving",
 		Usage: "Disable gossip receiving transactions from other peers",
 	}
+	GossipSequencerHTTPFlag = &cli.StringFlag{
+		Name:  "gossip.sequencerhttp",
+		Usage: "Sequencer mempool HTTP endpoint",
+	}
 	GossipBroadcastToAllEnabledFlag = cli.BoolFlag{
 		Name:  "gossip.enablebroadcasttoall",
 		Usage: "Enable gossip broadcast blocks and transactions to all peers",
@@ -1838,8 +1842,8 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Info("Gossip broadcast to all enabled", "enabled", cfg.GossipBroadcastToAllEnabled, "cap", cfg.GossipBroadcastToAllCap)
 	}
 	// Only configure sequencer http flag if we're running in verifier mode i.e. --mine is disabled.
-	if ctx.IsSet(TxGossipSequencerHTTPFlag.Name) && !ctx.IsSet(MiningEnabledFlag.Name) {
-		cfg.TxGossipSequencerHTTP = ctx.String(TxGossipSequencerHTTPFlag.Name)
+	if ctx.IsSet(GossipSequencerHTTPFlag.Name) && !ctx.IsSet(MiningEnabledFlag.Name) {
+		cfg.GossipSequencerHTTP = ctx.String(GossipSequencerHTTPFlag.Name)
 	}
 
 	// Cap the cache allowance and tune the garbage collector

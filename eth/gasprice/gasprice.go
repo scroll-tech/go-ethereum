@@ -74,13 +74,14 @@ type OracleBackend interface {
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend     OracleBackend
-	lastHead    common.Hash
-	lastPrice   *big.Int
-	maxPrice    *big.Int
-	ignorePrice *big.Int
-	cacheLock   sync.RWMutex
-	fetchLock   sync.Mutex
+	backend         OracleBackend
+	lastHead        common.Hash
+	lastPrice       *big.Int
+	lastIsCongested bool
+	maxPrice        *big.Int
+	ignorePrice     *big.Int
+	cacheLock       sync.RWMutex
+	fetchLock       sync.Mutex
 
 	checkBlocks, percentile           int
 	maxHeaderHistory, maxBlockHistory int
@@ -176,6 +177,10 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	head, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	headHash := head.Hash()
 
+	if oracle.backend.ChainConfig().IsScroll() {
+		return oracle.SuggestScrollPriorityFee(ctx, head), nil
+	}
+
 	// If the latest gasprice is still available, return it.
 	oracle.cacheLock.RLock()
 	lastHead, lastPrice := oracle.lastHead, oracle.lastPrice
@@ -192,10 +197,6 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
 		return new(big.Int).Set(lastPrice), nil
-	}
-
-	if oracle.backend.ChainConfig().IsScroll() {
-		return oracle.SuggestScrollPriorityFee(ctx, head), nil
 	}
 
 	var (

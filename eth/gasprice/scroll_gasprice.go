@@ -12,6 +12,25 @@ import (
 )
 
 func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *types.Header) (*big.Int, bool) {
+	headHash := header.Hash()
+	// If the latest gasprice is still available, return it.
+	oracle.cacheLock.RLock()
+	lastHead, lastPrice := oracle.lastHead, oracle.lastPrice
+	oracle.cacheLock.RUnlock()
+	if headHash == lastHead {
+		return new(big.Int).Set(lastPrice), oracle.lastIsCongested
+	}
+	oracle.fetchLock.Lock()
+	defer oracle.fetchLock.Unlock()
+
+	// Try checking the cache again, maybe the last fetch fetched what we need
+	oracle.cacheLock.RLock()
+	lastHead, lastPrice = oracle.lastHead, oracle.lastPrice
+	oracle.cacheLock.RUnlock()
+	if headHash == lastHead {
+		return new(big.Int).Set(lastPrice), oracle.lastIsCongested
+	}
+
 	var isCongested bool
 	// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
 	// as the base fee is set separately or added manually for legacy transactions.
@@ -141,11 +160,12 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 // returning a suggestion that is a significant amount (10%) higher than the median effective
 // priority fee from the previous block.
 func (oracle *Oracle) SuggestScrollPriorityFee(ctx context.Context, header *types.Header) *big.Int {
-	suggestion, _ := oracle.calculateSuggestPriorityFee(ctx, header)
+	suggestion, isCongested := oracle.calculateSuggestPriorityFee(ctx, header)
 
 	oracle.cacheLock.Lock()
 	oracle.lastHead = header.Hash()
 	oracle.lastPrice = suggestion
+	oracle.lastIsCongested = isCongested
 	oracle.cacheLock.Unlock()
 
 	return new(big.Int).Set(suggestion)

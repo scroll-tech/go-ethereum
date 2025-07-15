@@ -12,6 +12,8 @@ import (
 )
 
 func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *types.Header) *big.Int {
+	// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
+	// as the base fee is set separately or added manually for legacy transactions.
 	suggestion := oracle.defaultGasTipCap
 	if !oracle.backend.ChainConfig().IsCurie(header.Number) {
 		suggestion = oracle.defaultBasePrice
@@ -21,7 +23,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 	// capacity margin
 	receipts, err := oracle.backend.GetReceipts(ctx, header.Hash())
 	if receipts == nil || err != nil {
-		log.Error("failed to get block receipts", "err", err)
+		log.Error("failed to get block receipts", "block number", header.Number, "err", err)
 		return suggestion
 	}
 	var maxTxGasUsed uint64

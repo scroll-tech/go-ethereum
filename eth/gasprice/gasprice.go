@@ -49,15 +49,15 @@ var (
 )
 
 type Config struct {
-	Blocks             int
-	Percentile         int
-	MaxHeaderHistory   int
-	MaxBlockHistory    int
-	Default            *big.Int `toml:",omitempty"`
-	MaxPrice           *big.Int `toml:",omitempty"`
-	IgnorePrice        *big.Int `toml:",omitempty"`
-	DefaultBasePrice   *big.Int `toml:",omitempty"` // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
-	DefaultGasTipCap   *big.Int `toml:",omitempty"` // Default minimum gas tip cap to use after Curie (EIP 1559).
+	Blocks           int
+	Percentile       int
+	MaxHeaderHistory int
+	MaxBlockHistory  int
+	Default          *big.Int `toml:",omitempty"`
+	MaxPrice         *big.Int `toml:",omitempty"`
+	IgnorePrice      *big.Int `toml:",omitempty"`
+	DefaultBasePrice *big.Int `toml:",omitempty"` // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
+	DefaultGasTipCap *big.Int `toml:",omitempty"` // Default minimum gas tip cap to use after Curie (EIP 1559).
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -154,17 +154,17 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 	}()
 
 	return &Oracle{
-		backend:            backend,
-		lastPrice:          params.Default,
-		maxPrice:           maxPrice,
-		ignorePrice:        ignorePrice,
-		checkBlocks:        blocks,
-		percentile:         percent,
-		maxHeaderHistory:   maxHeaderHistory,
-		maxBlockHistory:    maxBlockHistory,
-		defaultBasePrice:   defaultBasePrice,
-		defaultGasTipCap:   defaultGasTipCap,
-		historyCache:       cache,
+		backend:          backend,
+		lastPrice:        params.Default,
+		maxPrice:         maxPrice,
+		ignorePrice:      ignorePrice,
+		checkBlocks:      blocks,
+		percentile:       percent,
+		maxHeaderHistory: maxHeaderHistory,
+		maxBlockHistory:  maxBlockHistory,
+		defaultBasePrice: defaultBasePrice,
+		defaultGasTipCap: defaultGasTipCap,
+		historyCache:     cache,
 	}
 }
 

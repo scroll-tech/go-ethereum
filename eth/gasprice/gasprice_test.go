@@ -216,10 +216,10 @@ func TestSuggestTipCapCongestedThreshold(t *testing.T) {
 	expectedDefaultBasePricePostCurie := big.NewInt(100)
 
 	config := Config{
-		Blocks:             3,
-		Percentile:         60,
-		Default:            big.NewInt(params.GWei),
-		DefaultBasePrice:   expectedDefaultBasePricePreCurie,
+		Blocks:           3,
+		Percentile:       60,
+		Default:          big.NewInt(params.GWei),
+		DefaultBasePrice: expectedDefaultBasePricePreCurie,
 	}
 	var cases = []struct {
 		fork      *big.Int // London fork number

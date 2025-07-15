@@ -61,7 +61,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		log.Error("found tx consuming more gas than the block limit", "gas", maxTxGasUsed)
 		return suggestion
 	}
-	if !oracle.backend.ChainConfig().Scroll.IsValidBlockSizeForMining(maxTxSizeUsed) {
+	if !oracle.backend.ChainConfig().Scroll.IsValidBlockSize(maxTxSizeUsed) {
 		log.Error("found tx consuming more size than the block size limit", "size", maxTxSizeUsed)
 		return suggestion
 	}

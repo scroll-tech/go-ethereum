@@ -132,11 +132,15 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 		suggestion.Set(oracle.maxPrice)
 	}
 
-	oracle.cacheLock.Lock()
-	oracle.lastHead = header.Hash()
-	oracle.lastPrice = suggestion
-	oracle.lastIsCongested = isCongested
-	oracle.cacheLock.Unlock()
+	// update the cache only if it's latest block header
+	latestHeader, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if header.Hash() == latestHeader.Hash() {
+		oracle.cacheLock.Lock()
+		oracle.lastHead = header.Hash()
+		oracle.lastPrice = suggestion
+		oracle.lastIsCongested = isCongested
+		oracle.cacheLock.Unlock()
+	}
 
 	return suggestion, isCongested
 }

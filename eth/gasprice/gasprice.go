@@ -69,8 +69,6 @@ type OracleBackend interface {
 	ChainConfig() *params.ChainConfig
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	StateAt(root common.Hash) (*state.StateDB, error)
-	Stats() (pending int, queued int)
-	StatsWithMinBaseFee(minBaseFee *big.Int) (pending int, queued int)
 }
 
 // Oracle recommends gas prices based on the content of recent

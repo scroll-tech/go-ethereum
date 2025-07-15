@@ -56,7 +56,6 @@ type Config struct {
 	Default            *big.Int `toml:",omitempty"`
 	MaxPrice           *big.Int `toml:",omitempty"`
 	IgnorePrice        *big.Int `toml:",omitempty"`
-	CongestedThreshold int      // Number of pending transactions to consider the network congested and suggest a minimum tip cap.
 	DefaultBasePrice   *big.Int `toml:",omitempty"` // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
 	DefaultGasTipCap   *big.Int `toml:",omitempty"` // Default minimum gas tip cap to use after Curie (EIP 1559).
 }
@@ -87,7 +86,6 @@ type Oracle struct {
 
 	checkBlocks, percentile           int
 	maxHeaderHistory, maxBlockHistory int
-	congestedThreshold                int      // Number of pending transactions to consider the network congested and suggest a minimum tip cap.
 	defaultBasePrice                  *big.Int // Base price to set when CongestedThreshold is reached before Curie (EIP 1559).
 	defaultGasTipCap                  *big.Int // Default gas tip cap to suggest after Curie (EIP 1559) when the network is not congested.
 	historyCache                      *lru.Cache
@@ -131,11 +129,6 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		maxBlockHistory = 1
 		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", params.MaxBlockHistory, "updated", maxBlockHistory)
 	}
-	congestedThreshold := params.CongestedThreshold
-	if congestedThreshold < 0 {
-		congestedThreshold = 0
-		log.Warn("Sanitizing invalid gasprice oracle congested threshold", "provided", params.CongestedThreshold, "updated", congestedThreshold)
-	}
 	defaultBasePrice := params.DefaultBasePrice
 	if defaultBasePrice == nil || defaultBasePrice.Int64() < 0 {
 		defaultBasePrice = DefaultBasePrice
@@ -169,7 +162,6 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		percentile:         percent,
 		maxHeaderHistory:   maxHeaderHistory,
 		maxBlockHistory:    maxBlockHistory,
-		congestedThreshold: congestedThreshold,
 		defaultBasePrice:   defaultBasePrice,
 		defaultGasTipCap:   defaultGasTipCap,
 		historyCache:       cache,

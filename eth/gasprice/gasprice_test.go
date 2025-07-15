@@ -219,7 +219,6 @@ func TestSuggestTipCapCongestedThreshold(t *testing.T) {
 		Blocks:             3,
 		Percentile:         60,
 		Default:            big.NewInt(params.GWei),
-		CongestedThreshold: 50,
 		DefaultBasePrice:   expectedDefaultBasePricePreCurie,
 	}
 	var cases = []struct {

@@ -51,7 +51,10 @@ type scrollTestBackend struct {
 }
 
 func (b *scrollTestBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
-	panic("not implemented")
+	if number == rpc.LatestBlockNumber || number == rpc.BlockNumber(b.block.NumberU64()) {
+		return b.block.Header(), nil
+	}
+	return nil, nil
 }
 
 func (b *scrollTestBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
@@ -250,5 +253,110 @@ func TestSuggestScrollPriorityFee(t *testing.T) {
 		if got.Cmp(c.want) != 0 {
 			t.Errorf("Gas price mismatch for test case %d: want %d, got %d", i, c.want, got)
 		}
+	}
+}
+
+// Benchmark API QPS for gas price oracle with different transaction patterns
+func BenchmarkScrollGasPriceAPIQPS(b *testing.B) {
+	// Create diverse transaction patterns to fill blocks
+	createTransactionSet := func(blockIndex int, txCount int) []testTxData {
+		txs := make([]testTxData, txCount)
+		for i := 0; i < txCount; i++ {
+			// Create varied transactions to avoid cache hits on tx.Size()
+			txs[i] = testTxData{
+				priorityFee: int64((blockIndex*txCount + i + 1) * params.GWei), // Unique priority fees
+				gasLimit:    uint64(21000 + (i%10)*1000),                       // Varied gas limits
+				payloadSize: uint64(i%10) * 256,                                // Varied payload sizes: 0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2304 bytes
+			}
+		}
+		return txs
+	}
+
+	testScenarios := []struct {
+		name        string
+		curieBlock  *big.Int
+		blocksCount int
+		txsPerBlock int
+		description string
+	}{
+		{
+			name:        "LightLoad_PreCurie",
+			curieBlock:  big.NewInt(100), // After current block
+			blocksCount: 1,
+			txsPerBlock: 5,
+			description: "Light load with 5 txs, pre-Curie",
+		},
+		{
+			name:        "LightLoad_PostCurie",
+			curieBlock:  big.NewInt(0), // Curie from genesis
+			blocksCount: 1,
+			txsPerBlock: 5,
+			description: "Light load with 5 txs, post-Curie",
+		},
+		{
+			name:        "MediumLoad_PreCurie",
+			curieBlock:  big.NewInt(100),
+			blocksCount: 3,
+			txsPerBlock: 20,
+			description: "Medium load with 20 txs per block, 3 blocks",
+		},
+		{
+			name:        "MediumLoad_PostCurie",
+			curieBlock:  big.NewInt(0),
+			blocksCount: 3,
+			txsPerBlock: 20,
+			description: "Medium load with 20 txs per block, 3 blocks",
+		},
+		{
+			name:        "HighLoad_PostCurie",
+			curieBlock:  big.NewInt(0),
+			blocksCount: 1,
+			txsPerBlock: 100,
+			description: "High load with 100 txs, testing congestion scenarios",
+		},
+	}
+
+	for _, scenario := range testScenarios {
+		b.Run(scenario.name, func(b *testing.B) {
+			// Create backend with diverse transactions
+			txs := createTransactionSet(0, scenario.txsPerBlock)
+			backend := newScrollTestBackend(nil, txs, scenario.curieBlock)
+
+			config := Config{
+				DefaultBasePrice: big.NewInt(20000),
+				DefaultGasTipCap: big.NewInt(100),
+				MaxPrice:         big.NewInt(500 * params.GWei),
+			}
+			oracle := NewOracle(backend, config)
+			ctx := context.Background()
+
+			// Sub-benchmarks for different API methods
+			b.Run("SuggestScrollPriorityFee", func(b *testing.B) {
+				b.ResetTimer()
+				b.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						_ = oracle.SuggestScrollPriorityFee(ctx, backend.block.Header())
+					}
+				})
+			})
+
+			b.Run("SuggestTipCap", func(b *testing.B) {
+				b.ResetTimer()
+				b.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						_, _ = oracle.SuggestTipCap(ctx)
+					}
+				})
+			})
+
+			b.Run("calculateSuggestPriorityFee", func(b *testing.B) {
+				b.ResetTimer()
+				b.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						_, _ = oracle.calculateSuggestPriorityFee(ctx, backend.block.Header())
+					}
+				})
+			})
+		})
 	}
 }

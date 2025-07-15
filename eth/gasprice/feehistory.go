@@ -246,7 +246,7 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	oldestBlock := lastBlock + 1 - uint64(blocks)
 
 	// If the suggestedGasPrice equals to oracle.defaultGasTipCap or oracle.defaultBasePrice (before Curie (EIP-1559)),
-	// it means the latest block is out of capacity. We consider the network to be non-congested and suggest a minimal
+	// it means the latest block is NOT out of capacity. We consider the network to be non-congested and suggest a minimal
 	// tip cap. This is to prevent users from overpaying for gas when the network is not congested and a few high-priced
 	// transactions are causing the suggested tip cap to be high.
 	var nonCongestedPrice *big.Int

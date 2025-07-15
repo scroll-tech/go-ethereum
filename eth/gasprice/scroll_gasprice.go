@@ -11,7 +11,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
-func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *types.Header) *big.Int {
+func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *types.Header) (*big.Int, bool) {
+	var isCongested bool
 	// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
 	// as the base fee is set separately or added manually for legacy transactions.
 	suggestion := oracle.defaultGasTipCap
@@ -24,7 +25,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 	receipts, err := oracle.backend.GetReceipts(ctx, header.Hash())
 	if receipts == nil || err != nil {
 		log.Error("failed to get block receipts", "block number", header.Number, "err", err)
-		return suggestion
+		return suggestion, isCongested
 	}
 	var maxTxGasUsed uint64
 
@@ -44,7 +45,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(header.Number.Int64()))
 	if block == nil || err != nil {
 		log.Error("failed to get last block", "err", err)
-		return suggestion
+		return suggestion, isCongested
 	}
 	txs := block.Transactions()
 
@@ -59,11 +60,11 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 	// sanity check the max gas used and transaction size value
 	if maxTxGasUsed > header.GasLimit {
 		log.Error("found tx consuming more gas than the block limit", "gas", maxTxGasUsed)
-		return suggestion
+		return suggestion, isCongested
 	}
 	if !oracle.backend.ChainConfig().Scroll.IsValidBlockSize(maxTxSizeUsed) {
 		log.Error("found tx consuming more size than the block size limit", "size", maxTxSizeUsed)
-		return suggestion
+		return suggestion, isCongested
 	}
 
 	if header.GasUsed+maxTxGasUsed > header.GasLimit ||
@@ -91,7 +92,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		baseFee := block.BaseFee()
 		if len(txs) == 0 {
 			log.Error("block was at capacity but doesn't have transactions")
-			return suggestion
+			return suggestion, isCongested
 		}
 		tips := bigIntArray(make([]*big.Int, len(txs)))
 		for i := range txs {
@@ -100,6 +101,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		sort.Sort(tips)
 		median := tips[len(tips)/2]
 		newSuggestion := new(big.Int).Add(median, new(big.Int).Div(median, big.NewInt(10)))
+		isCongested = true
 		// use the new suggestion only if it's bigger than the minimum
 		if newSuggestion.Cmp(suggestion) > 0 {
 			suggestion = newSuggestion
@@ -111,7 +113,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 		suggestion.Set(oracle.maxPrice)
 	}
 
-	return suggestion
+	return suggestion, isCongested
 }
 
 // SuggestScrollPriorityFee returns a max priority fee value that can be used such that newly
@@ -139,7 +141,7 @@ func (oracle *Oracle) CalculateSuggestPriorityFee(ctx context.Context, header *t
 // returning a suggestion that is a significant amount (10%) higher than the median effective
 // priority fee from the previous block.
 func (oracle *Oracle) SuggestScrollPriorityFee(ctx context.Context, header *types.Header) *big.Int {
-	suggestion := oracle.CalculateSuggestPriorityFee(ctx, header)
+	suggestion, _ := oracle.calculateSuggestPriorityFee(ctx, header)
 
 	oracle.cacheLock.Lock()
 	oracle.lastHead = header.Hash()

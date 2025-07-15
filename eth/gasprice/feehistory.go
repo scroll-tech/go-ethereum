@@ -250,13 +250,9 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	// tip cap. This is to prevent users from overpaying for gas when the network is not congested and a few high-priced
 	// transactions are causing the suggested tip cap to be high.
 	var nonCongestedPrice *big.Int
-	suggestedGasPrice := oracle.CalculateSuggestPriorityFee(ctx, headHeader)
-	// Before Curie (EIP-1559), we need to return the total suggested gas price. After Curie we return defaultGasTipCap wei as the tip cap,
-	// as the base fee is set separately or added manually for legacy transactions.
-	if oracle.backend.ChainConfig().IsCurie(headHeader.Number) && suggestedGasPrice.Cmp(oracle.defaultBasePrice) == 0 {
-		nonCongestedPrice = oracle.defaultGasTipCap
-	} else if !oracle.backend.ChainConfig().IsCurie(headHeader.Number) && suggestedGasPrice.Cmp(oracle.defaultGasTipCap) == 0 {
-		nonCongestedPrice = oracle.defaultBasePrice
+	suggestedGasPrice, isCongested := oracle.calculateSuggestPriorityFee(ctx, headHeader)
+	if !isCongested {
+		nonCongestedPrice = suggestedGasPrice
 	}
 
 	var (

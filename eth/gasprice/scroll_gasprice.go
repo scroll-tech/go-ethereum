@@ -132,6 +132,12 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 		suggestion.Set(oracle.maxPrice)
 	}
 
+	oracle.cacheLock.Lock()
+	oracle.lastHead = header.Hash()
+	oracle.lastPrice = suggestion
+	oracle.lastIsCongested = isCongested
+	oracle.cacheLock.Unlock()
+
 	return suggestion, isCongested
 }
 
@@ -160,13 +166,7 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 // returning a suggestion that is a significant amount (10%) higher than the median effective
 // priority fee from the previous block.
 func (oracle *Oracle) SuggestScrollPriorityFee(ctx context.Context, header *types.Header) *big.Int {
-	suggestion, isCongested := oracle.calculateSuggestPriorityFee(ctx, header)
-
-	oracle.cacheLock.Lock()
-	oracle.lastHead = header.Hash()
-	oracle.lastPrice = suggestion
-	oracle.lastIsCongested = isCongested
-	oracle.cacheLock.Unlock()
+	suggestion, _ := oracle.calculateSuggestPriorityFee(ctx, header)
 
 	return new(big.Int).Set(suggestion)
 }

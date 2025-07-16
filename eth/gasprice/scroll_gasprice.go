@@ -15,20 +15,20 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 	headHash := header.Hash()
 	// If the latest gasprice is still available, return it.
 	oracle.cacheLock.RLock()
-	lastHead, lastPrice := oracle.lastHead, oracle.lastPrice
+	lastHead, lastPrice, lastIsCongested := oracle.lastHead, oracle.lastPrice, oracle.lastIsCongested
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
-		return new(big.Int).Set(lastPrice), oracle.lastIsCongested
+		return new(big.Int).Set(lastPrice), lastIsCongested
 	}
 	oracle.fetchLock.Lock()
 	defer oracle.fetchLock.Unlock()
 
 	// Try checking the cache again, maybe the last fetch fetched what we need
 	oracle.cacheLock.RLock()
-	lastHead, lastPrice = oracle.lastHead, oracle.lastPrice
+	lastHead, lastPrice, lastIsCongested = oracle.lastHead, oracle.lastPrice, oracle.lastIsCongested
 	oracle.cacheLock.RUnlock()
 	if headHash == lastHead {
-		return new(big.Int).Set(lastPrice), oracle.lastIsCongested
+		return new(big.Int).Set(lastPrice), lastIsCongested
 	}
 
 	var isCongested bool

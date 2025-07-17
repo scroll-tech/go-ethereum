@@ -183,15 +183,15 @@ func calcBaseFeeEIP1559(config *params.ChainConfig, parent *types.Header) *big.I
 
 func extractBaseFeeEIP1559(_ *params.ChainConfig, baseFee *big.Int) *big.Int {
 	_, overhead := ReadL2BaseFeeCoefficients()
+
 	// In Feynman base fee calculation, we reuse the contract's baseFeeOverhead slot as the proving base fee.
 	result := new(big.Int).Sub(baseFee, overhead)
 
 	// Add underflow protection: return max(0, baseFee - overhead)
 	//
 	// Potential underflow scenarios:
-	// 1. During transition to Feynman: parent base fee might be < overhead
-	// 2. Contract overhead updates: when overhead is updated via contract,
-	//    it might become larger than current base fee
+	// - Contract overhead updates: when overhead is updated via contract,
+	//   it might become larger than current base fee
 	if result.Sign() < 0 {
 		return big.NewInt(0)
 	}

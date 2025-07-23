@@ -559,11 +559,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 	}
 	if w.chainConfig.SystemContract != nil {
 		periodMs := w.chainConfig.SystemContract.Period
-		blocksPerSecond := uint64(1000) / periodMs
-		if blocksPerSecond == 0 {
-			blocksPerSecond = 1
-		}
-
+		blocksPerSecond := system_contract.CalcBlocksPerSecond(periodMs)
 		// Calculate the actual timing based on block number within the current second
 		blockIndex := header.Number.Uint64() % blocksPerSecond
 

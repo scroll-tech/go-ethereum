@@ -225,17 +225,22 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
-func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
-	// Get the base timestamp (in seconds)
-	baseTimestamp := parent.Time
-
-	// Convert period to milliseconds and calculate blocks per second
-	// For example: if Period = 250ms = 0.25s, then periodMs = 250
-	periodMs := s.config.Period
+// CalcBlocksPerSecond converts period to milliseconds and calculate blocks per second
+// For example: if Period = 250ms = 0.25s, then periodMs = 250
+func CalcBlocksPerSecond(periodMs uint64) uint64 {
 	blocksPerSecond := 1000 / periodMs // integer division, e.g. 1000/250 = 4
 	if blocksPerSecond == 0 {
 		blocksPerSecond = 1
 	}
+	return blocksPerSecond
+}
+
+func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
+	// Get the base timestamp (in seconds)
+	baseTimestamp := parent.Time
+
+	periodMs := s.config.Period
+	blocksPerSecond := CalcBlocksPerSecond(periodMs)
 
 	// Calculate the block index within the current second
 	blockIndex := parent.Number.Uint64() % blocksPerSecond
@@ -248,9 +253,8 @@ func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 
 	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
 	// we don't know when it will be sealed
-	nowTimestamp := uint64(time.Now().Unix())
-	if s.config.RelaxedPeriod || baseTimestamp < nowTimestamp {
-		baseTimestamp = nowTimestamp
+	if s.config.RelaxedPeriod || baseTimestamp < uint64(time.Now().Unix()) {
+		baseTimestamp = uint64(time.Now().Unix())
 	}
 
 	return baseTimestamp

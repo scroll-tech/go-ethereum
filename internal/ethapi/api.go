@@ -999,7 +999,7 @@ func EstimateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, bloc
 	}()
 
 	signer := types.MakeSigner(config, header.Number, header.Time)
-	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config, signer, evm.StateDB, header.Number)
+	return fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, config, signer, evm.StateDB, header.Number, header.Time)
 }
 
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
@@ -1199,7 +1199,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 
 		result, err := DoCall(ctx, b, args, blockNrOrHash, nil, 0, gasCap)
 		if err != nil {
-			if errors.Is(err, core.ErrIntrinsicGas) {
+			if errors.Is(err, core.ErrIntrinsicGas) || errors.Is(err, core.ErrFloorDataGas) {
 				return true, nil, nil // Special case, raise gas limit
 			}
 			return true, nil, err // Bail out
@@ -1447,7 +1447,8 @@ func newRPCPendingTransaction(tx *types.Transaction, current *types.Header, conf
 	blockNumber := uint64(0)
 	blockTime := uint64(0)
 	if current != nil {
-		baseFee = misc.CalcBaseFee(config, current, l1BaseFee)
+		// Use time.Now() as the current block time to calculate the pending base fee.
+		baseFee = misc.CalcBaseFee(config, current, l1BaseFee, uint64(time.Now().Unix()))
 		blockNumber = current.Number.Uint64()
 		blockTime = current.Time
 	}
@@ -1536,10 +1537,33 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 	// Retrieve the precompiles since they don't need to be added to the access list
 	precompiles := vm.ActivePrecompiles(b.ChainConfig().Rules(header.Number, header.Time))
 
+	// addressesToExclude contains sender, receiver, precompiles and valid authorizations
+	addressesToExclude := map[common.Address]struct{}{args.from(): {}, to: {}}
+	for _, addr := range precompiles {
+		addressesToExclude[addr] = struct{}{}
+	}
+
+	// Prevent redundant operations if args contain more authorizations than EVM may handle
+	maxAuthorizations := uint64(*args.Gas) / params.CallNewAccountGas
+	if uint64(len(args.AuthorizationList)) > maxAuthorizations {
+		return nil, 0, nil, errors.New("insufficient gas to process all authorizations")
+	}
+
+	for _, auth := range args.AuthorizationList {
+		// Duplicating stateTransition.validateAuthorization() logic
+		if (!auth.ChainID.IsZero() && auth.ChainID.CmpBig(b.ChainConfig().ChainID) != 0) || auth.Nonce+1 < auth.Nonce {
+			continue
+		}
+
+		if authority, err := auth.Authority(); err == nil {
+			addressesToExclude[authority] = struct{}{}
+		}
+	}
+
 	// Create an initial tracer
-	prevTracer := vm.NewAccessListTracer(nil, args.from(), to, precompiles)
+	prevTracer := vm.NewAccessListTracer(nil, addressesToExclude)
 	if args.AccessList != nil {
-		prevTracer = vm.NewAccessListTracer(*args.AccessList, args.from(), to, precompiles)
+		prevTracer = vm.NewAccessListTracer(*args.AccessList, addressesToExclude)
 	}
 	for {
 		// Retrieve the current access list to expand
@@ -1565,14 +1589,14 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		}
 
 		// Apply the transaction with the access list tracer
-		tracer := vm.NewAccessListTracer(accessList, args.from(), to, precompiles)
+		tracer := vm.NewAccessListTracer(accessList, addressesToExclude)
 		config := vm.Config{Tracer: tracer, Debug: true, NoBaseFee: true}
 		vmenv, _, err := b.GetEVM(ctx, msg, statedb, header, &config)
 		if err != nil {
 			return nil, 0, nil, err
 		}
 		signer := types.MakeSigner(b.ChainConfig(), header.Number, header.Time)
-		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig(), signer, statedb, header.Number)
+		l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, header.BaseFee, b.ChainConfig(), signer, statedb, header.Number, header.Time)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}

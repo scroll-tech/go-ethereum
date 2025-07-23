@@ -96,6 +96,10 @@ var (
 	// transactions is reached for specific accounts.
 	ErrInflightTxLimitReached = errors.New("in-flight transaction limit reached for delegated accounts")
 
+	// ErrOutOfOrderTxFromDelegated is returned when the transaction with gapped
+	// nonce received from the accounts with delegation or pending delegation.
+	ErrOutOfOrderTxFromDelegated = errors.New("gapped-nonce tx from delegated accounts")
+
 	// ErrAuthorityReserved is returned if a transaction has an authorization
 	// signed by an address which already has in-flight transactions known to the
 	// pool.
@@ -293,9 +297,11 @@ type TxPool struct {
 	eip1559  bool // Fork indicator whether we are using EIP-1559 type transactions.
 	shanghai bool // Fork indicator whether we are in the Shanghai stage.
 	eip7702  bool // Fork indicator whether we are using EIP-7702 type transactions.
+	feynman  bool // Fork indicator whether we are in the Feynman stage.
 
 	currentState  *state.StateDB // Current state in the blockchain head
 	currentHead   *big.Int       // Current blockchain head
+	currentTime   uint64         // Current blockchain head time
 	pendingNonces *txNoncer      // Pending state tracking virtual nonces
 	currentMaxGas uint64         // Current gas limit for transaction caps
 
@@ -420,6 +426,8 @@ func (pool *TxPool) loop() {
 		journal = time.NewTicker(pool.config.Rejournal)
 		// Track the previous head headers for transaction reorgs
 		head = pool.chain.CurrentBlock()
+		// Track the min L2 base fee
+		minBaseFee = big.NewInt(0)
 	)
 	defer report.Stop()
 	defer evict.Stop()
@@ -437,6 +445,13 @@ func (pool *TxPool) loop() {
 				for _, tx := range head.Transactions() {
 					log.Debug("TX is included in a block", "hash", tx.Hash().Hex())
 				}
+			}
+
+			newMinBaseFee := misc.MinBaseFee()
+			if minBaseFee.Cmp(newMinBaseFee) != 0 {
+				log.Debug("Updating min base fee in txpool", "old", minBaseFee, "new", newMinBaseFee)
+				minBaseFee = newMinBaseFee
+				pool.SetGasPrice(minBaseFee)
 			}
 
 		// System shutdown.
@@ -824,9 +839,14 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// 2. If FeeVault is enabled, perform an additional check for L1 data fees.
 	if pool.chainconfig.Scroll.FeeVaultEnabled() {
 		// Get L1 data fee in current state
-		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+		l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead, pool.currentTime)
 		if err != nil {
 			return fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+		}
+		// Reject transactions that require the max data fee amount.
+		// This can only happen if the L1 gas oracle is updated incorrectly.
+		if l1DataFee.Cmp(fees.MaxL1DataFee()) >= 0 {
+			return errors.New("invalid transaction: invalid L1 data fee")
 		}
 		// Transactor should have enough funds to cover the costs
 		// cost == L1 data fee + V + GP * GL
@@ -841,6 +861,16 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	if tx.Gas() < intrGas {
 		return ErrIntrinsicGas
+	}
+	// Ensure the transaction can cover floor data gas.
+	if pool.feynman {
+		floorDataGas, err := FloorDataGas(tx.Data())
+		if err != nil {
+			return err
+		}
+		if tx.Gas() < floorDataGas {
+			return fmt.Errorf("%w: gas %v, minimum needed %v", ErrFloorDataGas, tx.Gas(), floorDataGas)
+		}
 	}
 	return nil
 }
@@ -918,7 +948,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	from, _ := types.Sender(pool.signer, tx) // already validated
 	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
 		// Nonce already pending, check if required price bump is met
-		inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+		inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead, pool.currentTime)
 		if !inserted {
 			log.Debug("Discarding underpriced pending transaction", "hash", hash.Hex(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
 			pendingDiscardMeter.Mark(1)
@@ -972,7 +1002,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction, local boo
 		pool.queue[from] = newTxList(false)
 	}
 
-	inserted, old := pool.queue[from].Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+	inserted, old := pool.queue[from].Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead, pool.currentTime)
 	if !inserted {
 		// An older transaction was better, discard this
 		log.Debug("Discarding underpriced queued transaction", "hash", hash.Hex(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
@@ -1039,7 +1069,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		return false
 	}
 
-	inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead)
+	inserted, old := list.Add(tx, pool.currentState, pool.config.PriceBump, pool.chainconfig, pool.currentHead, pool.currentTime)
 	if !inserted {
 		// An older transaction was better, discard this
 		log.Debug("Discarding underpriced pending transaction", "hash", hash.Hex(), "gasTipCap", tx.GasTipCap(), "gasFeeCap", tx.GasFeeCap())
@@ -1429,7 +1459,8 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsCurie(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
 			l1BaseFee := fees.GetL1BaseFee(pool.currentState)
-			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead, l1BaseFee)
+			// Use time.Now() as the current block time to calculate the pending base fee.
+			pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead, l1BaseFee, uint64(time.Now().Unix()))
 			pool.priced.SetBaseFee(pendingBaseFee)
 		}
 		// Update all accounts to the latest known pending nonce
@@ -1570,9 +1601,11 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.eip1559 = pool.chainconfig.IsCurie(next)
 	pool.shanghai = pool.chainconfig.IsShanghai(next)
 	pool.eip7702 = pool.chainconfig.IsEuclidV2(newHead.Time)
+	pool.feynman = pool.chainconfig.IsFeynman(newHead.Time)
 
 	// Update current head
 	pool.currentHead = next
+	pool.currentTime = newHead.Time
 }
 
 // promoteExecutables moves transactions that have become processable from the
@@ -1660,7 +1693,7 @@ func (pool *TxPool) executableTxFilter(costLimit *big.Int) func(tx *types.Transa
 
 		if pool.chainconfig.Scroll.FeeVaultEnabled() {
 			// recheck L1 data fee, as the oracle price may have changed
-			l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead)
+			l1DataFee, err := fees.CalculateL1DataFee(tx, pool.currentState, pool.chainconfig, pool.currentHead, pool.currentTime)
 			if err != nil {
 				log.Error("Failed to calculate L1 data fee", "err", err, "tx", tx)
 				return false
@@ -1909,36 +1942,50 @@ func (pool *TxPool) calculateTxsLifecycle(txs types.Transactions, t time.Time) {
 	}
 }
 
+// checkDelegationLimit determines if the tx sender is delegated or has a
+// pending delegation, and if so, ensures they have at most one in-flight
+// **executable** transaction, e.g. disallow stacked and gapped transactions
+// from the account.
+func (pool *TxPool) checkDelegationLimit(from common.Address, tx *types.Transaction) error {
+	// Short circuit if the sender has neither delegation nor pending delegation.
+	if pool.currentState.GetKeccakCodeHash(from) == codehash.EmptyKeccakCodeHash && len(pool.all.auths[from]) == 0 {
+		return nil
+	}
+	pending := pool.pending[from]
+	if pending == nil {
+		// Transaction with gapped nonce is not supported for delegated accounts
+		if pool.pendingNonces.get(from) != tx.Nonce() {
+			return ErrOutOfOrderTxFromDelegated
+		}
+		return nil
+	}
+	// Transaction replacement is supported
+	if pending.Overlaps(tx) {
+		return nil
+	}
+	return ErrInflightTxLimitReached
+}
+
 // validateAuth verifies that the transaction complies with code authorization
 // restrictions brought by SetCode transaction type.
 func (pool *TxPool) validateAuth(from common.Address, tx *types.Transaction) error {
 	// Allow at most one in-flight tx for delegated accounts or those with a
 	// pending authorization.
-	if pool.currentState.GetKeccakCodeHash(from) != codehash.EmptyKeccakCodeHash || len(pool.all.auths[from]) != 0 {
-		var (
-			count  int
-			exists bool
-		)
-		pending := pool.pending[from]
-		if pending != nil {
-			count += pending.Len()
-			exists = pending.Overlaps(tx)
-		}
-		queue := pool.queue[from]
-		if queue != nil {
-			count += queue.Len()
-			exists = exists || queue.Overlaps(tx)
-		}
-		// Replace the existing in-flight transaction for delegated accounts
-		// are still supported
-		if count >= 1 && !exists {
-			return ErrInflightTxLimitReached
-		}
+	if err := pool.checkDelegationLimit(from, tx); err != nil {
+		return err
 	}
-	// Authorities cannot conflict with any pending or queued transactions.
+	// For symmetry, allow at most one in-flight tx for any authority with a
+	// pending transaction.
 	if auths := tx.SetCodeAuthorities(); len(auths) > 0 {
 		for _, auth := range auths {
-			if pool.pending[auth] != nil || pool.queue[auth] != nil {
+			var count int
+			if pending := pool.pending[auth]; pending != nil {
+				count += pending.Len()
+			}
+			if queue := pool.queue[auth]; queue != nil {
+				count += queue.Len()
+			}
+			if count > 1 {
 				return ErrAuthorityReserved
 			}
 		}

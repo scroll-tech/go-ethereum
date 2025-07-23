@@ -152,6 +152,19 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 	if chainConfig.CurieBlock != nil && chainConfig.CurieBlock.Cmp(new(big.Int).SetUint64(pre.Env.Number)) == 0 {
 		misc.ApplyCurieHardFork(statedb)
 	}
+	// Apply Feynman hard fork
+	if chainConfig.IsFeynmanTransitionBlock(pre.Env.Timestamp, pre.Env.ParentTimestamp) {
+		misc.ApplyFeynmanHardFork(statedb)
+	}
+	// Apply EIP-2935
+	if pre.Env.BlockHashes != nil && chainConfig.IsFeynman(pre.Env.Timestamp) {
+		var (
+			prevNumber = pre.Env.Number - 1
+			prevHash   = pre.Env.BlockHashes[math.HexOrDecimal64(prevNumber)]
+			evm        = vm.NewEVM(vmContext, vm.TxContext{}, statedb, chainConfig, vmConfig)
+		)
+		core.ProcessParentBlockHash(prevHash, evm, statedb)
+	}
 
 	for i, tx := range txs {
 		msg, err := tx.AsMessage(signer, pre.Env.BaseFee)
@@ -171,7 +184,7 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		snapshot := statedb.Snapshot()
 		evm := vm.NewEVM(vmContext, txContext, statedb, chainConfig, vmConfig)
 
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, chainConfig, new(big.Int).SetUint64(pre.Env.Number))
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, chainConfig, new(big.Int).SetUint64(pre.Env.Number), pre.Env.Timestamp)
 		if err != nil {
 			log.Info("rejected tx due to fees.CalculateL1DataFee", "index", i, "hash", tx.Hash(), "from", msg.From(), "error", err)
 			rejectedTxs = append(rejectedTxs, &rejectedTx{i, err.Error()})

@@ -277,6 +277,11 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			for task := range tasks {
 				signer := types.MakeSigner(api.backend.ChainConfig(), task.block.Number(), task.block.Time())
 				blockCtx := core.NewEVMBlockContext(task.block.Header(), api.chainContext(localctx), api.backend.ChainConfig(), nil)
+				// EIP-2935: Insert parent hash in history contract.
+				if api.backend.ChainConfig().IsFeynman(task.block.Time()) {
+					evm := vm.NewEVM(blockCtx, vm.TxContext{}, task.statedb, api.backend.ChainConfig(), vm.Config{})
+					core.ProcessParentBlockHash(task.block.ParentHash(), evm, task.statedb)
+				}
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
 					msg, _ := tx.AsMessage(signer, task.block.BaseFee())
@@ -287,7 +292,7 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 						TxHash:      tx.Hash(),
 					}
 
-					l1DataFee, err := fees.CalculateL1DataFee(tx, task.statedb, api.backend.ChainConfig(), task.block.Number())
+					l1DataFee, err := fees.CalculateL1DataFee(tx, task.statedb, api.backend.ChainConfig(), task.block.Number(), task.block.Time())
 					if err != nil {
 						// though it's not a "tracing error", we still need to put it here
 						task.results[i] = &txTraceResult{Error: err.Error()}
@@ -539,6 +544,11 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		vmctx              = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), api.backend.ChainConfig(), nil)
 		deleteEmptyObjects = chainConfig.IsEIP158(block.Number())
 	)
+	// EIP-2935: Insert parent hash in history contract.
+	if api.backend.ChainConfig().IsFeynman(block.Time()) {
+		vmenv := vm.NewEVM(vmctx, vm.TxContext{}, statedb, chainConfig, vm.Config{})
+		core.ProcessParentBlockHash(block.ParentHash(), vmenv, statedb)
+	}
 	for i, tx := range block.Transactions() {
 		var (
 			msg, _    = tx.AsMessage(signer, block.BaseFee())
@@ -547,7 +557,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		)
 		statedb.SetTxContext(tx.Hash(), i)
 
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number())
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number(), block.Time())
 		if err != nil {
 			log.Warn("Tracing intermediate roots did not complete due to fees.CalculateL1DataFee", "txindex", i, "txhash", tx.Hash(), "err", err)
 			return nil, err
@@ -614,6 +624,11 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		threads = len(txs)
 	}
 	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), api.backend.ChainConfig(), nil)
+	// EIP-2935: Insert parent hash in history contract.
+	if api.backend.ChainConfig().IsFeynman(block.Time()) {
+		evm := vm.NewEVM(blockCtx, vm.TxContext{}, statedb, api.backend.ChainConfig(), vm.Config{})
+		core.ProcessParentBlockHash(block.ParentHash(), evm, statedb)
+	}
 	blockHash := block.Hash()
 	blockNumber := block.NumberU64()
 	for th := 0; th < threads; th++ {
@@ -630,7 +645,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 					TxHash:      txs[task.index].Hash(),
 				}
 
-				l1DataFee, err := fees.CalculateL1DataFee(txs[task.index], task.statedb, api.backend.ChainConfig(), block.Number())
+				l1DataFee, err := fees.CalculateL1DataFee(txs[task.index], task.statedb, api.backend.ChainConfig(), block.Number(), block.Time())
 				if err != nil {
 					// though it's not a "tracing error", we still need to put it here
 					results[task.index] = &txTraceResult{
@@ -664,7 +679,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		msg, _ := tx.AsMessage(signer, block.BaseFee())
 		statedb.SetTxContext(tx.Hash(), i)
 		vmenv := vm.NewEVM(blockCtx, core.NewEVMTxContext(msg), statedb, api.backend.ChainConfig(), vm.Config{})
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number())
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number(), block.Time())
 		if err != nil {
 			failed = err
 			break
@@ -748,6 +763,13 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 			canon = false
 		}
 	}
+
+	// EIP-2935: Insert parent hash in history contract.
+	if api.backend.ChainConfig().IsFeynman(block.Time()) {
+		evm := vm.NewEVM(vmctx, vm.TxContext{}, statedb, api.backend.ChainConfig(), vm.Config{})
+		core.ProcessParentBlockHash(block.ParentHash(), evm, statedb)
+	}
+
 	for i, tx := range block.Transactions() {
 		// Prepare the trasaction for un-traced execution
 		var (
@@ -782,7 +804,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
 		statedb.SetTxContext(tx.Hash(), i)
-		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number())
+		l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number(), block.Time())
 		if err == nil {
 			_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), l1DataFee)
 		}
@@ -847,7 +869,7 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 		TxIndex:   int(index),
 		TxHash:    hash,
 	}
-	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number())
+	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb, api.backend.ChainConfig(), block.Number(), block.Time())
 	if err != nil {
 		return nil, err
 	}
@@ -907,7 +929,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	}
 
 	signer := types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, block.BaseFee(), api.backend.ChainConfig(), signer, statedb, block.Number())
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, block.BaseFee(), api.backend.ChainConfig(), signer, statedb, block.Number(), block.Time())
 	if err != nil {
 		return nil, err
 	}

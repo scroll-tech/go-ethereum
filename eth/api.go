@@ -133,6 +133,8 @@ func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
 	api.e.gasPrice = (*big.Int)(&gasPrice)
 	api.e.lock.Unlock()
 
+	// This will override the min base fee configuration.
+	// That is fine, it only happens if we explicitly set gas price via the console.
 	api.e.txPool.SetGasPrice((*big.Int)(&gasPrice))
 	return true
 }
@@ -359,6 +361,11 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 
 	// Collect storage locations that prover needs but sequencer might not touch necessarily
 	statedb.GetState(rcfg.L2MessageQueueAddress, rcfg.WithdrawTrieRootSlot)
+
+	// Note: scroll-revm detects the Feynman transition block using this storage slot,
+	// since it does not have access to the parent block timestamp. We need to make
+	// sure that this is always present in the execution witness.
+	statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.IsFeynmanSlot)
 
 	receipts, _, usedGas, err := blockchain.Processor().Process(block, statedb, *blockchain.GetVMConfig())
 	if err != nil {

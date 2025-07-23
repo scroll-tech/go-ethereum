@@ -239,7 +239,7 @@ func CalcBlocksPerSecond(periodMs uint64) uint64 {
 
 func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 	// Get the base timestamp (in seconds)
-	baseTimestamp := parent.Time
+	timestamp := parent.Time
 
 	periodMs := s.config.Period
 	blocksPerSecond := CalcBlocksPerSecond(periodMs)
@@ -250,16 +250,16 @@ func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 	// If this block is the last one in the current second, increment the timestamp
 	// We compare with blocksPerSecond-1 because blockIndex is 0-based
 	if blockIndex == blocksPerSecond-1 {
-		baseTimestamp++
+		timestamp++
 	}
 
 	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
 	// we don't know when it will be sealed
-	if s.config.RelaxedPeriod || baseTimestamp < uint64(time.Now().Unix()) {
-		baseTimestamp = uint64(time.Now().Unix())
+	if s.config.RelaxedPeriod || timestamp < uint64(time.Now().Unix()) {
+		timestamp = uint64(time.Now().Unix())
 	}
 
-	return baseTimestamp
+	return timestamp
 }
 
 // Prepare initializes the consensus fields of a block header according to the

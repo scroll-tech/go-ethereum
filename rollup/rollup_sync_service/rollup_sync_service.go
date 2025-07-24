@@ -482,14 +482,8 @@ func (s *RollupSyncService) getCommittedBatchMeta(commitedBatch da.EntryWithBloc
 			return nil, fmt.Errorf("parent committed batch meta = nil, batch index: %v, err: %w", commitedBatch.BatchIndex()-1, ErrMissingBatchEvent)
 		}
 
-		// If parent batch has a lower version this means this is the first batch of CodecV7.
-		// In this case we need to compute the prevL1MessageQueueHash from the empty hash.
-		var prevL1MessageQueueHash common.Hash
-		if encoding.CodecVersion(parentCommittedBatchMeta.Version) < commitedBatch.Version() {
-			prevL1MessageQueueHash = common.Hash{}
-		} else {
-			prevL1MessageQueueHash = parentCommittedBatchMeta.PostL1MessageQueueHash
-		}
+		// For the first batch of CodecV7, this will be the empty hash.
+		prevL1MessageQueueHash := parentCommittedBatchMeta.PostL1MessageQueueHash
 
 		chunks, err := s.getLocalChunksForBatch(chunkRanges)
 		if err != nil {

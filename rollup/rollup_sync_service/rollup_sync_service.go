@@ -602,6 +602,11 @@ func validateBatch(batchIndex uint64, event *l1.FinalizeBatchEvent, parentFinali
 			log.Warn("Resetting sync height to L1 block 7892668 to fix L1 message queue hash calculation issue after EuclidV2 on Scroll Sepolia")
 			return 0, nil, errShouldResetSyncHeight{height: 7892668}
 		}
+		// This is hotfix for the L1 message hash mismatch issue which lead to wrong committedBatchMeta.PostL1MessageQueueHash hashes.
+		// This happened after upgrading to Feyman where rollup-verifier erroneously reset the prevMessageQueueHash to the empty hash.
+		// If the error message due to mismatching PostL1MessageQueueHash contains the same hash as the hardcoded one,
+		// this means the node ran into this issue.
+		// We need to reset the sync height to before committing the first Feynman batch.
 		if strings.Contains(err.Error(), "expected 0x19c790f49efb448b523d94e5672d9ed108656886be12c038cf39062700000000, got 0x0000000000000000000000000000000000000000000000000000000000000000") {
 			log.Warn("Resetting sync height to L1 block 8816625 to fix L1 message queue hash calculation issue after Feynman on Scroll Sepolia")
 			return 0, nil, errShouldResetSyncHeight{height: 8816625}

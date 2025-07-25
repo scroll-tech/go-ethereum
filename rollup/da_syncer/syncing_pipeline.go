@@ -16,6 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 // Config is the configuration parameters of data availability syncing.
@@ -23,6 +24,7 @@ type Config struct {
 	BlobScanAPIEndpoint    string // BlobScan blob api endpoint
 	BlockNativeAPIEndpoint string // BlockNative blob api endpoint
 	BeaconNodeAPIEndpoint  string // Beacon node api endpoint
+	AwsS3BlobAPIEndpoint   string // AWS S3 blob data api endpoint
 
 	RecoveryMode   bool   // Recovery mode is used to override existing blocks with the blocks read from the pipeline and start from a specific L1 block and batch
 	InitialL1Block uint64 // L1 block in which the InitialBatch was committed (or any earlier L1 block but requires more RPC requests)
@@ -50,7 +52,7 @@ type SyncingPipeline struct {
 	daQueue    *DAQueue
 }
 
-func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient l1.Client, l1DeploymentBlock uint64, config Config) (*SyncingPipeline, error) {
+func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient l1.Client, l1DeploymentBlock uint64, config Config, missingHeaderFieldsManager *missing_header_fields.Manager) (*SyncingPipeline, error) {
 	l1Reader, err := l1.NewReader(ctx, l1.Config{
 		ScrollChainAddress:    genesisConfig.Scroll.L1Config.ScrollChainAddress,
 		L1MessageQueueAddress: genesisConfig.Scroll.L1Config.L1MessageQueueAddress,
@@ -73,6 +75,9 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	}
 	if config.BlockNativeAPIEndpoint != "" {
 		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
+	}
+	if config.AwsS3BlobAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewAwsS3Client(config.AwsS3BlobAPIEndpoint))
 	}
 	if blobClientList.Size() == 0 {
 		return nil, errors.New("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag")
@@ -124,7 +129,7 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 
 	daQueue := NewDAQueue(lastProcessedBatchMeta.L1BlockNumber, dataSourceFactory)
 	batchQueue := NewBatchQueue(daQueue, db, lastProcessedBatchMeta)
-	blockQueue := NewBlockQueue(batchQueue)
+	blockQueue := NewBlockQueue(batchQueue, missingHeaderFieldsManager)
 	daSyncer := NewDASyncer(blockchain, config.L2EndBlock)
 
 	ctx, cancel := context.WithCancel(ctx)

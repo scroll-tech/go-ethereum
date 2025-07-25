@@ -749,11 +749,6 @@ var (
 		Usage: "Gas price below which gpo will ignore transactions",
 		Value: ethconfig.Defaults.GPO.IgnorePrice.Int64(),
 	}
-	GpoCongestionThresholdFlag = cli.IntFlag{
-		Name:  "gpo.congestionthreshold",
-		Usage: "Number of pending transactions to consider the network congested and suggest a minimum tip cap",
-		Value: ethconfig.Defaults.GPO.CongestedThreshold,
-	}
 	GpoDefaultGasTipCapFlag = cli.Int64Flag{
 		Name:  "gpo.defaultgastipcap",
 		Usage: "Default minimum gas tip cap (in wei) to be used after Curie fork (EIP-1559) (default: 100)",
@@ -893,14 +888,27 @@ var (
 		Usage: "peer ids of shadow fork peers",
 	}
 
-	// Tx gossip settings
-	TxGossipBroadcastDisabledFlag = cli.BoolFlag{
-		Name:  "txgossip.disablebroadcast",
+	// Gossip settings
+	GossipTxBroadcastDisabledFlag = cli.BoolFlag{
+		Name:  "gossip.disabletxbroadcast",
 		Usage: "Disable gossip broadcast transactions to other peers",
 	}
-	TxGossipReceivingDisabledFlag = cli.BoolFlag{
-		Name:  "txgossip.disablereceiving",
+	GossipTxReceivingDisabledFlag = cli.BoolFlag{
+		Name:  "gossip.disabletxreceiving",
 		Usage: "Disable gossip receiving transactions from other peers",
+	}
+	GossipSequencerHTTPFlag = &cli.StringFlag{
+		Name:  "gossip.sequencerhttp",
+		Usage: "Sequencer mempool HTTP endpoint",
+	}
+	GossipBroadcastToAllEnabledFlag = cli.BoolFlag{
+		Name:  "gossip.enablebroadcasttoall",
+		Usage: "Enable gossip broadcast blocks and transactions to all peers",
+	}
+	GossipBroadcastToAllCapFlag = cli.IntFlag{
+		Name:  "gossip.broadcasttoallcap",
+		Usage: "Maximum number of peers for broadcasting blocks and transactions (effective only when gossip.enablebroadcasttoall is enabled)",
+		Value: 30,
 	}
 
 	// DA syncing settings
@@ -908,6 +916,12 @@ var (
 		Name:  "da.sync",
 		Usage: "Enable node syncing from DA",
 	}
+	DAMissingHeaderFieldsBaseURLFlag = cli.StringFlag{
+		Name:  "da.missingheaderfields.baseurl",
+		Usage: "Base URL for fetching missing header fields for pre-EuclidV2 blocks",
+		Value: "https://scroll-block-missing-metadata.s3.us-west-2.amazonaws.com/",
+	}
+
 	DABlobScanAPIEndpointFlag = cli.StringFlag{
 		Name:  "da.blob.blobscan",
 		Usage: "BlobScan blob API endpoint",
@@ -1396,6 +1410,8 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 		cfg.DaSyncingEnabled = ctx.Bool(DASyncEnabledFlag.Name)
 	}
 
+	cfg.DAMissingHeaderFieldsBaseURL = ctx.GlobalString(DAMissingHeaderFieldsBaseURLFlag.Name)
+
 	if ctx.GlobalIsSet(ExternalSignerFlag.Name) {
 		cfg.ExternalSigner = ctx.GlobalString(ExternalSignerFlag.Name)
 	}
@@ -1530,9 +1546,6 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config, light bool) {
 	}
 	if ctx.GlobalIsSet(GpoIgnoreGasPriceFlag.Name) {
 		cfg.IgnorePrice = big.NewInt(ctx.GlobalInt64(GpoIgnoreGasPriceFlag.Name))
-	}
-	if ctx.GlobalIsSet(GpoCongestionThresholdFlag.Name) {
-		cfg.CongestedThreshold = ctx.GlobalInt(GpoCongestionThresholdFlag.Name)
 	}
 	if ctx.GlobalIsSet(GpoDefaultGasTipCapFlag.Name) {
 		cfg.DefaultGasTipCap = big.NewInt(ctx.GlobalInt64(GpoDefaultGasTipCapFlag.Name))
@@ -1807,13 +1820,22 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)
 		log.Info("Shadow fork peers", "ids", cfg.ShadowForkPeerIDs)
 	}
-	if ctx.GlobalIsSet(TxGossipBroadcastDisabledFlag.Name) {
-		cfg.TxGossipBroadcastDisabled = ctx.GlobalBool(TxGossipBroadcastDisabledFlag.Name)
-		log.Info("Transaction gossip broadcast disabled", "disabled", cfg.TxGossipBroadcastDisabled)
+	if ctx.GlobalIsSet(GossipTxBroadcastDisabledFlag.Name) {
+		cfg.GossipTxBroadcastDisabled = ctx.GlobalBool(GossipTxBroadcastDisabledFlag.Name)
+		log.Info("Gossip transaction broadcast disabled", "disabled", cfg.GossipTxBroadcastDisabled)
 	}
-	if ctx.GlobalIsSet(TxGossipReceivingDisabledFlag.Name) {
-		cfg.TxGossipReceivingDisabled = ctx.GlobalBool(TxGossipReceivingDisabledFlag.Name)
-		log.Info("Transaction gossip receiving disabled", "disabled", cfg.TxGossipReceivingDisabled)
+	if ctx.GlobalIsSet(GossipTxReceivingDisabledFlag.Name) {
+		cfg.GossipTxReceivingDisabled = ctx.GlobalBool(GossipTxReceivingDisabledFlag.Name)
+		log.Info("Gossip transaction receiving disabled", "disabled", cfg.GossipTxReceivingDisabled)
+	}
+	if ctx.GlobalIsSet(GossipBroadcastToAllEnabledFlag.Name) {
+		cfg.GossipBroadcastToAllEnabled = ctx.GlobalBool(GossipBroadcastToAllEnabledFlag.Name)
+		cfg.GossipBroadcastToAllCap = ctx.GlobalInt(GossipBroadcastToAllCapFlag.Name)
+		log.Info("Gossip broadcast to all enabled", "enabled", cfg.GossipBroadcastToAllEnabled, "cap", cfg.GossipBroadcastToAllCap)
+	}
+	// Only configure sequencer http flag if we're running in verifier mode i.e. --mine is disabled.
+	if ctx.IsSet(GossipSequencerHTTPFlag.Name) && !ctx.IsSet(MiningEnabledFlag.Name) {
+		cfg.GossipSequencerHTTP = ctx.String(GossipSequencerHTTPFlag.Name)
 	}
 
 	// Cap the cache allowance and tune the garbage collector

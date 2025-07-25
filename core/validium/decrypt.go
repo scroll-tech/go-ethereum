@@ -198,13 +198,14 @@ func decryptAddress(data []byte) (common.Address, error) {
 		return common.Address{}, errors.New("decryption failed")
 	}
 
-	plaintext := string(raw)
-	if !common.IsHexAddress(plaintext) {
-		log.Warn("decrypted data is not address", "data", common.Bytes2Hex(data), "plaintext", plaintext)
+	if len(raw) != common.AddressLength {
+		log.Warn("decrypted data is not address", "data", common.Bytes2Hex(data), "plaintext", common.Bytes2Hex(raw))
 		return common.Address{}, errors.New("decryption failed")
 	}
 
-	return common.HexToAddress(plaintext), nil
+	address := common.BytesToAddress(raw)
+	log.Info("Successfully decrypted address", "address", address)
+	return address, nil
 }
 
 // decryptInnerCall decrypts the inner call of a relayMessageArgs if it is encrypted.

@@ -691,9 +691,9 @@ func (w *worker) processTxPool() (bool, error) {
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		// Decrypt L1 message payloads.
-		for _, msg := range l1Messages {
-			if decrypted, err := validium.DecryptTxData(msg.Data); err == nil {
-				msg.Data = decrypted
+		for i := range l1Messages {
+			if decrypted, err := validium.DecryptTxData(l1Messages[i].Data); err == nil {
+				l1Messages[i].Data = decrypted
 			}
 		}
 

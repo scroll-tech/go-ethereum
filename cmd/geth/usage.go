@@ -254,6 +254,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.GossipSequencerHTTPFlag,
 			utils.GossipBroadcastToAllEnabledFlag,
 			utils.GossipBroadcastToAllCapFlag,
+			utils.StealthDepositSequencerKey,
 		},
 	},
 	{

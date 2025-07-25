@@ -49,6 +49,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/consensus/ethash"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/core/validium"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/eth"
@@ -76,6 +77,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rollup/tracing"
 	"github.com/scroll-tech/go-ethereum/rpc"
+
+	ecies "github.com/scroll-tech/ecies-go/v2"
 )
 
 func init() {
@@ -962,6 +965,12 @@ var (
 		Name:  "da.recovery.produceblocks",
 		Usage: "Produce unsigned blocks after L1 recovery for permissionless batch submission",
 	}
+
+	// Stealth deposit settings
+	StealthDepositSequencerKey = cli.StringFlag{
+		Name:  "stealth.sequencerkey",
+		Usage: "Stealth deposit sequencer key",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1739,6 +1748,20 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+func setStealthDeposit(ctx *cli.Context, cfg *ethconfig.Config) {
+	if !ctx.IsSet(StealthDepositSequencerKey.Name) {
+		log.Warn("Stealth deposit sequencer key not set, skipping stealth deposit configuration")
+		return
+	}
+
+	hex := ctx.String(StealthDepositSequencerKey.Name)
+	key, err := ecies.NewPrivateKeyFromHex(hex)
+	if err != nil {
+		panic(fmt.Sprintf("error while parsing sequencer key: %w", err))
+	}
+	validium.SetSequencerKey(key)
+}
+
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(MaxBlockRangeFlag.Name) {
 		cfg.MaxBlockRange = ctx.GlobalInt64(MaxBlockRangeFlag.Name)
@@ -1815,6 +1838,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setCircuitCapacityCheck(ctx, cfg)
 	setEnableRollupVerify(ctx, cfg)
 	setDA(ctx, cfg)
+	setStealthDeposit(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
 	if ctx.GlobalIsSet(ShadowforkPeersFlag.Name) {
 		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)

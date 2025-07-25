@@ -32,6 +32,7 @@ func SetSequencerKey(key *ecies.PrivateKey) {
 	lock.Lock()
 	defer lock.Unlock()
 	SequencerKey = key
+	log.Warn("Sequencer key set", "publicKey", key.PublicKey.Hex(true))
 }
 
 func init() {

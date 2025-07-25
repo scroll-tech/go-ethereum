@@ -192,6 +192,7 @@ var (
 		utils.DARecoverySignBlocksFlag,
 		utils.DARecoveryL2EndBlockFlag,
 		utils.DARecoveryProduceBlocksFlag,
+		utils.StealthDepositSequencerKey,
 	}
 
 	rpcFlags = []cli.Flag{

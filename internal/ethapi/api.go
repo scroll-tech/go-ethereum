@@ -1168,7 +1168,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		if err != nil {
 			return 0, err
 		}
-		if l1DataFee.Cmp(available) >= 0 {
+		if l1DataFee.Cmp(available) > 0 {
 			return 0, errors.New("insufficient funds for l1 fee")
 		}
 		available.Sub(available, l1DataFee)

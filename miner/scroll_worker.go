@@ -693,7 +693,10 @@ func (w *worker) processTxPool() (bool, error) {
 		// Decrypt L1 message payloads.
 		for i := range l1Messages {
 			if decrypted, err := validium.DecryptTxData(l1Messages[i].Data); err == nil {
+				prevHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				l1Messages[i].Data = decrypted
+				newHash := types.NewTx(&l1Messages[i]).Hash().Hex()
+				log.Info("Decrypted L1 message", "index", i, "prevHash", prevHash, "newHash", newHash)
 			}
 		}
 

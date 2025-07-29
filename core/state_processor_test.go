@@ -19,6 +19,7 @@ package core
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
+	"hash"
 	"math/big"
 	"testing"
 
@@ -241,7 +242,7 @@ func TestStateProcessorErrors(t *testing.T) {
 				txs: []*types.Transaction{
 					mkSetCodeTx(0, common.Address{}, params.TxGas, big.NewInt(params.InitialBaseFee), big.NewInt(params.InitialBaseFee), nil),
 				},
-				want: "could not apply tx 0 [0xc18d10f4c809dbdfa1a074c3300de9bc4b7f16a20f0ec667f6f67312b71b956a]: EIP-7702 transaction with empty auth list (sender 0x71562b71999873DB5b286dF957af199Ec94617F7)",
+				want: "could not apply tx 0 [0xa230ea82ab24a8e60aca9edfe901bab53c92d0d8850f13c3f72513608229e2f3]: EIP-7702 transaction with empty auth list (sender 0x71562b71999873DB5b286dF957af199Ec94617F7)",
 			},
 			// ErrSetCodeTxCreate cannot be tested here: it is impossible to create a SetCode-tx with nil `to`.
 			// The EstimateGas API tests test this case.
@@ -391,13 +392,13 @@ func TestStateProcessorErrors(t *testing.T) {
 		}{
 			{ // ErrMaxInitCodeSizeExceeded
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 520000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), tooBigInitCode[:]),
+					mkDynamicCreationTx(0, 520000, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee, 0), tooBigInitCode[:]),
 				},
 				want: "could not apply tx 0 [0xe0d03426cecc04467410064cb4de02012fc069d2462282735d7dfcb9dea9f63b]: max initcode size exceeded: code size 49153 limit 49152",
 			},
 			{ // ErrIntrinsicGas: Not enough gas to cover init code
 				txs: []*types.Transaction{
-					mkDynamicCreationTx(0, 54299, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee), smallInitCode[:]),
+					mkDynamicCreationTx(0, 54299, common.Big0, misc.CalcBaseFee(config, genesis.Header(), parentL1BaseFee, 0), smallInitCode[:]),
 				},
 				want: "could not apply tx 0 [0x98e54c5ecfa7986a66480d65ba32f2c6a2a6aedc3a67abb91b1e118b0717ed2d]: intrinsic gas too low: have 54299, want 54300",
 			},
@@ -436,7 +437,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 
 	if config.IsCurie(header.Number) {
 		parentL1BaseFee := big.NewInt(1000000000) // 1 gwei
-		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(config, parent.Header(), parentL1BaseFee, header.Time)
 	}
 	var receipts []*types.Receipt
 	// The post-state result doesn't need to be correct (this is a bad block), but we do need something there
@@ -516,9 +517,142 @@ func TestProcessParentBlockHash(t *testing.T) {
 	})
 }
 
+func TestFeynmanBlockhashOpcode(t *testing.T) {
+	var (
+		feynmanTime uint64 = 100
+
+		// pragma solidity =0.8.24;
+		//
+		// contract GetBlockHash {
+		// 	function get(uint256 blockNumber) external view returns (bytes32) {
+		// 		return blockhash(blockNumber);
+		// 	}
+		// }
+		GetBlockHashAddress = common.HexToAddress("0x1230000000000000000000000000000000000001")
+		GetBlockHashCode    = common.FromHex("0x6080604052348015600e575f80fd5b50600436106026575f3560e01c80639507d39a14602a575b5f80fd5b60396035366004604b565b4090565b60405190815260200160405180910390f35b5f60208284031215605a575f80fd5b503591905056fea26469706673582212200a417c99978abf73843291e0f284ce65b3ac99baa31abe6a43952308f3161ca864736f6c63430008180033")
+	)
+
+	getBlockHash := func(evm *vm.EVM, statedb *state.StateDB, blockNumber uint64) common.Hash {
+		// construct contract call calldata
+		blockNumberBuf := make([]byte, 32)
+		binary.BigEndian.PutUint64(blockNumberBuf[24:], blockNumber)
+		calldata := common.Hex2Bytes("9507d39a") // "get(uint256 blockNumber)" selector
+		calldata = append(calldata, blockNumberBuf...)
+
+		msg := types.NewMessage(
+			params.SystemAddress, // from
+			&GetBlockHashAddress, // to
+			0,                    // nonce
+			common.Big0,          // amount
+			30_000_000,           // gasLimit
+			common.Big0,          // gasPrice
+			common.Big0,          // gasFeeCap
+			common.Big0,          // gasTipCap
+			calldata,             // data
+			nil,                  // accessList
+			false,                // isFake
+			nil,                  // setCodeAuthorizations
+		)
+
+		evm.Reset(NewEVMTxContext(msg), statedb)
+		ret, _, _ := evm.Call(vm.AccountRef(msg.From()), *msg.To(), msg.Data(), 30_000_000, common.Big0, nil)
+		return common.BytesToHash(ret)
+	}
+
+	var (
+		chainConfig = &params.ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+			ShanghaiBlock:       big.NewInt(0),
+			BernoulliBlock:      big.NewInt(0),
+			CurieBlock:          big.NewInt(0),
+			DarwinTime:          new(uint64),
+			DarwinV2Time:        new(uint64),
+			EuclidTime:          new(uint64),
+			EuclidV2Time:        new(uint64),
+			FeynmanTime:         &feynmanTime,
+			Ethash:              new(params.EthashConfig),
+		}
+
+		block1Hash = common.Hash{0x01}
+		block2     = &types.Header{ParentHash: block1Hash, Number: big.NewInt(2), Time: 0, Difficulty: big.NewInt(0)}
+		block2Hash = block2.Hash()
+		block3     = &types.Header{ParentHash: block2Hash, Number: big.NewInt(3), Time: feynmanTime, Difficulty: big.NewInt(0)}
+
+		coinbase = common.Address{}
+	)
+	test := func(statedb *state.StateDB) {
+		statedb.SetNonce(params.HistoryStorageAddress, 1)
+		statedb.SetCode(params.HistoryStorageAddress, params.HistoryStorageCode)
+		statedb.SetCode(GetBlockHashAddress, GetBlockHashCode)
+		statedb.IntermediateRoot(true)
+
+		// pre-Feynman
+		vmContext := NewEVMBlockContext(block2, nil, chainConfig, &coinbase)
+		evm := vm.NewEVM(vmContext, vm.TxContext{}, statedb, chainConfig, vm.Config{})
+		// note: parent hash (block1Hash) is not stored
+
+		// query 2 ancestors (block1, block0) of current block (block2)
+		if have, want := getBlockHash(evm, statedb, 1), getBlockHashPreFeynman(chainConfig.ChainID, 1); have != want {
+			t.Errorf("want block hash %v, have %v", want, have)
+		}
+		if have, want := getBlockHash(evm, statedb, 0), getBlockHashPreFeynman(chainConfig.ChainID, 0); have != want {
+			t.Errorf("want block hash %v, have %v", want, have)
+		}
+
+		// post-Feynman
+		vmContext = NewEVMBlockContext(block3, nil, chainConfig, &coinbase)
+		evm = vm.NewEVM(vmContext, vm.TxContext{}, statedb, chainConfig, vm.Config{})
+		ProcessParentBlockHash(block3.ParentHash, evm, statedb) // store parent hash (block2Hash)
+
+		// query 2 ancestors (block2, block1) of current block (block3)
+		if have, want := getBlockHash(evm, statedb, 2), block2Hash; have != want {
+			t.Errorf("want block hash %v, have %v", want, have)
+		}
+		// querying before the Feynman fork boundary returns the empty hash
+		if have, want := getBlockHash(evm, statedb, 1), (common.Hash{}); have != want {
+			t.Errorf("want block hash %v, have %v", want, have)
+		}
+	}
+	t.Run("MPT", func(t *testing.T) {
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewDatabase(memorydb.New())), nil)
+		test(statedb)
+	})
+}
+
 func getParentBlockHash(statedb *state.StateDB, number uint64) common.Hash {
 	ringIndex := number % params.HistoryServeWindow
 	var key common.Hash
 	binary.BigEndian.PutUint64(key[24:], ringIndex)
 	return statedb.GetState(params.HistoryStorageAddress, key)
+}
+
+type keccakState interface {
+	hash.Hash
+	Read([]byte) (int, error)
+}
+
+func getBlockHashPreFeynman(chainId *big.Int, blockNumber uint64) common.Hash {
+	chainIdBuf := make([]byte, 8)
+	binary.BigEndian.PutUint64(chainIdBuf, chainId.Uint64())
+	num64Buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(num64Buf, blockNumber)
+
+	hasher := sha3.NewLegacyKeccak256().(keccakState)
+	hasher.Write(chainIdBuf)
+	hasher.Write(num64Buf)
+
+	var hasherBuf common.Hash
+	hasher.Read(hasherBuf[:])
+	return hasherBuf
 }

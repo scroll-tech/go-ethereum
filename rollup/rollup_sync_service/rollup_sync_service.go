@@ -48,10 +48,17 @@ const (
 )
 
 var (
-	finalizedBlockGauge      = metrics.NewRegisteredGauge("chain/head/finalized", nil)
-	ErrShouldResetSyncHeight = errors.New("ErrShouldResetSyncHeight")
-	ErrMissingBatchEvent     = errors.New("ErrMissingBatchEvent")
+	finalizedBlockGauge  = metrics.NewRegisteredGauge("chain/head/finalized", nil)
+	ErrMissingBatchEvent = errors.New("ErrMissingBatchEvent")
 )
+
+type errShouldResetSyncHeight struct {
+	height uint64
+}
+
+func (e errShouldResetSyncHeight) Error() string {
+	return fmt.Sprintf("ErrShouldResetSyncHeight: height=%d", e.height)
+}
 
 // RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
 type RollupSyncService struct {
@@ -113,6 +120,9 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 	}
 	if config.BlockNativeAPIEndpoint != "" {
 		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
+	}
+	if config.AwsS3BlobAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewAwsS3Client(config.AwsS3BlobAPIEndpoint))
 	}
 	if blobClientList.Size() == 0 {
 		return nil, errors.New("no blob client is configured for rollup verifier. Please provide at least one blob client via command line flag")
@@ -221,10 +231,10 @@ func (s *RollupSyncService) fetchRollupEvents() error {
 		}
 
 		if err = s.updateRollupEvents(daEntries); err != nil {
-			if errors.Is(err, ErrShouldResetSyncHeight) {
-				log.Warn("Resetting sync height to L1 block 7892668 to fix L1 message queue hash calculation")
-				s.callDataBlobSource.SetL1Height(7892668)
-
+			var resetSyncErr errShouldResetSyncHeight
+			if errors.As(err, &resetSyncErr) {
+				log.Warn("Resetting rollup sync height", "height", resetSyncErr.height)
+				s.callDataBlobSource.SetL1Height(resetSyncErr.height)
 				return nil
 			}
 			if errors.Is(err, ErrMissingBatchEvent) {
@@ -464,13 +474,13 @@ func (s *RollupSyncService) getCommittedBatchMeta(commitedBatch da.EntryWithBloc
 		return nil, fmt.Errorf("failed to decode block ranges from chunks, batch index: %v, err: %w", commitedBatch.BatchIndex(), err)
 	}
 
-	// With CodecV7 the batch creation changed. We need to compute and store PostL1MessageQueueHash.
+	// With >= CodecV7 the batch creation changed. We need to compute and store PostL1MessageQueueHash.
 	// PrevL1MessageQueueHash of a batch == PostL1MessageQueueHash of the previous batch.
 	// We need to do this for every committed batch (instead of finalized batch) because the L1MessageQueueHash
 	// is a continuous hash of all L1 messages over all batches. With bundles we only receive the finalize event
 	// for the last batch of the bundle.
 	var lastL1MessageQueueHash common.Hash
-	if commitedBatch.Version() == encoding.CodecV7 {
+	if commitedBatch.Version() >= encoding.CodecV7 {
 		parentCommittedBatchMeta, err := rawdb.ReadCommittedBatchMeta(s.db, commitedBatch.BatchIndex()-1)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read parent committed batch meta, batch index: %v, err: %w", commitedBatch.BatchIndex()-1, errors.Join(ErrMissingBatchEvent, err))
@@ -479,25 +489,19 @@ func (s *RollupSyncService) getCommittedBatchMeta(commitedBatch da.EntryWithBloc
 			return nil, fmt.Errorf("parent committed batch meta = nil, batch index: %v, err: %w", commitedBatch.BatchIndex()-1, ErrMissingBatchEvent)
 		}
 
-		// If parent batch has a lower version this means this is the first batch of CodecV7.
-		// In this case we need to compute the prevL1MessageQueueHash from the empty hash.
-		var prevL1MessageQueueHash common.Hash
-		if encoding.CodecVersion(parentCommittedBatchMeta.Version) < commitedBatch.Version() {
-			prevL1MessageQueueHash = common.Hash{}
-		} else {
-			prevL1MessageQueueHash = parentCommittedBatchMeta.PostL1MessageQueueHash
-		}
+		// For the first batch of CodecV7, this will be the empty hash.
+		prevL1MessageQueueHash := parentCommittedBatchMeta.PostL1MessageQueueHash
 
 		chunks, err := s.getLocalChunksForBatch(chunkRanges)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get local node info, batch index: %v, err: %w", commitedBatch.BatchIndex(), err)
 		}
 
-		// There is no chunks encoded in a batch anymore with CodecV7.
+		// There is no chunks encoded in a batch anymore with >= CodecV7.
 		// For compatibility reason here we still use a single chunk to store the block ranges of the batch.
 		// We make sure that there is really only one chunk which contains all blocks of the batch.
 		if len(chunks) != 1 {
-			return nil, fmt.Errorf("invalid argument: chunk count is not 1 for CodecV7, batch index: %v", commitedBatch.BatchIndex())
+			return nil, fmt.Errorf("invalid argument: chunk count is not 1 for CodecV%v, batch index: %v", commitedBatch.Version(), commitedBatch.BatchIndex())
 		}
 
 		lastL1MessageQueueHash, err = encoding.MessageQueueV2ApplyL1MessagesFromBlocks(prevL1MessageQueueHash, chunks[0].Blocks)
@@ -563,11 +567,11 @@ func validateBatch(batchIndex uint64, event *l1.FinalizeBatchEvent, parentFinali
 			Chunks:                     chunks,
 		}
 	} else {
-		// With CodecV7 the batch creation changed. There is no chunks encoded in a batch anymore.
+		// With >= CodecV7 the batch creation changed. There is no chunks encoded in a batch anymore.
 		// For compatibility reason here we still use a single chunk to store the block ranges of the batch.
 		// We make sure that there is really only one chunk which contains all blocks of the batch.
 		if len(chunks) != 1 {
-			return 0, nil, fmt.Errorf("invalid argument: chunk count is not 1 for CodecV7, batch index: %v", batchIndex)
+			return 0, nil, fmt.Errorf("invalid argument: chunk count is not 1 for CodecV%v, batch index: %v", committedBatchMeta.Version, batchIndex)
 		}
 
 		batch = &encoding.Batch{
@@ -595,7 +599,17 @@ func validateBatch(batchIndex uint64, event *l1.FinalizeBatchEvent, parentFinali
 		// We need to reset the sync height to 1 block before the L1 block in which the last batch in CodecV6 was committed.
 		// The node will overwrite the wrongly computed message queue hashes.
 		if strings.Contains(err.Error(), "0xaa16faf2a1685fe1d7e0f2810b1a0e98c2841aef96596d10456a6d0f00000000") {
-			return 0, nil, ErrShouldResetSyncHeight
+			log.Warn("Resetting sync height to L1 block 7892668 to fix L1 message queue hash calculation issue after EuclidV2 on Scroll Sepolia")
+			return 0, nil, errShouldResetSyncHeight{height: 7892668}
+		}
+		// This is hotfix for the L1 message hash mismatch issue which lead to wrong committedBatchMeta.PostL1MessageQueueHash hashes.
+		// This happened after upgrading to Feyman where rollup-verifier erroneously reset the prevMessageQueueHash to the empty hash.
+		// If the error message due to mismatching PostL1MessageQueueHash contains the same hash as the hardcoded one,
+		// this means the node ran into this issue.
+		// We need to reset the sync height to before committing the first Feynman batch.
+		if strings.Contains(err.Error(), "expected 0x19c790f49efb448b523d94e5672d9ed108656886be12c038cf39062700000000, got 0x0000000000000000000000000000000000000000000000000000000000000000") {
+			log.Warn("Resetting sync height to L1 block 8816625 to fix L1 message queue hash calculation issue after Feynman on Scroll Sepolia")
+			return 0, nil, errShouldResetSyncHeight{height: 8816625}
 		}
 		return 0, nil, fmt.Errorf("failed to create DA batch, batch index: %v, codec version: %v, err: %w", batchIndex, codecVersion, err)
 	}

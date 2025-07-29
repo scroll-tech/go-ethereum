@@ -488,7 +488,7 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(parentState)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee, header.Time)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -836,6 +836,16 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSizeForMining(w.current.blockSize+tx.Size()) {
 		// can't fit this txn in this block, silently ignore and continue looking for more txns
 		return false, errors.New("tx too big")
+	}
+
+	// Reject transactions that require the max data fee amount.
+	// This can only happen if the L1 gas oracle is updated incorrectly.
+	l1DataFee, err := fees.CalculateL1DataFee(tx, w.current.state, w.chain.Config(), w.current.header.Number, w.current.header.Time)
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+	}
+	if l1DataFee.Cmp(fees.MaxL1DataFee()) >= 0 {
+		return false, errors.New("invalid transaction: invalid L1 data fee")
 	}
 
 	// Start executing the transaction

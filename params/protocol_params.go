@@ -127,9 +127,9 @@ const (
 	// Introduced in Tangerine Whistle (Eip 150)
 	CreateBySelfdestructGas uint64 = 25000
 
-	BaseFeeChangeDenominator = 8          // Bounds the amount the base fee can change between blocks.
-	ElasticityMultiplier     = 2          // Bounds the maximum gas limit an EIP-1559 block may have.
-	InitialBaseFee           = 1000000000 // Initial base fee for EIP-1559 blocks.
+	DefaultBaseFeeChangeDenominator = 8        // Bounds the amount the base fee can change between blocks.
+	DefaultElasticityMultiplier     = 2        // Bounds the maximum gas limit an EIP-1559 block may have.
+	InitialBaseFee                  = 10000000 // Initial base fee for EIP-1559 blocks.
 
 	MaxCodeSize     = 24576           // Maximum bytecode to permit for a contract
 	MaxInitCodeSize = 2 * MaxCodeSize // Maximum initcode to permit in a creation transaction and create instructions
@@ -174,8 +174,6 @@ const (
 	BlobTxBlobGaspriceUpdateFraction = 5007716 // Controls the maximum rate of change for blob gas price, using Prague parameters
 
 	BlobTxTargetBlobGasPerBlock = 6 * BlobTxBlobGasPerBlob // Target consumable blob gas for data blobs per block (for 1559-like pricing), using Prague parameters
-
-	HistoryServeWindow = 8192 // Number of blocks to serve historical block hashes for, EIP-2935.
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations
@@ -197,4 +195,5 @@ var (
 	// EIP-2935 - Serve historical block hashes from state
 	HistoryStorageAddress = common.HexToAddress("0x0000F90827F1C53a10cb7A02335B175320002935")
 	HistoryStorageCode    = common.FromHex("3373fffffffffffffffffffffffffffffffffffffffe14604657602036036042575f35600143038111604257611fff81430311604257611fff9006545f5260205ff35b5f5ffd5b5f35611fff60014303065500")
+	HistoryServeWindow    = uint64(8191)
 )

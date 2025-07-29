@@ -1199,7 +1199,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 
 		result, err := DoCall(ctx, b, args, blockNrOrHash, nil, 0, gasCap)
 		if err != nil {
-			if errors.Is(err, core.ErrIntrinsicGas) {
+			if errors.Is(err, core.ErrIntrinsicGas) || errors.Is(err, core.ErrFloorDataGas) {
 				return true, nil, nil // Special case, raise gas limit
 			}
 			return true, nil, err // Bail out
@@ -1447,7 +1447,8 @@ func newRPCPendingTransaction(tx *types.Transaction, current *types.Header, conf
 	blockNumber := uint64(0)
 	blockTime := uint64(0)
 	if current != nil {
-		baseFee = misc.CalcBaseFee(config, current, l1BaseFee)
+		// Use time.Now() as the current block time to calculate the pending base fee.
+		baseFee = misc.CalcBaseFee(config, current, l1BaseFee, uint64(time.Now().Unix()))
 		blockNumber = current.Number.Uint64()
 		blockTime = current.Time
 	}

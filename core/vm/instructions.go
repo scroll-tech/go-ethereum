@@ -485,10 +485,11 @@ func opBlockhashPostFeynman(pc *uint64, interpreter *EVMInterpreter, scope *Scop
 		lower = upper - 256
 	}
 	if num64 >= lower && num64 < upper {
-		res := interpreter.evm.Context.GetHash(num64)
-		if witness := interpreter.evm.StateDB.Witness(); witness != nil {
-			witness.AddBlockHash(num64)
-		}
+		// load block hash from the history storage system contract.
+		ringIndex := num64 % params.HistoryServeWindow
+		var key common.Hash
+		binary.BigEndian.PutUint64(key[24:], ringIndex)
+		res := interpreter.evm.StateDB.GetState(params.HistoryStorageAddress, key)
 		num.SetBytes(res[:])
 	} else {
 		num.Clear()

@@ -280,14 +280,20 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	if b.eth.sequencerRPCService != nil {
 		// If the transaction pool is disabled, then we need to make sure that we send the transaction to the sequencer RPC synchronously.
 		if b.disableTxPool {
-			return b.sendToSequencer(ctx, signedTx)
+			err = b.sendToSequencer(ctx, signedTx)
+			if err != nil {
+				log.Warn("failed to forward tx to sequencer", "tx", signedTx.Hash(), "err", err)
+			}
+			return err
 		}
 
 		// If the transaction pool is enabled, we send the transaction to the sequencer RPC asynchronously as this is
 		// additional to the public mempool.
 		go func() {
 			err := b.sendToSequencer(ctx, signedTx)
-			log.Warn("failed to forward tx to sequencer", "tx", signedTx.Hash(), "err", err)
+			if err != nil {
+				log.Warn("failed to forward tx to sequencer", "tx", signedTx.Hash(), "err", err)
+			}
 		}()
 	}
 

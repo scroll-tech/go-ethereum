@@ -401,7 +401,6 @@ func (w *worker) mainLoop() {
 			idleTimer.UpdateSince(idleStart)
 			w.current.deadlineReached = true
 			if len(w.current.txs) > 0 {
-				log.Info("hhff", "deadlineReached", w.current.deadlineReached, "len(w.current.txs)", len(w.current.txs))
 				_, err = w.commit()
 			} else if w.config.AllowEmpty {
 				log.Warn("Committing empty block", "number", w.current.header.Number)
@@ -560,15 +559,11 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
 	}
 	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.RelaxedPeriod && w.chainConfig.SystemContract.Period != 1 {
-		log.Info("hhf: System contract related period", "period", w.chainConfig.SystemContract.Period)
 		// system contract with relaxed period uses time.Now() as the header.Time, calculate the deadline
 		deadline = time.Unix(int64(header.Time+w.chainConfig.SystemContract.Period), 0)
 	}
 	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.Period == 1 {
-		log.Info("hhf: Using system contract deadline calculation", "blockNumber", header.Number, "blockTime", header.Time)
 		deadline = CalculateBlockDeadline(w.chainConfig.SystemContract, header)
-	} else {
-		log.Info("hhf: Using default deadline calculation", "blockNumber", header.Number, "blockTime", header.Time)
 	}
 
 	w.current = &work{

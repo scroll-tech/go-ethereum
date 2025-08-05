@@ -258,16 +258,13 @@ func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 	// Calculate blocks per period
 	blocksPerPeriod := blocksPerSecond * period
 
-	// Calculate the next block number (the block we're about to create)
-	nextBlockNumber := parent.Number.Uint64() + 1
-
 	// Calculate the block index within the current period for the next block
-	blockIndex := nextBlockNumber % blocksPerPeriod
+	blockIndex := parent.Number.Uint64() % blocksPerPeriod
 
-	// If the next block is the first one in a new period, increment the timestamp by period
-	// blockIndex == 0 means we're starting a new period
-	if blockIndex == 0 && nextBlockNumber > 0 {
-		timestamp += period
+	// If this block is the last one in the current second, increment the timestamp
+	// We compare with blocksPerPeriod-1 because blockIndex is 0-based
+	if blockIndex == blocksPerPeriod-1 {
+		timestamp++
 	}
 
 	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as

@@ -249,10 +249,6 @@ func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 	if s.config.Period == 1 {
 		// Get the base timestamp (in seconds)
 		timestamp = parent.Time
-		period := s.config.Period
-		if period == 0 {
-			period = 1 // Default to 1 second period
-		}
 
 		blocksPerSecond := CalcBlocksPerSecond(s.config.BlocksPerSecond)
 

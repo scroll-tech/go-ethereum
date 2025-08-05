@@ -1194,11 +1194,6 @@ func (w *worker) isCanonical(header *types.Header) bool {
 // SystemContract configuration and current header information.
 // This function abstracts the deadline calculation logic for easier testing.
 func CalculateBlockDeadline(config *params.SystemContractConfig, header *types.Header) time.Time {
-	period := config.Period
-	if period == 0 {
-		period = 1 // Default to 1 second period
-	}
-
 	blocksPerSecond := system_contract.CalcBlocksPerSecond(config.BlocksPerSecond)
 	periodMs := system_contract.CalcPeriodMs(blocksPerSecond)
 

@@ -559,19 +559,7 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
 	}
 	if w.chainConfig.SystemContract != nil {
-		periodMs := w.chainConfig.SystemContract.Period
-		blocksPerSecond := system_contract.CalcBlocksPerSecond(periodMs)
-		// Calculate the actual timing based on block number within the current second
-		blockIndex := header.Number.Uint64() % blocksPerSecond
-
-		// Calculate base time and add the fraction of a second based on block index
-		baseTimeNano := int64(header.Time) * int64(time.Second)
-		fractionNano := int64(blockIndex) * int64(periodMs) * int64(time.Millisecond)
-
-		// Add one period to determine the deadline
-		nextBlockNano := baseTimeNano + fractionNano + int64(periodMs)*int64(time.Millisecond)
-
-		deadline = time.Unix(0, nextBlockNano)
+		deadline = CalculateBlockDeadline(w.chainConfig.SystemContract, header)
 	}
 
 	w.current = &work{
@@ -1191,4 +1179,32 @@ func (w *worker) handleReorg(trigger *reorgTrigger) error {
 
 func (w *worker) isCanonical(header *types.Header) bool {
 	return w.chain.GetBlockByNumber(header.Number.Uint64()).Hash() == header.Hash()
+}
+
+// CalculateBlockDeadline calculates the deadline for block production based on
+// SystemContract configuration and current header information.
+// This function abstracts the deadline calculation logic for easier testing.
+func CalculateBlockDeadline(config *params.SystemContractConfig, header *types.Header) time.Time {
+	period := config.Period
+	if period == 0 {
+		period = 1 // Default to 1 second period
+	}
+
+	blocksPerSecond := system_contract.CalcBlocksPerSecond(config.BlocksPerSecond)
+	periodMs := system_contract.CalcPeriodMs(config.BlocksPerSecond)
+
+	// Calculate blocks per period
+	blocksPerPeriod := blocksPerSecond * period
+
+	// Calculate the actual timing based on block number within the current period
+	blockIndex := header.Number.Uint64() % blocksPerPeriod
+
+	// Calculate base time and add the fraction based on block index within the period
+	baseTimeNano := int64(header.Time) * int64(time.Second)
+	fractionNano := int64(blockIndex) * int64(periodMs) * int64(time.Millisecond)
+
+	// Add one period to determine the deadline
+	nextBlockNano := baseTimeNano + fractionNano + int64(periodMs)*int64(time.Millisecond)
+
+	return time.Unix(0, nextBlockNano)
 }

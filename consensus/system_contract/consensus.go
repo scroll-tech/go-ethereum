@@ -227,30 +227,47 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
-// CalcBlocksPerSecond converts period to milliseconds and calculate blocks per second
-// For example: if Period = 250ms = 0.25s, then periodMs = 250
-func CalcBlocksPerSecond(periodMs uint64) uint64 {
-	blocksPerSecond := 1000 / periodMs // integer division, e.g. 1000/250 = 4
+// CalcBlocksPerSecond returns the number of blocks per second
+// Uses the BlocksPerSecond configuration parameter directly
+// Default is 1 block per second if not specified
+func CalcBlocksPerSecond(blocksPerSecond uint64) uint64 {
 	if blocksPerSecond == 0 {
-		blocksPerSecond = 1
+		return 1 // Default to 1 block per second
 	}
 	return blocksPerSecond
+}
+
+// CalcPeriodMs calculates the period in milliseconds between blocks
+// based on the blocks per second configuration
+func CalcPeriodMs(blocksPerSecond uint64) uint64 {
+	bps := CalcBlocksPerSecond(blocksPerSecond)
+	return 1000 / bps
 }
 
 func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 	// Get the base timestamp (in seconds)
 	timestamp := parent.Time
 
-	periodMs := s.config.Period
-	blocksPerSecond := CalcBlocksPerSecond(periodMs)
+	period := s.config.Period
+	if period == 0 {
+		period = 1 // Default to 1 second period
+	}
 
-	// Calculate the block index within the current second
-	blockIndex := parent.Number.Uint64() % blocksPerSecond
+	blocksPerSecond := CalcBlocksPerSecond(s.config.BlocksPerSecond)
 
-	// If this block is the last one in the current second, increment the timestamp
-	// We compare with blocksPerSecond-1 because blockIndex is 0-based
-	if blockIndex == blocksPerSecond-1 {
-		timestamp++
+	// Calculate blocks per period
+	blocksPerPeriod := blocksPerSecond * period
+
+	// Calculate the next block number (the block we're about to create)
+	nextBlockNumber := parent.Number.Uint64() + 1
+
+	// Calculate the block index within the current period for the next block
+	blockIndex := nextBlockNumber % blocksPerPeriod
+
+	// If the next block is the first one in a new period, increment the timestamp by period
+	// blockIndex == 0 means we're starting a new period
+	if blockIndex == 0 && nextBlockNumber > 0 {
+		timestamp += period
 	}
 
 	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as

@@ -824,8 +824,8 @@ func (c *CliqueConfig) String() string {
 
 // SystemContractConfig is the consensus engine configs for rollup sequencer sealing.
 type SystemContractConfig struct {
-	Period uint64 `json:"period"` // Number of milliseconds between blocks to enforce
-
+	Period                uint64         `json:"period"`                  // Number of seconds between blocks to enforce
+	BlocksPerSecond       uint64         `json:"blocks_per_second"`       // Number of blocks per second within the period
 	SystemContractAddress common.Address `json:"system_contract_address"` // address of system contract on L1
 	SystemContractSlot    common.Hash    `json:"system_contract_slot"`    // slot of signer address in system contract on L1
 

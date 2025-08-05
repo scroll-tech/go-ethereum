@@ -559,7 +559,11 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 		// clique with relaxed period uses time.Now() as the header.Time, calculate the deadline
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
 	}
-	if w.chainConfig.SystemContract != nil {
+	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.RelaxedPeriod && w.chainConfig.SystemContract.Period != 1 {
+		// system contract with relaxed period uses time.Now() as the header.Time, calculate the deadline
+		deadline = time.Unix(int64(header.Time+w.chainConfig.SystemContract.Period), 0)
+	}
+	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.Period == 1 {
 		deadline = CalculateBlockDeadline(w.chainConfig.SystemContract, header)
 	}
 
@@ -1192,7 +1196,7 @@ func CalculateBlockDeadline(config *params.SystemContractConfig, header *types.H
 	}
 
 	blocksPerSecond := system_contract.CalcBlocksPerSecond(config.BlocksPerSecond)
-	periodMs := system_contract.CalcPeriodMs(config.BlocksPerSecond)
+	periodMs := system_contract.CalcPeriodMs(blocksPerSecond)
 
 	// Calculate blocks per period
 	blocksPerPeriod := blocksPerSecond * period

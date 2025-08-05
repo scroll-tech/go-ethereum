@@ -245,26 +245,30 @@ func CalcPeriodMs(blocksPerSecond uint64) uint64 {
 }
 
 func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
-	// Get the base timestamp (in seconds)
-	timestamp := parent.Time
+	var timestamp uint64
+	if s.config.Period == 1 {
+		// Get the base timestamp (in seconds)
+		timestamp = parent.Time
+		period := s.config.Period
+		if period == 0 {
+			period = 1 // Default to 1 second period
+		}
 
-	period := s.config.Period
-	if period == 0 {
-		period = 1 // Default to 1 second period
-	}
+		blocksPerSecond := CalcBlocksPerSecond(s.config.BlocksPerSecond)
 
-	blocksPerSecond := CalcBlocksPerSecond(s.config.BlocksPerSecond)
+		// Calculate blocks per period
+		blocksPerPeriod := blocksPerSecond * period
 
-	// Calculate blocks per period
-	blocksPerPeriod := blocksPerSecond * period
+		// Calculate the block index within the current period for the next block
+		blockIndex := parent.Number.Uint64() % blocksPerPeriod
 
-	// Calculate the block index within the current period for the next block
-	blockIndex := parent.Number.Uint64() % blocksPerPeriod
-
-	// If this block is the last one in the current second, increment the timestamp
-	// We compare with blocksPerPeriod-1 because blockIndex is 0-based
-	if blockIndex == blocksPerPeriod-1 {
-		timestamp++
+		// If this block is the last one in the current second, increment the timestamp
+		// We compare with blocksPerPeriod-1 because blockIndex is 0-based
+		if blockIndex == blocksPerPeriod-1 {
+			timestamp++
+		}
+	} else {
+		timestamp = parent.Time + s.config.Period
 	}
 
 	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as

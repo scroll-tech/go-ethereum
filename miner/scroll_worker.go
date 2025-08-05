@@ -560,11 +560,15 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
 	}
 	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.RelaxedPeriod && w.chainConfig.SystemContract.Period != 1 {
+		log.Info("hhf: System contract related period", "period", w.chainConfig.SystemContract.Period)
 		// system contract with relaxed period uses time.Now() as the header.Time, calculate the deadline
 		deadline = time.Unix(int64(header.Time+w.chainConfig.SystemContract.Period), 0)
 	}
 	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.Period == 1 {
+		log.Info("hhf: Using system contract deadline calculation", "blockNumber", header.Number, "blockTime", header.Time)
 		deadline = CalculateBlockDeadline(w.chainConfig.SystemContract, header)
+	} else {
+		log.Info("hhf: Using default deadline calculation", "blockNumber", header.Number, "blockTime", header.Time)
 	}
 
 	w.current = &work{
@@ -1198,11 +1202,8 @@ func CalculateBlockDeadline(config *params.SystemContractConfig, header *types.H
 	blocksPerSecond := system_contract.CalcBlocksPerSecond(config.BlocksPerSecond)
 	periodMs := system_contract.CalcPeriodMs(blocksPerSecond)
 
-	// Calculate blocks per period
-	blocksPerPeriod := blocksPerSecond * period
-
 	// Calculate the actual timing based on block number within the current period
-	blockIndex := header.Number.Uint64() % blocksPerPeriod
+	blockIndex := header.Number.Uint64() % blocksPerSecond
 
 	// Calculate base time and add the fraction based on block index within the period
 	baseTimeNano := int64(header.Time) * int64(time.Second)

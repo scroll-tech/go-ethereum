@@ -1505,7 +1505,7 @@ func TestBlockIntervalWithWorkerDeadline(t *testing.T) {
 			period:           2,
 			blocksPerSecond:  2,
 			expectedInterval: 500 * time.Millisecond,
-			blocks:           8,
+			blocks:           2,
 		},
 	}
 

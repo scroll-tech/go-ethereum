@@ -256,15 +256,12 @@ func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
 
 		blocksPerSecond := CalcBlocksPerSecond(s.config.BlocksPerSecond)
 
-		// Calculate blocks per period
-		blocksPerPeriod := blocksPerSecond * period
-
 		// Calculate the block index within the current period for the next block
-		blockIndex := parent.Number.Uint64() % blocksPerPeriod
+		blockIndex := parent.Number.Uint64() % blocksPerSecond
 
 		// If this block is the last one in the current second, increment the timestamp
-		// We compare with blocksPerPeriod-1 because blockIndex is 0-based
-		if blockIndex == blocksPerPeriod-1 {
+		// We compare with blocksPerSecond-1 because blockIndex is 0-based
+		if blockIndex == blocksPerSecond-1 {
 			timestamp++
 		}
 	} else {

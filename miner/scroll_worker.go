@@ -558,7 +558,7 @@ func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reor
 		// clique with relaxed period uses time.Now() as the header.Time, calculate the deadline
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
 	}
-	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.RelaxedPeriod && w.chainConfig.SystemContract.Period != 1 {
+	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.RelaxedPeriod {
 		// system contract with relaxed period uses time.Now() as the header.Time, calculate the deadline
 		deadline = time.Unix(int64(header.Time+w.chainConfig.SystemContract.Period), 0)
 	}

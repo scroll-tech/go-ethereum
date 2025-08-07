@@ -291,7 +291,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 		// additional to the public mempool.
 		go func() {
 			// create a new context with a timeout to prevent the original context from being cancelled
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			err := b.sendToSequencer(ctx, signedTx)
 			if err != nil {

@@ -2,7 +2,6 @@ package gasprice
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"sort"
 

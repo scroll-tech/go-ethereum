@@ -139,10 +139,8 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 	}
 
 	// update the cache only if it's latest block header
-	latestHeader, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
-	if err != nil && errors.Is(err, context.Canceled) {
-		log.Debug("latest header retrieval cancelled, skipping cache update", "block number", header.Number)
-	} else if latestHeader != nil && header.Hash() == latestHeader.Hash() {
+	latestHeader, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if header.Hash() == latestHeader.Hash() {
 		oracle.cacheLock.Lock()
 		oracle.lastHead = header.Hash()
 		oracle.lastPrice = suggestion

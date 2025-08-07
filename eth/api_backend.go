@@ -290,7 +290,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 		// If the transaction pool is enabled, we send the transaction to the sequencer RPC asynchronously as this is
 		// additional to the public mempool.
 		go func() {
-			// create a new context with a timeout
+			// create a new context with a timeout to prevent the original context from being cancelled
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			err := b.sendToSequencer(ctx, signedTx)

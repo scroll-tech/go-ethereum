@@ -2,6 +2,7 @@ package gasprice
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"sort"
 
@@ -43,6 +44,15 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 	// capacity margin
 	receipts, err := oracle.backend.GetReceipts(ctx, header.Hash())
 	if receipts == nil || err != nil {
+		// Handle context cancellation gracefully
+		if errors.Is(err, context.Canceled) {
+			log.Debug("gas price calculation cancelled due to context cancellation", "block number", header.Number)
+			// Return cached values if available, otherwise use defaults
+			if lastIsCongested {
+				return lastPrice, lastIsCongested
+			}
+			return suggestion, isCongested
+		}
 		log.Debug("failed to get block receipts during calculating suggest priority fee", "block number", header.Number, "err", err)
 		// If the lastIsCongested is true on the cache, return the lastPrice.
 		// We believe it's better to err on the side of returning a higher-than-needed suggestion than a lower-than-needed one.
@@ -68,6 +78,11 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 	)
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(header.Number.Int64()))
 	if block == nil || err != nil {
+		// Handle context cancellation gracefully
+		if errors.Is(err, context.Canceled) {
+			log.Debug("block retrieval cancelled due to context cancellation", "block number", header.Number)
+			return suggestion, isCongested
+		}
 		log.Error("failed to get last block", "err", err)
 		return suggestion, isCongested
 	}
@@ -138,8 +153,10 @@ func (oracle *Oracle) calculateSuggestPriorityFee(ctx context.Context, header *t
 	}
 
 	// update the cache only if it's latest block header
-	latestHeader, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
-	if header.Hash() == latestHeader.Hash() {
+	latestHeader, err := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil && errors.Is(err, context.Canceled) {
+		log.Debug("latest header retrieval cancelled, skipping cache update", "block number", header.Number)
+	} else if latestHeader != nil && header.Hash() == latestHeader.Hash() {
 		oracle.cacheLock.Lock()
 		oracle.lastHead = header.Hash()
 		oracle.lastPrice = suggestion

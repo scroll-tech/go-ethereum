@@ -295,7 +295,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 			defer cancel()
 			err := b.sendToSequencer(ctx, signedTx)
 			if err != nil {
-				log.Warn("failed to forward tx to sequencer", "tx", signedTx.Hash(), "err", err)
+				log.Warn("failed to forward tx to sequencer asynchronously", "tx", signedTx.Hash(), "err", err)
 			}
 		}()
 	}

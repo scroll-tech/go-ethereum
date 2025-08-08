@@ -696,7 +696,7 @@ func (w *worker) processTxPool() (bool, error) {
 				prevHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				l1Messages[i].Data = decrypted
 				newHash := types.NewTx(&l1Messages[i]).Hash().Hex()
-				log.Info("Decrypted L1 message", "index", i, "prevHash", prevHash, "newHash", newHash)
+				log.Info("Decrypted L1 message", "queueIndex", l1Messages[i].QueueIndex, "prevHash", prevHash, "newHash", newHash)
 			}
 		}
 

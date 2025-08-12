@@ -810,11 +810,11 @@ func (c *EthashConfig) String() string {
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
 type CliqueConfig struct {
-	Period           uint64         `json:"period"`                   // Number of seconds between blocks to enforce
-	Epoch            uint64         `json:"epoch"`                    // Epoch length to reset votes and checkpoint
-	RelaxedPeriod    bool           `json:"relaxed_period,omitempty"` // Relaxes the period to be just an upper bound
-	ShadowForkHeight uint64         `json:"shadow_fork_height"`       // Allows shadow forking consensus layer at given height
-	ShadowForkSigner common.Address `json:"shadow_fork_signer"`       // Sets the address to be the authorized signer after the shadow fork
+	Period           uint64         `json:"period"`             // Number of seconds between blocks to enforce
+	Epoch            uint64         `json:"epoch"`              // Epoch length to reset votes and checkpoint
+	RelaxedPeriod    bool           `json:"relaxed_period"`     // Relaxes the period to be just an upper bound
+	ShadowForkHeight uint64         `json:"shadow_fork_height"` // Allows shadow forking consensus layer at given height
+	ShadowForkSigner common.Address `json:"shadow_fork_signer"` // Sets the address to be the authorized signer after the shadow fork
 }
 
 // String implements the stringer interface, returning the consensus engine details.
@@ -824,10 +824,10 @@ func (c *CliqueConfig) String() string {
 
 // SystemContractConfig is the consensus engine configs for rollup sequencer sealing.
 type SystemContractConfig struct {
-	Period                uint64         `json:"period"`                  // Number of seconds between blocks to enforce
-	BlocksPerSecond       uint64         `json:"blocks_per_second"`       // Number of blocks per second within the period
-	SystemContractAddress common.Address `json:"system_contract_address"` // address of system contract on L1
-	SystemContractSlot    common.Hash    `json:"system_contract_slot"`    // slot of signer address in system contract on L1
+	Period                uint64         `json:"period"`                      // Number of seconds between blocks to enforce
+	BlocksPerSecond       uint64         `json:"blocks_per_second,omitempty"` // Number of blocks per second within the period
+	SystemContractAddress common.Address `json:"system_contract_address"`     // address of system contract on L1
+	SystemContractSlot    common.Hash    `json:"system_contract_slot"`        // slot of signer address in system contract on L1
 
 	RelaxedPeriod bool `json:"relaxed_period"` // Relaxes the period to be just an upper bound
 }

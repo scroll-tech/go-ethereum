@@ -985,7 +985,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 	// Call Prepare to clear out the statedb access list
 	statedb.SetTxContext(txctx.TxHash, txctx.TxIndex)
 
-	log.Info("hhf message", message)
+	log.Info("hhf message", "msg value", message)
 	result, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()), l1DataFee)
 	if err != nil {
 		return nil, fmt.Errorf("tracing failed: %w", err)

@@ -418,6 +418,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 	st.gas -= gas
 
+	log.Info("State transition", "from", msg.From().Hex(), "to", st.to().Hex(), "gas", st.gas, "value", st.value, "data", common.Bytes2Hex(st.data), "isL1MessageTx", msg.IsL1MessageTx())
 	// Check clause 6
 	// Note: If this is an L1MessageTx, we will not return a top-level ErrInsufficientFundsForTransfer.
 	// Instead, we return ErrInsufficientBalance from within st.evm.Call. This means that such transactions

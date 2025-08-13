@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/holiman/uint256"
+	"github.com/scroll-tech/go-ethereum/log"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -214,6 +215,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Debug {
 		if evm.depth == 0 {
+			log.Info("Call", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas)
 			evm.Config.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value, authorizationResults)
 			defer func(startGas uint64, startTime time.Time) { // Lazy evaluation of the parameters
 				evm.Config.Tracer.CaptureEnd(ret, startGas-gas, time.Since(startTime), err)

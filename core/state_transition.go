@@ -273,9 +273,7 @@ func (st *StateTransition) buyGas() error {
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
 		return err
 	}
-	log.Info("before adding Gas", "gas", st.msg.Gas(), "st.gas", st.gas, "from", st.msg.From().Hex(), "to", st.to().Hex())
 	st.gas += st.msg.Gas()
-	log.Info("after adding Gas", "st.gas", st.gas, "from", st.msg.From().Hex(), "to", st.to().Hex())
 
 	st.initialGas = st.msg.Gas()
 	st.state.SubBalance(st.msg.From(), mgval)

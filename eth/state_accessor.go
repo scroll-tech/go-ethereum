@@ -193,6 +193,7 @@ func (eth *Ethereum) stateAtTransaction(block *types.Block, txIndex int, reexec 
 		txContext := core.NewEVMTxContext(msg)
 		context := core.NewEVMBlockContext(block.Header(), eth.blockchain, eth.blockchain.Config(), nil)
 		if idx == txIndex {
+			log.Info("hhf Found transaction in block", "block", block.NumberU64(), "txIndex", txIndex, "txHash", tx.Hash().Hex())
 			return msg, context, statedb, nil
 		}
 		// Not yet the searched for transaction, execute on top of the current state

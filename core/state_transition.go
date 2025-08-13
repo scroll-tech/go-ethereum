@@ -397,7 +397,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		floorDataGas     uint64
 	)
 
-	log.Info("Before IntrinsicGas", "gas", st.gas)
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), st.msg.SetCodeAuthorizations(), contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai)
 	if err != nil {
@@ -420,7 +419,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		}
 	}
 	st.gas -= gas
-	log.Info("After IntrinsicGas", "gas", st.gas)
 
 	// Check clause 6
 	// Note: If this is an L1MessageTx, we will not return a top-level ErrInsufficientFundsForTransfer.

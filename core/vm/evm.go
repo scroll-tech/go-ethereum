@@ -215,29 +215,34 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Debug {
 		if evm.depth == 0 {
-			log.Info("Call", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas)
+			log.Info("call CaptureStart", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas, "value", value)
 			evm.Config.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value, authorizationResults)
 			defer func(startGas uint64, startTime time.Time) { // Lazy evaluation of the parameters
 				evm.Config.Tracer.CaptureEnd(ret, startGas-gas, time.Since(startTime), err)
 			}(gas, time.Now())
 		} else {
+			log.Info("call CaptureEnter", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas, "value", value)
 			// Handle tracer events for entering and exiting a call frame
 			evm.Config.Tracer.CaptureEnter(CALL, caller.Address(), addr, input, gas, value)
 			defer func(startGas uint64) {
+				log.Info("call CaptureExit", "caller", caller.Address(), "callee", addr, "input", input, "startGas", startGas, "gas", gas, "value", value)
 				evm.Config.Tracer.CaptureExit(ret, startGas-gas, err)
 			}(gas)
 		}
 	}
 
 	if isPrecompile {
+		log.Info("call Precompile", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas, "value", value)
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		code := evm.resolveCode(addr)
 		if len(code) == 0 {
+			log.Info("call resolve code = 0", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas, "value", value)
 			ret, err = nil, nil // gas is unchanged
 		} else {
+			log.Info("call resolve code != 0", "caller", caller.Address(), "callee", addr, "input", input, "gas", gas, "value", value)
 			addrCopy := addr
 			// If the account has no code, we can abort here
 			// The depth-check is already done, and precompiles handled above

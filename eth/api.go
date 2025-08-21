@@ -814,6 +814,56 @@ func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, queueIndex uint64
 	return &rpcMsg, nil
 }
 
+type QueryMode string
+
+const (
+	QueryModeSynced   QueryMode = "synced"
+	QueryModeIncluded QueryMode = "included"
+)
+
+func (s *QueryMode) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	tmp := QueryMode(str)
+	if tmp != QueryModeSynced && tmp != QueryModeIncluded {
+		return fmt.Errorf("invalid query mode: %s, should be one of: \"synced\", \"included\"", str)
+	}
+	*s = tmp
+	return nil
+}
+
+func (api *ScrollAPI) GetL1MessagesInBlock(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, mode QueryMode) ([]*ethapi.RPCTransaction, error) {
+	block, err := api.eth.APIBackend.BlockByNumberOrHash(ctx, blockNrOrHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve block: %w", err)
+	}
+	if block == nil {
+		return nil, fmt.Errorf("block not found: %s", blockNrOrHash.String())
+	}
+
+	var txs []*ethapi.RPCTransaction
+	for idx, tx := range block.Transactions() {
+		if !tx.IsL1MessageTx() {
+			break
+		}
+		if mode == QueryModeIncluded {
+			// do nothing, use tx as is
+		} else if mode == QueryModeSynced {
+			queueIndex := tx.AsL1MessageTx().QueueIndex
+			msg := rawdb.ReadL1Message(api.eth.ChainDb(), queueIndex)
+			if msg == nil {
+				return nil, fmt.Errorf("internal error: L1 message with queue index %d not found", queueIndex)
+			}
+			tx = types.NewTx(msg)
+		}
+		rpcTx := ethapi.NewRPCTransaction(tx, block.Hash(), block.NumberU64(), block.Time(), uint64(idx), block.BaseFee(), api.eth.blockchain.Config())
+		txs = append(txs, rpcTx)
+	}
+	return txs, nil
+}
+
 // GetFirstQueueIndexNotInL2Block returns the first L1 message queue index that is
 // not included in the chain up to and including the provided block.
 func (api *ScrollAPI) GetFirstQueueIndexNotInL2Block(ctx context.Context, hash common.Hash) (queueIndex *uint64, err error) {

@@ -2,6 +2,7 @@ package system_contract
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -396,6 +397,7 @@ func ecrecover(header *types.Header) (common.Address, error) {
 
 	// For compatibility with scroll's reth node, the signature is stored in the extra data field
 	// If the signature is not found in the block signature field, we try to extract it from the extra data field
+	log.Info("Morty: ecrecover", "hash", header.Hash(), "signature", hex.EncodeToString(signature), "extra", hex.EncodeToString(header.Extra))
 	if len(signature) == 0 && len(header.Extra) == crypto.SignatureLength {
 		signature = header.Extra[0:]
 	}

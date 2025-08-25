@@ -394,6 +394,12 @@ func SealHash(header *types.Header) (hash common.Hash) {
 func ecrecover(header *types.Header) (common.Address, error) {
 	signature := header.BlockSignature[0:]
 
+	// For compatibility with scroll's reth node, the signature is stored in the extra data field
+	// If the signature is not found in the block signature field, we try to extract it from the extra data field
+	if len(signature) == 0 && len(header.Extra) == crypto.SignatureLength {
+		signature = header.Extra[0:]
+	}
+
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)
 	if err != nil {

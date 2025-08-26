@@ -2,6 +2,7 @@ package system_contract
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -211,6 +212,7 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 	defer s.lock.RUnlock()
 
 	if signer != s.signerAddressL1 {
+		log.Info("Morty: ecrecover Unauthorized signer", "Got", signer, "Expected:", s.signerAddressL1)
 		log.Error("Unauthorized signer", "Got", signer, "Expected:", s.signerAddressL1)
 		return ErrUnauthorizedSigner
 	}
@@ -401,14 +403,17 @@ func ecrecover(header *types.Header) (common.Address, error) {
 		signature[64] -= 27
 	}
 
+	log.Info("Morty: ecrecover", "hash", header.Hash(), "signature", hex.EncodeToString(signature))
+
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)
 	if err != nil {
+		log.Info("Morty: failed to ecrecover", "hash", header.Hash(), "signature", hex.EncodeToString(signature), "error", err)
 		return common.Address{}, err
 	}
 	var signer common.Address
 	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
-
+	log.Info("Morty: ecrecover", "hash", header.Hash(), "signer", signer.Hex())
 	return signer, nil
 }
 

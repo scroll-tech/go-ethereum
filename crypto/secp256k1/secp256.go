@@ -172,8 +172,8 @@ func checkSignature(sig []byte) error {
 	if len(sig) != 65 {
 		return ErrInvalidSignatureLen
 	}
-	// if sig[64] >= 4 {
-	// 	return ErrInvalidRecoveryID
-	// }
+	if sig[64] >= 4 {
+		return ErrInvalidRecoveryID
+	}
 	return nil
 }

@@ -137,6 +137,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 	}
 	// Check that the BlockSignature contains signature if block is not requested
 	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
+		log.Info("Morty: missing signature", "hash", header.Hash(), "signature", hex.EncodeToString(header.BlockSignature), "extra", hex.EncodeToString(header.Extra), "number", header.Number)
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero

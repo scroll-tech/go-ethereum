@@ -393,9 +393,9 @@ func SealHash(header *types.Header) (hash common.Hash) {
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
 	signature := header.BlockSignature[0:]
-	// Normalize recovery ID for compatibility with Scroll's reth node.
-	// Scroll's reth uses alloy signer which produces signatures with recovery ID (V) of 27/28,
-	// but Ethereum's standard crypto.Ecrecover expects V to be 0/1.
+	// Normalize recovery ID for compatibility with Scroll's rollup node.
+	// Scroll's rollup node uses alloy signer which produces signatures with recovery ID (V) of 27/28,
+	// but go-ethereum's standard crypto.Ecrecover expects V to be 0/1.
 	// Convert 27/28 format to 0/1 format by subtracting 27.
 	if signature[64] >= 27 && signature[64] <= 28 {
 		signature[64] -= 27

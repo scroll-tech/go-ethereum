@@ -113,12 +113,13 @@ type finalizeDepositERC20Args struct {
 }
 
 type finalizeDepositERC20EncryptedArgs struct {
-	Token   common.Address
-	L2Token common.Address
-	From    common.Address
-	To      []byte // encrypted address
-	Amount  *big.Int
-	L2Data  []byte
+	Token         common.Address
+	L2Token       common.Address
+	From          common.Address
+	To            []byte // encrypted address
+	Amount        *big.Int
+	L2Data        []byte
+	EncryptionKey []byte // 33-bytes pubkey used to encrypt the `to` address
 }
 
 // unpackArguments unpacks the payload into the provided struct.
@@ -159,6 +160,15 @@ func (v *finalizeDepositERC20EncryptedArgs) packFunctionCall() ([]byte, error) {
 
 // decrypt converts a finalizeDepositERC20EncryptedArgs to finalizeDepositERC20Args by decrypting the To field.
 func (v *finalizeDepositERC20EncryptedArgs) decrypt() (*finalizeDepositERC20Args, error) {
+	publicKey, err := ecies.NewPublicKeyFromBytes(v.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if !publicKey.Equals(SequencerKey.PublicKey) {
+		return nil, fmt.Errorf("invalid encryption key")
+	}
+
 	decrypted, err := decryptAddress(v.To)
 	if err != nil {
 		return nil, err

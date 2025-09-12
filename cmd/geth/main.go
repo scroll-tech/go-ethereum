@@ -192,7 +192,8 @@ var (
 		utils.DARecoverySignBlocksFlag,
 		utils.DARecoveryL2EndBlockFlag,
 		utils.DARecoveryProduceBlocksFlag,
-		utils.StealthDepositSequencerKey,
+		utils.ValidiumModeFlag,
+		utils.ValidiumSequencerKeys,
 	}
 
 	rpcFlags = []cli.Flag{

@@ -966,10 +966,15 @@ var (
 		Usage: "Produce unsigned blocks after L1 recovery for permissionless batch submission",
 	}
 
-	// Stealth deposit settings
-	StealthDepositSequencerKey = cli.StringFlag{
-		Name:  "stealth.sequencerkey",
-		Usage: "Stealth deposit sequencer key",
+	// Validium settings
+	ValidiumModeFlag = cli.BoolFlag{
+		Name:  "validium",
+		Usage: "Enable Validium mode",
+	}
+
+	ValidiumSequencerKeys = cli.StringFlag{
+		Name:  "validium.sequencerkeys",
+		Usage: "Validium sequencer decryption keys",
 	}
 )
 
@@ -1748,16 +1753,22 @@ func setDA(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
-func setStealthDeposit(ctx *cli.Context, cfg *ethconfig.Config) {
-	if !ctx.IsSet(StealthDepositSequencerKey.Name) {
-		log.Warn("Stealth deposit sequencer key not set, skipping stealth deposit configuration")
+func setValidium(ctx *cli.Context, cfg *ethconfig.Config) {
+	if !ctx.IsSet(ValidiumModeFlag.Name) {
 		return
 	}
 
-	hex := ctx.String(StealthDepositSequencerKey.Name)
+	// validium mode is enabled
+
+	if !ctx.IsSet(ValidiumSequencerKeys.Name) {
+		Fatalf("No sequencer decryption keys configured in validium mode")
+	}
+
+	// parse decryption key
+	hex := ctx.String(ValidiumSequencerKeys.Name)
 	key, err := ecies.NewPrivateKeyFromHex(hex)
 	if err != nil {
-		panic(fmt.Sprintf("error while parsing sequencer key: %w", err))
+		Fatalf("error while parsing sequencer key: %w", err)
 	}
 	validium.SetSequencerKey(key)
 }
@@ -1838,7 +1849,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setCircuitCapacityCheck(ctx, cfg)
 	setEnableRollupVerify(ctx, cfg)
 	setDA(ctx, cfg)
-	setStealthDeposit(ctx, cfg)
+	setValidium(ctx, cfg)
 	setMaxBlockRange(ctx, cfg)
 	if ctx.GlobalIsSet(ShadowforkPeersFlag.Name) {
 		cfg.ShadowForkPeerIDs = ctx.GlobalStringSlice(ShadowforkPeersFlag.Name)

@@ -136,6 +136,8 @@ type worker struct {
 	mux          *event.TypeMux
 	txsCh        chan core.NewTxsEvent
 	txsSub       event.Subscription
+	l1TxsCh      chan core.NewL1MsgsEvent
+	l1TxsSub     event.Subscription
 	chainHeadCh  chan core.ChainHeadEvent
 	chainHeadSub event.Subscription
 
@@ -191,6 +193,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		chain:        eth.BlockChain(),
 		isLocalBlock: isLocalBlock,
 		txsCh:        make(chan core.NewTxsEvent, txChanSize),
+		l1TxsCh:      make(chan core.NewL1MsgsEvent, txChanSize),
 		chainHeadCh:  make(chan core.ChainHeadEvent, chainHeadChanSize),
 		exitCh:       make(chan struct{}),
 		startCh:      make(chan struct{}, 1),
@@ -206,6 +209,9 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
+
+	// Subscribe NewL1MsgsEvent from L1Message SyncService
+	worker.l1TxsSub = eth.SyncService().SubscribeNewL1MsgsEvent(worker.l1TxsCh)
 
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -336,6 +342,7 @@ func (w *worker) mainLoop() {
 	defer w.wg.Done()
 	defer w.asyncChecker.Wait()
 	defer w.txsSub.Unsubscribe()
+	defer w.l1TxsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 	defer func() {
 		// training wheels on
@@ -406,6 +413,8 @@ func (w *worker) mainLoop() {
 			} else if w.config.AllowEmpty {
 				log.Warn("Committing empty block", "number", w.current.header.Number)
 				_, err = w.commit()
+			} else {
+				log.Debug("Empty block, not committing", "number", w.current.header.Number)
 			}
 		case ev := <-w.txsCh:
 			idleTimer.UpdateSince(idleStart)
@@ -421,11 +430,21 @@ func (w *worker) mainLoop() {
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
+		case ev := <-w.l1TxsCh:
+			// If we're stuck on an empty block and we received new L1 messages,
+			// simply start a new mining work.
+			if w.current == nil || w.current.deadlineReached {
+				if _, err := w.tryCommitNewWork(time.Now(), w.chain.CurrentHeader().Hash(), false, nil); err != nil {
+					log.Error("failed to commit new work on L1Message trigger", "ev", ev, "err", err)
+				}
+			}
 
 		// System stopped
 		case <-w.exitCh:
 			return
 		case <-w.txsSub.Err():
+			return
+		case <-w.l1TxsSub.Err():
 			return
 		case <-w.chainHeadSub.Err():
 			return

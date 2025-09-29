@@ -756,3 +756,18 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 	}
 	return arg
 }
+
+// GetL1MessagesInBlock returns the list of L1 messages in a given block.
+func (ec *Client) GetL1MessagesInBlock(ctx context.Context, blockHash common.Hash, mode eth.QueryMode) (txs []*types.Transaction, err error) {
+	var json []*rpcTransaction
+	err = ec.c.CallContext(ctx, &json, "scroll_getL1MessagesInBlock", blockHash, mode)
+	if err != nil {
+		return nil, err
+	} else if json == nil {
+		return nil, nil
+	}
+	for _, tx := range json {
+		txs = append(txs, tx.tx)
+	}
+	return txs, nil
+}

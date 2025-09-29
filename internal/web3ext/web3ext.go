@@ -925,6 +925,11 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'getL1MessagesInBlock',
+			call: 'scroll_getL1MessagesInBlock',
+			params: 2
+		}),
+		new web3._extend.Method({
 			name: 'getFirstQueueIndexNotInL2Block',
 			call: 'scroll_getFirstQueueIndexNotInL2Block',
 			params: 1

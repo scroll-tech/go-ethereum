@@ -415,7 +415,9 @@ func (w *worker) mainLoop() {
 			// be automatically eliminated.
 			if w.current != nil {
 				shouldCommit, _ := w.processTxnSlice(ev.Txs)
-				if shouldCommit || (w.current.deadlineReached && len(w.current.txs) > 0) {
+				// Note: shouldCommit implies that the block is not empty.
+				// Note: We must still wait for the deadline to avoid creating a block with a future timestamp.
+				if shouldCommit && w.current.deadlineReached {
 					_, err = w.commit()
 				}
 			}

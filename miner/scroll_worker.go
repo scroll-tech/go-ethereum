@@ -414,10 +414,10 @@ func (w *worker) mainLoop() {
 			// already included in the current mining block. These transactions will
 			// be automatically eliminated.
 			if w.current != nil {
-				shouldCommit, _ := w.processTxnSlice(ev.Txs)
-				// Note: shouldCommit implies that the block is not empty.
-				// Note: We must still wait for the deadline to avoid creating a block with a future timestamp.
-				if shouldCommit && w.current.deadlineReached {
+				// Note: We ignore shouldCommit and commit based on len(w.current.txs) instead.
+				w.processTxnSlice(ev.Txs)
+				// Note: We must wait for the deadline to avoid creating a block with a future timestamp.
+				if w.current.deadlineReached && len(w.current.txs) > 0 {
 					_, err = w.commit()
 				}
 			}

@@ -115,7 +115,7 @@ func (c *BeaconNodeClient) getBlobsPath(slot uint64, versionedHash common.Hash) 
 		return "", fmt.Errorf("failed to parse path, err: %w", err)
 	}
 	q := u.Query()
-	q.Set("versioned_hashes", fmt.Sprintf("[%s]", versionedHash.Hex()))
+	q.Set("versioned_hashes", versionedHash.Hex())
 	u.RawQuery = q.Encode()
 	queryPath := u.String()
 	return queryPath, nil

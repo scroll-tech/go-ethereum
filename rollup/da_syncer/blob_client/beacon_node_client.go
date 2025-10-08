@@ -105,15 +105,31 @@ func NewBeaconNodeClient(apiEndpoint string) (*BeaconNodeClient, error) {
 	}, nil
 }
 
+func (c *BeaconNodeClient) getBlobsPath(slot uint64, versionedHash common.Hash) (string, error) {
+	basePath, err := url.JoinPath(c.apiEndpoint, beaconNodeBlobEndpoint, fmt.Sprintf("%d", slot))
+	if err != nil {
+		return "", fmt.Errorf("failed to join path, err: %w", err)
+	}
+	u, err := url.Parse(basePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse path, err: %w", err)
+	}
+	q := u.Query()
+	q.Set("versioned_hashes", fmt.Sprintf("[%s]", versionedHash.Hex()))
+	u.RawQuery = q.Encode()
+	queryPath := u.String()
+	return queryPath, nil
+}
+
 func (c *BeaconNodeClient) GetBlobByVersionedHashAndBlockTime(ctx context.Context, versionedHash common.Hash, blockTime uint64) (*kzg4844.Blob, error) {
 	slot := (blockTime - c.genesisTime) / c.secondsPerSlot
 
-	// get blob sidecar for slot
-	blobSidecarPath, err := url.JoinPath(c.apiEndpoint, beaconNodeBlobEndpoint, fmt.Sprintf("%d?versioned_hashes=[%s]", slot, versionedHash))
+	// get blob by slot and versioned hash
+	getBlobsPath, err := c.getBlobsPath(slot, versionedHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to join path, err: %w", err)
+		return nil, fmt.Errorf("failed to create getBlobs path, err: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", blobSidecarPath, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", getBlobsPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request, err: %w", err)
 	}

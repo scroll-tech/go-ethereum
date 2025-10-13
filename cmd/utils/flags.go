@@ -857,7 +857,7 @@ var (
 		Name:  "l1.sync.interval",
 		Usage: "Poll interval for L1 message syncing (e.g., 2s, 10s, 1m)",
 	}
-	L1FetchBlockRangeFlag = cli.Uint64Flag{
+	L1FetchBlockRangeFlag = cli.Int64Flag{
 		Name:  "l1.sync.fetchblockrange",
 		Usage: "Block range for L1 message fetching in a single eth_getLogs query",
 	}

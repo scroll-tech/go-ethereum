@@ -21,7 +21,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/big"
+	"math/bits"
 
+	"github.com/holiman/uint256"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/crypto"
@@ -64,7 +66,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}): &sha256hash{},
 	common.BytesToAddress([]byte{3}): &ripemd160hash{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},
-	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: false, eip7823: false},
+	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: false, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}): &bn256AddByzantium{},
 	common.BytesToAddress([]byte{7}): &bn256ScalarMulByzantium{},
 	common.BytesToAddress([]byte{8}): &bn256PairingByzantium{},
@@ -77,7 +79,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}): &sha256hash{},
 	common.BytesToAddress([]byte{3}): &ripemd160hash{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},
-	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: false, eip7823: false},
+	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: false, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{limitInputLength: false},
@@ -91,7 +93,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}): &sha256hash{},
 	common.BytesToAddress([]byte{3}): &ripemd160hash{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},
-	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true, eip7823: false},
+	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{limitInputLength: false},
@@ -105,7 +107,7 @@ var PrecompiledContractsArchimedes = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}): &sha256hashDisabled{},
 	common.BytesToAddress([]byte{3}): &ripemd160hashDisabled{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},
-	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true, eip7823: false},
+	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{limitInputLength: true},
@@ -119,7 +121,7 @@ var PrecompiledContractsBernoulli = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}): &sha256hash{},
 	common.BytesToAddress([]byte{3}): &ripemd160hashDisabled{},
 	common.BytesToAddress([]byte{4}): &dataCopy{},
-	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true, eip7823: false},
+	common.BytesToAddress([]byte{5}): &bigModExp{eip2565: true, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{limitInputLength: true},
@@ -133,7 +135,7 @@ var PrecompiledContractsEuclidV2 = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}):          &sha256hash{},
 	common.BytesToAddress([]byte{3}):          &ripemd160hashDisabled{},
 	common.BytesToAddress([]byte{4}):          &dataCopy{},
-	common.BytesToAddress([]byte{5}):          &bigModExp{eip2565: true, eip7823: false},
+	common.BytesToAddress([]byte{5}):          &bigModExp{eip2565: true, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}):          &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{limitInputLength: true},
@@ -148,7 +150,7 @@ var PrecompiledContractsFeynman = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}):          &sha256hash{},
 	common.BytesToAddress([]byte{3}):          &ripemd160hashDisabled{},
 	common.BytesToAddress([]byte{4}):          &dataCopy{},
-	common.BytesToAddress([]byte{5}):          &bigModExp{eip2565: true, eip7823: false},
+	common.BytesToAddress([]byte{5}):          &bigModExp{eip2565: true, eip7823: false, eip7883: false},
 	common.BytesToAddress([]byte{6}):          &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{limitInputLength: false},
@@ -163,7 +165,7 @@ var PrecompiledContractsGalileo = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}):          &sha256hash{},
 	common.BytesToAddress([]byte{3}):          &ripemd160hashDisabled{},
 	common.BytesToAddress([]byte{4}):          &dataCopy{},
-	common.BytesToAddress([]byte{5}):          &bigModExp{eip2565: true, eip7823: true},
+	common.BytesToAddress([]byte{5}):          &bigModExp{eip2565: true, eip7823: true, eip7883: true},
 	common.BytesToAddress([]byte{6}):          &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{limitInputLength: false},
@@ -371,124 +373,232 @@ func (c *dataCopy) Run(in []byte) ([]byte, error) {
 type bigModExp struct {
 	eip2565 bool
 	eip7823 bool
+	eip7883 bool
 }
 
-var (
-	big0      = big.NewInt(0)
-	big1      = big.NewInt(1)
-	big3      = big.NewInt(3)
-	big4      = big.NewInt(4)
-	big7      = big.NewInt(7)
-	big8      = big.NewInt(8)
-	big16     = big.NewInt(16)
-	big20     = big.NewInt(20)
-	big32     = big.NewInt(32)
-	big64     = big.NewInt(64)
-	big96     = big.NewInt(96)
-	big480    = big.NewInt(480)
-	big1024   = big.NewInt(1024)
-	big3072   = big.NewInt(3072)
-	big199680 = big.NewInt(199680)
-)
+var big0 = big.NewInt(0)
 
-// modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
+// byzantiumMultComplexity implements the bigModexp multComplexity formula, as defined in EIP-198.
+//
+//	def mult_complexity(x):
+//		if x <= 64: return x ** 2
+//		elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//		else: return x ** 2 // 16 + 480 * x - 199680
+//
+// where is x is max(length_of_MODULUS, length_of_BASE)
+// returns MaxUint64 if an overflow occurred.
+func byzantiumMultComplexity(x uint64) uint64 {
+	switch {
+	case x <= 64:
+		return x * x
+	case x <= 1024:
+		// x^2 / 4 + 96*x - 3072
+		return x*x/4 + 96*x - 3072
+
+	default:
+		// For large x, use uint256 arithmetic to avoid overflow
+		// x^2 / 16 + 480*x - 199680
+
+		// xSqr = x^2 / 16
+		carry, xSqr := bits.Mul64(x, x)
+		if carry != 0 {
+			return math.MaxUint64
+		}
+		xSqr = xSqr >> 4
+
+		// Calculate 480 * x (can't overflow if x^2 didn't overflow)
+		x480 := x * 480
+		// Calculate 480 * x - 199680 (will not underflow, since x > 1024)
+		x480 = x480 - 199680
+
+		// xSqr + x480
+		sum, carry := bits.Add64(xSqr, x480, 0)
+		if carry != 0 {
+			return math.MaxUint64
+		}
+		return sum
+	}
+}
+
+// berlinMultComplexity implements the multiplication complexity formula for Berlin.
 //
 // def mult_complexity(x):
 //
-//	if x <= 64: return x ** 2
-//	elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-//	else: return x ** 2 // 16 + 480 * x - 199680
+//	ceiling(x/8)^2
 //
 // where is x is max(length_of_MODULUS, length_of_BASE)
-func modexpMultComplexity(x *big.Int) *big.Int {
-	switch {
-	case x.Cmp(big64) <= 0:
-		x.Mul(x, x) // x ** 2
-	case x.Cmp(big1024) <= 0:
-		// (x ** 2 // 4 ) + ( 96 * x - 3072)
-		x = new(big.Int).Add(
-			new(big.Int).Div(new(big.Int).Mul(x, x), big4),
-			new(big.Int).Sub(new(big.Int).Mul(big96, x), big3072),
-		)
-	default:
-		// (x ** 2 // 16) + (480 * x - 199680)
-		x = new(big.Int).Add(
-			new(big.Int).Div(new(big.Int).Mul(x, x), big16),
-			new(big.Int).Sub(new(big.Int).Mul(big480, x), big199680),
-		)
+func berlinMultComplexity(x uint64) uint64 {
+	// x = (x + 7) / 8
+	x, carry := bits.Add64(x, 7, 0)
+	if carry != 0 {
+		return math.MaxUint64
+	}
+	x /= 8
+
+	// x^2
+	carry, x = bits.Mul64(x, x)
+	if carry != 0 {
+		return math.MaxUint64
 	}
 	return x
 }
 
+// galileoMultComplexity implements the multiplication complexity formula for galileo.
+//
+// For x <= 32: returns 16
+// For x > 32: returns 2 * ceiling(x/8)^2
+func galileoMultComplexity(x uint64) uint64 {
+	if x <= 32 {
+		return 16
+	}
+	// For x > 32, return 2 * berlinMultComplexity(x)
+	result := berlinMultComplexity(x)
+	carry, result := bits.Mul64(result, 2)
+	if carry != 0 {
+		return math.MaxUint64
+	}
+	return result
+}
+
+// modexpIterationCount calculates the number of iterations for the modexp precompile.
+// This is the adjusted exponent length used in gas calculation.
+func modexpIterationCount(expLen uint64, expHead uint256.Int, multiplier uint64) uint64 {
+	var iterationCount uint64
+
+	// For large exponents (expLen > 32), add (expLen - 32) * multiplier
+	if expLen > 32 {
+		carry, count := bits.Mul64(expLen-32, multiplier)
+		if carry > 0 {
+			return math.MaxUint64
+		}
+		iterationCount = count
+	}
+	// Add the MSB position - 1 if expHead is non-zero
+	if bitLen := expHead.BitLen(); bitLen > 0 {
+		count, carry := bits.Add64(iterationCount, uint64(bitLen-1), 0)
+		if carry > 0 {
+			return math.MaxUint64
+		}
+		iterationCount = count
+	}
+
+	return max(iterationCount, 1)
+}
+
+// byzantiumModexpGas calculates the gas cost for the modexp precompile using Byzantium rules.
+func byzantiumModexpGas(baseLen, expLen, modLen uint64, expHead uint256.Int) uint64 {
+	const (
+		multiplier = 8
+		divisor    = 20
+	)
+
+	maxLen := max(baseLen, modLen)
+	multComplexity := byzantiumMultComplexity(maxLen)
+	if multComplexity == math.MaxUint64 {
+		return math.MaxUint64
+	}
+	iterationCount := modexpIterationCount(expLen, expHead, multiplier)
+
+	// Calculate gas: (multComplexity * iterationCount) / divisor
+	carry, gas := bits.Mul64(iterationCount, multComplexity)
+	gas /= divisor
+	if carry != 0 {
+		return math.MaxUint64
+	}
+	return gas
+}
+
+// berlinModexpGas calculates the gas cost for the modexp precompile using Berlin rules.
+func berlinModexpGas(baseLen, expLen, modLen uint64, expHead uint256.Int) uint64 {
+	const (
+		multiplier = 8
+		divisor    = 3
+		minGas     = 200
+	)
+
+	maxLen := max(baseLen, modLen)
+	multComplexity := berlinMultComplexity(maxLen)
+	if multComplexity == math.MaxUint64 {
+		return math.MaxUint64
+	}
+	iterationCount := modexpIterationCount(expLen, expHead, multiplier)
+
+	// Calculate gas: (multComplexity * iterationCount) / divisor
+	carry, gas := bits.Mul64(iterationCount, multComplexity)
+	gas /= divisor
+	if carry != 0 {
+		return math.MaxUint64
+	}
+	return max(gas, minGas)
+}
+
+// galileoModexpGas calculates the gas cost for the modexp precompile using Galileo rules.
+func galileoModexpGas(baseLen, expLen, modLen uint64, expHead uint256.Int) uint64 {
+	const (
+		multiplier = 16
+		minGas     = 500
+	)
+
+	maxLen := max(baseLen, modLen)
+	multComplexity := galileoMultComplexity(maxLen)
+	if multComplexity == math.MaxUint64 {
+		return math.MaxUint64
+	}
+	iterationCount := modexpIterationCount(expLen, expHead, multiplier)
+
+	// Calculate gas: multComplexity * iterationCount
+	carry, gas := bits.Mul64(iterationCount, multComplexity)
+	if carry != 0 {
+		return math.MaxUint64
+	}
+	return max(gas, minGas)
+}
+
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bigModExp) RequiredGas(input []byte) uint64 {
-	var (
-		baseLen = new(big.Int).SetBytes(getData(input, 0, 32))
-		expLen  = new(big.Int).SetBytes(getData(input, 32, 32))
-		modLen  = new(big.Int).SetBytes(getData(input, 64, 32))
-	)
+	baseLenBig := new(uint256.Int).SetBytes(getData(input, 0, 32))
+	expLenBig := new(uint256.Int).SetBytes(getData(input, 32, 32))
+	modLenBig := new(uint256.Int).SetBytes(getData(input, 64, 32))
+
+	// Convert to uint64, capping at max value
+	baseLen := baseLenBig.Uint64()
+	if !baseLenBig.IsUint64() {
+		baseLen = math.MaxUint64
+	}
+	expLen := expLenBig.Uint64()
+	if !expLenBig.IsUint64() {
+		expLen = math.MaxUint64
+	}
+	modLen := modLenBig.Uint64()
+	if !modLenBig.IsUint64() {
+		modLen = math.MaxUint64
+	}
+
 	if len(input) > 96 {
 		input = input[96:]
 	} else {
 		input = input[:0]
 	}
+
 	// Retrieve the head 32 bytes of exp for the adjusted exponent length
-	var expHead *big.Int
-	if big.NewInt(int64(len(input))).Cmp(baseLen) <= 0 {
-		expHead = new(big.Int)
-	} else {
-		if expLen.Cmp(big32) > 0 {
-			expHead = new(big.Int).SetBytes(getData(input, baseLen.Uint64(), 32))
+	var expHead uint256.Int
+	if uint64(len(input)) > baseLen {
+		if expLen > 32 {
+			expHead.SetBytes(getData(input, baseLen, 32))
 		} else {
-			expHead = new(big.Int).SetBytes(getData(input, baseLen.Uint64(), expLen.Uint64()))
+			// TODO: Check that if expLen < baseLen, then getData will return an empty slice
+			expHead.SetBytes(getData(input, baseLen, expLen))
 		}
 	}
-	// Calculate the adjusted exponent length
-	var msb int
-	if bitlen := expHead.BitLen(); bitlen > 0 {
-		msb = bitlen - 1
-	}
-	adjExpLen := new(big.Int)
-	if expLen.Cmp(big32) > 0 {
-		adjExpLen.Sub(expLen, big32)
-		adjExpLen.Mul(big8, adjExpLen)
-	}
-	adjExpLen.Add(adjExpLen, big.NewInt(int64(msb)))
-	// Calculate the gas cost of the operation
-	gas := new(big.Int).Set(math.BigMax(modLen, baseLen))
-	if c.eip2565 {
-		// EIP-2565 has three changes
-		// 1. Different multComplexity (inlined here)
-		// in EIP-2565 (https://eips.ethereum.org/EIPS/eip-2565):
-		//
-		// def mult_complexity(x):
-		//    ceiling(x/8)^2
-		//
-		//where is x is max(length_of_MODULUS, length_of_BASE)
-		gas = gas.Add(gas, big7)
-		gas = gas.Div(gas, big8)
-		gas.Mul(gas, gas)
 
-		gas.Mul(gas, math.BigMax(adjExpLen, big1))
-		// 2. Different divisor (`GQUADDIVISOR`) (3)
-		gas.Div(gas, big3)
-		if gas.BitLen() > 64 {
-			return math.MaxUint64
-		}
-		// 3. Minimum price of 200 gas
-		if gas.Uint64() < 200 {
-			return 200
-		}
-		return gas.Uint64()
+	// Choose the appropriate gas calculation based on the EIP flags
+	if c.eip7883 {
+		return galileoModexpGas(baseLen, expLen, modLen, expHead)
+	} else if c.eip2565 {
+		return berlinModexpGas(baseLen, expLen, modLen, expHead)
+	} else {
+		return byzantiumModexpGas(baseLen, expLen, modLen, expHead)
 	}
-	gas = modexpMultComplexity(gas)
-	gas.Mul(gas, math.BigMax(adjExpLen, big1))
-	gas.Div(gas, big20)
-
-	if gas.BitLen() > 64 {
-		return math.MaxUint64
-	}
-	return gas.Uint64()
 }
 
 func (c *bigModExp) Run(input []byte) ([]byte, error) {

@@ -2,21 +2,15 @@ package secp256r1
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"math/big"
 )
 
-// Verify verifies the given signature (r, s) for the given hash and public key (x, y).
-// It returns true if the signature is valid, false otherwise.
+// Verify checks the given signature (r, s) for the given hash and public key (x, y).
 func Verify(hash []byte, r, s, x, y *big.Int) bool {
-	// Create the public key format
-	publicKey := newPublicKey(x, y)
-
-	// Check if they are invalid public key coordinates
-	if publicKey == nil {
+	if x == nil || y == nil || !elliptic.P256().IsOnCurve(x, y) {
 		return false
 	}
-
-	// Verify the signature with the public key,
-	// then return true if it's valid, false otherwise
-	return ecdsa.Verify(publicKey, hash, r, s)
+	pk := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	return ecdsa.Verify(pk, hash, r, s)
 }

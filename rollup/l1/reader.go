@@ -206,6 +206,11 @@ func (r *Reader) FetchRollupEventsInRange(from, to uint64) (RollupEvents, error)
 		if err != nil {
 			return false, fmt.Errorf("failed to filter logs, err: %w", err)
 		}
+		for _, lg := range logsBatch {
+			if lg.Topics[0] == r.l1CommitBatchEventSignature {
+				log.Info("Morty fetched rollup events", "fromBlock", from, "toBlock", to, "logs", lg.TxHash.Hex(), "signature", lg.Topics[0].Hex())
+			}
+		}
 		logs = append(logs, logsBatch...)
 		return true, nil
 	})

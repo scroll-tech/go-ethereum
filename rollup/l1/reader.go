@@ -358,12 +358,14 @@ func queryInBatches(ctx context.Context, fromBlock, toBlock uint64, batchSize ui
 
 // fetchTx fetches tx corresponding to given event log
 func (r *Reader) fetchTx(txHash, blockHash common.Hash) (*types.Transaction, error) {
+	log.Info("Morty getting transaction", "tx hash", txHash.Hex(), "block hash", blockHash.Hex())
 	tx, _, err := r.client.TransactionByHash(r.ctx, txHash)
 	if err != nil {
-		log.Debug("failed to get transaction by hash, probably an unindexed transaction, fetching the whole block to get the transaction",
+		log.Info("Morty failed to get transaction by hash, probably an unindexed transaction, fetching the whole block to get the transaction",
 			"tx hash", txHash.Hex(), "block hash", blockHash.Hex(), "err", err)
 		block, err := r.client.BlockByHash(r.ctx, blockHash)
 		if err != nil {
+			log.Info("Morty getting tx from block", "tx hash", txHash.Hex(), "block hash", blockHash.Hex())
 			return nil, fmt.Errorf("failed to get block by hash, block hash: %v, err: %w", blockHash.Hex(), err)
 		}
 
@@ -376,10 +378,11 @@ func (r *Reader) fetchTx(txHash, blockHash common.Hash) (*types.Transaction, err
 			}
 		}
 		if !found {
+			log.Info("Morty getting tx all failed", "tx hash", txHash.Hex(), "block hash", blockHash.Hex())
 			return nil, fmt.Errorf("transaction not found in the block, tx hash: %v, block hash: %v", txHash.Hex(), blockHash.Hex())
 		}
 	}
-
+	log.Info("Morty got transaction", "tx hash", txHash.Hex(), "block hash", blockHash.Hex())
 	return tx, nil
 }
 

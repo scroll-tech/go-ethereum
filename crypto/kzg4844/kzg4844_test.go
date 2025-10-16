@@ -249,7 +249,6 @@ func benchmarkComputeCellProofs(b *testing.B, ckzg bool) {
 
 	blob := randBlob()
 	_, _ = ComputeCellProofs(blob) // for kzg initialization
-	b.ResetTimer()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

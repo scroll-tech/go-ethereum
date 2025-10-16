@@ -105,7 +105,8 @@ func benchmarkBlobToCommitment(b *testing.B, ckzg bool) {
 
 	blob := randBlob()
 
-	for b.Loop() {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		BlobToCommitment(blob)
 	}
 }
@@ -124,7 +125,8 @@ func benchmarkComputeProof(b *testing.B, ckzg bool) {
 		point = randFieldElement()
 	)
 
-	for b.Loop() {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		ComputeProof(blob, point)
 	}
 }
@@ -145,7 +147,8 @@ func benchmarkVerifyProof(b *testing.B, ckzg bool) {
 		proof, claim, _ = ComputeProof(blob, point)
 	)
 
-	for b.Loop() {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		VerifyProof(commitment, point, claim, proof)
 	}
 }
@@ -164,7 +167,8 @@ func benchmarkComputeBlobProof(b *testing.B, ckzg bool) {
 		commitment, _ = BlobToCommitment(blob)
 	)
 
-	for b.Loop() {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		ComputeBlobProof(blob, commitment)
 	}
 }
@@ -184,7 +188,8 @@ func benchmarkVerifyBlobProof(b *testing.B, ckzg bool) {
 		proof, _      = ComputeBlobProof(blob, commitment)
 	)
 
-	for b.Loop() {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		VerifyBlobProof(blob, commitment, proof)
 	}
 }
@@ -246,7 +251,8 @@ func benchmarkComputeCellProofs(b *testing.B, ckzg bool) {
 	_, _ = ComputeCellProofs(blob) // for kzg initialization
 	b.ResetTimer()
 
-	for b.Loop() {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		_, err := ComputeCellProofs(blob)
 		if err != nil {
 			b.Fatalf("failed to create KZG proof at point: %v", err)

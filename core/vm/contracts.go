@@ -612,8 +612,8 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 		inputLenOverflow = max(baseLenBig.BitLen(), expLenBig.BitLen(), modLenBig.BitLen()) > 64
 	)
 
-	// Since the ZKVM is more compatible, EIP-7823 && EIP-7883 don't need this check anymore,
-	// but still need it for EIP-2565 to be compatible with backward compatibility
+	// As ZKVM offers better compatibility, this check is no longer needed for EIP-7823 and EIP-7883,
+	// but it still needs to be retained for EIP-2565 to ensure backward compatibility.
 	if c.eip2565 {
 		// Check that all inputs are `u256` (32 - bytes) or less, revert otherwise
 		var lenLimit = new(big.Int).SetInt64(32)

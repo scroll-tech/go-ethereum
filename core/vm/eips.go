@@ -282,17 +282,18 @@ func enable7702(jt *JumpTable) {
 	jt[DELEGATECALL].dynamicGas = gasDelegateCallEIP7702
 }
 
-// opCLZ implements the CLZ opcode (count leading zero bytes)
+// opCLZ implements the CLZ opcode (count leading zero bits)
 func opCLZ(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	x := scope.Stack.peek()
 	x.SetUint64(256 - uint64(x.BitLen()))
 	return nil, nil
 }
 
+// enable7939 enables EIP-7939 (CLZ opcode)
 func enable7939(jt *JumpTable) {
 	jt[CLZ] = &operation{
 		execute:     opCLZ,
-		constantGas: GasFastestStep,
+		constantGas: GasFastStep,
 		minStack:    minStack(1, 1),
 		maxStack:    maxStack(1, 1),
 	}

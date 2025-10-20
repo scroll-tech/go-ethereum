@@ -140,7 +140,7 @@ var PrecompiledContractsEuclidV2 = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{limitInputLength: true},
 	common.BytesToAddress([]byte{9}):          &blake2FDisabled{},
-	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
+	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{eip7951: false},
 }
 
 // PrecompiledContractsFeynman contains the default set of pre-compiled Ethereum
@@ -155,7 +155,7 @@ var PrecompiledContractsFeynman = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{limitInputLength: false},
 	common.BytesToAddress([]byte{9}):          &blake2FDisabled{},
-	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
+	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{eip7951: false},
 }
 
 // PrecompiledContractsGalileo contains the default set of pre-compiled Ethereum
@@ -170,7 +170,7 @@ var PrecompiledContractsGalileo = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{7}):          &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):          &bn256PairingIstanbul{limitInputLength: false},
 	common.BytesToAddress([]byte{9}):          &blake2FDisabled{},
-	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
+	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{eip7951: true},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -1331,10 +1331,15 @@ func (c *bls12381MapG2) Run(input []byte) ([]byte, error) {
 
 // P256VERIFY (secp256r1 signature verification)
 // implemented as a native contract
-type p256Verify struct{}
+type p256Verify struct {
+	eip7951 bool
+}
 
 // RequiredGas returns the gas required to execute the precompiled contract
 func (c *p256Verify) RequiredGas(input []byte) uint64 {
+	if c.eip7951 {
+		return params.P256VerifyGasGalileo
+	}
 	return params.P256VerifyGas
 }
 

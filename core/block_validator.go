@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -66,6 +67,11 @@ func (v *BlockValidator) WithAsyncValidator(asyncValidator func(*types.Block) er
 // header's transaction and uncle roots. The headers are assumed to be already
 // validated at this point.
 func (v *BlockValidator) ValidateBody(block *types.Block) error {
+	// check EIP 7934 RLP-encoded block size cap
+	if v.config.IsGalileo(block.Number(), block.Time()) && block.Size() > common.StorageSize(params.MaxBlockSize) {
+		return ErrBlockOversized
+	}
+
 	// Check whether the block's known, and if not, that it's linkable
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock

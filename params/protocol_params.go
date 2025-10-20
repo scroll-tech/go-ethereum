@@ -196,4 +196,6 @@ var (
 	HistoryStorageAddress = common.HexToAddress("0x0000F90827F1C53a10cb7A02335B175320002935")
 	HistoryStorageCode    = common.FromHex("3373fffffffffffffffffffffffffffffffffffffffe14604657602036036042575f35600143038111604257611fff81430311604257611fff9006545f5260205ff35b5f5ffd5b5f35611fff60014303065500")
 	HistoryServeWindow    = uint64(8191)
+
+	MaxBlockSize = 8_388_608 // maximum size of an RLP-encoded block
 )

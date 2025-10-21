@@ -68,7 +68,8 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{18}):   &bls12381MapG2{},
 	common.BytesToAddress([]byte{0xf8}): &bn256PairingIstanbul{limitInputLength: true},
 
-	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{},
+	common.BytesToAddress([]byte{0x01, 0x00}): &p256Verify{eip7951: false},
+	common.BytesToAddress([]byte{0x01, 0x01}): &p256Verify{eip7951: true},
 }
 
 // EIP-152 test vectors
@@ -415,4 +416,10 @@ func BenchmarkPrecompiledP256Verify(bench *testing.B) {
 	benchmarkPrecompiled("0b", t, bench)
 }
 
-func TestPrecompiledP256Verify(t *testing.T) { testJson("p256Verify", "0b", t) }
+func TestPrecompiledP256Verify(t *testing.T) {
+	testJson("p256Verify", "0x0100", t)
+}
+
+func TestPrecompiledP256VerifyGalileo(t *testing.T) {
+	testJson("p256VerifyGalileo", "0x0101", t)
+}

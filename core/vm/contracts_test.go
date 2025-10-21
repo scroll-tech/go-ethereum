@@ -413,7 +413,7 @@ func BenchmarkPrecompiledP256Verify(bench *testing.B) {
 		Expected: "0000000000000000000000000000000000000000000000000000000000000001",
 		Name:     "p256Verify",
 	}
-	benchmarkPrecompiled("0b", t, bench)
+	benchmarkPrecompiled("0x0100", t, bench)
 }
 
 func TestPrecompiledP256Verify(t *testing.T) {

@@ -365,7 +365,7 @@ func (tx *Transaction) WithoutBlobTxSidecar() *Transaction {
 	if size := tx.size.Load(); size != 0 {
 		// The tx had a sidecar before, so we need to subtract it from the size.
 		scSize := rlp.ListSize(blobtx.Sidecar.encodedSize())
-		cpy.size.Store(size.(uint64) - scSize)
+		cpy.size.Store(size.(common.StorageSize) - common.StorageSize(scSize))
 	}
 	if h := tx.hash.Load(); h != nil {
 		cpy.hash.Store(h)

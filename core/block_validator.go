@@ -68,7 +68,7 @@ func (v *BlockValidator) WithAsyncValidator(asyncValidator func(*types.Block) er
 // validated at this point.
 func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	// check EIP 7934 RLP-encoded block size cap
-	if v.config.IsGalileo(block.Number(), block.Time()) && block.Size() > common.StorageSize(params.MaxBlockSize) {
+	if v.config.IsGalileo(block.Time()) && block.Size() > common.StorageSize(params.MaxBlockSize) {
 		return ErrBlockOversized
 	}
 

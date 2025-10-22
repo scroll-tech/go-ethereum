@@ -814,6 +814,11 @@ func (w *worker) processTxns(txs types.OrderedTransactionSet) (bool, error) {
 	return false, nil
 }
 
+// Block size is capped by the protocol at params.MaxBlockSize. When producing blocks, we
+// try to say below the size including a buffer zone, this is to avoid going over the
+// maximum size with auxiliary data added into the block.
+const maxBlockSizeBufferZone = 1_000_000
+
 // processTxn
 func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 	if w.beforeTxHook != nil {
@@ -839,6 +844,10 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSizeForMining(w.current.blockSize+tx.Size()) {
 		// can't fit this txn in this block, silently ignore and continue looking for more txns
 		return false, errors.New("tx too big")
+	}
+
+	if w.current.blockSize+tx.Size() < common.StorageSize(params.MaxBlockSize-maxBlockSizeBufferZone) {
+		return false, errors.New("tx would exceed block size limit")
 	}
 
 	// Reject transactions that require the max data fee amount.

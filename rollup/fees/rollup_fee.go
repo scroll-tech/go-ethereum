@@ -210,7 +210,13 @@ func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint6
 	return ratio, nil
 }
 
-// calculateTxCompressedSize calculates the size of `data` after compression using da-codec
+// calculateTxCompressedSize calculates the size of `data` after compression using da-codec.
+// We constrain compressed_size so that it cannot exceed the original size:
+//
+//	compressed_size(tx) = min(size(zstd(tx)), size(tx))
+//
+// This provides an upper bound on the rollup fee for a given transaction, regardless
+// what compression algorithm the sequencer/prover uses.
 func calculateTxCompressedSize(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) (*big.Int, error) {
 	if len(data) == 0 {
 		return common.Big0, nil
@@ -223,9 +229,11 @@ func calculateTxCompressedSize(data []byte, blockNumber uint64, blockTime uint64
 		return nil, fmt.Errorf("transaction compression failed: %w", err)
 	}
 
-	// Note: We use the compressed size, even in the unlikely case
-	// that it is larger than the original size.
-	return new(big.Int).SetUint64(uint64(len(compressed))), nil
+	if len(compressed) < len(data) {
+		return new(big.Int).SetUint64(uint64(len(compressed))), nil
+	} else {
+		return new(big.Int).SetUint64(uint64(len(data))), nil
+	}
 }
 
 // calculatePenalty computes the penalty multiplier based on compression ratio
@@ -312,6 +320,9 @@ func calculateEncodedL1DataFeeFeynman(
 //
 // Post Galileo formula:
 // rollup_fee(tx) = (execScalar * l1BaseFee + blobScalar * l1BlobBaseFee) * compressed_size(tx) / PRECISION
+//
+// Where:
+// compressed_size(tx) = min(size(zstd(tx)), size(tx))
 func calculateEncodedL1DataFeeGalileo(
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,

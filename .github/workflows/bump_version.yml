@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
 
       - name: Run test
-        run: echo "$VALUE"
+        run: echo ${{ secrets.TEST_VALUE }}
         env:
           VALUE: ${{ secrets.TEST_VALUE }}
 

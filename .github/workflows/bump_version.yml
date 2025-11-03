@@ -14,10 +14,7 @@ jobs:
   try-to-bump:
     if: contains(github.event.pull_request.labels.*.name, 'bump-version')
     runs-on: ubuntu-latest
-    permissions:
-      # Give the default GITHUB_TOKEN write permission to commit and push the
-      # added or changed files to the repository.
-      contents: write
+    permissions: {}
 
     steps:
       - name: Checkout code
@@ -25,7 +22,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           # note: this is needed by git-auto-commit-action below
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Run test
         run: echo "$VALUE"

@@ -27,6 +27,11 @@ jobs:
           # note: this is needed by git-auto-commit-action below
           persist-credentials: true
 
+      - name: Run test
+        run: echo "$VALUE"
+        env:
+          VALUE: ${{ secrets.TEST_VALUE }}
+
       - name: check diff
         id: check_diff
         run: |

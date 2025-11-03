@@ -20,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          # ref: ${{ github.head_ref }}
           # note: this is needed by git-auto-commit-action below
           persist-credentials: false
 

@@ -213,11 +213,13 @@ func estimateTxCompressionRatio(data []byte, blockNumber uint64, blockTime uint6
 // calculateTxCompressedSize calculates the size of `data` after compression using da-codec.
 // We constrain compressed_size so that it cannot exceed the original size:
 //
-//	compressed_size(tx) = min(size(zstd(tx)), size(tx))
+//	compressed_size(tx) = min(size(zstd(rlp(tx))), size(rlp(tx)))
 //
 // This provides an upper bound on the rollup fee for a given transaction, regardless
 // what compression algorithm the sequencer/prover uses.
 func calculateTxCompressedSize(data []byte, blockNumber uint64, blockTime uint64, config *params.ChainConfig) (*big.Int, error) {
+	// Compressed size of empty data is 0.
+	// In practice, the rlp-encoded transaction is always non-empty.
 	if len(data) == 0 {
 		return common.Big0, nil
 	}
@@ -333,7 +335,7 @@ func calculateEncodedL1DataFeeGalileo(
 	penaltyFactor *big.Int,
 	compressedSize *big.Int,
 ) *big.Int {
-	// feePerByte = execGas + blobGas = (execScalar * l1BaseFee) + (blobScalar * l1BlobBaseFee)
+	// feePerByte = (execScalar * l1BaseFee) + (blobScalar * l1BlobBaseFee)
 	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
 	feePerByte := new(big.Int).Add(execGas, blobGas)
@@ -342,6 +344,7 @@ func calculateEncodedL1DataFeeGalileo(
 	baseTerm := new(big.Int).Mul(feePerByte, compressedSize)
 
 	// penaltyTerm = (baseTerm * compressedSize) / penaltyFactor
+	// Note: We divide by penaltyFactor after multiplication to preserve precision.
 	penaltyTerm := new(big.Int).Mul(baseTerm, compressedSize)
 	penaltyTerm.Div(penaltyTerm, penaltyFactor)
 

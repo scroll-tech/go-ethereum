@@ -316,30 +316,40 @@ func calculateEncodedL1DataFeeFeynman(
 	return l1DataFee
 }
 
-// calculateEncodedL1DataFeeGalileo computes the L1 fee for an RLP-encoded tx, post Galileo
+// calculateEncodedL1DataFeeGalileo computes the rollup fee for an RLP-encoded tx, post Galileo
 //
-// Post Galileo formula:
-// rollup_fee(tx) = (execScalar * l1BaseFee + blobScalar * l1BlobBaseFee) * compressed_size(tx) / PRECISION
+// Post Galileo rollup fee formula:
+// rollupFee(tx) = feePerByte * compressedSize(tx) * (1 + penalty(tx)) / PRECISION
 //
 // Where:
-// compressed_size(tx) = min(size(zstd(tx)), size(tx))
+// feePerByte = (execScalar * l1BaseFee + blobScalar * l1BlobBaseFee)
+// compressedSize(tx) = min(len(zstd(rlp(tx))), len(rlp(tx)))
+// penalty(tx) = compressedSize(tx) / penaltyFactor
 func calculateEncodedL1DataFeeGalileo(
 	l1BaseFee *big.Int,
 	l1BlobBaseFee *big.Int,
 	execScalar *big.Int,
 	blobScalar *big.Int,
+	penaltyFactor *big.Int,
 	compressedSize *big.Int,
 ) *big.Int {
-	// feePerByte = execGas + blobGas = execScalar * l1BaseFee + blobScalar * l1BlobBaseFee
+	// feePerByte = execGas + blobGas = (execScalar * l1BaseFee) + (blobScalar * l1BlobBaseFee)
 	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)
 	feePerByte := new(big.Int).Add(execGas, blobGas)
 
-	// l1DataFee = feePerByte * compressedSize
-	l1DataFee := new(big.Int).Mul(feePerByte, compressedSize)
-	l1DataFee.Div(l1DataFee, rcfg.Precision) // account for scalars
+	// baseTerm = feePerByte * compressedSize
+	baseTerm := new(big.Int).Mul(feePerByte, compressedSize)
 
-	return l1DataFee
+	// penaltyTerm = (baseTerm * compressedSize) / penaltyFactor
+	penaltyTerm := new(big.Int).Mul(baseTerm, compressedSize)
+	penaltyTerm.Div(penaltyTerm, penaltyFactor)
+
+	// rollupFee = (baseTerm + penaltyTerm) / PRECISION
+	rollupFee := new(big.Int).Add(baseTerm, penaltyTerm)
+	rollupFee.Div(rollupFee, rcfg.Precision) // execScalar and blobScalar are scaled by PRECISION
+
+	return rollupFee
 }
 
 // calculateL1GasUsed computes the L1 gas used based on the calldata and
@@ -424,6 +434,7 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 			gpoState.l1BlobBaseFee,
 			gpoState.commitScalar, // now represents execScalar
 			gpoState.blobScalar,
+			gpoState.penaltyFactor, // in Galileo, penaltyFactor is repurposed as a coefficient of the blob utilization penalty
 			compressedSize,
 		)
 	}

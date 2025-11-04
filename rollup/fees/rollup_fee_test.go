@@ -96,6 +96,43 @@ func TestL1DataFeeFeynman(t *testing.T) {
 	})
 }
 
+func TestL1DataFeeGalileo(t *testing.T) {
+	l1BaseFee := new(big.Int).SetInt64(1_000_000_000)     // 1 gwei
+	l1BlobBaseFee := new(big.Int).SetInt64(1_000_000_000) // 1 gwei
+	execScalar := new(big.Int).SetInt64(2394981796)       // 2.39
+	blobScalar := new(big.Int).SetInt64(1019097245)       // 1.02
+	penaltyFactor := new(big.Int).SetInt64(10000)
+
+	testcases := []struct {
+		name           string
+		compressedSize int64
+		expected       int64
+	}{
+		{"50-byte tx", 50, 171557471810},              // ~0.06 cents
+		{"100-byte tx", 100, 344821983141},            // ~0.12 cents
+		{"1-KiB tx", 1024, 3854009072433},             // ~1.35 cents
+		{"10-KiB tx", 10 * 1024, 70759382824796},      // ~24.77 cents
+		{"1-MiB tx", 1024 * 1024, 378961881717079120}, // ~1325 USD
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := calculateEncodedL1DataFeeGalileo(
+				l1BaseFee,
+				l1BlobBaseFee,
+				execScalar,
+				blobScalar,
+				penaltyFactor,
+				new(big.Int).SetInt64(tt.compressedSize),
+			)
+			assert.Equal(t,
+				new(big.Int).SetInt64(tt.expected),
+				actual,
+			)
+		})
+	}
+}
+
 func TestCompression(t *testing.T) {
 	// Mock config that would select a specific codec version
 	// Note: You'll need to adjust this based on your actual params.ChainConfig structure

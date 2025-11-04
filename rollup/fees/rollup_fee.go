@@ -233,9 +233,8 @@ func calculateTxCompressedSize(data []byte, blockNumber uint64, blockTime uint64
 
 	if len(compressed) < len(data) {
 		return new(big.Int).SetUint64(uint64(len(compressed))), nil
-	} else {
-		return new(big.Int).SetUint64(uint64(len(data))), nil
 	}
+	return new(big.Int).SetUint64(uint64(len(data))), nil
 }
 
 // calculatePenalty computes the penalty multiplier based on compression ratio
@@ -335,6 +334,11 @@ func calculateEncodedL1DataFeeGalileo(
 	penaltyFactor *big.Int,
 	compressedSize *big.Int,
 ) *big.Int {
+	// Sanitize penalty factor.
+	if penaltyFactor.Cmp(common.Big0) == 0 {
+		penaltyFactor = common.Big1
+	}
+
 	// feePerByte = (execScalar * l1BaseFee) + (blobScalar * l1BlobBaseFee)
 	execGas := new(big.Int).Mul(execScalar, l1BaseFee)
 	blobGas := new(big.Int).Mul(blobScalar, l1BlobBaseFee)

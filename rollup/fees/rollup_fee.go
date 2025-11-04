@@ -413,10 +413,10 @@ func CalculateL1DataFee(tx *types.Transaction, state StateDB, config *params.Cha
 			compressionRatio,
 		)
 	} else {
-		// TODO: Decide if we should use `raw` (rlp-encoded tx) or `tx.Data()` (payload) here.
+		// Note: In Galileo, we take the compressed size of the full RLP-encoded transaction.
 		compressedSize, err := calculateTxCompressedSize(raw, blockNumber.Uint64(), blockTime, config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to estimate compression ratio: tx hash=%s: %w", tx.Hash().Hex(), err)
+			return nil, fmt.Errorf("failed to calculate compressed size: tx hash=%s: %w", tx.Hash().Hex(), err)
 		}
 
 		l1DataFee = calculateEncodedL1DataFeeGalileo(

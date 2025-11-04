@@ -101,6 +101,12 @@ func TestCompression(t *testing.T) {
 	// Note: You'll need to adjust this based on your actual params.ChainConfig structure
 
 	compress := func(data []byte) (*big.Int, *big.Int) {
+		// Compute compression ratio and compressed size for each test case.
+		// These test cases are meant to be shared between the Go and Rust implementations.
+		// Note: Feynman's compression ratio is computed on the transaction payload,
+		// while Galileo's compressed size is computed on the full RLP-encoded transaction.
+		// In these compression tests we ignore this distinction.
+
 		ratio, err := estimateTxCompressionRatio(data, 1000000, 1700000000, params.TestChainConfig)
 		assert.NoError(t, err)
 		assert.NotNil(t, ratio)

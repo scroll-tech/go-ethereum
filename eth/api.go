@@ -367,6 +367,20 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 	// sure that this is always present in the execution witness.
 	statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.IsFeynmanSlot)
 
+	// Ensure that all access list entries are included in the witness,
+	// as these are always loaded by revm.
+	for _, tx := range block.Transactions() {
+		for _, accessTuple := range tx.AccessList() {
+			// Load account
+			statedb.GetBalance(accessTuple.Address)
+
+			// Load storage entries
+			for _, key := range accessTuple.StorageKeys {
+				statedb.GetState(accessTuple.Address, key)
+			}
+		}
+	}
+
 	receipts, _, usedGas, err := blockchain.Processor().Process(block, statedb, *blockchain.GetVMConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to process block %d: %w", block.Number(), err)

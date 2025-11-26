@@ -97,7 +97,7 @@ var (
 	// GalileoV2L1GasPriceOracleBytecode is the new gas price oracle after the GalileoV2 hard fork.
 	// Run these commands in the scroll-contracts repo to verify this bytecode:
 	//
-	// git checkout 6c25be6426812d396aae7d52eae580a7a2a4c849
+	// git checkout dfffa0f04bbd1de31ef342e1642a2f9ad9a620fe
 	// yarn
 	// forge build
 	// cat artifacts/src/L1GasPriceOracle.sol/L1GasPriceOracle.json | jq -r .deployedBytecode.object

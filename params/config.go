@@ -1035,10 +1035,12 @@ func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTime
 	return isForkedTime(blockTimestamp, c.FeynmanTime) && !isForkedTime(parentTimestamp, c.FeynmanTime)
 }
 
+// IsGalileo returns whether time is either equal to the Galileo fork time or greater.
 func (c *ChainConfig) IsGalileo(now uint64) bool {
 	return isForkedTime(now, c.GalileoTime)
 }
 
+// IsGalileoV2 returns whether time is either equal to the GalileoV2 fork time or greater.
 func (c *ChainConfig) IsGalileoV2(now uint64) bool {
 	return isForkedTime(now, c.GalileoV2Time)
 }

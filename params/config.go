@@ -675,7 +675,7 @@ type ChainConfig struct {
 	EuclidV2Time        *uint64  `json:"euclidv2Time,omitempty"`        // EuclidV2 switch time (nil = no fork, 0 = already on euclidv2)
 	FeynmanTime         *uint64  `json:"feynmanTime,omitempty"`         // Feynman switch time (nil = no fork, 0 = already on feynman)
 	GalileoTime         *uint64  `json:"galileoTime,omitempty"`         // Galileo switch time (nil = no fork, 0 = already on galileo)
-	GalileoV2Time       *uint64  `json:"galileoV2Time,omitempty"`       // GalileoV2 switch time (nil = no fork, 0 = already on galileoV2)
+	GalileoV2Time       *uint64  `json:"galileov2Time,omitempty"`       // GalileoV2 switch time (nil = no fork, 0 = already on galileoV2)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.

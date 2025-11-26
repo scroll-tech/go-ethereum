@@ -97,6 +97,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if p.config.IsFeynmanTransitionBlock(block.Time(), parent.Time) {
 		misc.ApplyFeynmanHardFork(statedb)
 	}
+	// Apply GalileoV2 hard fork
+	if p.config.IsGalileoV2TransitionBlock(block.Time(), parent.Time) {
+		misc.ApplyGalileoV2HardFork(statedb)
+	}
 	blockContext := NewEVMBlockContext(header, p.bc, p.config, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 	processorBlockTransactionGauge.Update(int64(block.Transactions().Len()))

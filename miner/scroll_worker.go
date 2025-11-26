@@ -641,6 +641,11 @@ func (w *worker) handleForks(parent *types.Block) (bool, error) {
 		misc.ApplyFeynmanHardFork(w.current.state)
 	}
 
+	// Apply GalileoV2 hard fork
+	if w.chainConfig.IsGalileoV2TransitionBlock(w.current.header.Time, parent.Time()) {
+		misc.ApplyGalileoV2HardFork(w.current.state)
+	}
+
 	// Apply EIP-2935
 	if w.chainConfig.IsFeynman(w.current.header.Time) {
 		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)

@@ -156,6 +156,10 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 	if chainConfig.IsFeynmanTransitionBlock(pre.Env.Timestamp, pre.Env.ParentTimestamp) {
 		misc.ApplyFeynmanHardFork(statedb)
 	}
+	// Apply GalileoV2 hard fork
+	if chainConfig.IsGalileoV2TransitionBlock(pre.Env.Timestamp, pre.Env.ParentTimestamp) {
+		misc.ApplyGalileoV2HardFork(statedb)
+	}
 	// Apply EIP-2935
 	if pre.Env.BlockHashes != nil && chainConfig.IsFeynman(pre.Env.Timestamp) {
 		var (

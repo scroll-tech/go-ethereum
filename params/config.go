@@ -334,7 +334,7 @@ var (
 		EuclidV2Time:        newUint64(1741852800),
 		FeynmanTime:         newUint64(1753167600),
 		GalileoTime:         newUint64(1764054000),
-		GalileoV2Time:       nil,
+		GalileoV2Time:       newUint64(1764831600),
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,

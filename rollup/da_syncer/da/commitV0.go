@@ -13,15 +13,18 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 type CommitBatchDAV0 struct {
+	db ethdb.Database
+
 	version                    encoding.CodecVersion
 	batchIndex                 uint64
 	parentTotalL1MessagePopped uint64
+	l1MessagesPopped           int
 	skippedL1MessageBitmap     []byte
 	chunks                     []*encoding.DAChunkRawTx
-	l1Txs                      []*types.L1MessageTx
 
 	event *l1.CommitBatchEvent
 }
@@ -50,18 +53,15 @@ func NewCommitBatchDAV0WithChunks(db ethdb.Database,
 	event *l1.CommitBatchEvent,
 ) (*CommitBatchDAV0, error) {
 	parentTotalL1MessagePopped := getBatchTotalL1MessagePopped(parentBatchHeader)
-	l1Txs, err := getL1Messages(db, parentTotalL1MessagePopped, skippedL1MessageBitmap, getTotalMessagesPoppedFromChunks(decodedChunks))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get L1 messages for v0 batch %d: %w", batchIndex, err)
-	}
 
 	return &CommitBatchDAV0{
+		db:                         db,
 		version:                    version,
 		batchIndex:                 batchIndex,
 		parentTotalL1MessagePopped: parentTotalL1MessagePopped,
+		l1MessagesPopped:           getTotalMessagesPoppedFromChunks(decodedChunks),
 		skippedL1MessageBitmap:     skippedL1MessageBitmap,
 		chunks:                     decodedChunks,
-		l1Txs:                      l1Txs,
 		event:                      event,
 	}, nil
 }
@@ -110,25 +110,35 @@ func (c *CommitBatchDAV0) CompareTo(other Entry) int {
 	return 0
 }
 
-func (c *CommitBatchDAV0) Blocks() []*PartialBlock {
+func (c *CommitBatchDAV0) Blocks(manager *missing_header_fields.Manager) ([]*PartialBlock, error) {
+	l1Txs, err := getL1Messages(c.db, c.parentTotalL1MessagePopped, c.skippedL1MessageBitmap, c.l1MessagesPopped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get L1 messages for v0 batch %d: %w", c.batchIndex, err)
+	}
+
 	var blocks []*PartialBlock
 	l1TxPointer := 0
 
 	curL1TxIndex := c.parentTotalL1MessagePopped
 	for _, chunk := range c.chunks {
-		for blockId, daBlock := range chunk.Blocks {
+		for blockIndex, daBlock := range chunk.Blocks {
 			// create txs
 			txs := make(types.Transactions, 0, daBlock.NumTransactions())
 			// insert l1 msgs
-			for l1TxPointer < len(c.l1Txs) && c.l1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages()) {
-				l1Tx := types.NewTx(c.l1Txs[l1TxPointer])
+			for l1TxPointer < len(l1Txs) && l1Txs[l1TxPointer].QueueIndex < curL1TxIndex+uint64(daBlock.NumL1Messages()) {
+				l1Tx := types.NewTx(l1Txs[l1TxPointer])
 				txs = append(txs, l1Tx)
 				l1TxPointer++
 			}
 			curL1TxIndex += uint64(daBlock.NumL1Messages())
 
 			// insert l2 txs
-			txs = append(txs, chunk.Transactions[blockId]...)
+			txs = append(txs, chunk.Transactions[blockIndex]...)
+
+			difficulty, stateRoot, coinbase, nonce, extraData, err := manager.GetMissingHeaderFields(daBlock.Number())
+			if err != nil {
+				return nil, fmt.Errorf("failed to get missing header fields for block %d: %w", daBlock.Number(), err)
+			}
 
 			block := NewPartialBlock(
 				&PartialHeader{
@@ -136,15 +146,30 @@ func (c *CommitBatchDAV0) Blocks() []*PartialBlock {
 					Time:       daBlock.Timestamp(),
 					BaseFee:    daBlock.BaseFee(),
 					GasLimit:   daBlock.GasLimit(),
-					Difficulty: 10,                             // TODO: replace with real difficulty
-					ExtraData:  []byte{1, 2, 3, 4, 5, 6, 7, 8}, // TODO: replace with real extra data
+					Difficulty: difficulty,
+					ExtraData:  extraData,
+					StateRoot:  stateRoot,
+					Coinbase:   coinbase,
+					Nonce:      nonce,
 				},
 				txs)
 			blocks = append(blocks, block)
 		}
 	}
 
-	return blocks
+	return blocks, nil
+}
+
+func (c *CommitBatchDAV0) SetParentTotalL1MessagePopped(totalL1MessagePopped uint64) {
+	// we ignore setting parentTotalL1MessagePopped from outside as it is calculated from parent batch header for V0 batches
+}
+
+func (c *CommitBatchDAV0) TotalL1MessagesPopped() uint64 {
+	return c.parentTotalL1MessagePopped + uint64(c.l1MessagesPopped)
+}
+
+func (c *CommitBatchDAV0) L1MessagesPoppedInBatch() uint64 {
+	return uint64(c.l1MessagesPopped)
 }
 
 func getTotalMessagesPoppedFromChunks(decodedChunks []*encoding.DAChunkRawTx) int {

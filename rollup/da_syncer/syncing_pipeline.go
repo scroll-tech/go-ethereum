@@ -16,6 +16,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/blob_client"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/serrors"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 // Config is the configuration parameters of data availability syncing.
@@ -23,6 +24,7 @@ type Config struct {
 	BlobScanAPIEndpoint    string // BlobScan blob api endpoint
 	BlockNativeAPIEndpoint string // BlockNative blob api endpoint
 	BeaconNodeAPIEndpoint  string // Beacon node api endpoint
+	AwsS3BlobAPIEndpoint   string // AWS S3 blob data api endpoint
 
 	RecoveryMode   bool   // Recovery mode is used to override existing blocks with the blocks read from the pipeline and start from a specific L1 block and batch
 	InitialL1Block uint64 // L1 block in which the InitialBatch was committed (or any earlier L1 block but requires more RPC requests)
@@ -50,7 +52,7 @@ type SyncingPipeline struct {
 	daQueue    *DAQueue
 }
 
-func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient l1.Client, l1DeploymentBlock uint64, config Config) (*SyncingPipeline, error) {
+func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesisConfig *params.ChainConfig, db ethdb.Database, ethClient l1.Client, l1DeploymentBlock uint64, config Config, missingHeaderFieldsManager *missing_header_fields.Manager) (*SyncingPipeline, error) {
 	l1Reader, err := l1.NewReader(ctx, l1.Config{
 		ScrollChainAddress:    genesisConfig.Scroll.L1Config.ScrollChainAddress,
 		L1MessageQueueAddress: genesisConfig.Scroll.L1Config.L1MessageQueueAddress,
@@ -74,35 +76,60 @@ func NewSyncingPipeline(ctx context.Context, blockchain *core.BlockChain, genesi
 	if config.BlockNativeAPIEndpoint != "" {
 		blobClientList.AddBlobClient(blob_client.NewBlockNativeClient(config.BlockNativeAPIEndpoint))
 	}
+	if config.AwsS3BlobAPIEndpoint != "" {
+		blobClientList.AddBlobClient(blob_client.NewAwsS3Client(config.AwsS3BlobAPIEndpoint))
+	}
 	if blobClientList.Size() == 0 {
 		return nil, errors.New("DA syncing is enabled but no blob client is configured. Please provide at least one blob client via command line flag")
 	}
 
 	dataSourceFactory := NewDataSourceFactory(blockchain, genesisConfig, config, l1Reader, blobClientList, db)
-	var initialL1Block uint64
+	var lastProcessedBatchMeta *rawdb.DAProcessedBatchMeta
 	if config.RecoveryMode {
-		initialL1Block = config.InitialL1Block
-		if initialL1Block == 0 {
+		if config.InitialL1Block == 0 {
 			return nil, errors.New("sync from DA: initial L1 block must be set in recovery mode")
 		}
 		if config.InitialBatch == 0 {
 			return nil, errors.New("sync from DA: initial batch must be set in recovery mode")
 		}
 
-		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", initialL1Block, "initialBatch", config.InitialBatch)
-	} else {
-		initialL1Block = l1DeploymentBlock - 1
-		config.InitialL1Block = initialL1Block
-		from := rawdb.ReadDASyncedL1BlockNumber(db)
-		if from != nil {
-			initialL1Block = *from
+		l1MessageQueueHeightFinder, err := NewL1MessageQueueHeightFinder(ctx, config.InitialL1Block, l1Reader, blobClientList, db)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create L1MessageQueueHeightFinder: %w", err)
 		}
-		log.Info("sync from DA: initializing pipeline", "initialL1Block", initialL1Block)
+
+		l1MessageQueueHeightBeforeInitialBatch, err := l1MessageQueueHeightFinder.TotalL1MessagesPoppedBefore(config.InitialBatch)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find L1 message queue height before initial batch: %w", err)
+		}
+
+		lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
+			BatchIndex:            config.InitialBatch,
+			L1BlockNumber:         config.InitialL1Block,
+			TotalL1MessagesPopped: l1MessageQueueHeightBeforeInitialBatch,
+		}
+
+		log.Info("sync from DA: initializing pipeline in recovery mode", "initialL1Block", config.InitialL1Block, "initialBatch", config.InitialBatch, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
+	} else {
+		lastProcessedBatchMeta = rawdb.ReadDAProcessedBatchMeta(db)
+		if lastProcessedBatchMeta == nil {
+			var l1BlockNumber uint64
+			if l1DeploymentBlock > 0 {
+				l1BlockNumber = l1DeploymentBlock - 1
+			}
+			lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
+				BatchIndex:            0,
+				L1BlockNumber:         l1BlockNumber,
+				TotalL1MessagesPopped: 0,
+			}
+			rawdb.WriteDAProcessedBatchMeta(db, lastProcessedBatchMeta)
+		}
+		log.Info("sync from DA: initializing pipeline", "BatchIndex", lastProcessedBatchMeta.BatchIndex, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
 	}
 
-	daQueue := NewDAQueue(initialL1Block, config.InitialBatch, dataSourceFactory)
-	batchQueue := NewBatchQueue(daQueue, db)
-	blockQueue := NewBlockQueue(batchQueue)
+	daQueue := NewDAQueue(lastProcessedBatchMeta.L1BlockNumber, dataSourceFactory)
+	batchQueue := NewBatchQueue(daQueue, db, lastProcessedBatchMeta)
+	blockQueue := NewBlockQueue(batchQueue, missingHeaderFieldsManager)
 	daSyncer := NewDASyncer(blockchain, config.L2EndBlock)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -260,12 +287,21 @@ func (s *SyncingPipeline) Stop() {
 
 func (s *SyncingPipeline) reset(resetCounter int) {
 	amount := 100 * uint64(resetCounter)
-	syncedL1Height := s.config.InitialL1Block
-	from := rawdb.ReadDASyncedL1BlockNumber(s.db)
-	if from != nil && *from+amount > syncedL1Height {
-		syncedL1Height = *from - amount
-		rawdb.WriteDASyncedL1BlockNumber(s.db, syncedL1Height)
+
+	lastProcessedBatchMeta := rawdb.ReadDAProcessedBatchMeta(s.db)
+	if lastProcessedBatchMeta == nil {
+		lastProcessedBatchMeta = &rawdb.DAProcessedBatchMeta{
+			BatchIndex:            0,
+			L1BlockNumber:         s.config.InitialL1Block - amount,
+			TotalL1MessagesPopped: 0,
+		}
 	}
-	log.Info("resetting syncing pipeline", "syncedL1Height", syncedL1Height)
-	s.blockQueue.Reset(syncedL1Height)
+
+	if lastProcessedBatchMeta.L1BlockNumber > amount {
+		lastProcessedBatchMeta.L1BlockNumber -= amount
+		rawdb.WriteDAProcessedBatchMeta(s.db, lastProcessedBatchMeta)
+	}
+
+	log.Info("resetting syncing pipeline", "batch index", lastProcessedBatchMeta.BatchIndex, "L1BlockNumber", lastProcessedBatchMeta.L1BlockNumber, "TotalL1MessagesPopped", lastProcessedBatchMeta.TotalL1MessagesPopped)
+	s.blockQueue.Reset(lastProcessedBatchMeta)
 }

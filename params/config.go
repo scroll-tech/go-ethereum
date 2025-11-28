@@ -30,16 +30,18 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash        = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	RopstenGenesisHash        = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	SepoliaGenesisHash        = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
-	RinkebyGenesisHash        = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-	GoerliGenesisHash         = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
-	ScrollAlphaGenesisHash    = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
-	ScrollSepoliaGenesisHash  = common.HexToHash("0xaa62d1a8b2bffa9e5d2368b63aae0d98d54928bd713125e3fd9e5c896c68592c")
-	ScrollMainnetGenesisHash  = common.HexToHash("0xbbc05efd412b7cd47a2ed0e5ddfcf87af251e414ea4c801d78b6784513180a80")
-	ScrollSepoliaGenesisState = common.HexToHash("0x20695989e9038823e35f0e88fbc44659ffdbfa1fe89fbeb2689b43f15fa64cb5")
-	ScrollMainnetGenesisState = common.HexToHash("0x08d535cc60f40af5dd3b31e0998d7567c2d568b224bed2ba26070aeb078d1339")
+	MainnetGenesisHash                     = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+	RopstenGenesisHash                     = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	SepoliaGenesisHash                     = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
+	RinkebyGenesisHash                     = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	GoerliGenesisHash                      = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	ScrollAlphaGenesisHash                 = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
+	ScrollSepoliaGenesisHash               = common.HexToHash("0xaa62d1a8b2bffa9e5d2368b63aae0d98d54928bd713125e3fd9e5c896c68592c")
+	ScrollMainnetGenesisHash               = common.HexToHash("0xbbc05efd412b7cd47a2ed0e5ddfcf87af251e414ea4c801d78b6784513180a80")
+	ScrollSepoliaGenesisState              = common.HexToHash("0x20695989e9038823e35f0e88fbc44659ffdbfa1fe89fbeb2689b43f15fa64cb5")
+	ScrollMainnetGenesisState              = common.HexToHash("0x08d535cc60f40af5dd3b31e0998d7567c2d568b224bed2ba26070aeb078d1339")
+	ScrollMainnetMissingHeaderFieldsSHA256 = common.HexToHash("0xfa2746026ec9590e37e495cb20046e20a38fd0e7099abd2012640dddf6c88b25")
+	ScrollSepoliaMissingHeaderFieldsSHA256 = common.HexToHash("0xa02354c12ca0f918bf4768255af9ed13c137db7e56252348f304b17bb4088924")
 )
 
 func newUint64(val uint64) *uint64 { return &val }
@@ -328,9 +330,19 @@ var (
 		CurieBlock:          big.NewInt(4740239),
 		DarwinTime:          newUint64(1723622400),
 		DarwinV2Time:        newUint64(1724832000),
+		EuclidTime:          newUint64(1741680000),
+		EuclidV2Time:        newUint64(1741852800),
+		FeynmanTime:         newUint64(1753167600),
+		GalileoTime:         newUint64(1764054000),
+		GalileoV2Time:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
+		},
+		SystemContract: &SystemContractConfig{
+			Period:                3,
+			SystemContractAddress: common.HexToAddress("0xC706Ba9fa4fedF4507CB7A898b4766c1bbf9be57"),
+			SystemContractSlot:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000067"),
 		},
 		Scroll: ScrollConfig{
 			UseZktrie:                 true,
@@ -338,12 +350,16 @@ var (
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
 			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			L1Config: &L1Config{
-				L1ChainId:             11155111,
-				L1MessageQueueAddress: common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
-				NumL1MessagesPerBlock: 10,
-				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
+				L1ChainId:                       11155111,
+				L1MessageQueueAddress:           common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
+				L1MessageQueueV2Address:         common.HexToAddress("0xA0673eC0A48aa924f067F1274EcD281A10c5f19F"),
+				L1MessageQueueV2DeploymentBlock: 7773746,
+				NumL1MessagesPerBlock:           10,
+				ScrollChainAddress:              common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
+				L2SystemConfigAddress:           common.HexToAddress("0xF444cF06A3E3724e20B35c2989d3942ea8b59124"),
 			},
-			GenesisStateRoot: &ScrollSepoliaGenesisState,
+			GenesisStateRoot:          &ScrollSepoliaGenesisState,
+			MissingHeaderFieldsSHA256: &ScrollSepoliaMissingHeaderFieldsSHA256,
 		},
 	}
 
@@ -369,9 +385,19 @@ var (
 		CurieBlock:          big.NewInt(7096836),
 		DarwinTime:          newUint64(1724227200),
 		DarwinV2Time:        newUint64(1725264000),
+		EuclidTime:          newUint64(1744815600),
+		EuclidV2Time:        newUint64(1745305200),
+		FeynmanTime:         newUint64(1755576000),
+		GalileoTime:         nil,
+		GalileoV2Time:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
+		},
+		SystemContract: &SystemContractConfig{
+			Period:                3,
+			SystemContractAddress: common.HexToAddress("0x8432728A257646449245558B8b7Dbe51A16c7a4D"),
+			SystemContractSlot:    common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000067"),
 		},
 		Scroll: ScrollConfig{
 			UseZktrie:                 true,
@@ -379,12 +405,16 @@ var (
 			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
 			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			L1Config: &L1Config{
-				L1ChainId:             1,
-				L1MessageQueueAddress: common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
-				NumL1MessagesPerBlock: 10,
-				ScrollChainAddress:    common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
+				L1ChainId:                       1,
+				L1MessageQueueAddress:           common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
+				L1MessageQueueV2Address:         common.HexToAddress("0x56971da63A3C0205184FEF096E9ddFc7A8C2D18a"),
+				L1MessageQueueV2DeploymentBlock: 22088276,
+				NumL1MessagesPerBlock:           10,
+				ScrollChainAddress:              common.HexToAddress("0xa13BAF47339d63B743e7Da8741db5456DAc1E556"),
+				L2SystemConfigAddress:           common.HexToAddress("0x331A873a2a85219863d80d248F9e2978fE88D0Ea"),
 			},
-			GenesisStateRoot: &ScrollMainnetGenesisState,
+			GenesisStateRoot:          &ScrollMainnetGenesisState,
+			MissingHeaderFieldsSHA256: &ScrollMainnetMissingHeaderFieldsSHA256,
 		},
 	}
 
@@ -501,6 +531,7 @@ var (
 		DarwinV2Time:            new(uint64),
 		EuclidTime:              new(uint64),
 		EuclidV2Time:            new(uint64),
+		FeynmanTime:             new(uint64),
 		TerminalTotalDifficulty: nil,
 		Ethash:                  new(EthashConfig),
 		Clique:                  nil,
@@ -642,6 +673,9 @@ type ChainConfig struct {
 	DarwinV2Time        *uint64  `json:"darwinv2Time,omitempty"`        // DarwinV2 switch time (nil = no fork, 0 = already on darwinv2)
 	EuclidTime          *uint64  `json:"euclidTime,omitempty"`          // Euclid switch time (nil = no fork, 0 = already on euclid)
 	EuclidV2Time        *uint64  `json:"euclidv2Time,omitempty"`        // EuclidV2 switch time (nil = no fork, 0 = already on euclidv2)
+	FeynmanTime         *uint64  `json:"feynmanTime,omitempty"`         // Feynman switch time (nil = no fork, 0 = already on feynman)
+	GalileoTime         *uint64  `json:"galileoTime,omitempty"`         // Galileo switch time (nil = no fork, 0 = already on galileo)
+	GalileoV2Time       *uint64  `json:"galileov2Time,omitempty"`       // GalileoV2 switch time (nil = no fork, 0 = already on galileoV2)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -686,16 +720,20 @@ type ScrollConfig struct {
 
 	// Genesis State Root for MPT clients
 	GenesisStateRoot *common.Hash `json:"genesisStateRoot,omitempty"`
+
+	// MissingHeaderFieldsSHA256 is the SHA256 hash of the missing header fields file.
+	MissingHeaderFieldsSHA256 *common.Hash `json:"missingHeaderFieldsSHA256,omitempty"`
 }
 
 // L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer
 type L1Config struct {
 	L1ChainId                       uint64         `json:"l1ChainId,string,omitempty"`
 	L1MessageQueueAddress           common.Address `json:"l1MessageQueueAddress,omitempty"`
-	L1MessageQueueV2Address         common.Address `json:"l1MessageQueueV2Address,omitempty"`         // TODO: set address once known
-	L1MessageQueueV2DeploymentBlock uint64         `json:"l1MessageQueueV2DeploymentBlock,omitempty"` // TODO: set block number once known
+	L1MessageQueueV2Address         common.Address `json:"l1MessageQueueV2Address,omitempty"`
+	L1MessageQueueV2DeploymentBlock uint64         `json:"l1MessageQueueV2DeploymentBlock,omitempty"`
 	NumL1MessagesPerBlock           uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
 	ScrollChainAddress              common.Address `json:"scrollChainAddress,omitempty"`
+	L2SystemConfigAddress           common.Address `json:"l2SystemConfigAddress,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -703,8 +741,8 @@ func (c *L1Config) String() string {
 		return "<nil>"
 	}
 
-	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, numL1MessagesPerBlock: %v, ScrollChainAddress: %v}",
-		c.L1ChainId, c.L1MessageQueueAddress.Hex(), c.NumL1MessagesPerBlock, c.ScrollChainAddress.Hex())
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, l1MessageQueueV2Address: %v, l1MessageQueueV2DeploymentBlock: %v, numL1MessagesPerBlock: %v, ScrollChainAddress: %v, L2SystemConfigAddress: %v}",
+		c.L1ChainId, c.L1MessageQueueAddress.Hex(), c.L1MessageQueueV2Address.Hex(), c.L1MessageQueueV2DeploymentBlock, c.NumL1MessagesPerBlock, c.ScrollChainAddress.Hex(), c.L2SystemConfigAddress.Hex())
 }
 
 func (s ScrollConfig) FeeVaultEnabled() bool {
@@ -730,8 +768,18 @@ func (s ScrollConfig) String() string {
 		maxTxPayloadBytesPerBlock = fmt.Sprintf("%v", *s.MaxTxPayloadBytesPerBlock)
 	}
 
-	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, l1Config: %v}",
-		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.L1Config.String())
+	genesisStateRoot := "<nil>"
+	if s.GenesisStateRoot != nil {
+		genesisStateRoot = fmt.Sprintf("%v", *s.GenesisStateRoot)
+	}
+
+	missingHeaderFieldsSHA256 := "<nil>"
+	if s.MissingHeaderFieldsSHA256 != nil {
+		missingHeaderFieldsSHA256 = fmt.Sprintf("%v", *s.MissingHeaderFieldsSHA256)
+	}
+
+	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, l1Config: %v, genesisStateRoot: %v, missingHeaderFieldsSHA256: %v}",
+		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.L1Config.String(), genesisStateRoot, missingHeaderFieldsSHA256)
 }
 
 // IsValidTxCount returns whether the given block's transaction count is below the limit.
@@ -748,6 +796,14 @@ func (s ScrollConfig) IsValidBlockSize(size common.StorageSize) bool {
 // IsValidBlockSizeForMining is similar to IsValidBlockSize, but it accounts for the confidence factor in Rust CCC
 func (s ScrollConfig) IsValidBlockSizeForMining(size common.StorageSize) bool {
 	return s.IsValidBlockSize(size * (1.0 / 0.95))
+}
+
+// L2SystemConfigAddress returns the configured l2 system config address, or the zero address if it is not configured.
+func (s ScrollConfig) L2SystemConfigAddress() common.Address {
+	if s.L1Config == nil {
+		return common.Address{} // only in tests
+	}
+	return s.L1Config.L2SystemConfigAddress
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -774,10 +830,10 @@ func (c *CliqueConfig) String() string {
 
 // SystemContractConfig is the consensus engine configs for rollup sequencer sealing.
 type SystemContractConfig struct {
-	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
-
-	SystemContractAddress common.Address `json:"system_contract_address"` // address of system contract on L1
-	SystemContractSlot    common.Hash    `json:"system_contract_slot"`    // slot of signer address in system contract on L1
+	Period                uint64         `json:"period"`                      // Number of seconds between blocks to enforce
+	BlocksPerSecond       uint64         `json:"blocks_per_second,omitempty"` // Number of blocks per second within the period
+	SystemContractAddress common.Address `json:"system_contract_address"`     // address of system contract on L1
+	SystemContractSlot    common.Hash    `json:"system_contract_slot"`        // slot of signer address in system contract on L1
 
 	RelaxedPeriod bool `json:"relaxed_period"` // Relaxes the period to be just an upper bound
 }
@@ -793,8 +849,12 @@ func (c *ChainConfig) String() string {
 	switch {
 	case c.Ethash != nil:
 		engine = c.Ethash
+	case c.Clique != nil && c.SystemContract != nil:
+		engine = "upgradable (clique + system_contract)"
 	case c.Clique != nil:
 		engine = c.Clique
+	case c.SystemContract != nil:
+		engine = c.SystemContract
 	default:
 		engine = "unknown"
 	}
@@ -814,7 +874,19 @@ func (c *ChainConfig) String() string {
 	if c.EuclidV2Time != nil {
 		euclidV2Time = fmt.Sprintf("@%v", *c.EuclidV2Time)
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, DarwinV2: %v, Euclid: %v, EuclidV2: %v, Engine: %v, Scroll config: %v}",
+	feynmanTime := "<nil>"
+	if c.FeynmanTime != nil {
+		feynmanTime = fmt.Sprintf("@%v", *c.FeynmanTime)
+	}
+	galileoTime := "<nil>"
+	if c.GalileoTime != nil {
+		galileoTime = fmt.Sprintf("@%v", *c.GalileoTime)
+	}
+	galileoV2Time := "<nil>"
+	if c.GalileoV2Time != nil {
+		galileoV2Time = fmt.Sprintf("@%v", *c.GalileoV2Time)
+	}
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, DarwinV2: %v, Euclid: %v, EuclidV2: %v, Feynman: %v, Galileo: %v, GalileoV2: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -838,6 +910,9 @@ func (c *ChainConfig) String() string {
 		darwinV2Time,
 		euclidTime,
 		euclidV2Time,
+		feynmanTime,
+		galileoTime,
+		galileoV2Time,
 		engine,
 		c.Scroll,
 	)
@@ -950,6 +1025,36 @@ func (c *ChainConfig) IsEuclidV2(now uint64) bool {
 	return isForkedTime(now, c.EuclidV2Time)
 }
 
+// IsFeynman returns whether time is either equal to the Feynman fork time or greater.
+func (c *ChainConfig) IsFeynman(now uint64) bool {
+	return isForkedTime(now, c.FeynmanTime)
+}
+
+// IsFeynmanTransitionBlock returns whether the given block timestamp corresponds to the first Feynman block.
+func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
+	return isForkedTime(blockTimestamp, c.FeynmanTime) && !isForkedTime(parentTimestamp, c.FeynmanTime)
+}
+
+// IsGalileo returns whether time is either equal to the Galileo fork time or greater.
+func (c *ChainConfig) IsGalileo(now uint64) bool {
+	return isForkedTime(now, c.GalileoTime)
+}
+
+// IsGalileoV2 returns whether time is either equal to the GalileoV2 fork time or greater.
+func (c *ChainConfig) IsGalileoV2(now uint64) bool {
+	return isForkedTime(now, c.GalileoV2Time)
+}
+
+// IsGalileoV2TransitionBlock returns whether the given block timestamp corresponds to the first GalileoV2 block.
+func (c *ChainConfig) IsGalileoV2TransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
+	return isForkedTime(blockTimestamp, c.GalileoV2Time) && !isForkedTime(parentTimestamp, c.GalileoV2Time)
+}
+
+// IsScroll returns whether the node is an scroll node or not.
+func (c *ChainConfig) IsScroll() bool {
+	return c.Scroll.L1Config != nil
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
@@ -974,6 +1079,16 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 		bhead.SetUint64(err.RewindTo)
 	}
 	return lasterr
+}
+
+// BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
+func (c *ChainConfig) BaseFeeChangeDenominator() uint64 {
+	return DefaultBaseFeeChangeDenominator
+}
+
+// ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
+func (c *ChainConfig) ElasticityMultiplier() uint64 {
+	return DefaultElasticityMultiplier
 }
 
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
@@ -1163,6 +1278,7 @@ type Rules struct {
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon, IsArchimedes, IsShanghai            bool
 	IsBernoulli, IsCurie, IsDarwin, IsEuclid, IsEuclidV2    bool
+	IsFeynman, IsGalileo, IsGalileoV2                       bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1190,5 +1306,8 @@ func (c *ChainConfig) Rules(num *big.Int, time uint64) Rules {
 		IsDarwin:         c.IsDarwin(time),
 		IsEuclid:         c.IsEuclid(time),
 		IsEuclidV2:       c.IsEuclidV2(time),
+		IsFeynman:        c.IsFeynman(time),
+		IsGalileo:        c.IsGalileo(time),
+		IsGalileoV2:      c.IsGalileoV2(time),
 	}
 }

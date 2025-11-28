@@ -8,6 +8,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 type Type int
@@ -34,10 +35,13 @@ type Entry interface {
 
 type EntryWithBlocks interface {
 	Entry
-	Blocks() []*PartialBlock
+	Blocks(manager *missing_header_fields.Manager) ([]*PartialBlock, error)
 	Version() encoding.CodecVersion
 	Chunks() []*encoding.DAChunkRawTx
 	BlobVersionedHashes() []common.Hash
+	SetParentTotalL1MessagePopped(uint64)
+	TotalL1MessagesPopped() uint64
+	L1MessagesPoppedInBatch() uint64
 }
 
 type Entries []Entry
@@ -50,6 +54,9 @@ type PartialHeader struct {
 	GasLimit   uint64
 	Difficulty uint64
 	ExtraData  []byte
+	StateRoot  common.Hash
+	Coinbase   common.Address
+	Nonce      types.BlockNonce
 }
 
 func (h *PartialHeader) ToHeader() *types.Header {
@@ -60,6 +67,9 @@ func (h *PartialHeader) ToHeader() *types.Header {
 		GasLimit:   h.GasLimit,
 		Difficulty: new(big.Int).SetUint64(h.Difficulty),
 		Extra:      h.ExtraData,
+		Root:       h.StateRoot,
+		Coinbase:   h.Coinbase,
+		Nonce:      h.Nonce,
 	}
 }
 

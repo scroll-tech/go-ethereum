@@ -22,6 +22,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/url"
+	"path"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -32,6 +35,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/clique"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
 	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"github.com/scroll-tech/go-ethereum/core"
@@ -60,6 +64,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 	"github.com/scroll-tech/go-ethereum/rollup/rollup_sync_service"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
@@ -108,6 +113,9 @@ type Ethereum struct {
 	p2pServer *p2p.Server
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+
+	// Scroll additions
+	sequencerRPCService *rpc.Client
 }
 
 // New creates a new Ethereum object (including the
@@ -213,6 +221,12 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
 	}
 
+	state, err := eth.blockchain.State()
+	if err != nil {
+		return nil, err
+	}
+	misc.InitializeL2BaseFeeCoefficients(chainConfig, state)
+
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -225,6 +239,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
+	eth.txPool.SetGasPrice(misc.MinBaseFee())
 
 	// Initialize and start DA syncing pipeline before SyncService as SyncService is blocking until all L1 messages are loaded.
 	// We need SyncService to load the L1 messages for DA syncing, but since both sync from last known L1 state, we can
@@ -233,7 +248,12 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	if config.EnableDASyncing {
 		// Do not start syncing pipeline if we are producing blocks for permissionless batches.
 		if !config.DA.ProduceBlocks {
-			eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA)
+			missingHeaderFieldsManager, err := createMissingHeaderFieldsManager(stack, chainConfig)
+			if err != nil {
+				return nil, fmt.Errorf("cannot create missing header fields manager: %w", err)
+			}
+
+			eth.syncingPipeline, err = da_syncer.NewSyncingPipeline(context.Background(), eth.blockchain, chainConfig, eth.chainDb, l1Client, stack.Config().L1DeploymentBlock, config.DA, missingHeaderFieldsManager)
 			if err != nil {
 				return nil, fmt.Errorf("cannot initialize da syncer: %w", err)
 			}
@@ -265,16 +285,20 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 		checkpoint = params.TrustedCheckpoints[genesisHash]
 	}
 	if eth.handler, err = newHandler(&handlerConfig{
-		Database:          chainDb,
-		Chain:             eth.blockchain,
-		TxPool:            eth.txPool,
-		Network:           config.NetworkId,
-		Sync:              config.SyncMode,
-		BloomCache:        uint64(cacheLimit),
-		EventMux:          eth.eventMux,
-		Checkpoint:        checkpoint,
-		Whitelist:         config.Whitelist,
-		ShadowForkPeerIDs: config.ShadowForkPeerIDs,
+		Database:             chainDb,
+		Chain:                eth.blockchain,
+		TxPool:               eth.txPool,
+		Network:              config.NetworkId,
+		Sync:                 config.SyncMode,
+		BloomCache:           uint64(cacheLimit),
+		EventMux:             eth.eventMux,
+		Checkpoint:           checkpoint,
+		Whitelist:            config.Whitelist,
+		ShadowForkPeerIDs:    config.ShadowForkPeerIDs,
+		DisableTxBroadcast:   config.GossipTxBroadcastDisabled,
+		DisableTxReceiving:   config.GossipTxReceivingDisabled,
+		EnableBroadcastToAll: config.GossipBroadcastToAllEnabled,
+		BroadcastToAllCap:    config.GossipBroadcastToAllCap,
 	}); err != nil {
 		return nil, err
 	}
@@ -284,7 +308,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	// Some of the extraData is used with Clique consensus (before EuclidV2). After EuclidV2 we use SystemContract consensus where this is overridden when creating a block.
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
-	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
+	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, config.GossipTxBroadcastDisabled, eth, nil}
 	if eth.APIBackend.allowUnprotectedTxs {
 		log.Info("Unprotected transactions allowed")
 	}
@@ -294,6 +318,16 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	}
 	gpoParams.DefaultBasePrice = new(big.Int).SetUint64(config.TxPool.PriceLimit)
 	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
+
+	if config.GossipSequencerHTTP != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		client, err := rpc.DialContext(ctx, config.GossipSequencerHTTP)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize rollup sequencer client: %w", err)
+		}
+		eth.sequencerRPCService = client
+	}
 
 	// Setup DNS discovery iterators.
 	dnsclient := dnsdisc.NewClient(dnsdisc.Config{})
@@ -329,6 +363,22 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	return eth, nil
 }
 
+func createMissingHeaderFieldsManager(stack *node.Node, chainConfig *params.ChainConfig) (*missing_header_fields.Manager, error) {
+	downloadURL, err := url.Parse(stack.Config().DAMissingHeaderFieldsBaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid DAMissingHeaderFieldsBaseURL: %w", err)
+	}
+	downloadURL.Path = path.Join(downloadURL.Path, chainConfig.ChainID.String()+".bin")
+
+	expectedSHA256Checksum := chainConfig.Scroll.MissingHeaderFieldsSHA256
+	if expectedSHA256Checksum == nil {
+		return nil, fmt.Errorf("missing expected SHA256 checksum for missing header fields file in chain config")
+	}
+
+	filePath := filepath.Join(stack.Config().DataDir, fmt.Sprintf("missing-header-fields-%s-%s", chainConfig.ChainID, expectedSHA256Checksum.Hex()))
+	return missing_header_fields.NewManager(context.Background(), filePath, downloadURL.String(), *expectedSHA256Checksum), nil
+}
+
 func makeExtraData(extra []byte) []byte {
 	if len(extra) == 0 {
 		// create default extradata
@@ -353,6 +403,9 @@ func (s *Ethereum) APIs() []rpc.API {
 
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, s.engine.APIs(s.BlockChain())...)
+
+	// Append L2 base fee APIs.
+	apis = append(apis, misc.APIs()...)
 
 	if !s.config.EnableDASyncing {
 		apis = append(apis, rpc.API{
@@ -520,10 +573,11 @@ func (s *Ethereum) StartMining(threads int) error {
 	// If the miner was not running, initialize it
 	if !s.IsMining() {
 		// Propagate the initial price point to the transaction pool
-		s.lock.RLock()
-		price := s.gasPrice
-		s.lock.RUnlock()
-		s.txPool.SetGasPrice(price)
+		// Disabled, we now update min gas price automatically via L2 base fee.
+		// s.lock.RLock()
+		// price := s.gasPrice
+		// s.lock.RUnlock()
+		// s.txPool.SetGasPrice(price)
 
 		// Configure the local mining address
 		eb, err := s.Etherbase()
@@ -663,6 +717,9 @@ func (s *Ethereum) Stop() error {
 	}
 	s.blockchain.Stop()
 	s.engine.Close()
+	if s.sequencerRPCService != nil {
+		s.sequencerRPCService.Close()
+	}
 	rawdb.PopUncleanShutdownMarker(s.chainDb)
 	s.chainDb.Close()
 	s.eventMux.Stop()

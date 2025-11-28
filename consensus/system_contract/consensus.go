@@ -36,20 +36,30 @@ var (
 	// errUnknownBlock is returned when the list of signers is requested for a block
 	// that is not part of the local blockchain.
 	errUnknownBlock = errors.New("unknown block")
-	// errNonceNotEmpty is returned if a nonce value is non-zero
+
+	// errInvalidCoinbase is returned if a coinbase value is non-zero
+	errInvalidCoinbase = errors.New("coinbase not empty")
+
+	// errInvalidNonce is returned if a nonce value is non-zero
 	errInvalidNonce = errors.New("nonce not empty nor zero")
+
 	// errMissingSignature is returned if a block's extra-data section doesn't seem
 	// to contain a 65 byte secp256k1 signature.
 	errMissingSignature = errors.New("extra-data 65 byte signature missing")
+
 	// errInvalidMixDigest is returned if a block's mix digest is non-zero.
 	errInvalidMixDigest = errors.New("non-zero mix digest")
+
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
 	errInvalidUncleHash = errors.New("non empty uncle hash")
+
 	// errInvalidDifficulty is returned if a difficulty value is non-zero
 	errInvalidDifficulty = errors.New("non-one difficulty")
+
 	// errInvalidTimestamp is returned if the timestamp of a block is lower than
-	// the previous block's timestamp + the minimum block period.
+	// the previous block's timestamp.
 	errInvalidTimestamp = errors.New("invalid timestamp")
+
 	// errInvalidExtra is returned if the extra data is not empty
 	errInvalidExtra = errors.New("invalid extra")
 )
@@ -76,13 +86,18 @@ func (s *SystemContract) VerifyHeader(chain consensus.ChainHeaderReader, header 
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications (the order is that of
 // the input slice).
-func (s *SystemContract) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (s *SystemContract) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool, parent *types.Header) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
 	go func() {
 		for i, header := range headers {
-			err := s.verifyHeader(chain, header, headers[:i])
+			parents := headers[:i]
+			if len(parents) == 0 && parent != nil {
+				parents = []*types.Header{parent}
+			}
+
+			err := s.verifyHeader(chain, header, parents)
 			if err != nil {
 				log.Error("Error verifying headers", "err", err)
 			}
@@ -105,16 +120,22 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errUnknownBlock
 	}
 
-	// Don't waste time checking blocks from the future
-	if header.Time > uint64(time.Now().Unix()) {
+	// Don't waste time checking blocks from the future.
+	// We add 100ms leeway since the scroll_worker internal timers might trigger early.
+	now := time.Now()
+	if header.Time > uint64(now.Unix()) && time.Unix(int64(header.Time), 0).Sub(now) > 100*time.Millisecond {
 		return consensus.ErrFutureBlock
+	}
+	// Ensure that the coinbase is zero
+	if header.Coinbase != (common.Address{}) {
+		return errInvalidCoinbase
 	}
 	// Ensure that the nonce is zero
 	if header.Nonce != (types.BlockNonce{}) {
 		return errInvalidNonce
 	}
 	// Check that the BlockSignature contains signature if block is not requested
-	if !header.Requested && header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
+	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -181,20 +202,17 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 		return err
 	}
 
-	// only if block header has NOT been requested, then verify the signature against the current signer
-	if !header.Requested {
-		signer, err := ecrecover(header)
-		if err != nil {
-			return err
-		}
+	signer, err := ecrecover(header)
+	if err != nil {
+		return err
+	}
 
-		s.lock.RLock()
-		defer s.lock.RUnlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
-		if signer != s.signerAddressL1 {
-			log.Error("Unauthorized signer", "Got", signer, "Expected:", s.signerAddressL1)
-			return ErrUnauthorizedSigner
-		}
+	if signer != s.signerAddressL1 {
+		log.Error("Unauthorized signer", "Got", signer, "Expected:", s.signerAddressL1)
+		return ErrUnauthorizedSigner
 	}
 
 	return nil
@@ -209,24 +227,79 @@ func (s *SystemContract) VerifyUncles(chain consensus.ChainReader, block *types.
 	return nil
 }
 
+// CalcBlocksPerSecond returns the number of blocks per second
+// Uses the BlocksPerSecond configuration parameter directly
+// Default is 1 block per second if not specified
+func CalcBlocksPerSecond(blocksPerSecond uint64) uint64 {
+	if blocksPerSecond == 0 {
+		return 1 // Default to 1 block per second
+	}
+	return blocksPerSecond
+}
+
+// CalcPeriodMs calculates the period in milliseconds between blocks
+// based on the blocks per second configuration
+func CalcPeriodMs(blocksPerSecond uint64) uint64 {
+	bps := CalcBlocksPerSecond(blocksPerSecond)
+	return 1000 / bps
+}
+
+func (s *SystemContract) CalcTimestamp(parent *types.Header) uint64 {
+	var timestamp uint64
+	if s.config.Period == 1 {
+		// Get the base timestamp (in seconds)
+		timestamp = parent.Time
+
+		blocksPerSecond := CalcBlocksPerSecond(s.config.BlocksPerSecond)
+
+		// Calculate the block index within the current period for the next block
+		blockIndex := parent.Number.Uint64() % blocksPerSecond
+
+		// If this block is the last one in the current second, increment the timestamp
+		// We compare with blocksPerSecond-1 because blockIndex is 0-based
+		if blockIndex == blocksPerSecond-1 {
+			timestamp++
+		}
+	} else {
+		timestamp = parent.Time + s.config.Period
+	}
+
+	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
+	// we don't know when it will be sealed
+	if s.config.RelaxedPeriod || timestamp < uint64(time.Now().Unix()) {
+		timestamp = uint64(time.Now().Unix())
+	}
+
+	return timestamp
+}
+
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. Update only timestamp and prepare ExtraData for Signature
-func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
+func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *types.Header, timeOverride *uint64) error {
+	// Make sure unused fields are empty
+	header.Coinbase = common.Address{}
+	header.Nonce = types.BlockNonce{}
+	header.MixDigest = common.Hash{}
+
+	// Prepare EuclidV2-related fields
 	header.BlockSignature = make([]byte, extraSeal)
 	header.IsEuclidV2 = true
 	header.Extra = nil
+
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + s.config.Period
-	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
-	// we don't know when it will be sealed
-	if s.config.RelaxedPeriod || header.Time < uint64(time.Now().Unix()) {
-		header.Time = uint64(time.Now().Unix())
+	if timeOverride != nil {
+		header.Time = *timeOverride
+	} else {
+		header.Time = s.CalcTimestamp(parent)
 	}
+
+	// Difficulty must be 1
 	header.Difficulty = big.NewInt(1)
+
 	return nil
 }
 
@@ -234,6 +307,8 @@ func (s *SystemContract) Prepare(chain consensus.ChainHeaderReader, header *type
 // No rules here
 func (s *SystemContract) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
 	// No block rewards in PoA, so the state remains as is
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.UncleHash = types.CalcUncleHash(nil)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
@@ -241,9 +316,6 @@ func (s *SystemContract) Finalize(chain consensus.ChainHeaderReader, header *typ
 func (s *SystemContract) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Finalize block
 	s.Finalize(chain, header, state, txs, uncles)
-
-	// Assign the final state root to header.
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Assemble and return the final block for sealing.
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
@@ -335,10 +407,6 @@ func ecrecover(header *types.Header) (common.Address, error) {
 
 // SystemContractRLP returns the rlp bytes which needs to be signed for the system contract
 // sealing. The RLP to sign consists of the entire header apart from the ExtraData
-//
-// Note, the method requires the extra data to be at least 65 bytes, otherwise it
-// panics. This is done to avoid accidentally using both forms (signature present
-// or not), which could be abused to produce different hashes for the same header.
 func SystemContractRLP(header *types.Header) []byte {
 	b := new(bytes.Buffer)
 	encodeSigHeader(b, header)
@@ -354,8 +422,12 @@ func (s *SystemContract) CalcDifficulty(chain consensus.ChainHeaderReader, time 
 // controlling the signer voting.
 func (s *SystemContract) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	return []rpc.API{{
-		Namespace: "system_contract",
-		Service:   &API{},
+		// note: cannot use underscore in namespace,
+		// but overlap with another module's name space works fine.
+		Namespace: "scroll",
+		Version:   "1.0",
+		Service:   &API{system_contract: s},
+		Public:    false,
 	}}
 }
 

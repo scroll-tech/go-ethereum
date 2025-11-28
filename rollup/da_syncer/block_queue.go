@@ -4,20 +4,24 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer/da"
+	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
 )
 
 // BlockQueue is a pipeline stage that reads batches from BatchQueue, extracts all da.PartialBlock from it and
 // provides them to the next stage one-by-one.
 type BlockQueue struct {
-	batchQueue *BatchQueue
-	blocks     []*da.PartialBlock
+	batchQueue                 *BatchQueue
+	blocks                     []*da.PartialBlock
+	missingHeaderFieldsManager *missing_header_fields.Manager
 }
 
-func NewBlockQueue(batchQueue *BatchQueue) *BlockQueue {
+func NewBlockQueue(batchQueue *BatchQueue, missingHeaderFieldsManager *missing_header_fields.Manager) *BlockQueue {
 	return &BlockQueue{
-		batchQueue: batchQueue,
-		blocks:     make([]*da.PartialBlock, 0),
+		batchQueue:                 batchQueue,
+		blocks:                     make([]*da.PartialBlock, 0),
+		missingHeaderFieldsManager: missingHeaderFieldsManager,
 	}
 }
 
@@ -34,23 +38,20 @@ func (bq *BlockQueue) NextBlock(ctx context.Context) (*da.PartialBlock, error) {
 }
 
 func (bq *BlockQueue) getBlocksFromBatch(ctx context.Context) error {
-	daEntry, err := bq.batchQueue.NextBatch(ctx)
+	entryWithBlocks, err := bq.batchQueue.NextBatch(ctx)
 	if err != nil {
 		return err
 	}
 
-	entryWithBlocks, ok := daEntry.(da.EntryWithBlocks)
-	// this should never happen because we only receive CommitBatch entries
-	if !ok {
-		return fmt.Errorf("unexpected type of daEntry: %T", daEntry)
+	bq.blocks, err = entryWithBlocks.Blocks(bq.missingHeaderFieldsManager)
+	if err != nil {
+		return fmt.Errorf("failed to get blocks from entry: %w", err)
 	}
-
-	bq.blocks = entryWithBlocks.Blocks()
 
 	return nil
 }
 
-func (bq *BlockQueue) Reset(height uint64) {
+func (bq *BlockQueue) Reset(lastProcessedBatchMeta *rawdb.DAProcessedBatchMeta) {
 	bq.blocks = make([]*da.PartialBlock, 0)
-	bq.batchQueue.Reset(height)
+	bq.batchQueue.Reset(lastProcessedBatchMeta)
 }

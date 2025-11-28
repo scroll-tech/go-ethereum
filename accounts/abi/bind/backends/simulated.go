@@ -538,7 +538,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call ethereum.CallMs
 		b.pendingState.RevertToSnapshot(snapshot)
 
 		if err != nil {
-			if errors.Is(err, core.ErrIntrinsicGas) {
+			if errors.Is(err, core.ErrIntrinsicGas) || errors.Is(err, core.ErrFloorDataGas) {
 				return true, nil, nil // Special case, raise gas limit
 			}
 			return true, nil, err // Bail out
@@ -640,7 +640,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	vmEnv := vm.NewEVM(evmContext, txContext, stateDB, b.config, vm.Config{NoBaseFee: true})
 	gasPool := new(core.GasPool).AddGas(math.MaxUint64)
 	signer := types.MakeSigner(b.blockchain.Config(), head.Number, head.Time)
-	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, head.BaseFee, b.blockchain.Config(), signer, stateDB, head.Number)
+	l1DataFee, err := fees.EstimateL1DataFeeForMessage(msg, head.BaseFee, b.blockchain.Config(), signer, stateDB, head.Number, head.Time)
 	if err != nil {
 		return nil, err
 	}

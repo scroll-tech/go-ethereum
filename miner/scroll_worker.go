@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -341,6 +342,7 @@ func (w *worker) mainLoop() {
 		p := recover()
 		if p != nil {
 			log.Error("worker mainLoop panic", "panic", p)
+			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
 		}
 	}()
 
@@ -363,7 +365,10 @@ func (w *worker) mainLoop() {
 		if errors.As(err, &retryableCommitError) || errors.Is(err, system_contract.ErrUnauthorizedSigner) {
 			log.Warn("failed to commit to a block, retrying", "err", err)
 			if errors.Is(err, system_contract.ErrUnauthorizedSigner) {
-				time.Sleep(5 * time.Second) // half the time it takes for the system contract consensus to read and update the address locally.
+				// half the time it takes for the system contract consensus to read and update the address locally.
+				// note: a blocking wait here might be problematic, since it will prevent progress on
+				// `updateSnapshot` and other functionalities.
+				time.Sleep(5 * time.Second)
 			}
 			if _, err = w.tryCommitNewWork(time.Now(), w.current.header.ParentHash, w.current.reorging, w.current.reorgReason); err != nil {
 				continue
@@ -396,6 +401,9 @@ func (w *worker) mainLoop() {
 			idleTimer.UpdateSince(idleStart)
 			w.current.deadlineReached = true
 			if len(w.current.txs) > 0 {
+				_, err = w.commit()
+			} else if w.config.AllowEmpty {
+				log.Warn("Committing empty block", "number", w.current.header.Number)
 				_, err = w.commit()
 			}
 		case ev := <-w.txsCh:
@@ -444,27 +452,11 @@ func (w *worker) updateSnapshot() {
 // collectPendingL1Messages reads pending L1 messages from the database.
 // It returns a list of L1 messages that can be included in the block. Depending on the current
 // block time, it reads L1 messages from either L1MessageQueueV1 or L1MessageQueueV2.
-// It also makes sure that all L1 messages V1 are consumed before we activate EuclidV2 fork by backdating the block's time
-// to the parent block's timestamp.
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 
 	// If we are on EuclidV2, we need to read L1 messages from L1MessageQueueV2.
 	if w.chainConfig.IsEuclidV2(w.current.header.Time) {
-		parent := w.chain.CurrentHeader()
-
-		// w.current would be the first block in the EuclidV2 fork
-		if !w.chainConfig.IsEuclidV2(parent.Time) {
-			// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2 as with EuclidV2
-			// only L1 messages V2 are allowed.
-			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
-			if len(l1MessagesV1) > 0 {
-				// backdate the block to the parent block's timestamp -> not yet EuclidV2
-				w.current.header.Time = parent.Time
-				return l1MessagesV1
-			}
-		}
-
 		return rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
 	}
 
@@ -472,8 +464,7 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 }
 
 // newWork
-func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, reorgReason error) error {
-	parent := w.chain.GetBlockByHash(parentHash)
+func (w *worker) newWork(now time.Time, parent *types.Block, reorging bool, reorgReason error) error {
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
@@ -497,7 +488,7 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 	// Set baseFee if we are on an EIP-1559 chain
 	if w.chainConfig.IsCurie(header.Number) {
 		parentL1BaseFee := fees.GetL1BaseFee(parentState)
-		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee)
+		header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header(), parentL1BaseFee, header.Time)
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
@@ -505,6 +496,11 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 			return errors.New("refusing to mine without etherbase")
 		}
 		header.Coinbase = w.coinbase
+	}
+
+	var nextL1MsgIndex uint64
+	if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
+		nextL1MsgIndex = *dbVal
 	}
 
 	if w.config.SigningDisabled {
@@ -515,15 +511,40 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 		header.Nonce = types.BlockNonce{}
 	} else {
 		prepareStart := time.Now()
-		if err := w.engine.Prepare(w.chain, header); err != nil {
+		// Note: this call will set header.Time, among other fields.
+		if err := w.engine.Prepare(w.chain, header, nil); err != nil {
 			return fmt.Errorf("failed to prepare header for mining: %w", err)
 		}
 		prepareTimer.UpdateSince(prepareStart)
-	}
 
-	var nextL1MsgIndex uint64
-	if dbVal := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), header.ParentHash); dbVal != nil {
-		nextL1MsgIndex = *dbVal
+		if w.chainConfig.IsEuclidV2(header.Time) && !w.chainConfig.IsEuclidV2(parent.Time()) {
+			// We found a potential EuclidV2 transition block.
+			// We need to make sure that all the L1 messages V1 are consumed before we activate EuclidV2,
+			// since we can only include MessageQueueV2 messages after EuclidV2.
+			l1MessagesV1 := rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), nextL1MsgIndex, 1)
+			if len(l1MessagesV1) > 0 {
+				// Reset Extra (it was unset by SystemContract)
+				header.Extra = w.extra
+
+				// Backdate the block to the parent block's timestamp -> not yet EuclidV2
+				parentTime := parent.Time()
+				log.Warn("Backdating header timestamp to ensure it precedes the EuclidV2 transition", "blockNumber", header.Number, "oldTime", header.Time, "newTime", parentTime)
+
+				// Run Prepare again, this time we provide a timestamp override, so it will use Clique.
+				// Note: Clique should correctly unset or overwrite any fields previously set by SystemConfig,
+				// with the exception of Extra that was reset above.
+				prepareStart := time.Now()
+				if err := w.engine.Prepare(w.chain, header, &parentTime); err != nil {
+					return fmt.Errorf("failed to prepare header for mining: %w", err)
+				}
+				prepareTimer.UpdateSince(prepareStart)
+			} else {
+				// Only print log if we are the sequencer -- otherwise we will print confusing logs for the pending block.
+				if w.isRunning() {
+					log.Info("All MessageQueueV1 messages processed, creating EuclidV2 transition block", "blockNumber", header.Number, "blockTime", header.Time, "firstV2MsgIndex", nextL1MsgIndex)
+				}
+			}
+		}
 	}
 
 	vmConfig := *w.chain.GetVMConfig()
@@ -536,6 +557,13 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 	if w.chainConfig.Clique != nil && w.chainConfig.Clique.RelaxedPeriod {
 		// clique with relaxed period uses time.Now() as the header.Time, calculate the deadline
 		deadline = time.Unix(int64(header.Time+w.chainConfig.Clique.Period), 0)
+	}
+	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.RelaxedPeriod {
+		// system contract with relaxed period uses time.Now() as the header.Time, calculate the deadline
+		deadline = time.Unix(int64(header.Time+w.chainConfig.SystemContract.Period), 0)
+	}
+	if w.chainConfig.SystemContract != nil && w.chainConfig.SystemContract.Period == 1 {
+		deadline = CalculateBlockDeadline(w.chainConfig.SystemContract, header)
 	}
 
 	w.current = &work{
@@ -560,13 +588,14 @@ func (w *worker) newWork(now time.Time, parentHash common.Hash, reorging bool, r
 }
 
 // tryCommitNewWork
-func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorging bool, reorgReason error) (common.Hash, error) {
+func (w *worker) tryCommitNewWork(now time.Time, parentHash common.Hash, reorging bool, reorgReason error) (common.Hash, error) {
+	parent := w.chain.GetBlockByHash(parentHash)
 	err := w.newWork(now, parent, reorging, reorgReason)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed creating new work: %w", err)
 	}
 
-	shouldCommit, err := w.handleForks()
+	shouldCommit, err := w.handleForks(parent)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed handling forks: %w", err)
 	}
@@ -600,16 +629,36 @@ func (w *worker) tryCommitNewWork(now time.Time, parent common.Hash, reorging bo
 }
 
 // handleForks
-func (w *worker) handleForks() (bool, error) {
+func (w *worker) handleForks(parent *types.Block) (bool, error) {
+	// Apply Curie predeployed contract update
 	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(w.current.header.Number) == 0 {
 		misc.ApplyCurieHardFork(w.current.state)
 		return true, nil
 	}
 
+	// Apply Feynman hard fork
+	if w.chainConfig.IsFeynmanTransitionBlock(w.current.header.Time, parent.Time()) {
+		misc.ApplyFeynmanHardFork(w.current.state)
+	}
+
+	// Apply GalileoV2 hard fork
+	if w.chainConfig.IsGalileoV2TransitionBlock(w.current.header.Time, parent.Time()) {
+		misc.ApplyGalileoV2HardFork(w.current.state)
+	}
+
+	// Apply EIP-2935
+	if w.chainConfig.IsFeynman(w.current.header.Time) {
+		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)
+		vmenv := vm.NewEVM(context, vm.TxContext{}, w.current.state, w.chainConfig, vm.Config{})
+		core.ProcessParentBlockHash(w.current.header.ParentHash, vmenv, w.current.state)
+	}
+
+	// Stop/start miner at Euclid fork boundary on zktrie/mpt nodes
 	if w.chainConfig.IsEuclid(w.current.header.Time) {
 		parent := w.chain.GetBlockByHash(w.current.header.ParentHash)
 		return parent != nil && !w.chainConfig.IsEuclid(parent.Time()), nil
 	}
+
 	return false, nil
 }
 
@@ -795,6 +844,16 @@ func (w *worker) processTxn(tx *types.Transaction) (bool, error) {
 	if !tx.IsL1MessageTx() && !w.chain.Config().Scroll.IsValidBlockSizeForMining(w.current.blockSize+tx.Size()) {
 		// can't fit this txn in this block, silently ignore and continue looking for more txns
 		return false, errors.New("tx too big")
+	}
+
+	// Reject transactions that require the max data fee amount.
+	// This can only happen if the L1 gas oracle is updated incorrectly.
+	l1DataFee, err := fees.CalculateL1DataFee(tx, w.current.state, w.chain.Config(), w.current.header.Number, w.current.header.Time)
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate L1 data fee, err: %w", err)
+	}
+	if l1DataFee.Cmp(fees.MaxL1DataFee()) >= 0 {
+		return false, errors.New("invalid transaction: invalid L1 data fee")
 	}
 
 	// Start executing the transaction
@@ -1129,4 +1188,24 @@ func (w *worker) handleReorg(trigger *reorgTrigger) error {
 
 func (w *worker) isCanonical(header *types.Header) bool {
 	return w.chain.GetBlockByNumber(header.Number.Uint64()).Hash() == header.Hash()
+}
+
+// CalculateBlockDeadline calculates the deadline for block production based on
+// SystemContract configuration and current header information.
+// This function abstracts the deadline calculation logic for easier testing.
+func CalculateBlockDeadline(config *params.SystemContractConfig, header *types.Header) time.Time {
+	blocksPerSecond := system_contract.CalcBlocksPerSecond(config.BlocksPerSecond)
+	periodMs := system_contract.CalcPeriodMs(blocksPerSecond)
+
+	// Calculate the actual timing based on block number within the current period
+	blockIndex := header.Number.Uint64() % blocksPerSecond
+
+	// Calculate base time and add the fraction based on block index within the period
+	baseTimeNano := int64(header.Time) * int64(time.Second)
+	fractionNano := int64(blockIndex) * int64(periodMs) * int64(time.Millisecond)
+
+	// Add one period to determine the deadline
+	nextBlockNano := baseTimeNano + fractionNano + int64(periodMs)*int64(time.Millisecond)
+
+	return time.Unix(0, nextBlockNano)
 }

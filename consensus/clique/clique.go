@@ -191,6 +191,8 @@ type Clique struct {
 // New creates a Clique proof-of-authority consensus engine with the initial
 // signers set to the ones provided by the user.
 func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
+	log.Info("Initializing clique consensus engine")
+
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
@@ -224,7 +226,7 @@ func (c *Clique) VerifyHeader(chain consensus.ChainHeaderReader, header *types.H
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
-func (c *Clique) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (c *Clique) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool, parent *types.Header) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
@@ -252,8 +254,10 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	}
 	number := header.Number.Uint64()
 
-	// Don't waste time checking blocks from the future
-	if header.Time > uint64(time.Now().Unix()) {
+	// Don't waste time checking blocks from the future.
+	// We add 100ms leeway since the scroll_worker internal timers might trigger early.
+	now := time.Now()
+	if header.Time > uint64(now.Unix()) && time.Unix(int64(header.Time), 0).Sub(now) > 100*time.Millisecond {
 		return consensus.ErrFutureBlock
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
@@ -503,12 +507,28 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parents []*typ
 	return nil
 }
 
+func (c *Clique) CalcTimestamp(parent *types.Header) uint64 {
+	timestamp := parent.Time + c.config.Period
+
+	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
+	// we don't know when it will be sealed
+	if c.config.RelaxedPeriod || timestamp < uint64(time.Now().Unix()) {
+		timestamp = uint64(time.Now().Unix())
+	}
+
+	return timestamp
+}
+
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
-func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
+func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header, timeOverride *uint64) error {
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
+
+	// Unset EuclidV2-related fields
+	header.BlockSignature = nil
+	header.IsEuclidV2 = false
 
 	number := header.Number.Uint64()
 	// Assemble the voting snapshot to check which votes make sense
@@ -564,11 +584,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + c.config.Period
-	// If RelaxedPeriod is enabled, always set the header timestamp to now (ie the time we start building it) as
-	// we don't know when it will be sealed
-	if c.config.RelaxedPeriod || header.Time < uint64(time.Now().Unix()) {
-		header.Time = uint64(time.Now().Unix())
+	if timeOverride != nil {
+		header.Time = *timeOverride
+	} else {
+		header.Time = c.CalcTimestamp(parent)
 	}
 	return nil
 }

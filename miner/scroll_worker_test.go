@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -33,6 +34,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/clique"
 	"github.com/scroll-tech/go-ethereum/consensus/ethash"
+	"github.com/scroll-tech/go-ethereum/consensus/system_contract"
+	"github.com/scroll-tech/go-ethereum/consensus/wrapper"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
@@ -76,6 +79,14 @@ var (
 		GasCeil:        params.GenesisGasLimit,
 		MaxAccountsNum: math.MaxInt,
 		CCCMaxWorkers:  2,
+	}
+
+	testConfigAllowEmpty = &Config{
+		Recommit:       time.Second,
+		GasCeil:        params.GenesisGasLimit,
+		MaxAccountsNum: math.MaxInt,
+		CCCMaxWorkers:  2,
+		AllowEmpty:     true,
 	}
 )
 
@@ -136,6 +147,15 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 		gspec.Timestamp = uint64(time.Now().Unix())
 		copy(gspec.ExtraData[32:32+common.AddressLength], testBankAddress.Bytes())
 		e.Authorize(testBankAddress, func(account accounts.Account, s string, data []byte) ([]byte, error) {
+			return crypto.Sign(crypto.Keccak256(data), testBankKey)
+		})
+	case *wrapper.UpgradableEngine:
+		gspec.ExtraData = make([]byte, 32+common.AddressLength+crypto.SignatureLength)
+		gspec.Timestamp = uint64(time.Now().Unix())
+		copy(gspec.ExtraData[32:32+common.AddressLength], testBankAddress.Bytes())
+		e.Authorize(testBankAddress, func(account accounts.Account, s string, data []byte) ([]byte, error) {
+			return crypto.Sign(crypto.Keccak256(data), testBankKey)
+		}, func(account accounts.Account, s string, data []byte) ([]byte, error) {
 			return crypto.Sign(crypto.Keccak256(data), testBankKey)
 		})
 	case *ethash.Ethash:
@@ -207,12 +227,24 @@ func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
 	return tx
 }
 
-func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
+func testWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int, allowEmpty bool) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.AddLocals(pendingTxs)
-	w := newWorker(testConfig, chainConfig, engine, backend, new(event.TypeMux), nil, false, false)
+	config := testConfig
+	if allowEmpty {
+		config = testConfigAllowEmpty
+	}
+	w := newWorker(config, chainConfig, engine, backend, new(event.TypeMux), nil, false, false)
 	w.setEtherbase(testBankAddress)
 	return w, backend
+}
+
+func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
+	return testWorker(t, chainConfig, engine, db, blocks, false)
+}
+
+func newTestWorkerWithEmptyBlock(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
+	return testWorker(t, chainConfig, engine, db, blocks, true)
 }
 
 func TestGenerateBlockAndImportClique(t *testing.T) {
@@ -1353,5 +1385,196 @@ func TestEuclidV2HardForkMessageQueue(t *testing.T) {
 		case <-time.After(3 * time.Second):
 			t.Fatalf("timeout")
 		}
+	}
+}
+
+// TestEuclidV2TransitionVerification tests that the upgradable consensus engine
+// can successfully verify the EuclidV2 transition chain.
+func TestEuclidV2TransitionVerification(t *testing.T) {
+	// patch time.Now() to be able to simulate hard fork time
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+	var timeCount int64
+	patches.ApplyFunc(time.Now, func() time.Time {
+		timeCount++
+		return time.Unix(timeCount, 0)
+	})
+
+	// init chain config
+	chainConfig := params.AllCliqueProtocolChanges.Clone()
+	chainConfig.EuclidTime = newUint64(0)
+	chainConfig.EuclidV2Time = newUint64(10000)
+	chainConfig.FeynmanTime = nil
+	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	chainConfig.SystemContract = &params.SystemContractConfig{Period: 1}
+
+	// init worker
+	db := rawdb.NewMemoryDatabase()
+	cliqueEngine := clique.New(chainConfig.Clique, db)
+	sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, &system_contract.FakeEthClient{Value: testBankAddress})
+	engine := wrapper.NewUpgradableEngine(chainConfig.IsEuclidV2, cliqueEngine, sysEngine)
+	w, b := newTestWorkerWithEmptyBlock(t, chainConfig, engine, db, 0)
+	defer w.close()
+	b.genesis.MustCommit(db)
+
+	// collect mined blocks
+	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
+	defer sub.Unsubscribe()
+	w.start()
+
+	blocks := []*types.Block{}
+	headers := []*types.Header{}
+
+	for i := 0; i < 6; i++ {
+		select {
+		case ev := <-sub.Chan():
+			// activate EuclidV2 at next block
+			if i == 2 {
+				timeCount = int64(*chainConfig.EuclidV2Time)
+			}
+
+			block := ev.Data.(core.NewMinedBlockEvent).Block
+			blocks = append(blocks, block)
+			headers = append(headers, block.Header())
+
+		case <-time.After(3 * time.Second):
+			t.Fatalf("timeout")
+		}
+	}
+
+	// sanity check: we generated the EuclidV2 transition block
+	assert.False(t, chainConfig.IsEuclidV2(headers[0].Time))
+	assert.True(t, chainConfig.IsEuclidV2(headers[len(headers)-1].Time))
+
+	// import headers into new chain
+	chainDb := rawdb.NewMemoryDatabase()
+	b.genesis.MustCommit(chainDb)
+	chain, err := core.NewBlockChain(chainDb, nil, b.chain.Config(), engine, vm.Config{}, nil, nil)
+	assert.NoError(t, err)
+	defer chain.Stop()
+
+	// previously this would fail with `unknown ancestor`
+	_, err = chain.InsertHeaderChain(headers, 0)
+	assert.NoError(t, err)
+
+	// import headers into new chain
+	chainDb = rawdb.NewMemoryDatabase()
+	b.genesis.MustCommit(chainDb)
+	chain, err = core.NewBlockChain(chainDb, nil, b.chain.Config(), engine, vm.Config{}, nil, nil)
+	assert.NoError(t, err)
+	defer chain.Stop()
+
+	// previously this would fail with `unknown ancestor`
+	_, err = chain.InsertChain(blocks)
+	assert.NoError(t, err)
+}
+
+// TestBlockIntervalWithWorkerDeadline tests the block interval calculation
+// that simulates the actual worker deadline calculation logic
+func TestBlockIntervalWithWorkerDeadline(t *testing.T) {
+	tests := []struct {
+		name             string
+		period           uint64
+		blocksPerSecond  uint64
+		expectedInterval time.Duration
+		blocks           int // number of blocks to simulate
+	}{
+		{
+			name:             "1 second period, 1 block per second",
+			period:           1,
+			blocksPerSecond:  1,
+			expectedInterval: 1000 * time.Millisecond,
+			blocks:           5,
+		},
+		{
+			name:             "1 second period, 2 blocks per second",
+			period:           1,
+			blocksPerSecond:  2,
+			expectedInterval: 500 * time.Millisecond,
+			blocks:           6,
+		},
+		{
+			name:             "1 second period, 4 blocks per second",
+			period:           1,
+			blocksPerSecond:  4,
+			expectedInterval: 250 * time.Millisecond,
+			blocks:           8,
+		},
+		{
+			name:             "2 second period, 2 blocks per second",
+			period:           2,
+			blocksPerSecond:  2,
+			expectedInterval: 500 * time.Millisecond,
+			blocks:           2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &params.SystemContractConfig{
+				Period:          tt.period,
+				BlocksPerSecond: tt.blocksPerSecond,
+				RelaxedPeriod:   false,
+			}
+
+			// Start with a future timestamp to avoid time.Now() interference
+			currentTime := uint64(time.Now().Unix()) + 3600 // 1 hour in the future
+			var deadlines []time.Time
+			var timestamps []uint64
+
+			for i := 0; i < tt.blocks; i++ {
+				// Create header for current block
+				header := &types.Header{
+					Time:   currentTime,
+					Number: new(big.Int).SetUint64(uint64(i)),
+				}
+
+				// Simulate the worker deadline calculation logic from newWork
+				deadline := CalculateBlockDeadline(config, header)
+				deadlines = append(deadlines, deadline)
+
+				// Simulate timestamp calculation manually for next iteration
+				// This mimics the CalcTimestamp logic but simplified for testing
+				blocksPerSecond := system_contract.CalcBlocksPerSecond(tt.blocksPerSecond)
+				blocksPerPeriod := blocksPerSecond * tt.period
+				nextBlockNumber := uint64(i + 1)
+
+				var newTimestamp uint64
+				if nextBlockNumber%blocksPerPeriod == 0 && nextBlockNumber > 0 {
+					// Period boundary - increment timestamp
+					newTimestamp = currentTime + tt.period
+				} else {
+					// Within period - keep same timestamp
+					newTimestamp = currentTime
+				}
+
+				timestamps = append(timestamps, newTimestamp)
+
+				// Update currentTime for next iteration (simulate blockchain progression)
+				currentTime = newTimestamp
+			}
+
+			// Verify the intervals between deadlines
+			for i := 1; i < len(deadlines); i++ {
+				interval := deadlines[i].Sub(deadlines[i-1])
+
+				// Allow small tolerance for timing precision
+				tolerance := 10 * time.Millisecond
+				if interval < tt.expectedInterval-tolerance || interval > tt.expectedInterval+tolerance {
+					t.Errorf("Block %d interval: got %v, want %v (±%v)",
+						i, interval, tt.expectedInterval, tolerance)
+				}
+			}
+
+			// Note: Timestamp progression logic is verified in TestTimestampIncrementLogic
+			// Here we focus on deadline intervals which is what really matters for block production timing
+			blocksPerSecond := system_contract.CalcBlocksPerSecond(tt.blocksPerSecond)
+			blocksPerPeriod := blocksPerSecond * tt.period
+
+			t.Logf("Test %s completed successfully:", tt.name)
+			t.Logf("  - Expected interval: %v", tt.expectedInterval)
+			t.Logf("  - Blocks per period: %d", blocksPerPeriod)
+			t.Logf("  - Period length: %d seconds", tt.period)
+		})
 	}
 }

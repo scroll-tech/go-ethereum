@@ -230,6 +230,12 @@ type Config struct {
 
 	// DA syncer options
 	DA da_syncer.Config
+
+	GossipTxBroadcastDisabled   bool
+	GossipTxReceivingDisabled   bool
+	GossipSequencerHTTP         string
+	GossipBroadcastToAllEnabled bool
+	GossipBroadcastToAllCap     int
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

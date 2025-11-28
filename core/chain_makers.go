@@ -252,6 +252,9 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.IsFeynmanTransitionBlock(b.Time(), parent.Time()) {
 			misc.ApplyFeynmanHardFork(statedb)
 		}
+		if config.IsGalileoV2TransitionBlock(b.Time(), parent.Time()) {
+			misc.ApplyGalileoV2HardFork(statedb)
+		}
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)

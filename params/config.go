@@ -333,6 +333,8 @@ var (
 		EuclidTime:          newUint64(1741680000),
 		EuclidV2Time:        newUint64(1741852800),
 		FeynmanTime:         newUint64(1753167600),
+		GalileoTime:         newUint64(1764054000),
+		GalileoV2Time:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -386,6 +388,8 @@ var (
 		EuclidTime:          newUint64(1744815600),
 		EuclidV2Time:        newUint64(1745305200),
 		FeynmanTime:         newUint64(1755576000),
+		GalileoTime:         nil,
+		GalileoV2Time:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
 			Epoch:  30000,
@@ -671,6 +675,7 @@ type ChainConfig struct {
 	EuclidV2Time        *uint64  `json:"euclidv2Time,omitempty"`        // EuclidV2 switch time (nil = no fork, 0 = already on euclidv2)
 	FeynmanTime         *uint64  `json:"feynmanTime,omitempty"`         // Feynman switch time (nil = no fork, 0 = already on feynman)
 	GalileoTime         *uint64  `json:"galileoTime,omitempty"`         // Galileo switch time (nil = no fork, 0 = already on galileo)
+	GalileoV2Time       *uint64  `json:"galileov2Time,omitempty"`       // GalileoV2 switch time (nil = no fork, 0 = already on galileoV2)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -877,7 +882,11 @@ func (c *ChainConfig) String() string {
 	if c.GalileoTime != nil {
 		galileoTime = fmt.Sprintf("@%v", *c.GalileoTime)
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, DarwinV2: %v, Euclid: %v, EuclidV2: %v, Feynman: %v, Galileo: %v, Engine: %v, Scroll config: %v}",
+	galileoV2Time := "<nil>"
+	if c.GalileoV2Time != nil {
+		galileoV2Time = fmt.Sprintf("@%v", *c.GalileoV2Time)
+	}
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, Archimedes: %v, Shanghai: %v, Bernoulli: %v, Curie: %v, Darwin: %v, DarwinV2: %v, Euclid: %v, EuclidV2: %v, Feynman: %v, Galileo: %v, GalileoV2: %v, Engine: %v, Scroll config: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -903,6 +912,7 @@ func (c *ChainConfig) String() string {
 		euclidV2Time,
 		feynmanTime,
 		galileoTime,
+		galileoV2Time,
 		engine,
 		c.Scroll,
 	)
@@ -1020,13 +1030,24 @@ func (c *ChainConfig) IsFeynman(now uint64) bool {
 	return isForkedTime(now, c.FeynmanTime)
 }
 
+// IsFeynmanTransitionBlock returns whether the given block timestamp corresponds to the first Feynman block.
+func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
+	return isForkedTime(blockTimestamp, c.FeynmanTime) && !isForkedTime(parentTimestamp, c.FeynmanTime)
+}
+
+// IsGalileo returns whether time is either equal to the Galileo fork time or greater.
 func (c *ChainConfig) IsGalileo(now uint64) bool {
 	return isForkedTime(now, c.GalileoTime)
 }
 
-// IsFeynmanTransitionBlock returns whether the given block timestamp corresponds to the first Feynman block.
-func (c *ChainConfig) IsFeynmanTransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
-	return isForkedTime(blockTimestamp, c.FeynmanTime) && !isForkedTime(parentTimestamp, c.FeynmanTime)
+// IsGalileoV2 returns whether time is either equal to the GalileoV2 fork time or greater.
+func (c *ChainConfig) IsGalileoV2(now uint64) bool {
+	return isForkedTime(now, c.GalileoV2Time)
+}
+
+// IsGalileoV2TransitionBlock returns whether the given block timestamp corresponds to the first GalileoV2 block.
+func (c *ChainConfig) IsGalileoV2TransitionBlock(blockTimestamp uint64, parentTimestamp uint64) bool {
+	return isForkedTime(blockTimestamp, c.GalileoV2Time) && !isForkedTime(parentTimestamp, c.GalileoV2Time)
 }
 
 // IsScroll returns whether the node is an scroll node or not.
@@ -1257,7 +1278,7 @@ type Rules struct {
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon, IsArchimedes, IsShanghai            bool
 	IsBernoulli, IsCurie, IsDarwin, IsEuclid, IsEuclidV2    bool
-	IsFeynman, IsGalileo                                    bool
+	IsFeynman, IsGalileo, IsGalileoV2                       bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1287,5 +1308,6 @@ func (c *ChainConfig) Rules(num *big.Int, time uint64) Rules {
 		IsEuclidV2:       c.IsEuclidV2(time),
 		IsFeynman:        c.IsFeynman(time),
 		IsGalileo:        c.IsGalileo(time),
+		IsGalileoV2:      c.IsGalileoV2(time),
 	}
 }

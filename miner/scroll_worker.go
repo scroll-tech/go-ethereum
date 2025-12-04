@@ -630,21 +630,8 @@ func (w *worker) tryCommitNewWork(now time.Time, parentHash common.Hash, reorgin
 
 // handleForks
 func (w *worker) handleForks(parent *types.Block) (bool, error) {
-	// Apply Curie predeployed contract update
-	if w.chainConfig.CurieBlock != nil && w.chainConfig.CurieBlock.Cmp(w.current.header.Number) == 0 {
-		misc.ApplyCurieHardFork(w.current.state)
-		return true, nil
-	}
-
-	// Apply Feynman hard fork
-	if w.chainConfig.IsFeynmanTransitionBlock(w.current.header.Time, parent.Time()) {
-		misc.ApplyFeynmanHardFork(w.current.state)
-	}
-
-	// Apply GalileoV2 hard fork
-	if w.chainConfig.IsGalileoV2TransitionBlock(w.current.header.Time, parent.Time()) {
-		misc.ApplyGalileoV2HardFork(w.current.state)
-	}
+	// Apply Scroll hard fork state transitions on state
+	misc.ApplyForkStateTransitions(w.chainConfig, w.current.state, w.current.header.Number.Uint64(), w.current.header.Time, parent.Time())
 
 	// Apply EIP-2935
 	if w.chainConfig.IsFeynman(w.current.header.Time) {

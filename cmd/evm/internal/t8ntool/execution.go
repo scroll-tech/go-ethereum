@@ -150,7 +150,7 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 	}
 	// Apply Scroll hard fork state transitions on state
 	misc.ApplyForkStateTransitions(chainConfig, statedb, pre.Env.Number, pre.Env.Timestamp, pre.Env.ParentTimestamp)
-	// Apply EIP-2935
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if pre.Env.BlockHashes != nil && chainConfig.IsFeynman(pre.Env.Timestamp) {
 		var (
 			prevNumber = pre.Env.Number - 1

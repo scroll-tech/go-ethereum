@@ -633,7 +633,7 @@ func (w *worker) handleForks(parent *types.Block) (bool, error) {
 	// Apply Scroll hard fork state transitions on state
 	misc.ApplyForkStateTransitions(w.chainConfig, w.current.state, w.current.header.Number.Uint64(), w.current.header.Time, parent.Time())
 
-	// Apply EIP-2935
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if w.chainConfig.IsFeynman(w.current.header.Time) {
 		context := core.NewEVMBlockContext(w.current.header, w.chain, w.chainConfig, nil)
 		vmenv := vm.NewEVM(context, vm.TxContext{}, w.current.state, w.chainConfig, vm.Config{})

@@ -91,7 +91,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	// Apply Scroll hard fork state transitions on state
 	parent := p.bc.GetHeaderByHash(block.ParentHash())
 	misc.ApplyForkStateTransitions(p.config, statedb, blockNumber.Uint64(), blockTime, parent.Time)
-	// Apply EIP-2935
+	// Apply EIP-2935: Insert parent hash in history contract.
 	blockContext := NewEVMBlockContext(header, p.bc, p.config, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 	processorBlockTransactionGauge.Update(int64(block.Transactions().Len()))

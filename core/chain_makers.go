@@ -247,7 +247,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			misc.ApplyDAOHardFork(statedb)
 		}
 		// Apply Scroll hard fork state transitions on state
-		misc.ApplyForkStateTransitions(config, statedb, b.header.Number.Uint64(), b.header.Time, parent.Time())
+		misc.ApplyForkStateTransitions(config, statedb, b.header.Number.Uint64(), b.Time(), parent.Time())
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)

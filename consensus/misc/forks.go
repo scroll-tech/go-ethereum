@@ -49,14 +49,14 @@ func VerifyForkHashes(config *params.ChainConfig, header *types.Header, uncle bo
 func ApplyForkStateTransitions(config *params.ChainConfig, statedb *state.StateDB, blockNumber, blockTimestamp, parentTimestamp uint64) {
 	// Apply Curie hard fork
 	if config.CurieBlock != nil && config.CurieBlock.Cmp(new(big.Int).SetUint64(blockNumber)) == 0 {
-		ApplyCurieHardFork(statedb)
+		applyCurieHardFork(statedb)
 	}
 	// Apply Feynman hard fork
 	if config.IsFeynmanTransitionBlock(blockTimestamp, parentTimestamp) {
-		ApplyFeynmanHardFork(statedb)
+		applyFeynmanHardFork(statedb)
 	}
 	// Apply GalileoV2 hard fork
 	if config.IsGalileoV2TransitionBlock(blockTimestamp, parentTimestamp) {
-		ApplyGalileoV2HardFork(statedb)
+		applyGalileoV2HardFork(statedb)
 	}
 }

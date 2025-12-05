@@ -205,7 +205,7 @@ type txTraceResult struct {
 type blockTraceTask struct {
 	statedb     *state.StateDB   // Intermediate state prepped for tracing
 	block       *types.Block     // Block to trace the transactions from
-	parentBlock *types.Block     // Block to trace the transactions from
+	parentBlock *types.Block     // Parent block of the block to trace
 	rootref     common.Hash      // Trie root reference held for this task
 	results     []*txTraceResult // Trace results procudes by the task
 }
@@ -283,7 +283,7 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 				// Apply Scroll hard fork state transitions on state
 				misc.ApplyForkStateTransitions(api.backend.ChainConfig(), task.statedb, task.block.NumberU64(), task.block.Time(), task.parentBlock.Time())
 
-				// EIP-2935: Insert parent hash in history contract.
+				// Apply EIP-2935: Insert parent hash in history contract.
 				if api.backend.ChainConfig().IsFeynman(task.block.Time()) {
 					evm := vm.NewEVM(blockCtx, vm.TxContext{}, task.statedb, api.backend.ChainConfig(), vm.Config{})
 					core.ProcessParentBlockHash(task.block.ParentHash(), evm, task.statedb)
@@ -555,7 +555,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	// Apply Scroll hard fork state transitions on state
 	misc.ApplyForkStateTransitions(api.backend.ChainConfig(), statedb, block.NumberU64(), block.Time(), parent.Time())
 
-	// EIP-2935: Insert parent hash in history contract.
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if api.backend.ChainConfig().IsFeynman(block.Time()) {
 		vmenv := vm.NewEVM(vmctx, vm.TxContext{}, statedb, chainConfig, vm.Config{})
 		core.ProcessParentBlockHash(block.ParentHash(), vmenv, statedb)
@@ -639,7 +639,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	// Apply Scroll hard fork state transitions on state
 	misc.ApplyForkStateTransitions(api.backend.ChainConfig(), statedb, block.NumberU64(), block.Time(), parent.Time())
 
-	// EIP-2935: Insert parent hash in history contract.
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if api.backend.ChainConfig().IsFeynman(block.Time()) {
 		evm := vm.NewEVM(blockCtx, vm.TxContext{}, statedb, api.backend.ChainConfig(), vm.Config{})
 		core.ProcessParentBlockHash(block.ParentHash(), evm, statedb)
@@ -783,7 +783,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 	// Apply Scroll hard fork state transitions on state
 	misc.ApplyForkStateTransitions(api.backend.ChainConfig(), statedb, block.NumberU64(), block.Time(), parent.Time())
 
-	// EIP-2935: Insert parent hash in history contract.
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if api.backend.ChainConfig().IsFeynman(block.Time()) {
 		evm := vm.NewEVM(vmctx, vm.TxContext{}, statedb, api.backend.ChainConfig(), vm.Config{})
 		core.ProcessParentBlockHash(block.ParentHash(), evm, statedb)

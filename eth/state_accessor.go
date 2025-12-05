@@ -179,7 +179,7 @@ func (eth *Ethereum) stateAtTransaction(block *types.Block, txIndex int, reexec 
 	}
 	// Apply Scroll hard fork state transitions on state
 	misc.ApplyForkStateTransitions(eth.blockchain.Config(), statedb, block.NumberU64(), block.Time(), parent.Time())
-	// If feynman hardfork, insert parent block hash in the state as per EIP-2935.
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if eth.blockchain.Config().IsFeynman(block.Time()) {
 		context := core.NewEVMBlockContext(block.Header(), eth.blockchain, eth.blockchain.Config(), nil)
 		vmenv := vm.NewEVM(context, vm.TxContext{}, statedb, eth.blockchain.Config(), vm.Config{})

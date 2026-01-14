@@ -382,19 +382,6 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 		}
 	}
 
-	// Ensure that EIP-7702 delegated code is included in the witness.
-	// When a transaction calls an EIP-7702 EOA (that has delegated to a contract)
-	// and fails in precheck (e.g., insufficient balance), geth doesn't load the
-	// bytecode from the delegated address. However, revm always loads it.
-	for _, tx := range block.Transactions() {
-		// Check if the To address has delegated code
-		if to := tx.To(); to != nil {
-			if target, ok := types.ParseDelegation(statedb.GetCode(*to)); ok {
-				statedb.GetCode(target)
-			}
-		}
-	}
-
 	receipts, _, usedGas, err := blockchain.Processor().Process(block, statedb, *blockchain.GetVMConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to process block %d: %w", block.Number(), err)

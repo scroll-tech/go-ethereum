@@ -39,6 +39,7 @@ var VersionWithMeta = func() string {
 	if VersionMeta != "" {
 		v += "-" + VersionMeta
 	}
+
 	return v
 }()
 

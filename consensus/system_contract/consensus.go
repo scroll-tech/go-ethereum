@@ -135,7 +135,7 @@ func (s *SystemContract) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return errInvalidNonce
 	}
 	// Check that the BlockSignature contains signature if block is not requested
-	if header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
+	if !s.skipSignerCheck && header.Number.Cmp(big.NewInt(0)) != 0 && len(header.BlockSignature) != extraSeal {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero
@@ -200,6 +200,10 @@ func (s *SystemContract) verifyCascadingFields(chain consensus.ChainHeaderReader
 	} else if err := misc.VerifyEip1559Header(chain.Config(), parent, header); err != nil {
 		// Verify the header's EIP-1559 attributes.
 		return err
+	}
+
+	if s.skipSignerCheck {
+		return nil
 	}
 
 	signer, err := ecrecover(header)

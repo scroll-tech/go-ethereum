@@ -182,6 +182,7 @@ var (
 		utils.GossipSequencerHTTPFlag,
 		utils.GossipBroadcastToAllEnabledFlag,
 		utils.GossipBroadcastToAllCapFlag,
+		utils.SkipSignerCheckFlag,
 		utils.DASyncEnabledFlag,
 		utils.DAMissingHeaderFieldsBaseURLFlag,
 		utils.DABlockNativeAPIEndpointFlag,

@@ -50,6 +50,8 @@ func New(ctx context.Context, config *params.SystemContractConfig, client sync_s
 
 		ctx:    ctx,
 		cancel: cancel,
+
+		skipSignerCheck: skipSignerCheck,
 	}
 
 	if err := s.fetchAddressFromL1(); err != nil {

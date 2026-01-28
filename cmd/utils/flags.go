@@ -1854,7 +1854,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	}
 	if ctx.GlobalIsSet(SkipSignerCheckFlag.Name) {
 		cfg.SkipSignerCheck = ctx.GlobalBool(SkipSignerCheckFlag.Name)
-		log.Info("Skip signer check for the SystemContract engine", "skipped", cfg.SkipSignerCheck)
+		log.Warn("Skip signer check for the SystemContract engine", "skipped", cfg.SkipSignerCheck)
 	}
 	// Only configure sequencer http flag if we're running in verifier mode i.e. --mine is disabled.
 	if ctx.IsSet(GossipSequencerHTTPFlag.Name) && !ctx.IsSet(MiningEnabledFlag.Name) {

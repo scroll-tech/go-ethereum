@@ -7,9 +7,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
-// ApplyCurieHardFork modifies the state database according to the Curie hard-fork rules,
+// applyCurieHardFork modifies the state database according to the Curie hard-fork rules,
 // updating the bytecode and storage of the L1GasPriceOracle contract.
-func ApplyCurieHardFork(statedb *state.StateDB) {
+func applyCurieHardFork(statedb *state.StateDB) {
 	log.Info("Applying Curie hard fork")
 
 	// update contract byte code

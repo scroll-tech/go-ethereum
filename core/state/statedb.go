@@ -338,6 +338,9 @@ func (s *StateDB) GetKeccakCodeHash(addr common.Address) common.Hash {
 	if stateObject == nil {
 		return common.Hash{}
 	}
+	if s.witness != nil {
+		s.witness.AddCode(stateObject.Code(s.db))
+	}
 	return common.BytesToHash(stateObject.KeccakCodeHash())
 }
 

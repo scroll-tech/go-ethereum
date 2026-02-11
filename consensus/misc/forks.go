@@ -18,8 +18,10 @@ package misc
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -40,4 +42,21 @@ func VerifyForkHashes(config *params.ChainConfig, header *types.Header, uncle bo
 	}
 	// All ok, return
 	return nil
+}
+
+// ApplyForkStateTransitions applies the special hard fork state transitions for
+// Curie, Feynman, or GalileoV2, if the given block is the upgrade block.
+func ApplyForkStateTransitions(config *params.ChainConfig, statedb *state.StateDB, blockNumber, blockTimestamp, parentTimestamp uint64) {
+	// Apply Curie hard fork
+	if config.CurieBlock != nil && config.CurieBlock.Cmp(new(big.Int).SetUint64(blockNumber)) == 0 {
+		applyCurieHardFork(statedb)
+	}
+	// Apply Feynman hard fork
+	if config.IsFeynmanTransitionBlock(blockTimestamp, parentTimestamp) {
+		applyFeynmanHardFork(statedb)
+	}
+	// Apply GalileoV2 hard fork
+	if config.IsGalileoV2TransitionBlock(blockTimestamp, parentTimestamp) {
+		applyGalileoV2HardFork(statedb)
+	}
 }

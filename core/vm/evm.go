@@ -47,6 +47,8 @@ type (
 func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
 	var precompiles map[common.Address]PrecompiledContract
 	switch {
+	case evm.chainRules.IsGalileo:
+		precompiles = PrecompiledContractsGalileo
 	case evm.chainRules.IsFeynman:
 		precompiles = PrecompiledContractsFeynman
 	case evm.chainRules.IsEuclidV2:
@@ -188,6 +190,13 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
+		// EIP-7702: Ensure delegated code is loaded into witness even when balance check fails.
+		// revm always loads the code regardless of balance check result.
+		if code := evm.StateDB.GetCode(addr); len(code) > 0 {
+			if target, ok := types.ParseDelegation(code); ok {
+				evm.StateDB.GetCode(target)
+			}
+		}
 		return nil, gas, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()

@@ -246,12 +246,8 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 			misc.ApplyDAOHardFork(statedb)
 		}
-		if config.CurieBlock != nil && config.CurieBlock.Cmp(b.header.Number) == 0 {
-			misc.ApplyCurieHardFork(statedb)
-		}
-		if config.IsFeynmanTransitionBlock(b.Time(), parent.Time()) {
-			misc.ApplyFeynmanHardFork(statedb)
-		}
+		// Apply Scroll hard fork state transitions on state
+		misc.ApplyForkStateTransitions(config, statedb, b.header.Number.Uint64(), b.Time(), parent.Time())
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)

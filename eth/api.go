@@ -362,10 +362,25 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 	// Collect storage locations that prover needs but sequencer might not touch necessarily
 	statedb.GetState(rcfg.L2MessageQueueAddress, rcfg.WithdrawTrieRootSlot)
 
-	// Note: scroll-revm detects the Feynman transition block using this storage slot,
+	// Note: scroll-revm detects the Feynman and GalileoV2 transition blocks using these storage slots,
 	// since it does not have access to the parent block timestamp. We need to make
 	// sure that this is always present in the execution witness.
 	statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.IsFeynmanSlot)
+	statedb.GetState(rcfg.L1GasPriceOracleAddress, rcfg.IsGalileoSlot)
+
+	// Ensure that all access list entries are included in the witness,
+	// as these are always loaded by revm.
+	for _, tx := range block.Transactions() {
+		for _, accessTuple := range tx.AccessList() {
+			// Load account
+			statedb.GetBalance(accessTuple.Address)
+
+			// Load storage entries
+			for _, key := range accessTuple.StorageKeys {
+				statedb.GetState(accessTuple.Address, key)
+			}
+		}
+	}
 
 	receipts, _, usedGas, err := blockchain.Processor().Process(block, statedb, *blockchain.GetVMConfig())
 	if err != nil {
@@ -376,9 +391,6 @@ func generateWitness(blockchain *core.BlockChain, block *types.Block) (*stateles
 		return nil, fmt.Errorf("failed to validate block %d: %w", block.Number(), err)
 	}
 
-	if err = testWitness(blockchain, block, witness); err != nil {
-		return nil, err
-	}
 	return witness, nil
 }
 

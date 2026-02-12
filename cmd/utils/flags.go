@@ -982,7 +982,7 @@ var (
 
 	ValidiumSequencerKeys = cli.StringFlag{
 		Name:  "validium.sequencerkeys",
-		Usage: "Validium sequencer decryption keys",
+		Usage: "Validium sequencer decryption keys (comma-separated hex, keyId 0,1,2,...)",
 	}
 )
 
@@ -1778,13 +1778,35 @@ func setValidium(ctx *cli.Context, cfg *ethconfig.Config) {
 		Fatalf("No sequencer decryption keys configured in validium mode")
 	}
 
-	// parse decryption key
-	hex := ctx.String(ValidiumSequencerKeys.Name)
-	key, err := ecies.NewPrivateKeyFromHex(hex)
-	if err != nil {
-		Fatalf("error while parsing sequencer key: %w", err)
+	// parse decryption keys (comma-separated for key rotation support)
+	keysStr := ctx.String(ValidiumSequencerKeys.Name)
+	keyStrings := strings.Split(keysStr, ",")
+
+	if len(keyStrings) == 1 {
+		// Legacy mode: single key
+		key, err := ecies.NewPrivateKeyFromHex(strings.TrimSpace(keyStrings[0]))
+		if err != nil {
+			Fatalf("error while parsing sequencer key: %v", err)
+		}
+		validium.SetSequencerKey(key)
+		log.Info("Configured sequencer in legacy single-key mode")
+	} else {
+		// Multi-key mode: key rotation support
+		keys := make(map[uint64]*ecies.PrivateKey)
+		for i, hexKey := range keyStrings {
+			trimmed := strings.TrimSpace(hexKey)
+			if trimmed == "" {
+				continue // Skip empty entries
+			}
+			key, err := ecies.NewPrivateKeyFromHex(trimmed)
+			if err != nil {
+				Fatalf("error while parsing sequencer key %d: %v", i, err)
+			}
+			keys[uint64(i)] = key
+		}
+		validium.SetSequencerKeys(keys)
+		log.Info("Configured sequencer with key rotation support", "keyCount", len(keys))
 	}
-	validium.SetSequencerKey(key)
 }
 
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -2180,6 +2202,14 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
 	}
+
+	// Initialize encryption keys for validium mode with key rotation support
+	if backend.ChainDb() != nil {
+		if err := validium.InitializeKeys(backend.ChainDb()); err != nil {
+			log.Warn("Failed to initialize encryption keys, using legacy mode", "error", err)
+		}
+	}
+
 	if cfg.LightServ > 0 {
 		_, err := les.NewLesServer(stack, backend, cfg)
 		if err != nil {

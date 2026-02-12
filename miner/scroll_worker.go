@@ -472,15 +472,59 @@ func (w *worker) updateSnapshot() {
 // collectPendingL1Messages reads pending L1 messages from the database.
 // It returns a list of L1 messages that can be included in the block. Depending on the current
 // block time, it reads L1 messages from either L1MessageQueueV1 or L1MessageQueueV2.
+//
+// IMPORTANT: This function enforces key rotation boundaries. When a key rotation is detected
+// (i.e., the next message uses a different encryption key), it stops collecting messages and
+// returns only those encrypted with the same key. This ensures:
+//   1. Each block contains messages encrypted with a single key
+//   2. Key rotations define natural block boundaries
+//   3. Sequencer behavior aligns with rollup-relayer batch boundary enforcement
+//   4. No consensus divergence between sequencer and prover
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 
-	// If we are on EuclidV2, we need to read L1 messages from L1MessageQueueV2.
+	// Fetch all available messages up to maxCount
+	var allMessages []types.L1MessageTx
 	if w.chainConfig.IsEuclidV2(w.current.header.Time) {
-		return rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
+		allMessages = rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
+	} else {
+		allMessages = rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
 	}
 
-	return rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
+	if len(allMessages) == 0 {
+		return allMessages
+	}
+
+	// Check for key rotation boundary: all messages in block must use same encryption key
+	// Optimization: instead of checking keyId for every message (O(n * log k)), we:
+	//   1. Get the keyId for first message (one binary search)
+	//   2. Find next rotation boundary msgIndex (one binary search)
+	//   3. Stop collection when we reach that boundary (O(n) scan)
+	firstKeyId, err := validium.GetKeyIdForMessage(startIndex)
+	if err != nil {
+		log.Warn("Failed to get key ID for first message, including all messages", "startIndex", startIndex, "err", err)
+		return allMessages
+	}
+
+	// Find the msgIndex at which the next key rotation occurs
+	nextRotationIndex := validium.GetNextKeyRotationIndex(startIndex)
+
+	// Scan messages and stop if we reach the rotation boundary
+	for i := 0; i < len(allMessages); i++ {
+		queueIndex := allMessages[i].QueueIndex
+
+		// If this message is at or after the rotation boundary, stop here
+		if queueIndex >= nextRotationIndex {
+			log.Info("Key rotation boundary detected, stopping L1 message collection",
+				"firstIndex", startIndex, "firstKeyId", firstKeyId,
+				"rotationIndex", nextRotationIndex,
+				"messagesIncluded", i)
+			return allMessages[:i]
+		}
+	}
+
+	// No rotation boundary encountered, include all messages
+	return allMessages
 }
 
 // newWork
@@ -704,13 +748,20 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
-		// Decrypt L1 message payloads.
+		// Decrypt L1 message payloads using queue-specific keys for rotation support.
+		// Note: Decryption failures are logged but not fatal - users can submit invalid encrypted
+		// data on L2, which will fail to decrypt. An honest sequencer with the correct keys will
+		// not fail to decrypt properly encrypted messages. If a malicious sequencer uses wrong keys,
+		// the prover will reject the block since it validates using the correct key from the contract.
 		for i := range l1Messages {
-			if decrypted, err := validium.DecryptTxData(l1Messages[i].Data); err == nil {
+			queueIndex := l1Messages[i].QueueIndex
+			if decrypted, err := validium.DecryptTxDataWithIndex(l1Messages[i].Data, queueIndex); err == nil {
 				prevHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				l1Messages[i].Data = decrypted
 				newHash := types.NewTx(&l1Messages[i]).Hash().Hex()
-				log.Info("Decrypted L1 message", "queueIndex", l1Messages[i].QueueIndex, "prevHash", prevHash, "newHash", newHash)
+				log.Info("Decrypted L1 message", "queueIndex", queueIndex, "prevHash", prevHash, "newHash", newHash)
+			} else {
+				log.Error("Failed to decrypt L1 message", "queueIndex", queueIndex, "error", err)
 			}
 		}
 

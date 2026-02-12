@@ -11,8 +11,17 @@ import (
 )
 
 func TestDepositERC20NotEncrypted(t *testing.T) {
+	defer resetKeyState()
+
+	// Setup: configure a key (even though this data isn't encrypted)
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
+
 	data := common.Hex2Bytes("8ef1332e000000000000000000000000f1af3b23de0a5ca3cab7261cb0061c0d779a5c7b00000000000000000000000033b60d5dd260d453cac3782b0bdc01ce84672142000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e9cd600000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e48431f5c1000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000006efdbff2a14a7c8e15944d1f4a48f9f95f663a4000000000000000000000000f4e147db314947fc1275a8cbb6cde48c510cd8cf0000000000000000000000003a6a724595184dda4be69db1ce726f2ac3d66b870000000000000000000000000000000000000000000000000000000783a8a06400000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
-	newData, err := DecryptTxData(data)
+
+	// Non-encrypted data should pass through unchanged regardless of pubKey
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	newData, err := DecryptTxDataWithPubKey(data, compressedPubKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +35,7 @@ func TestDecryptRelayMessage(t *testing.T) {
 	defer resetKeyState()
 
 	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
-	SetSequencerKey(testKey)
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
 
 	// Address encrypted using eciesjs.
 	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
@@ -47,7 +56,8 @@ func TestDecryptRelayMessage(t *testing.T) {
 	}
 
 	// Process call, decrypt payload.
-	decryptedCall, err := DecryptTxData(encryptedCall)
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	decryptedCall, err := DecryptTxDataWithPubKey(encryptedCall, compressedPubKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +77,7 @@ func TestDecryptDepositERC20Message(t *testing.T) {
 	defer resetKeyState()
 
 	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
-	SetSequencerKey(testKey)
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
 
 	// Address encrypted using eciesjs.
 	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
@@ -102,7 +112,8 @@ func TestDecryptDepositERC20Message(t *testing.T) {
 	}
 
 	// Process call, decrypt payload.
-	decryptedOuterCall, err := DecryptTxData(encryptedOuterCall)
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	decryptedOuterCall, err := DecryptTxDataWithPubKey(encryptedOuterCall, compressedPubKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,234 +141,115 @@ func TestDecryptDepositERC20Message(t *testing.T) {
 func resetKeyState() {
 	lock.Lock()
 	defer lock.Unlock()
-	SequencerKey = nil
 	sequencerKeys = nil
-	keyActivations = nil
-	configuredKeys = nil
-	keysInitialized = false
 }
 
-func TestGetKeyForMessage_SingleKey(t *testing.T) {
+// TestDecryptTxDataWithPubKey_SingleKey tests decryption with a single key
+func TestDecryptTxDataWithPubKey_SingleKey(t *testing.T) {
 	defer resetKeyState()
 
-	// Setup: single key starting at msgIndex 0
-	key0, _ := ecies.GenerateKey()
-	lock.Lock()
-	sequencerKeys = map[uint64]*ecies.PrivateKey{0: key0}
-	keyActivations = []keyActivation{{msgIndex: 0, keyId: 0}}
-	keysInitialized = true
-	lock.Unlock()
+	// Setup: generate test key
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
 
-	// Test: all messages should use key 0
-	for queueIndex := uint64(0); queueIndex < 100; queueIndex++ {
-		key, err := GetKeyForMessage(queueIndex)
-		if err != nil {
-			t.Fatalf("GetKeyForMessage(%d) error: %v", queueIndex, err)
-		}
-		if key != key0 {
-			t.Errorf("GetKeyForMessage(%d) returned wrong key", queueIndex)
-		}
-	}
-}
+	// Address encrypted using eciesjs
+	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
+	targetEncrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
 
-func TestGetKeyForMessage_MultipleKeys(t *testing.T) {
-	defer resetKeyState()
-
-	// Setup: key rotation at msgIndex 0, 100, 200
-	key0, _ := ecies.GenerateKey()
-	key1, _ := ecies.GenerateKey()
-	key2, _ := ecies.GenerateKey()
-
-	lock.Lock()
-	sequencerKeys = map[uint64]*ecies.PrivateKey{
-		0: key0,
-		1: key1,
-		2: key2,
-	}
-	keyActivations = []keyActivation{
-		{msgIndex: 0, keyId: 0},
-		{msgIndex: 100, keyId: 1},
-		{msgIndex: 200, keyId: 2},
-	}
-	keysInitialized = true
-	lock.Unlock()
-
-	// Test cases
-	testCases := []struct {
-		queueIndex    uint64
-		expectedKeyId uint64
-	}{
-		{0, 0},
-		{50, 0},
-		{99, 0},
-		{100, 1}, // Boundary: exactly at key1 activation
-		{150, 1},
-		{199, 1},
-		{200, 2}, // Boundary: exactly at key2 activation
-		{500, 2},
+	// Create encrypted relay message call
+	encryptedArgs := relayMessageEncryptedArgs{
+		Sender:       common.Address{},
+		Target:       targetEncrypted,
+		Value:        big.NewInt(0),
+		MessageNonce: big.NewInt(0),
+		Message:      []byte{},
 	}
 
-	for _, tc := range testCases {
-		key, err := GetKeyForMessage(tc.queueIndex)
-		if err != nil {
-			t.Fatalf("GetKeyForMessage(%d) error: %v", tc.queueIndex, err)
-		}
-		expectedKey := sequencerKeys[tc.expectedKeyId]
-		if key != expectedKey {
-			t.Errorf("queueIndex=%d should use keyId=%d", tc.queueIndex, tc.expectedKeyId)
-		}
-	}
-}
-
-func TestGetKeyForMessage_LegacyMode(t *testing.T) {
-	defer resetKeyState()
-
-	// Setup: keys not initialized, but legacy key set
-	legacyKey, _ := ecies.GenerateKey()
-	lock.Lock()
-	SequencerKey = legacyKey
-	keysInitialized = false
-	lock.Unlock()
-
-	// Test: should fall back to legacy key
-	key, err := GetKeyForMessage(100)
+	encryptedCall, err := encryptedArgs.packFunctionCall()
 	if err != nil {
-		t.Fatalf("GetKeyForMessage error: %v", err)
-	}
-	if key != legacyKey {
-		t.Errorf("should return legacy key")
-	}
-}
-
-func TestGetNextKeyRotationIndex_SingleKey(t *testing.T) {
-	defer resetKeyState()
-
-	// Setup: single key starting at msgIndex 0
-	key0, _ := ecies.GenerateKey()
-	lock.Lock()
-	sequencerKeys = map[uint64]*ecies.PrivateKey{0: key0}
-	keyActivations = []keyActivation{{msgIndex: 0, keyId: 0}}
-	keysInitialized = true
-	lock.Unlock()
-
-	// Test: no rotation should occur
-	nextRotation := GetNextKeyRotationIndex(0)
-	if nextRotation != ^uint64(0) {
-		t.Errorf("expected max uint64, got %d", nextRotation)
+		t.Fatal(err)
 	}
 
-	nextRotation = GetNextKeyRotationIndex(1000)
-	if nextRotation != ^uint64(0) {
-		t.Errorf("expected max uint64, got %d", nextRotation)
+	// Decrypt using the public key
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	decryptedCall, err := DecryptTxDataWithPubKey(encryptedCall, compressedPubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decryptedArgs relayMessageArgs
+	err = unpackArguments("relayMessage", &decryptedArgs, decryptedCall[4:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decryptedArgs.Target != target {
+		t.Errorf("expected target %s, got %s", target.Hex(), decryptedArgs.Target.Hex())
 	}
 }
 
-func TestGetNextKeyRotationIndex_MultipleKeys(t *testing.T) {
+// TestDecryptTxDataWithPubKey_MultipleKeys tests that multiple keys can be configured
+func TestDecryptTxDataWithPubKey_MultipleKeys(t *testing.T) {
 	defer resetKeyState()
 
-	// Setup: key rotation at msgIndex 0, 100, 200
+	// Setup: generate multiple test keys
 	key0, _ := ecies.GenerateKey()
 	key1, _ := ecies.GenerateKey()
 	key2, _ := ecies.GenerateKey()
 
-	lock.Lock()
-	sequencerKeys = map[uint64]*ecies.PrivateKey{
-		0: key0,
-		1: key1,
-		2: key2,
-	}
-	keyActivations = []keyActivation{
-		{msgIndex: 0, keyId: 0},
-		{msgIndex: 100, keyId: 1},
-		{msgIndex: 200, keyId: 2},
-	}
-	keysInitialized = true
-	lock.Unlock()
+	SetSequencerKeys([]*ecies.PrivateKey{key0, key1, key2})
 
-	// Test cases
-	testCases := []struct {
-		queueIndex           uint64
-		expectedNextRotation uint64
-	}{
-		{0, 100},          // Starting at 0, next rotation at 100
-		{50, 100},         // In middle of key0 range
-		{99, 100},         // Just before rotation
-		{100, 200},        // At rotation boundary, next rotation at 200
-		{150, 200},        // In middle of key1 range
-		{199, 200},        // Just before second rotation
-		{200, ^uint64(0)}, // At last key, no more rotations
-		{500, ^uint64(0)}, // Beyond last rotation
+	// Verify all keys can be retrieved by their public keys
+	pubKey0 := key0.PublicKey.Bytes(true)
+	pubKey1 := key1.PublicKey.Bytes(true)
+	pubKey2 := key2.PublicKey.Bytes(true)
+
+	if _, err := GetKeyByPubKey(pubKey0); err != nil {
+		t.Errorf("failed to get key0: %v", err)
+	}
+	if _, err := GetKeyByPubKey(pubKey1); err != nil {
+		t.Errorf("failed to get key1: %v", err)
+	}
+	if _, err := GetKeyByPubKey(pubKey2); err != nil {
+		t.Errorf("failed to get key2: %v", err)
 	}
 
-	for _, tc := range testCases {
-		nextRotation := GetNextKeyRotationIndex(tc.queueIndex)
-		if nextRotation != tc.expectedNextRotation {
-			t.Errorf("queueIndex=%d: expected nextRotation=%d, got %d",
-				tc.queueIndex, tc.expectedNextRotation, nextRotation)
-		}
+	// Test that unknown key returns error
+	unknownKey, _ := ecies.GenerateKey()
+	unknownPubKey := unknownKey.PublicKey.Bytes(true)
+	if _, err := GetKeyByPubKey(unknownPubKey); err == nil {
+		t.Error("expected error for unknown public key")
 	}
 }
 
-func TestGetNextKeyRotationIndex_LegacyMode(t *testing.T) {
+// TestDecryptTxDataWithPubKey_NilPubKey tests that nil pubKey returns error
+func TestDecryptTxDataWithPubKey_NilPubKey(t *testing.T) {
 	defer resetKeyState()
 
-	// Setup: keys not initialized
-	lock.Lock()
-	keysInitialized = false
-	lock.Unlock()
+	// Setup: configure a key
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
 
-	// Test: should return max uint64 (no rotations in legacy mode)
-	nextRotation := GetNextKeyRotationIndex(100)
-	if nextRotation != ^uint64(0) {
-		t.Errorf("expected max uint64 in legacy mode, got %d", nextRotation)
-	}
-}
+	// Address encrypted using eciesjs
+	targetEncrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
 
-func TestGetKeyIdForMessage(t *testing.T) {
-	defer resetKeyState()
-
-	// Setup: key rotation at msgIndex 0, 100, 200
-	key0, _ := ecies.GenerateKey()
-	key1, _ := ecies.GenerateKey()
-	key2, _ := ecies.GenerateKey()
-
-	lock.Lock()
-	sequencerKeys = map[uint64]*ecies.PrivateKey{
-		0: key0,
-		1: key1,
-		2: key2,
-	}
-	keyActivations = []keyActivation{
-		{msgIndex: 0, keyId: 0},
-		{msgIndex: 100, keyId: 1},
-		{msgIndex: 200, keyId: 2},
-	}
-	keysInitialized = true
-	lock.Unlock()
-
-	// Test cases
-	testCases := []struct {
-		queueIndex    uint64
-		expectedKeyId uint64
-	}{
-		{0, 0},
-		{50, 0},
-		{99, 0},
-		{100, 1},
-		{150, 1},
-		{199, 1},
-		{200, 2},
-		{500, 2},
+	// Create encrypted relay message call
+	encryptedArgs := relayMessageEncryptedArgs{
+		Sender:       common.Address{},
+		Target:       targetEncrypted,
+		Value:        big.NewInt(0),
+		MessageNonce: big.NewInt(0),
+		Message:      []byte{},
 	}
 
-	for _, tc := range testCases {
-		keyId, err := GetKeyIdForMessage(tc.queueIndex)
-		if err != nil {
-			t.Fatalf("GetKeyIdForMessage(%d) error: %v", tc.queueIndex, err)
-		}
-		if keyId != tc.expectedKeyId {
-			t.Errorf("queueIndex=%d: expected keyId=%d, got %d",
-				tc.queueIndex, tc.expectedKeyId, keyId)
-		}
+	encryptedCall, err := encryptedArgs.packFunctionCall()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decrypt with nil pubKey (should return error)
+	_, err = DecryptTxDataWithPubKey(encryptedCall, nil)
+	if err == nil {
+		t.Error("expected error when calling DecryptTxDataWithPubKey with nil pubKey")
 	}
 }

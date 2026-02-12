@@ -1782,31 +1782,25 @@ func setValidium(ctx *cli.Context, cfg *ethconfig.Config) {
 	keysStr := ctx.String(ValidiumSequencerKeys.Name)
 	keyStrings := strings.Split(keysStr, ",")
 
-	if len(keyStrings) == 1 {
-		// Legacy mode: single key
-		key, err := ecies.NewPrivateKeyFromHex(strings.TrimSpace(keyStrings[0]))
+	keys := make([]*ecies.PrivateKey, 0, len(keyStrings))
+	for i, hexKey := range keyStrings {
+		trimmed := strings.TrimSpace(hexKey)
+		if trimmed == "" {
+			continue // Skip empty entries
+		}
+		key, err := ecies.NewPrivateKeyFromHex(trimmed)
 		if err != nil {
-			Fatalf("error while parsing sequencer key: %v", err)
+			Fatalf("error while parsing sequencer key %d: %v", i, err)
 		}
-		validium.SetSequencerKey(key)
-		log.Info("Configured sequencer in legacy single-key mode")
-	} else {
-		// Multi-key mode: key rotation support
-		keys := make(map[uint64]*ecies.PrivateKey)
-		for i, hexKey := range keyStrings {
-			trimmed := strings.TrimSpace(hexKey)
-			if trimmed == "" {
-				continue // Skip empty entries
-			}
-			key, err := ecies.NewPrivateKeyFromHex(trimmed)
-			if err != nil {
-				Fatalf("error while parsing sequencer key %d: %v", i, err)
-			}
-			keys[uint64(i)] = key
-		}
-		validium.SetSequencerKeys(keys)
-		log.Info("Configured sequencer with key rotation support", "keyCount", len(keys))
+		keys = append(keys, key)
 	}
+
+	if len(keys) == 0 {
+		Fatalf("no valid sequencer keys provided")
+	}
+
+	validium.SetSequencerKeys(keys)
+	log.Info("Configured sequencer keys", "keyCount", len(keys))
 }
 
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -2201,13 +2195,6 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 	backend, err := eth.New(stack, cfg, l1Client)
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
-	}
-
-	// Initialize encryption keys for validium mode with key rotation support
-	if backend.ChainDb() != nil {
-		if err := validium.InitializeKeys(backend.ChainDb()); err != nil {
-			log.Warn("Failed to initialize encryption keys, using legacy mode", "error", err)
-		}
 	}
 
 	if cfg.LightServ > 0 {

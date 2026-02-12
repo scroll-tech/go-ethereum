@@ -37,6 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/validium"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -78,6 +79,107 @@ var (
 	missingRCOnRestartCounter = metrics.NewRegisteredCounter("miner/missing_rc_on_restart", nil)
 	missingAncestorRCCounter  = metrics.NewRegisteredCounter("miner/missing_ancestor_rc", nil)
 )
+
+// findNextKeyRotationBoundary finds the msgIndex at which the next key rotation occurs
+// after the given queue index. Returns math.MaxUint64 if there is no subsequent rotation.
+//
+// This is used to efficiently find key rotation boundaries when collecting L1 messages.
+//
+// IMPORTANT: Key selection is based on L1 message queueIndex vs encryption key msgIndex,
+// NOT on keyId. The keyId is only used as a database index to iterate through stored keys.
+// The actual rotation boundary is determined by comparing EncryptionKey.MsgIndex with queueIndex.
+//
+// Optimization: Loop backwards from highest key since we're usually processing recent messages
+// with the latest key, making the next rotation boundary likely to be near the end.
+func findNextKeyRotationBoundary(db ethdb.Reader, queueIndex uint64) (uint64, error) {
+	highestKeyId := rawdb.ReadHighestSyncedEncryptionKeyId(db)
+
+	// Bootstrap mode or single key: no keys synced yet
+	if highestKeyId == 0 {
+		key0 := rawdb.ReadEncryptionKey(db, 0)
+		if key0 == nil {
+			// No keys at all
+			return ^uint64(0), nil
+		}
+		// Only one key exists, no rotation
+		return ^uint64(0), nil
+	}
+
+	// Find the smallest msgIndex that is > queueIndex
+	// Loop backwards: most likely processing recent messages, so next rotation is near the end
+	var nextRotationIndex uint64 = ^uint64(0)
+
+	for keyId := highestKeyId; ; keyId-- {
+		encKey := rawdb.ReadEncryptionKey(db, keyId)
+		if encKey == nil {
+			return 0, fmt.Errorf("missing encryption key in database: keyId %d", keyId)
+		}
+
+		// Selection based on msgIndex vs queueIndex (keyId is just for DB access)
+		if encKey.MsgIndex > queueIndex {
+			// Keep updating - going backwards, we want the smallest one
+			nextRotationIndex = encKey.MsgIndex
+		}
+
+		// Break at keyId 0 (can't use keyId >= 0 in loop condition with unsigned)
+		if keyId == 0 {
+			break
+		}
+	}
+
+	return nextRotationIndex, nil
+}
+
+// selectEncryptionKeyFromDB queries the database to find the appropriate encryption key
+// for the given L1 message queue index. It finds the key with the highest msgIndex <= queueIndex.
+//
+// This matches the on-chain algorithm in ScrollChainValidium._getEncryptionKey (lines 432-445).
+//
+// IMPORTANT: Key selection is based on L1 message queueIndex vs encryption key msgIndex,
+// NOT on keyId. The keyId is only used as a database index to iterate through stored keys.
+// The actual key is selected by comparing EncryptionKey.MsgIndex with queueIndex.
+//
+// Optimization: Loop backwards from highest key since we're usually processing recent messages
+// with the latest key. In most cases, the latest key is the correct one.
+//
+// Returns the compressed public key (33 bytes) to use for decryption, or error if no key is available.
+func selectEncryptionKeyFromDB(db ethdb.Reader, queueIndex uint64) ([]byte, error) {
+	highestKeyId := rawdb.ReadHighestSyncedEncryptionKeyId(db)
+
+	// Bootstrap mode: no keys synced yet
+	if highestKeyId == 0 {
+		// Try to read key 0
+		key0 := rawdb.ReadEncryptionKey(db, 0)
+		if key0 == nil {
+			return nil, fmt.Errorf("no encryption keys synced in database")
+		}
+		// Key 0 should be valid for all messages in bootstrap mode
+		return key0.Key, nil
+	}
+
+	// Find the key with highest msgIndex <= queueIndex
+	// Loop backwards: most messages use the latest key, so we'll find it immediately
+	for keyId := highestKeyId; ; keyId-- {
+		encKey := rawdb.ReadEncryptionKey(db, keyId)
+		if encKey == nil {
+			return nil, fmt.Errorf("missing encryption key in database: keyId %d", keyId)
+		}
+
+		// Selection based on msgIndex vs queueIndex (keyId is just for DB access)
+		if encKey.MsgIndex <= queueIndex {
+			// Found it! This is the most recent key valid for this message
+			return encKey.Key, nil
+		}
+
+		// Break at keyId 0 (can't use keyId >= 0 in loop condition with unsigned)
+		if keyId == 0 {
+			break
+		}
+	}
+
+	// No key found - all keys start after this message
+	return nil, fmt.Errorf("no encryption key available for queue index %d (all keys start after this message)", queueIndex)
+}
 
 // prioritizedTransaction represents a single transaction that
 // should be processed as the first transaction in the next block.
@@ -495,19 +597,26 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 		return allMessages
 	}
 
-	// Check for key rotation boundary: all messages in block must use same encryption key
-	// Optimization: instead of checking keyId for every message (O(n * log k)), we:
-	//   1. Get the keyId for first message (one binary search)
-	//   2. Find next rotation boundary msgIndex (one binary search)
-	//   3. Stop collection when we reach that boundary (O(n) scan)
-	firstKeyId, err := validium.GetKeyIdForMessage(startIndex)
+	// Check for key rotation boundary: all messages in block must use same encryption key.
+	// The rollup-relayer cannot break up blocks, so the sequencer must stop collecting messages
+	// at key rotation boundaries to ensure each block contains messages with a single key.
+	//
+	// Optimization: Find the next key rotation boundary by scanning the DB encryption keys,
+	// then stop message collection before reaching that boundary. This is more efficient than
+	// querying the encryption key for every message.
+
+	db := w.eth.ChainDb()
+	nextRotationIndex, err := findNextKeyRotationBoundary(db, startIndex)
 	if err != nil {
-		log.Warn("Failed to get key ID for first message, including all messages", "startIndex", startIndex, "err", err)
+		log.Warn("Failed to find next key rotation boundary, including all messages",
+			"startIndex", startIndex, "err", err)
 		return allMessages
 	}
 
-	// Find the msgIndex at which the next key rotation occurs
-	nextRotationIndex := validium.GetNextKeyRotationIndex(startIndex)
+	// If no rotation boundary found (maxUint64), include all messages
+	if nextRotationIndex == ^uint64(0) {
+		return allMessages
+	}
 
 	// Scan messages and stop if we reach the rotation boundary
 	for i := 0; i < len(allMessages); i++ {
@@ -516,14 +625,14 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 		// If this message is at or after the rotation boundary, stop here
 		if queueIndex >= nextRotationIndex {
 			log.Info("Key rotation boundary detected, stopping L1 message collection",
-				"firstIndex", startIndex, "firstKeyId", firstKeyId,
+				"firstIndex", startIndex,
 				"rotationIndex", nextRotationIndex,
 				"messagesIncluded", i)
 			return allMessages[:i]
 		}
 	}
 
-	// No rotation boundary encountered, include all messages
+	// No rotation boundary encountered in this batch, include all messages
 	return allMessages
 }
 
@@ -755,7 +864,17 @@ func (w *worker) processTxPool() (bool, error) {
 		// the prover will reject the block since it validates using the correct key from the contract.
 		for i := range l1Messages {
 			queueIndex := l1Messages[i].QueueIndex
-			if decrypted, err := validium.DecryptTxDataWithIndex(l1Messages[i].Data, queueIndex); err == nil {
+
+			// Select which public key to use by querying the database
+			pubKey, err := selectEncryptionKeyFromDB(w.eth.ChainDb(), queueIndex)
+			if err != nil {
+				log.Warn("Failed to select encryption key", "queueIndex", queueIndex, "err", err)
+				// Fall back to legacy mode by passing nil
+				pubKey = nil
+			}
+
+			// Decrypt with the selected public key
+			if decrypted, err := validium.DecryptTxDataWithPubKey(l1Messages[i].Data, pubKey); err == nil {
 				prevHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				l1Messages[i].Data = decrypted
 				newHash := types.NewTx(&l1Messages[i]).Hash().Hex()

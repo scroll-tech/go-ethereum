@@ -858,29 +858,40 @@ func (w *worker) processTxPool() (bool, error) {
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
 		// Decrypt L1 message payloads using queue-specific keys for rotation support.
-		// Note: Decryption failures are logged but not fatal - users can submit invalid encrypted
-		// data on L2, which will fail to decrypt. An honest sequencer with the correct keys will
-		// not fail to decrypt properly encrypted messages. If a malicious sequencer uses wrong keys,
-		// the prover will reject the block since it validates using the correct key from the contract.
+		//
+		// Error handling distinguishes operator errors from user errors:
+		// - ErrMissingPrivateKey (operator error): Stop including L1 messages entirely.
+		//   The sequencer cannot decrypt messages without the correct private key configured.
+		//   Already-processed messages are still included; the block continues with L2 txs.
+		// - ErrDecryptionFailed (user error): Include the message as-is and continue.
+		//   Users can submit invalid encrypted data on L2 which will revert on execution.
 		for i := range l1Messages {
 			queueIndex := l1Messages[i].QueueIndex
 
 			// Select which public key to use by querying the database
 			pubKey, err := selectEncryptionKeyFromDB(w.eth.ChainDb(), queueIndex)
 			if err != nil {
-				log.Warn("Failed to select encryption key", "queueIndex", queueIndex, "err", err)
-				// Fall back to legacy mode by passing nil
-				pubKey = nil
+				log.Error("Failed to select encryption key, stopping L1 message inclusion", "queueIndex", queueIndex, "err", err)
+				l1Messages = l1Messages[:i]
+				break
 			}
 
 			// Decrypt with the selected public key
-			if decrypted, err := validium.DecryptTxDataWithPubKey(l1Messages[i].Data, pubKey); err == nil {
+			decrypted, err := validium.DecryptTxDataWithPubKey(l1Messages[i].Data, pubKey)
+			if err == nil {
 				prevHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				l1Messages[i].Data = decrypted
 				newHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				log.Info("Decrypted L1 message", "queueIndex", queueIndex, "prevHash", prevHash, "newHash", newHash)
+			} else if errors.Is(err, validium.ErrMissingPrivateKey) {
+				// Operator error: private key not configured. Stop including L1 messages
+				// but continue building the block with what we have so far.
+				log.Error("Missing private key for L1 message decryption, stopping L1 message inclusion", "queueIndex", queueIndex, "error", err)
+				l1Messages = l1Messages[:i]
+				break
 			} else {
-				log.Error("Failed to decrypt L1 message", "queueIndex", queueIndex, "error", err)
+				// User error (ErrDecryptionFailed or other): include message as-is, it will revert on execution.
+				log.Warn("Failed to decrypt L1 message, including as-is", "queueIndex", queueIndex, "error", err)
 			}
 		}
 

@@ -13,6 +13,16 @@ import (
 	ecies "github.com/scroll-tech/ecies-go/v2"
 )
 
+var (
+	// ErrMissingPrivateKey indicates the operator has not configured the required private key.
+	// This is an operator error that requires fixing the sequencer configuration.
+	ErrMissingPrivateKey = errors.New("missing private key for encryption key")
+
+	// ErrDecryptionFailed indicates the encrypted data could not be decrypted.
+	// This is typically a user error (invalid encrypted data, wrong key used, or garbage data).
+	ErrDecryptionFailed = errors.New("decryption failed")
+)
+
 const (
 	relayMessage                  = "relayMessage"
 	relayMessageEncrypted         = "relayMessageEncrypted"
@@ -170,23 +180,29 @@ func decryptAddressWithKey(data []byte, privateKey *ecies.PrivateKey) (common.Ad
 
 // decryptAddressWithPubKey decrypts the given encrypted address using the private key
 // corresponding to the given compressed public key.
+// Returns ErrMissingPrivateKey if the private key is not configured (operator error).
+// Returns ErrDecryptionFailed if decryption fails or data is invalid (user error).
 func decryptAddressWithPubKey(data []byte, compressedPubKey []byte) (common.Address, error) {
 	privateKey, err := GetKeyByPubKey(compressedPubKey)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get private key: %w", err)
+		// Operator error: private key not configured
+		pubKeyHex := common.Bytes2Hex(compressedPubKey)
+		return common.Address{}, fmt.Errorf("%w for public key %s", ErrMissingPrivateKey, pubKeyHex[:16]+"...")
 	}
 
 	raw, err := ecies.Decrypt(privateKey, data)
 	if err != nil {
+		// User error: decryption failed (bad data or wrong key)
 		pubKeyHex := common.Bytes2Hex(compressedPubKey)
 		log.Warn("failed to decrypt address", "pubKeyHex", pubKeyHex[:16]+"...", "data", common.Bytes2Hex(data), "error", err)
-		return common.Address{}, errors.New("decryption failed")
+		return common.Address{}, fmt.Errorf("%w: %s", ErrDecryptionFailed, err.Error())
 	}
 
 	if len(raw) != common.AddressLength {
+		// User error: decrypted data is not a valid address
 		pubKeyHex := common.Bytes2Hex(compressedPubKey)
 		log.Warn("decrypted data is not address", "pubKeyHex", pubKeyHex[:16]+"...", "data", common.Bytes2Hex(data), "plaintext", common.Bytes2Hex(raw))
-		return common.Address{}, errors.New("decryption failed")
+		return common.Address{}, fmt.Errorf("%w: invalid address length %d", ErrDecryptionFailed, len(raw))
 	}
 
 	address := common.BytesToAddress(raw)

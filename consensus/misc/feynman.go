@@ -7,9 +7,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
-// ApplyFeynmanHardFork modifies the state database according to the Feynman hard-fork rules,
+// applyFeynmanHardFork modifies the state database according to the Feynman hard-fork rules,
 // updating the bytecode and storage of the L1GasPriceOracle contract.
-func ApplyFeynmanHardFork(statedb *state.StateDB) {
+func applyFeynmanHardFork(statedb *state.StateDB) {
 	log.Info("Applying Feynman hard fork")
 
 	// update contract byte code

@@ -32,6 +32,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/consensus"
+	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
@@ -202,10 +203,11 @@ type txTraceResult struct {
 // blockTraceTask represents a single block trace task when an entire chain is
 // being traced.
 type blockTraceTask struct {
-	statedb *state.StateDB   // Intermediate state prepped for tracing
-	block   *types.Block     // Block to trace the transactions from
-	rootref common.Hash      // Trie root reference held for this task
-	results []*txTraceResult // Trace results procudes by the task
+	statedb     *state.StateDB   // Intermediate state prepped for tracing
+	block       *types.Block     // Block to trace the transactions from
+	parentBlock *types.Block     // Parent block of the block to trace
+	rootref     common.Hash      // Trie root reference held for this task
+	results     []*txTraceResult // Trace results procudes by the task
 }
 
 // blockTraceResult represets the results of tracing a single block when an entire
@@ -277,11 +279,16 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			for task := range tasks {
 				signer := types.MakeSigner(api.backend.ChainConfig(), task.block.Number(), task.block.Time())
 				blockCtx := core.NewEVMBlockContext(task.block.Header(), api.chainContext(localctx), api.backend.ChainConfig(), nil)
-				// EIP-2935: Insert parent hash in history contract.
+
+				// Apply Scroll hard fork state transitions on state
+				misc.ApplyForkStateTransitions(api.backend.ChainConfig(), task.statedb, task.block.NumberU64(), task.block.Time(), task.parentBlock.Time())
+
+				// Apply EIP-2935: Insert parent hash in history contract.
 				if api.backend.ChainConfig().IsFeynman(task.block.Time()) {
 					evm := vm.NewEVM(blockCtx, vm.TxContext{}, task.statedb, api.backend.ChainConfig(), vm.Config{})
 					core.ProcessParentBlockHash(task.block.ParentHash(), evm, task.statedb)
 				}
+
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
 					msg, _ := tx.AsMessage(signer, task.block.BaseFee())
@@ -410,7 +417,7 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			// Send the block over to the concurrent tracers (if not in the fast-forward phase)
 			txs := next.Transactions()
 			select {
-			case tasks <- &blockTraceTask{statedb: statedb.Copy(), block: next, rootref: block.Root(), results: make([]*txTraceResult, len(txs))}:
+			case tasks <- &blockTraceTask{statedb: statedb.Copy(), block: next, parentBlock: block, rootref: block.Root(), results: make([]*txTraceResult, len(txs))}:
 			case <-notifier.Closed():
 				return
 			}
@@ -544,7 +551,11 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		vmctx              = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), api.backend.ChainConfig(), nil)
 		deleteEmptyObjects = chainConfig.IsEIP158(block.Number())
 	)
-	// EIP-2935: Insert parent hash in history contract.
+
+	// Apply Scroll hard fork state transitions on state
+	misc.ApplyForkStateTransitions(api.backend.ChainConfig(), statedb, block.NumberU64(), block.Time(), parent.Time())
+
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if api.backend.ChainConfig().IsFeynman(block.Time()) {
 		vmenv := vm.NewEVM(vmctx, vm.TxContext{}, statedb, chainConfig, vm.Config{})
 		core.ProcessParentBlockHash(block.ParentHash(), vmenv, statedb)
@@ -624,11 +635,16 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		threads = len(txs)
 	}
 	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), api.backend.ChainConfig(), nil)
-	// EIP-2935: Insert parent hash in history contract.
+
+	// Apply Scroll hard fork state transitions on state
+	misc.ApplyForkStateTransitions(api.backend.ChainConfig(), statedb, block.NumberU64(), block.Time(), parent.Time())
+
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if api.backend.ChainConfig().IsFeynman(block.Time()) {
 		evm := vm.NewEVM(blockCtx, vm.TxContext{}, statedb, api.backend.ChainConfig(), vm.Config{})
 		core.ProcessParentBlockHash(block.ParentHash(), evm, statedb)
 	}
+
 	blockHash := block.Hash()
 	blockNumber := block.NumberU64()
 	for th := 0; th < threads; th++ {
@@ -764,7 +780,10 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		}
 	}
 
-	// EIP-2935: Insert parent hash in history contract.
+	// Apply Scroll hard fork state transitions on state
+	misc.ApplyForkStateTransitions(api.backend.ChainConfig(), statedb, block.NumberU64(), block.Time(), parent.Time())
+
+	// Apply EIP-2935: Insert parent hash in history contract.
 	if api.backend.ChainConfig().IsFeynman(block.Time()) {
 		evm := vm.NewEVM(vmctx, vm.TxContext{}, statedb, api.backend.ChainConfig(), vm.Config{})
 		core.ProcessParentBlockHash(block.ParentHash(), evm, statedb)

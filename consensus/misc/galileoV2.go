@@ -7,9 +7,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
-// ApplyGalileoV2HardFork modifies the state database according to the GalileoV2 hard-fork rules,
+// applyGalileoV2HardFork modifies the state database according to the GalileoV2 hard-fork rules,
 // updating the bytecode and storage of the L1GasPriceOracle contract.
-func ApplyGalileoV2HardFork(statedb *state.StateDB) {
+func applyGalileoV2HardFork(statedb *state.StateDB) {
 	log.Info("Applying GalileoV2 hard fork")
 
 	// update contract byte code

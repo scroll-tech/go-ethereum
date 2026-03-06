@@ -33,11 +33,13 @@ type SystemContract struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	skipSignerCheck bool
 }
 
 // New creates a SystemContract consensus engine with the initial
 // authorized signer fetched from L1 (if available).
-func New(ctx context.Context, config *params.SystemContractConfig, client sync_service.EthClient) *SystemContract {
+func New(ctx context.Context, config *params.SystemContractConfig, client sync_service.EthClient, skipSignerCheck bool) *SystemContract {
 	log.Info("Initializing system_contract consensus engine", "config", config)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -48,6 +50,8 @@ func New(ctx context.Context, config *params.SystemContractConfig, client sync_s
 
 		ctx:    ctx,
 		cancel: cancel,
+
+		skipSignerCheck: skipSignerCheck,
 	}
 
 	if err := s.fetchAddressFromL1(); err != nil {

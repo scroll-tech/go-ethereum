@@ -1411,7 +1411,7 @@ func TestEuclidV2TransitionVerification(t *testing.T) {
 	// init worker
 	db := rawdb.NewMemoryDatabase()
 	cliqueEngine := clique.New(chainConfig.Clique, db)
-	sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, &system_contract.FakeEthClient{Value: testBankAddress})
+	sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, &system_contract.FakeEthClient{Value: testBankAddress}, false)
 	engine := wrapper.NewUpgradableEngine(chainConfig.IsEuclidV2, cliqueEngine, sysEngine)
 	w, b := newTestWorkerWithEmptyBlock(t, chainConfig, engine, db, 0)
 	defer w.close()

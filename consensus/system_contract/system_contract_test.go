@@ -36,7 +36,7 @@ func TestSystemContract_FetchSigner(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	sys := New(ctx, config, fakeClient)
+	sys := New(ctx, config, fakeClient, false)
 	defer sys.Close()
 
 	require.NoError(t, sys.fetchAddressFromL1())
@@ -62,7 +62,7 @@ func TestSystemContract_AuthorizeCheck(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	sys := New(ctx, config, fakeClient)
+	sys := New(ctx, config, fakeClient, false)
 	defer sys.Close()
 
 	require.NoError(t, sys.fetchAddressFromL1())
@@ -117,7 +117,7 @@ func TestSystemContract_SignsAfterUpdate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	sys := New(ctx, config, fakeClient)
+	sys := New(ctx, config, fakeClient, false)
 	defer sys.Close()
 
 	require.NoError(t, sys.fetchAddressFromL1())

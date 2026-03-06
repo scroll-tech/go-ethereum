@@ -236,14 +236,17 @@ type Config struct {
 	GossipSequencerHTTP         string
 	GossipBroadcastToAllEnabled bool
 	GossipBroadcastToAllCap     int
+
+	// Skip signer check for the SystemContract engine
+	SkipSignerCheck bool
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.
-func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, l1Client sync_service.EthClient) consensus.Engine {
+func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, l1Client sync_service.EthClient, skipSignerCheck bool) consensus.Engine {
 	// Case 1: Both SystemContract and Clique are defined: create an upgradable engine.
 	if chainConfig.SystemContract != nil && chainConfig.Clique != nil {
 		cliqueEngine := clique.New(chainConfig.Clique, db)
-		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
+		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client, skipSignerCheck)
 		sysEngine.Start()
 		return wrapper.NewUpgradableEngine(chainConfig.IsEuclidV2, cliqueEngine, sysEngine)
 	}
@@ -255,7 +258,7 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 
 	// Case 3: Only the SystemContract engine is defined.
 	if chainConfig.SystemContract != nil {
-		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client)
+		sysEngine := system_contract.New(context.Background(), chainConfig.SystemContract, l1Client, skipSignerCheck)
 		sysEngine.Start()
 		return sysEngine
 	}

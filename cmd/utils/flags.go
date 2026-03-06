@@ -919,6 +919,11 @@ var (
 		Value: 30,
 	}
 
+	SkipSignerCheckFlag = cli.BoolFlag{
+		Name:  "skipsignercheck",
+		Usage: "Skip signer check for the SystemContract engine",
+	}
+
 	// DA syncing settings
 	DASyncEnabledFlag = cli.BoolFlag{
 		Name:  "da.sync",
@@ -1846,6 +1851,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.GossipBroadcastToAllEnabled = ctx.GlobalBool(GossipBroadcastToAllEnabledFlag.Name)
 		cfg.GossipBroadcastToAllCap = ctx.GlobalInt(GossipBroadcastToAllCapFlag.Name)
 		log.Info("Gossip broadcast to all enabled", "enabled", cfg.GossipBroadcastToAllEnabled, "cap", cfg.GossipBroadcastToAllCap)
+	}
+	if ctx.GlobalIsSet(SkipSignerCheckFlag.Name) {
+		cfg.SkipSignerCheck = ctx.GlobalBool(SkipSignerCheckFlag.Name)
+		log.Warn("Skip signer check for the SystemContract engine", "skipped", cfg.SkipSignerCheck)
 	}
 	// Only configure sequencer http flag if we're running in verifier mode i.e. --mine is disabled.
 	if ctx.IsSet(GossipSequencerHTTPFlag.Name) && !ctx.IsSet(MiningEnabledFlag.Name) {

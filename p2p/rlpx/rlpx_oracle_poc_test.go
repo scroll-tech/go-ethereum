@@ -160,7 +160,7 @@ func TestImportPublicKeyInvalidCurvePoint(t *testing.T) {
 
 	// Build a 64-byte public key with (1, 1) — not on secp256k1.
 	pubBytes := make([]byte, 2*byteLen)
-	pubBytes[byteLen-1] = 1  // X = 1
+	pubBytes[byteLen-1] = 1   // X = 1
 	pubBytes[2*byteLen-1] = 1 // Y = 1
 
 	_, err := importPublicKeyForTest(pubBytes)

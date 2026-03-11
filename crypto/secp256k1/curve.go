@@ -92,6 +92,10 @@ func (BitCurve *BitCurve) Params() *elliptic.CurveParams {
 
 // IsOnCurve returns true if the given (x,y) lies on the BitCurve.
 func (BitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+	if x.Cmp(BitCurve.P) >= 0 || y.Cmp(BitCurve.P) >= 0 {
+		return false
+	}
+
 	// y² = x³ + b
 	y2 := new(big.Int).Mul(y, y) //y²
 	y2.Mod(y2, BitCurve.P)       //y²%P
@@ -105,7 +109,7 @@ func (BitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
 	return x3.Cmp(y2) == 0
 }
 
-//TODO: double check if the function is okay
+// TODO: double check if the function is okay
 // affineFromJacobian reverses the Jacobian transform. See the comment at the
 // top of the file.
 func (BitCurve *BitCurve) affineFromJacobian(x, y, z *big.Int) (xOut, yOut *big.Int) {

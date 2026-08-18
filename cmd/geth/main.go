@@ -220,6 +220,7 @@ var (
 		utils.RPCGlobalEVMTimeoutFlag,
 		utils.RPCGlobalTxFeeCapFlag,
 		utils.AllowUnprotectedTxs,
+		utils.DisableJSTracersFlag,
 		utils.MaxBlockRangeFlag,
 	}
 

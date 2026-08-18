@@ -192,6 +192,12 @@ type Config struct {
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
+	// DisableJSTracers rejects debug_trace* requests that ask for any JavaScript
+	// tracer, leaving only the native Go tracers reachable. This covers the
+	// bundled tracers as well as user-supplied code, because serving either one
+	// still builds a duktape VM and marshals traced EVM state through it.
+	DisableJSTracers bool `toml:",omitempty"`
+
 	// Endpoint of L1 HTTP-RPC server
 	L1Endpoint string `toml:",omitempty"`
 	// Number of confirmations on L1 needed for finalization

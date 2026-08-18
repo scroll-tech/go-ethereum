@@ -24,6 +24,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/eth/tracers/internal/jsgate"
 )
 
 // Context contains some contextual infos for a transaction execution that is not
@@ -47,30 +48,76 @@ type Tracer interface {
 type lookupFunc func(string, *Context) (Tracer, error)
 
 var (
-	lookups []lookupFunc
+	// lookups serves the named tracers and is consulted first. wildcardLookups
+	// holds the interpreted engines and is consulted last, because those evaluate
+	// dynamic user-supplied code.
+	lookups         []lookupFunc
+	wildcardLookups []lookupFunc
 )
+
+var (
+	errTracerNotFound = errors.New("tracer not found")
+
+	// ErrJSTracersDisabled is returned when the requested tracer is not a native
+	// one and the interpreted engines that could have served it are turned off.
+	// The name may also simply be unknown, which is why it wraps errTracerNotFound.
+	ErrJSTracersDisabled = fmt.Errorf("%w: JavaScript tracers are disabled, only native tracers are available", errTracerNotFound)
+)
+
+// DisableJSTracers turns the interpreted tracer engines off. The native Go
+// tracers and the default struct logger keep working. Call it during startup,
+// before the RPC layer begins serving requests.
+//
+// There is deliberately no exported counterpart to turn them back on, so no
+// later call can undo it. The setting is process-wide, matching the registry
+// it gates.
+func DisableJSTracers() {
+	jsgate.Disable()
+}
+
+// JSTracersDisabled reports whether the interpreted tracer engines are off.
+func JSTracersDisabled() bool {
+	return jsgate.Disabled()
+}
 
 // RegisterLookup registers a method as a lookup for tracers, meaning that
 // users can invoke a named tracer through that lookup. If 'wildcard' is true,
-// then the lookup will be placed last. This is typically meant for interpreted
-// engines (js) which can evaluate dynamic user-supplied code.
+// then the lookup will be placed last, and it will be skipped entirely when
+// JavaScript tracers are disabled. This is meant for interpreted engines (js)
+// which can evaluate dynamic user-supplied code.
 func RegisterLookup(wildcard bool, lookup lookupFunc) {
 	if wildcard {
-		lookups = append(lookups, lookup)
+		wildcardLookups = append(wildcardLookups, lookup)
 	} else {
 		lookups = append([]lookupFunc{lookup}, lookups...)
 	}
 }
 
-// New returns a new instance of a tracer, by iterating through the
-// registered lookups.
+// New returns a new instance of a tracer, by iterating through the registered
+// lookups. The interpreted engines are skipped when they are disabled, so
+// user-supplied code is never evaluated.
 func New(code string, ctx *Context) (Tracer, error) {
+	if tracer := tryLookups(lookups, code, ctx); tracer != nil {
+		return tracer, nil
+	}
+	if jsgate.Disabled() {
+		return nil, ErrJSTracersDisabled
+	}
+	if tracer := tryLookups(wildcardLookups, code, ctx); tracer != nil {
+		return tracer, nil
+	}
+	return nil, errTracerNotFound
+}
+
+// tryLookups returns the first tracer the given lookups can serve, or nil if
+// none of them recognise the code.
+func tryLookups(lookups []lookupFunc, code string, ctx *Context) Tracer {
 	for _, lookup := range lookups {
 		if tracer, err := lookup(code, ctx); err == nil {
-			return tracer, nil
+			return tracer
 		}
 	}
-	return nil, errors.New("tracer not found")
+	return nil
 }
 
 const (

@@ -43,6 +43,8 @@ const (
 	// maxBlockFetchers is the max number of goroutines to spin up to pull blocks
 	// for the fee history calculation (mostly relevant for LES).
 	maxBlockFetchers = 4
+	// maxQueryLimit is the max number of requested percentiles.
+	maxQueryLimit = 100
 )
 
 // blockFees represents a single block for processing
@@ -222,6 +224,9 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 	if len(rewardPercentiles) != 0 {
 		maxFeeHistory = oracle.maxBlockHistory
 	}
+	if len(rewardPercentiles) > maxQueryLimit {
+		return common.Big0, nil, nil, nil, fmt.Errorf("%w: over the query limit %d", errInvalidPercentile, maxQueryLimit)
+	}
 	if blocks > maxFeeHistory {
 		log.Warn("Sanitizing fee history length", "requested", blocks, "truncated", maxFeeHistory)
 		blocks = maxFeeHistory
@@ -230,8 +235,8 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 		if p < 0 || p > 100 {
 			return common.Big0, nil, nil, nil, fmt.Errorf("%w: %f", errInvalidPercentile, p)
 		}
-		if i > 0 && p < rewardPercentiles[i-1] {
-			return common.Big0, nil, nil, nil, fmt.Errorf("%w: #%d:%f > #%d:%f", errInvalidPercentile, i-1, rewardPercentiles[i-1], i, p)
+		if i > 0 && p <= rewardPercentiles[i-1] {
+			return common.Big0, nil, nil, nil, fmt.Errorf("%w: #%d:%f >= #%d:%f", errInvalidPercentile, i-1, rewardPercentiles[i-1], i, p)
 		}
 	}
 	var (

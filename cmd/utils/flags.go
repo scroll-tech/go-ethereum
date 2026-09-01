@@ -606,7 +606,7 @@ var (
 	}
 	HTTPApiFlag = cli.StringFlag{
 		Name:  "http.api",
-		Usage: "API's offered over the HTTP-RPC interface",
+		Usage: "API's offered over the HTTP-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
 		Value: "",
 	}
 	HTTPPathPrefixFlag = cli.StringFlag{
@@ -644,7 +644,7 @@ var (
 	}
 	WSApiFlag = cli.StringFlag{
 		Name:  "ws.api",
-		Usage: "API's offered over the WS-RPC interface",
+		Usage: "API's offered over the WS-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
 		Value: "",
 	}
 	WSAllowedOriginsFlag = cli.StringFlag{

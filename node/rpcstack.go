@@ -519,21 +519,40 @@ func (is *ipcServer) stop() error {
 // RegisterApis checks the given modules' availability, generates an allowlist based on the allowed modules,
 // and then registers all of the APIs exposed by the services.
 func RegisterApis(apis []rpc.API, modules []string, srv *rpc.Server, exposeAll bool) error {
-	if bad, available := checkModuleAvailability(modules, apis); len(bad) > 0 {
+	// An entry is either a bare namespace ("debug") or a single method
+	// ("debug:executionWitness"). Registration is per namespace either way; the
+	// method-level restrictions are enforced later, on the dispatch path.
+	namespaces, filter, err := rpc.ParseAPIEntries(modules)
+	if err != nil {
+		return err
+	}
+	if bad, available := checkModuleAvailability(namespaces, apis); len(bad) > 0 {
 		log.Error("Unavailable modules in HTTP API list", "unavailable", bad, "available", available)
 	}
 	// Generate the allow list based on the allowed modules
 	allowList := make(map[string]bool)
-	for _, module := range modules {
+	for _, module := range namespaces {
 		allowList[module] = true
 	}
-	// Register all the APIs exposed by the services
+	// Register all the APIs exposed by the services. The fallback to the public
+	// APIs is keyed on whether any entry was configured at all, not on how many
+	// survived parsing: an entry that parses to nothing, as admin_startHTTP
+	// builds from an empty api string, means "expose nothing", not "expose the
+	// default set".
 	for _, api := range apis {
-		if exposeAll || allowList[api.Namespace] || (len(allowList) == 0 && api.Public) {
+		if exposeAll || allowList[api.Namespace] || (len(modules) == 0 && api.Public) {
 			if err := srv.RegisterName(api.Namespace, api.Service); err != nil {
 				return err
 			}
 		}
+	}
+	// Apply the method-level restrictions once every namespace is registered, so
+	// the allowlist can be checked against the methods actually on offer.
+	if filter != nil {
+		for _, method := range srv.SetMethodFilter(filter) {
+			log.Error("Unknown method in API list, it will be denied", "method", method)
+		}
+		log.Info("Restricted RPC methods enabled", "entries", strings.Join(modules, ","))
 	}
 	return nil
 }

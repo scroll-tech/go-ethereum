@@ -30,6 +30,11 @@ import (
 
 const MetadataApi = "rpc"
 
+// metadataModulesMethod is the Go name of the only method RPCService exposes.
+// It is spelled out so the method filter can allow it without opening the whole
+// metadata namespace.
+const metadataModulesMethod = "Modules"
+
 // CodecOption specifies which type of messages a codec supports.
 //
 // Deprecated: this option is no longer honored by Server.
@@ -69,6 +74,36 @@ func NewServer() *Server {
 // service collection this server provides to clients.
 func (s *Server) RegisterName(name string, receiver interface{}) error {
 	return s.services.registerName(name, receiver)
+}
+
+// SetMethodFilter restricts which of the registered methods this server will
+// dispatch. It must be called during setup, after every service is registered
+// and before the server serves any codec. A nil filter permits every registered
+// method, which is the default.
+//
+// The filter is consulted on the dispatch path, so it applies uniformly to HTTP,
+// WebSocket and IPC, and to each element of a batch request individually.
+//
+// It returns the allowed method names this server offers nothing for. Those are
+// most likely typos, and since an unknown method stays denied, reporting them
+// gives the caller a chance to say so.
+func (s *Server) SetMethodFilter(filter *MethodFilter) (unknown []string) {
+	// The metadata service is registered by NewServer rather than by the caller,
+	// so it never appears in an API list. Allow its one method explicitly. Naming
+	// the method rather than the namespace keeps the guarantee that anything
+	// added later stays denied until somebody lists it.
+	filter.AllowMethod(MetadataApi, formatName(metadataModulesMethod))
+	s.services.setFilter(filter)
+
+	if filter == nil {
+		return nil
+	}
+	for _, method := range filter.methodNames() {
+		if s.services.callback(method) == nil {
+			unknown = append(unknown, method)
+		}
+	}
+	return unknown
 }
 
 // ServeCodec reads incoming requests from codec, calls the appropriate callback and writes

@@ -179,7 +179,9 @@ func (api *PrivateAdminAPI) ExportChain(file string, first *uint64, last *uint64
 		return false, errors.New("location would overwrite an existing file")
 	}
 	// Make sure we can create the file to export into
-	out, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
+	// Not os.ModePerm: the path is caller-supplied, so the file must not be
+	// world-writable.
+	out, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return false, err
 	}

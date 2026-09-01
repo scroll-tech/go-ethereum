@@ -606,7 +606,7 @@ var (
 	}
 	HTTPApiFlag = cli.StringFlag{
 		Name:  "http.api",
-		Usage: "API's offered over the HTTP-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
+		Usage: "API's offered over the HTTP-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it. An empty list exposes nothing. Does not restrict IPC",
 		Value: "",
 	}
 	HTTPPathPrefixFlag = cli.StringFlag{
@@ -644,7 +644,7 @@ var (
 	}
 	WSApiFlag = cli.StringFlag{
 		Name:  "ws.api",
-		Usage: "API's offered over the WS-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
+		Usage: "API's offered over the WS-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it. An empty list exposes nothing. Does not restrict IPC",
 		Value: "",
 	}
 	WSAllowedOriginsFlag = cli.StringFlag{
@@ -669,9 +669,9 @@ var (
 		Name:  "rpc.allow-unprotected-txs",
 		Usage: "Allow for unprotected (non EIP155 signed) transactions to be submitted via RPC",
 	}
-	DisableJSTracersFlag = cli.BoolFlag{
-		Name:  "rpc.disable-js-tracers",
-		Usage: "Reject debug_trace* requests asking for any JavaScript tracer, leaving only the native Go tracers (callTracer, prestateTracer, 4byteTracer, flatCallTracer, noopTracerNative)",
+	UnsafeAllowJSTracersFlag = cli.BoolFlag{
+		Name:  "rpc.unsafe-allow-js-tracers",
+		Usage: "Serve debug_trace* requests asking for a JavaScript tracer. These run in an in-process C interpreter (duktape); leave off unless you need them, and never on a public endpoint",
 	}
 
 	// Network Settings
@@ -1406,6 +1406,18 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
+// jsTracerFlagsConflict reports whether the JavaScript tracer flags ask for
+// opposite things.
+//
+// The deprecated --rpc.disable-js-tracers can no longer enable anything, so it
+// agrees with the default and with an explicit deny. Only an explicit
+// --rpc.unsafe-allow-js-tracers contradicts it, and a contradiction stops the
+// node rather than being resolved in silence: picking "disable" would ignore the
+// flag an operator adds deliberately when they need JavaScript tracers.
+func jsTracerFlagsConflict(disableSet, disable, allowSet, allow bool) bool {
+	return disableSet && disable && allowSet && allow
+}
+
 // SetNodeConfig applies node-related command line flags to the config.
 func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	SetP2PConfig(ctx, &cfg.P2P)
@@ -1423,7 +1435,17 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	}
 
 	if ctx.GlobalIsSet(DisableJSTracersFlag.Name) {
-		cfg.DisableJSTracers = ctx.GlobalBool(DisableJSTracersFlag.Name)
+		log.Warn("Option rpc.disable-js-tracers is deprecated, JavaScript tracers are off by default. Use --rpc.unsafe-allow-js-tracers to enable them")
+	}
+	if jsTracerFlagsConflict(
+		ctx.GlobalIsSet(DisableJSTracersFlag.Name), ctx.GlobalBool(DisableJSTracersFlag.Name),
+		ctx.GlobalIsSet(UnsafeAllowJSTracersFlag.Name), ctx.GlobalBool(UnsafeAllowJSTracersFlag.Name),
+	) {
+		Fatalf("--%s and --%s contradict each other. Drop --%s: it is deprecated, and JavaScript tracers are off by default",
+			DisableJSTracersFlag.Name, UnsafeAllowJSTracersFlag.Name, DisableJSTracersFlag.Name)
+	}
+	if ctx.GlobalIsSet(UnsafeAllowJSTracersFlag.Name) {
+		cfg.AllowJSTracers = ctx.GlobalBool(UnsafeAllowJSTracersFlag.Name)
 	}
 
 	cfg.DAMissingHeaderFieldsBaseURL = ctx.GlobalString(DAMissingHeaderFieldsBaseURLFlag.Name)
@@ -2126,8 +2148,9 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend, *eth.Ethereum) {
 	// Applied before the tracer APIs below are registered, so the interpreted
 	// engines are already off by the time any of them can be called.
-	if stack.Config().DisableJSTracers {
-		log.Info("JavaScript tracers disabled, only native tracers are reachable")
+	if stack.Config().AllowJSTracers {
+		log.Warn("JavaScript tracers enabled, they run in an in-process C interpreter")
+	} else {
 		tracers.DisableJSTracers()
 	}
 

@@ -262,6 +262,9 @@ func deprecated(field string) bool {
 		return true
 	case "ethconfig.Config.EWASMInterpreter":
 		return true
+	case "node.Config.DisableJSTracers":
+		// Replaced by AllowJSTracers; JavaScript tracers are off by default now.
+		return true
 	default:
 		return false
 	}

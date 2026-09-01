@@ -161,7 +161,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.RPCGlobalEVMTimeoutFlag,
 			utils.RPCGlobalTxFeeCapFlag,
 			utils.AllowUnprotectedTxs,
-			utils.DisableJSTracersFlag,
+			utils.UnsafeAllowJSTracersFlag,
 			utils.MaxBlockRangeFlag,
 			utils.JSpathFlag,
 			utils.ExecFlag,
@@ -262,6 +262,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		Name: "ALIASED (deprecated)",
 		Flags: []cli.Flag{
 			utils.NoUSBFlag,
+			utils.DisableJSTracersFlag,
 		},
 	},
 	{

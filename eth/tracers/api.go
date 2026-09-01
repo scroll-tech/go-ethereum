@@ -1043,11 +1043,5 @@ func APIs(backend Backend, scrollTracerWrapper scrollTracerWrapper) []rpc.API {
 			Service:   NewAPI(backend, scrollTracerWrapper),
 			Public:    false,
 		},
-		{
-			Namespace: "scroll",
-			Version:   "1.0",
-			Service:   TraceBlock(NewAPI(backend, scrollTracerWrapper)),
-			Public:    true,
-		},
 	}
 }

@@ -606,7 +606,7 @@ var (
 	}
 	HTTPApiFlag = cli.StringFlag{
 		Name:  "http.api",
-		Usage: "API's offered over the HTTP-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
+		Usage: "API's offered over the HTTP-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it. An empty list exposes nothing. Does not restrict IPC",
 		Value: "",
 	}
 	HTTPPathPrefixFlag = cli.StringFlag{
@@ -644,7 +644,7 @@ var (
 	}
 	WSApiFlag = cli.StringFlag{
 		Name:  "ws.api",
-		Usage: "API's offered over the WS-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
+		Usage: "API's offered over the WS-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it. An empty list exposes nothing. Does not restrict IPC",
 		Value: "",
 	}
 	WSAllowedOriginsFlag = cli.StringFlag{
@@ -669,9 +669,9 @@ var (
 		Name:  "rpc.allow-unprotected-txs",
 		Usage: "Allow for unprotected (non EIP155 signed) transactions to be submitted via RPC",
 	}
-	DisableJSTracersFlag = cli.BoolFlag{
-		Name:  "rpc.disable-js-tracers",
-		Usage: "Reject debug_trace* requests asking for any JavaScript tracer, leaving only the native Go tracers (callTracer, prestateTracer, 4byteTracer, flatCallTracer, noopTracerNative)",
+	UnsafeAllowJSTracersFlag = cli.BoolFlag{
+		Name:  "rpc.unsafe-allow-js-tracers",
+		Usage: "Serve debug_trace* requests asking for a JavaScript tracer. These run in an in-process C interpreter (duktape); leave off unless you need them, and never on a public endpoint",
 	}
 
 	// Network Settings
@@ -1423,7 +1423,10 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	}
 
 	if ctx.GlobalIsSet(DisableJSTracersFlag.Name) {
-		cfg.DisableJSTracers = ctx.GlobalBool(DisableJSTracersFlag.Name)
+		log.Warn("Option rpc.disable-js-tracers is deprecated, JavaScript tracers are off by default. Use --rpc.unsafe-allow-js-tracers to enable them")
+	}
+	if ctx.GlobalIsSet(UnsafeAllowJSTracersFlag.Name) {
+		cfg.AllowJSTracers = ctx.GlobalBool(UnsafeAllowJSTracersFlag.Name)
 	}
 
 	cfg.DAMissingHeaderFieldsBaseURL = ctx.GlobalString(DAMissingHeaderFieldsBaseURLFlag.Name)
@@ -2126,8 +2129,9 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend, *eth.Ethereum) {
 	// Applied before the tracer APIs below are registered, so the interpreted
 	// engines are already off by the time any of them can be called.
-	if stack.Config().DisableJSTracers {
-		log.Info("JavaScript tracers disabled, only native tracers are reachable")
+	if stack.Config().AllowJSTracers {
+		log.Warn("JavaScript tracers enabled, they run in an in-process C interpreter")
+	} else {
 		tracers.DisableJSTracers()
 	}
 

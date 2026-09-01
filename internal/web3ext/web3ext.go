@@ -903,23 +903,6 @@ web3._extend({
 	property: 'scroll',
 	methods: [
 		new web3._extend.Method({
-			name: 'getBlockTraceByNumber',
-			call: 'scroll_getBlockTraceByNumberOrHash',
-			params: 1,
-			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
-		}),
-		new web3._extend.Method({
-			name: 'getBlockTraceByHash',
-			call: 'scroll_getBlockTraceByNumberOrHash',
-			params: 1
-		}),
-		new web3._extend.Method({
-			name: 'getTxBlockTraceOnTopOfBlock',
-			call: 'scroll_getTxBlockTraceOnTopOfBlock',
-			params: 3,
-			inputFormatter: [web3._extend.formatters.inputTransactionFormatter, null, null]
-		}),
-		new web3._extend.Method({
 			name: 'getL1MessageByIndex',
 			call: 'scroll_getL1MessageByIndex',
 			params: 1

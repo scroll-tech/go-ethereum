@@ -1406,6 +1406,18 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
+// jsTracerFlagsConflict reports whether the JavaScript tracer flags ask for
+// opposite things.
+//
+// The deprecated --rpc.disable-js-tracers can no longer enable anything, so it
+// agrees with the default and with an explicit deny. Only an explicit
+// --rpc.unsafe-allow-js-tracers contradicts it, and a contradiction stops the
+// node rather than being resolved in silence: picking "disable" would ignore the
+// flag an operator adds deliberately when they need JavaScript tracers.
+func jsTracerFlagsConflict(disableSet, disable, allowSet, allow bool) bool {
+	return disableSet && disable && allowSet && allow
+}
+
 // SetNodeConfig applies node-related command line flags to the config.
 func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	SetP2PConfig(ctx, &cfg.P2P)
@@ -1424,6 +1436,13 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 
 	if ctx.GlobalIsSet(DisableJSTracersFlag.Name) {
 		log.Warn("Option rpc.disable-js-tracers is deprecated, JavaScript tracers are off by default. Use --rpc.unsafe-allow-js-tracers to enable them")
+	}
+	if jsTracerFlagsConflict(
+		ctx.GlobalIsSet(DisableJSTracersFlag.Name), ctx.GlobalBool(DisableJSTracersFlag.Name),
+		ctx.GlobalIsSet(UnsafeAllowJSTracersFlag.Name), ctx.GlobalBool(UnsafeAllowJSTracersFlag.Name),
+	) {
+		Fatalf("--%s and --%s contradict each other. Drop --%s: it is deprecated, and JavaScript tracers are off by default",
+			DisableJSTracersFlag.Name, UnsafeAllowJSTracersFlag.Name, DisableJSTracersFlag.Name)
 	}
 	if ctx.GlobalIsSet(UnsafeAllowJSTracersFlag.Name) {
 		cfg.AllowJSTracers = ctx.GlobalBool(UnsafeAllowJSTracersFlag.Name)

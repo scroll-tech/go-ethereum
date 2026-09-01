@@ -62,3 +62,29 @@ func Test_SplitTagsFlag(t *testing.T) {
 		})
 	}
 }
+
+// TestJSTracerFlagsConflict pins the precedence between the deprecated
+// --rpc.disable-js-tracers and its replacement. The deprecated flag can no
+// longer enable anything, so it only conflicts with an explicit allow.
+func TestJSTracerFlagsConflict(t *testing.T) {
+	for _, tt := range []struct {
+		name                string
+		disableSet, disable bool
+		allowSet, allow     bool
+		conflict            bool
+	}{
+		{name: "neither flag given"},
+		{name: "deprecated disable alone", disableSet: true, disable: true},
+		{name: "explicit allow alone", allowSet: true, allow: true},
+		{name: "explicit deny alone", allowSet: true},
+		{name: "disable plus deny agree", disableSet: true, disable: true, allowSet: true},
+		{name: "disable=false plus allow agree", disableSet: true, allowSet: true, allow: true},
+		{name: "disable plus allow contradict", disableSet: true, disable: true, allowSet: true, allow: true, conflict: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := jsTracerFlagsConflict(tt.disableSet, tt.disable, tt.allowSet, tt.allow); got != tt.conflict {
+				t.Errorf("jsTracerFlagsConflict() = %v, want %v", got, tt.conflict)
+			}
+		})
+	}
+}

@@ -796,7 +796,10 @@ func (w *worker) processTxns(txs types.OrderedTransactionSet) (bool, error) {
 			}
 
 			if tx.IsL1MessageTx() {
-				txs.Shift()
+				log.Error("Encountered error while processing L1MessageTx", "err", err, "blockNumber", w.current.header.Number, "queueIndex", tx.AsL1MessageTx().QueueIndex)
+				// Instead of skipping a message or stopping block building,
+				// we continue and build a block with no (more) L1 messages.
+				return false, nil
 			} else {
 				txs.Pop()
 			}
@@ -1071,13 +1074,8 @@ func (w *worker) onTxFailing(txIndex int, tx *types.Transaction, err error) {
 			return
 		}
 
-		queueIndex := tx.AsL1MessageTx().QueueIndex
-		log.Warn("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block",
-			w.current.header.Number, "reason", err)
-		rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, err.Error(),
-			w.current.header.Number.Uint64(), nil)
-		w.current.nextL1MsgIndex = queueIndex + 1
-		l1SkippedCounter.Inc(1)
+		// previously we would skip this transaction here,
+		// but now skipping is disabled.
 	} else if errors.Is(err, core.ErrInsufficientFunds) {
 		log.Trace("Skipping tx with insufficient funds", "tx", tx.Hash().String())
 		w.eth.TxPool().RemoveTx(tx.Hash(), true)

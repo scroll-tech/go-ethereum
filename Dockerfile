@@ -14,6 +14,7 @@ RUN cd /go-ethereum && env GO111MODULE=on go run build/ci.go install ./cmd/geth
 FROM ubuntu:24.04
 
 RUN apt-get -qq update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -qq upgrade -y \
     && apt-get -qq install -y --no-install-recommends ca-certificates netcat-openbsd curl \
     && rm -rf /var/lib/apt/lists/*
 

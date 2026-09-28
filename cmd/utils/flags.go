@@ -873,7 +873,7 @@ var (
 	// Circuit capacity check settings
 	CircuitCapacityCheckEnabledFlag = cli.BoolFlag{
 		Name:  "ccc",
-		Usage: "Enable circuit capacity check during block validation",
+		Usage: "Enable circuit capacity check during block validation (no longer supported, node fails to start)",
 	}
 
 	CircuitCapacityCheckWorkersFlag = cli.UintFlag{

@@ -11,13 +11,8 @@ GORUN = env GO111MODULE=on go run
 libzkp:
 	cd $(PWD)/rollup/ccc/libzkp && make libzkp
 
-nccc_geth: ## geth without circuit capacity checker
+geth:
 	$(GORUN) build/ci.go install ./cmd/geth
-	@echo "Done building."
-	@echo "Run \"$(GOBIN)/geth\" to launch geth."
-
-geth: libzkp
-	$(GORUN) build/ci.go install -buildtags circuit_capacity_checker ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 

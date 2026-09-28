@@ -970,7 +970,10 @@ func TestPrioritizeOverflowTx(t *testing.T) {
 
 	// Process 2 transactions with gas order: tx2 > tx1,
 	// but we will prioritize tx1.
-	b.txPool.AddRemotesSync([]*types.Transaction{tx2})
+	// The worker pauses txpool reorgs until it starts block 2, so wait for the txpool
+	// to drop tx0 (i.e. apply block 1), otherwise tx2 fails with insufficient funds.
+	require.Eventually(t, func() bool { return !b.txPool.Has(tx0.Hash()) }, time.Second, 10*time.Millisecond)
+	require.Equal(t, []error{nil}, b.txPool.AddRemotesSync([]*types.Transaction{tx2}))
 
 	select {
 	case ev := <-sub.Chan():

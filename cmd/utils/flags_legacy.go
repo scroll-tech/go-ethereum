@@ -36,9 +36,15 @@ var ShowDeprecated = cli.Command{
 var DeprecatedFlags = []cli.Flag{
 	LegacyMinerGasTargetFlag,
 	NoUSBFlag,
+	DisableJSTracersFlag,
 }
 
 var (
+	// (Deprecated 2026, shown in aliased flags section)
+	DisableJSTracersFlag = cli.BoolFlag{
+		Name:  "rpc.disable-js-tracers",
+		Usage: "Reject JavaScript tracers (deprecated, they are off by default; use --rpc.unsafe-allow-js-tracers to enable)",
+	}
 	// (Deprecated May 2020, shown in aliased flags section)
 	NoUSBFlag = cli.BoolFlag{
 		Name:  "nousb",

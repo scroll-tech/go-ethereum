@@ -71,9 +71,8 @@ func call(t *testing.T, url, method string) int {
 }
 
 // TestRegisterApisMethodEntries checks the --http.api form used in production:
-// a bare namespace alongside a single published debug method. The debug
-// namespace must still be registered, or the published method could not be
-// served at all, while its siblings must be refused.
+// a bare namespace alongside a single published debug method. The namespace
+// must still be registered, while its other methods are refused.
 func TestRegisterApisMethodEntries(t *testing.T) {
 	srv := rpc.NewServer()
 	t.Cleanup(srv.Stop)
@@ -121,8 +120,9 @@ func TestRegisterApisMalformedEntry(t *testing.T) {
 	}
 }
 
-// TestRegisterApisExposeAllIgnoresFilter pins that IPC, which registers
-// everything, is unaffected by method entries.
+// TestRegisterApisExposeAll pins the exposeAll escape hatch: every namespace is
+// registered regardless of the API list. This is not the IPC path; IPC never
+// calls RegisterApis.
 func TestRegisterApisExposeAll(t *testing.T) {
 	srv := rpc.NewServer()
 	t.Cleanup(srv.Stop)
@@ -138,45 +138,64 @@ func TestRegisterApisExposeAll(t *testing.T) {
 	}
 }
 
-// TestRegisterApisEmptyEntryExposesNothing pins the difference between "no
-// modules configured", which falls back to the public APIs, and "modules
-// configured but empty", which must expose nothing. admin_startHTTP builds the
-// latter from an empty --http.api string (node/api.go).
-func TestRegisterApisEmptyEntryExposesNothing(t *testing.T) {
-	srv := rpc.NewServer()
-	t.Cleanup(srv.Stop)
-	// Public APIs are what the fallback would register, so they are what makes
-	// the difference observable.
+// TestRegisterApisExposesNothingWithoutEntries pins that an API list naming
+// nothing exposes nothing. These are the shapes the CLI and admin_startHTTP
+// produce: SplitAndTrim drops empty fields, so --http.api "" arrives as nil,
+// while admin_startHTTP("") arrives as [""].
+func TestRegisterApisExposesNothingWithoutEntries(t *testing.T) {
 	apis := []rpc.API{
-		{Namespace: "eth", Version: "1.0", Service: new(ethTestAPI), Public: true},
-		{Namespace: "debug", Version: "1.0", Service: new(debugTestAPI), Public: true},
+		{Namespace: "eth", Version: "1.0", Service: new(ethTestAPI)},
+		{Namespace: "debug", Version: "1.0", Service: new(debugTestAPI)},
 	}
-	if err := RegisterApis(apis, []string{""}, srv, false); err != nil {
-		t.Fatalf("RegisterApis: %v", err)
-	}
-	httpsrv := httptest.NewServer(srv)
-	t.Cleanup(httpsrv.Close)
-
-	for _, method := range []string{"eth_blockNumber", "debug_setHead"} {
-		if code := call(t, httpsrv.URL, method); code != -32601 {
-			t.Errorf("%s: code %d, want -32601; an empty API list must expose nothing", method, code)
+	for _, modules := range [][]string{nil, {""}, {" "}} {
+		srv := rpc.NewServer()
+		if err := RegisterApis(apis, modules, srv, false); err != nil {
+			srv.Stop()
+			t.Fatalf("RegisterApis(%q): %v", modules, err)
 		}
+		httpsrv := httptest.NewServer(srv)
+		for _, method := range []string{"eth_blockNumber", "debug_setHead"} {
+			if code := call(t, httpsrv.URL, method); code != -32601 {
+				t.Errorf("modules=%q: %s code %d, want -32601", modules, method, code)
+			}
+		}
+		httpsrv.Close()
+		srv.Stop()
 	}
 }
 
-// TestRegisterApisNoModulesExposesPublic pins the other half: with no entries at
-// all, the public APIs are served, as before.
-func TestRegisterApisNoModulesExposesPublic(t *testing.T) {
+// TestRegisterApisPaddedEntry pins that surrounding whitespace is trimmed, so a
+// list written as "eth, debug" does what it reads like.
+func TestRegisterApisPaddedEntry(t *testing.T) {
 	srv := rpc.NewServer()
 	t.Cleanup(srv.Stop)
-	apis := []rpc.API{{Namespace: "eth", Version: "1.0", Service: new(ethTestAPI), Public: true}}
-	if err := RegisterApis(apis, nil, srv, false); err != nil {
+	if err := RegisterApis(testAPIs(), []string{" eth ", " debug : executionWitness "}, srv, false); err != nil {
 		t.Fatalf("RegisterApis: %v", err)
 	}
 	httpsrv := httptest.NewServer(srv)
 	t.Cleanup(httpsrv.Close)
 
-	if code := call(t, httpsrv.URL, "eth_blockNumber"); code == -32601 {
-		t.Error("eth_blockNumber not served with no modules configured")
+	if code := call(t, httpsrv.URL, "eth_blockNumber"); code != 0 {
+		t.Errorf("eth_blockNumber code %d, want it served", code)
+	}
+	if code := call(t, httpsrv.URL, "debug_executionWitness"); code != 0 {
+		t.Errorf("debug_executionWitness code %d, want it served", code)
+	}
+	if code := call(t, httpsrv.URL, "debug_setHead"); code != -32601 {
+		t.Errorf("debug_setHead code %d, want -32601", code)
+	}
+}
+
+// TestRegisterApisUnknownMethodFails pins that a method nobody offers stops the
+// node rather than being silently denied.
+func TestRegisterApisUnknownMethodFails(t *testing.T) {
+	srv := rpc.NewServer()
+	t.Cleanup(srv.Stop)
+	err := RegisterApis(testAPIs(), []string{"debug:executionWitnes"}, srv, false)
+	if err == nil {
+		t.Fatal("expected an error for a method the server does not offer")
+	}
+	if !strings.Contains(err.Error(), "unknown method") {
+		t.Errorf("error = %q, want it to mention an unknown method", err)
 	}
 }

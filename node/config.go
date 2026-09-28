@@ -127,9 +127,9 @@ type Config struct {
 	// Requests using ip address directly are not affected
 	HTTPVirtualHosts []string `toml:",omitempty"`
 
-	// HTTPModules is a list of API modules to expose via the HTTP RPC interface.
-	// If the module list is empty, all RPC API endpoints designated public will be
-	// exposed.
+	// HTTPModules is a list of API entries to expose via the HTTP RPC interface.
+	// An entry is a namespace ("debug") or a single method
+	// ("debug:executionWitness"). An empty list exposes nothing.
 	HTTPModules []string
 
 	// HTTPTimeouts allows for customization of the timeout values used by the HTTP RPC
@@ -156,9 +156,8 @@ type Config struct {
 	// cannot verify the validity of the request header.
 	WSOrigins []string `toml:",omitempty"`
 
-	// WSModules is a list of API modules to expose via the websocket RPC interface.
-	// If the module list is empty, all RPC API endpoints designated public will be
-	// exposed.
+	// WSModules is a list of API entries to expose via the websocket RPC
+	// interface, in the same form as HTTPModules. An empty list exposes nothing.
 	WSModules []string
 
 	// WSExposeAll exposes all API modules via the WebSocket RPC interface rather
@@ -192,11 +191,10 @@ type Config struct {
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
-	// DisableJSTracers rejects debug_trace* requests that ask for any JavaScript
-	// tracer, leaving only the native Go tracers reachable. This covers the
-	// bundled tracers as well as user-supplied code, because serving either one
-	// still builds a duktape VM and marshals traced EVM state through it.
-	DisableJSTracers bool `toml:",omitempty"`
+	// AllowJSTracers serves debug_trace* requests asking for a JavaScript tracer.
+	// Off by default: they run in duktape, an in-process C interpreter. The
+	// native Go tracers are unaffected either way.
+	AllowJSTracers bool `toml:",omitempty"`
 
 	// Endpoint of L1 HTTP-RPC server
 	L1Endpoint string `toml:",omitempty"`

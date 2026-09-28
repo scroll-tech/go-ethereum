@@ -23,7 +23,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Install rust
       uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
@@ -71,7 +71,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -91,6 +91,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
+        # Go >= 1.19 reformats doc comments; bumping requires a repo-wide reformat.
         go-version: 1.18.x
 
     - name: Install goimports
@@ -118,7 +119,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -142,7 +143,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4

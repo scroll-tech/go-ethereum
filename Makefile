@@ -31,7 +31,7 @@ ios:
 	@echo "Done building."
 	@echo "Import \"$(GOBIN)/Geth.framework\" to use the library."
 
-test: all
+test:
 	# genesis test
 	cd ${PWD}/cmd/geth; go test -test.run TestCustomGenesis
 	# module test

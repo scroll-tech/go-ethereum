@@ -14,9 +14,10 @@ on:
       - synchronize
       - ready_for_review
 
+# Cancel superseded PR runs; push runs get a unique group and always complete.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   build-geth:
@@ -33,7 +34,6 @@ jobs:
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: 1.26.x
-        # Only the test job saves the Go cache, so it keeps the full build cache.
         cache: false
 
     - name: Build
@@ -55,7 +55,6 @@ jobs:
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: 1.26.x
-        # Only the test job saves the Go cache, so it keeps the full build cache.
         cache: false
 
     - name: Lint
@@ -73,6 +72,7 @@ jobs:
       with:
         # Go >= 1.19 reformats doc comments; bumping requires a repo-wide reformat.
         go-version: 1.18.x
+        cache: false
 
     - name: Install goimports
       run: go install golang.org/x/tools/cmd/goimports@v0.24.0
@@ -105,7 +105,6 @@ jobs:
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: 1.26.x
-        # Only the test job saves the Go cache, so it keeps the full build cache.
         cache: false
 
     - run: go mod tidy
@@ -132,7 +131,6 @@ jobs:
       with:
         # Same version as the Dockerfile builder: govulncheck checks the stdlib of this Go.
         go-version: 1.26.8
-        # Only the test job saves the Go cache, so it keeps the full build cache.
         cache: false
 
     - name: Install govulncheck
@@ -170,6 +168,7 @@ jobs:
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: 1.26.x
+        cache: false
 
     - name: Test
       run: |

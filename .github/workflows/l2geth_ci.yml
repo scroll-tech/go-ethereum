@@ -15,7 +15,7 @@ on:
       - ready_for_review
 
 jobs:
-  build-mock-ccc-geth: # build geth with mock circuit capacity checker
+  build-geth:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions: {}
@@ -23,7 +23,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -32,34 +32,6 @@ jobs:
 
     - name: Build
       run: |
-        make nccc_geth
-
-  build-geth: # build geth with circuit capacity checker
-    if: github.event_name == 'push' # will only be triggered when pushing to main & staging & develop & alpha
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.22.x
-
-    - name: Install rust
-      uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
-      with:
-        toolchain: nightly-2023-12-03
-        override: true
-        components: rustfmt, clippy
-
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-
-    - name: Build
-      run: |
-        make libzkp
-        sudo cp ./rollup/ccc/libzkp/libzkp.so /usr/local/lib/
         make geth
 
   check:
@@ -71,7 +43,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -91,6 +63,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
+        # Go >= 1.19 reformats doc comments; bumping requires a repo-wide reformat.
         go-version: 1.18.x
 
     - name: Install goimports
@@ -118,7 +91,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -142,7 +115,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.x
+        go-version: 1.26.x
 
     - name: Checkout code
       uses: actions/checkout@v4

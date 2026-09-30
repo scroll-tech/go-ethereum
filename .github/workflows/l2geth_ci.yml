@@ -14,21 +14,27 @@ on:
       - synchronize
       - ready_for_review
 
+# Cancel superseded PR runs; push runs get a unique group and always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build-geth:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.26.x
-
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
+
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: 1.26.x
+        cache: false
 
     - name: Build
       run: |
@@ -40,15 +46,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.26.x
-
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
+
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: 1.26.x
+        cache: false
 
     - name: Lint
       run: |
@@ -61,16 +68,17 @@ jobs:
     permissions: {}
     steps:
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         # Go >= 1.19 reformats doc comments; bumping requires a repo-wide reformat.
         go-version: 1.18.x
+        cache: false
 
     - name: Install goimports
       run: go install golang.org/x/tools/cmd/goimports@v0.24.0
 
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
 
@@ -88,15 +96,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.26.x
-
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
+
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: 1.26.x
+        cache: false
 
     - run: go mod tidy
 
@@ -107,24 +116,60 @@ jobs:
           exit 1
         fi
 
+  govulncheck:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        # Same version as the Dockerfile builder: govulncheck checks the stdlib of this Go.
+        go-version: 1.26.8
+        cache: false
+
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+
+    - name: Check geth for called vulnerabilities
+      env:
+        # Accepted: GO-2026-6278 (gorilla/websocket, client side only),
+        # GO-2022-0300 (graphql-go, needs the MaxDepth option, which geth does not set).
+        ACCEPTED: GO-2026-6278 GO-2022-0300
+      run: |
+        set -euo pipefail
+        govulncheck -format json ./cmd/geth > govulncheck.json
+        test -s govulncheck.json
+        found=$(jq -r 'select(.finding.trace[0].function != null) | .finding.osv' govulncheck.json | sort -u)
+        unexpected=$(comm -23 <(echo "$found") <(tr ' ' '\n' <<< "$ACCEPTED" | sort -u))
+        if [ -n "$unexpected" ]; then
+          echo "geth calls code with these vulnerabilities:"
+          echo "$unexpected"
+          govulncheck ./cmd/geth || true
+          exit 1
+        fi
+
   test:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: 1.26.x
-
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
+
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: 1.26.x
+        cache: false
 
     - name: Test
       run: |
         make test
-
-    - name: Upload coverage report
-      run: bash <(curl -s https://codecov.io/bash)

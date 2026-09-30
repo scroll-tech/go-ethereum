@@ -232,9 +232,6 @@ func doInstall(cmdline []string) {
 	// Show packages during build.
 	gobuild.Args = append(gobuild.Args, "-v")
 
-	// Add -ldl flags for libscroll_zstd.a.
-	gobuild.Args = append(gobuild.Args, "-ldflags", "-extldflags -ldl")
-
 	// Now we choose what we're even building.
 	// Default: collect all 'main' packages in cmd/ and build those.
 	packages := flag.Args()
@@ -255,6 +252,10 @@ func doInstall(cmdline []string) {
 // buildFlags returns the go tool flags for building.
 func buildFlags(env build.Environment) (flags []string) {
 	var ld []string
+	// See https://github.com/golang/go/issues/33772#issuecomment-528176001
+	// We need to set --buildid to the linker here, and also pass --build-id to the
+	// cgo-linker further down.
+	ld = append(ld, "--buildid=none")
 	if env.Commit != "" {
 		ld = append(ld, "-X", "main.gitCommit="+env.Commit)
 		ld = append(ld, "-X", "main.gitDate="+env.Date)
@@ -265,9 +266,10 @@ func buildFlags(env build.Environment) (flags []string) {
 		ld = append(ld, "-s")
 	}
 	// Enforce the stacksize to 8M, which is the case on most platforms apart from
-	// alpine Linux.
+	// alpine Linux. --build-id=none and --strip-all make the build reproducible
+	// and remove debug info from the binary.
 	if runtime.GOOS == "linux" {
-		ld = append(ld, "-extldflags", "-Wl,-z,stack-size=0x800000")
+		ld = append(ld, "-extldflags", "-Wl,-z,stack-size=0x800000,--build-id=none,--strip-all")
 	}
 	if len(ld) > 0 {
 		flags = append(flags, "-ldflags", strings.Join(ld, " "))

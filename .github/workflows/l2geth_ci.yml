@@ -144,7 +144,9 @@ jobs:
         # GO-2022-0300 (graphql-go, needs the MaxDepth option, which geth does not set).
         ACCEPTED: GO-2026-6278 GO-2022-0300
       run: |
+        set -euo pipefail
         govulncheck -format json ./cmd/geth > govulncheck.json
+        test -s govulncheck.json
         found=$(jq -r 'select(.finding.trace[0].function != null) | .finding.osv' govulncheck.json | sort -u)
         unexpected=$(comm -23 <(echo "$found") <(tr ' ' '\n' <<< "$ACCEPTED" | sort -u))
         if [ -n "$unexpected" ]; then

@@ -4,7 +4,7 @@ ARG VERSION=""
 ARG BUILDNUM=""
 
 # Build Geth in a stock Go builder container
-FROM golang:1.26.8-bookworm AS builder
+FROM golang:1.26.10-bookworm AS builder
 
 # Get dependencies - will also be cached if we won't change go.mod/go.sum
 COPY go.mod go.sum /go-ethereum/

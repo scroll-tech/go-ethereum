@@ -5,7 +5,7 @@ ARG BUILDNUM=""
 ARG SCROLL_LIB_PATH=/scroll/lib
 
 # Build Geth in a stock Go builder container
-FROM golang:1.26.8-bookworm AS builder
+FROM golang:1.26.10-bookworm AS builder
 
 WORKDIR /go-ethereum
 COPY go.mod go.sum ./

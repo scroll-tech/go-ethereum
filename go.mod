@@ -2,7 +2,7 @@ module github.com/scroll-tech/go-ethereum
 
 go 1.25.0
 
-toolchain go1.26.8
+toolchain go1.26.10
 
 require (
 	github.com/Azure/azure-storage-blob-go v0.7.0

@@ -2,6 +2,7 @@ package validium
 
 import (
 	"bytes"
+	"errors"
 	"math/big"
 	"testing"
 
@@ -251,5 +252,33 @@ func TestDecryptTxDataWithPubKey_NilPubKey(t *testing.T) {
 	_, err = DecryptTxDataWithPubKey(encryptedCall, nil)
 	if err == nil {
 		t.Error("expected error when calling DecryptTxDataWithPubKey with nil pubKey")
+	}
+}
+
+// TestDecryptAddressRejectsNonUncompressedPrefix checks that only the 0x04 prefix decrypts, as in the prover.
+func TestDecryptAddressRejectsNonUncompressedPrefix(t *testing.T) {
+	defer resetKeyState()
+
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
+	encrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
+
+	if got, err := decryptAddressWithPubKey(encrypted, compressedPubKey); err != nil || got != target {
+		t.Fatalf("prefix 0x04: got %s, %v; want %s", got.Hex(), err, target.Hex())
+	}
+	for prefix := 0; prefix < 256; prefix++ {
+		if prefix == 0x04 {
+			continue
+		}
+		changed := bytes.Clone(encrypted)
+		changed[0] = byte(prefix)
+		if _, err := decryptAddressWithPubKey(changed, compressedPubKey); !errors.Is(err, ErrDecryptionFailed) {
+			t.Errorf("prefix 0x%02x: got %v, want ErrDecryptionFailed", prefix, err)
+		}
+	}
+	if _, err := decryptAddressWithPubKey(nil, compressedPubKey); !errors.Is(err, ErrDecryptionFailed) {
+		t.Errorf("empty ciphertext: got %v, want ErrDecryptionFailed", err)
 	}
 }

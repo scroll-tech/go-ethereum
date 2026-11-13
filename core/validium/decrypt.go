@@ -190,6 +190,12 @@ func decryptAddressWithPubKey(data []byte, compressedPubKey []byte) (common.Addr
 		return common.Address{}, fmt.Errorf("%w for public key %s", ErrMissingPrivateKey, pubKeyHex[:16]+"...")
 	}
 
+	// The ephemeral public key must be in the uncompressed form, 0x04 || X || Y. ecies.Decrypt
+	// ignores this byte, but the prover rejects any other prefix: both must reject the same data.
+	if len(data) == 0 || data[0] != 0x04 {
+		return common.Address{}, fmt.Errorf("%w: ephemeral public key is not uncompressed", ErrDecryptionFailed)
+	}
+
 	raw, err := ecies.Decrypt(privateKey, data)
 	if err != nil {
 		// User error: decryption failed (bad data or wrong key)

@@ -2,6 +2,7 @@ package validium
 
 import (
 	"bytes"
+	"errors"
 	"math/big"
 	"testing"
 
@@ -11,8 +12,17 @@ import (
 )
 
 func TestDepositERC20NotEncrypted(t *testing.T) {
+	defer resetKeyState()
+
+	// Setup: configure a key (even though this data isn't encrypted)
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
+
 	data := common.Hex2Bytes("8ef1332e000000000000000000000000f1af3b23de0a5ca3cab7261cb0061c0d779a5c7b00000000000000000000000033b60d5dd260d453cac3782b0bdc01ce84672142000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e9cd600000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e48431f5c1000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000006efdbff2a14a7c8e15944d1f4a48f9f95f663a4000000000000000000000000f4e147db314947fc1275a8cbb6cde48c510cd8cf0000000000000000000000003a6a724595184dda4be69db1ce726f2ac3d66b870000000000000000000000000000000000000000000000000000000783a8a06400000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
-	newData, err := DecryptTxData(data)
+
+	// Non-encrypted data should pass through unchanged regardless of pubKey
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	newData, err := DecryptTxDataWithPubKey(data, compressedPubKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,12 +33,14 @@ func TestDepositERC20NotEncrypted(t *testing.T) {
 }
 
 func TestDecryptRelayMessage(t *testing.T) {
-	testKey, _ := ecies.NewPrivateKeyFromHex("108ccd658782903954a11f6061fe7f30302feeca84a95354ed37384841956efb")
-	SetSequencerKey(testKey)
+	defer resetKeyState()
+
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
 
 	// Address encrypted using eciesjs.
 	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
-	targetEncrypted := common.Hex2Bytes("047940cffef9d00a0064cfde73bb473cb42ca9b62d2703b0009af7e9fa903095be5d914753f16b3f9451fee66cad74c075a247d64210793ea4225022581c8ac7b7d303f767fd538073f9d4207ca9e670b46dd4703d0eae18fd3e3e26921e4cd2abf57419ced65f10156a7d40642bcce03ee37425a1aa9e4244b6cd6f39944f6c4cb39081a1843602a0")
+	targetEncrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
 
 	// Assume we see a "relayMessageEncrypted(...)" call with no payload.
 	encryptedArgs := relayMessageEncryptedArgs{
@@ -45,7 +57,8 @@ func TestDecryptRelayMessage(t *testing.T) {
 	}
 
 	// Process call, decrypt payload.
-	decryptedCall, err := DecryptTxData(encryptedCall)
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	decryptedCall, err := DecryptTxDataWithPubKey(encryptedCall, compressedPubKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,12 +75,14 @@ func TestDecryptRelayMessage(t *testing.T) {
 }
 
 func TestDecryptDepositERC20Message(t *testing.T) {
-	testKey, _ := ecies.NewPrivateKeyFromHex("04273c070e32f8d44d49e44fb45f02e726ef8ffa857af1751d5d24bdad26021a")
-	SetSequencerKey(testKey)
+	defer resetKeyState()
+
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
 
 	// Address encrypted using eciesjs.
 	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
-	targetEncrypted := common.Hex2Bytes("041d424ad8ae52c1b9f9a5ee23d2b8a0689545fdd889645976f808df87ef4471e37ea0b77a494fa3d0b7c6e2794180a31b1326c5af1f21c40cfde321cccdfd48b2234800ffb1a93c5583b7267ce9274a193d28fae1f2f34653cc286fb8f0eb4d4f9a1234743fdd4d84544b5db30696578e8e7d1af76bc875ff6f8d3a60500322a70fd83879a8fef0d7")
+	targetEncrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
 
 	// Assume we see a "relayMessage(...)" call with "finalizeDepositERC20Encrypted(...)" payload.
 	encryptedInnerArgs := finalizeDepositERC20EncryptedArgs{
@@ -98,7 +113,8 @@ func TestDecryptDepositERC20Message(t *testing.T) {
 	}
 
 	// Process call, decrypt payload.
-	decryptedOuterCall, err := DecryptTxData(encryptedOuterCall)
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	decryptedOuterCall, err := DecryptTxDataWithPubKey(encryptedOuterCall, compressedPubKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,5 +133,152 @@ func TestDecryptDepositERC20Message(t *testing.T) {
 
 	if decryptedInnerArgs.To != target {
 		t.Errorf("expected target %s, got %s", target.Hex(), decryptedOuterArgs.Target.Hex())
+	}
+}
+
+// Tests for key rotation support
+
+// resetKeyState resets global key state to avoid test pollution
+func resetKeyState() {
+	lock.Lock()
+	defer lock.Unlock()
+	sequencerKeys = nil
+}
+
+// TestDecryptTxDataWithPubKey_SingleKey tests decryption with a single key
+func TestDecryptTxDataWithPubKey_SingleKey(t *testing.T) {
+	defer resetKeyState()
+
+	// Setup: generate test key
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
+
+	// Address encrypted using eciesjs
+	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
+	targetEncrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
+
+	// Create encrypted relay message call
+	encryptedArgs := relayMessageEncryptedArgs{
+		Sender:       common.Address{},
+		Target:       targetEncrypted,
+		Value:        big.NewInt(0),
+		MessageNonce: big.NewInt(0),
+		Message:      []byte{},
+	}
+
+	encryptedCall, err := encryptedArgs.packFunctionCall()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decrypt using the public key
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	decryptedCall, err := DecryptTxDataWithPubKey(encryptedCall, compressedPubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decryptedArgs relayMessageArgs
+	err = unpackArguments("relayMessage", &decryptedArgs, decryptedCall[4:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decryptedArgs.Target != target {
+		t.Errorf("expected target %s, got %s", target.Hex(), decryptedArgs.Target.Hex())
+	}
+}
+
+// TestDecryptTxDataWithPubKey_MultipleKeys tests that multiple keys can be configured
+func TestDecryptTxDataWithPubKey_MultipleKeys(t *testing.T) {
+	defer resetKeyState()
+
+	// Setup: generate multiple test keys
+	key0, _ := ecies.GenerateKey()
+	key1, _ := ecies.GenerateKey()
+	key2, _ := ecies.GenerateKey()
+
+	SetSequencerKeys([]*ecies.PrivateKey{key0, key1, key2})
+
+	// Verify all keys can be retrieved by their public keys
+	pubKey0 := key0.PublicKey.Bytes(true)
+	pubKey1 := key1.PublicKey.Bytes(true)
+	pubKey2 := key2.PublicKey.Bytes(true)
+
+	if _, err := GetKeyByPubKey(pubKey0); err != nil {
+		t.Errorf("failed to get key0: %v", err)
+	}
+	if _, err := GetKeyByPubKey(pubKey1); err != nil {
+		t.Errorf("failed to get key1: %v", err)
+	}
+	if _, err := GetKeyByPubKey(pubKey2); err != nil {
+		t.Errorf("failed to get key2: %v", err)
+	}
+
+	// Test that unknown key returns error
+	unknownKey, _ := ecies.GenerateKey()
+	unknownPubKey := unknownKey.PublicKey.Bytes(true)
+	if _, err := GetKeyByPubKey(unknownPubKey); err == nil {
+		t.Error("expected error for unknown public key")
+	}
+}
+
+// TestDecryptTxDataWithPubKey_NilPubKey tests that nil pubKey returns error
+func TestDecryptTxDataWithPubKey_NilPubKey(t *testing.T) {
+	defer resetKeyState()
+
+	// Setup: configure a key
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
+
+	// Address encrypted using eciesjs
+	targetEncrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
+
+	// Create encrypted relay message call
+	encryptedArgs := relayMessageEncryptedArgs{
+		Sender:       common.Address{},
+		Target:       targetEncrypted,
+		Value:        big.NewInt(0),
+		MessageNonce: big.NewInt(0),
+		Message:      []byte{},
+	}
+
+	encryptedCall, err := encryptedArgs.packFunctionCall()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decrypt with nil pubKey (should return error)
+	_, err = DecryptTxDataWithPubKey(encryptedCall, nil)
+	if err == nil {
+		t.Error("expected error when calling DecryptTxDataWithPubKey with nil pubKey")
+	}
+}
+
+// TestDecryptAddressRejectsNonUncompressedPrefix checks that only the 0x04 prefix decrypts, as in the prover.
+func TestDecryptAddressRejectsNonUncompressedPrefix(t *testing.T) {
+	defer resetKeyState()
+
+	testKey, _ := ecies.NewPrivateKeyFromHex("32d11e92cdb5ed666faa2ec639a03c63dfd730b6ae41f1306a59f1d1e9201b59")
+	SetSequencerKeys([]*ecies.PrivateKey{testKey})
+	compressedPubKey := testKey.PublicKey.Bytes(true)
+	target := common.HexToAddress("127b15f37acbeaa4188a3388689445ae892787bc")
+	encrypted := common.Hex2Bytes("047228ab6bed95b93ceef9a64da739375952d1c53cf3dd9a20b76821d74f393dd1a8cd854afd67d8ad5dc0672314c5c059d7b3ba1479fe1efc522b3049351969da362cabc57d7a99446e4341ad6fce79a38b6ed3cc1bb6b51858660b3f365cf45ceea21a1ea08aa65a4107d8cc27c5462153321e27")
+
+	if got, err := decryptAddressWithPubKey(encrypted, compressedPubKey); err != nil || got != target {
+		t.Fatalf("prefix 0x04: got %s, %v; want %s", got.Hex(), err, target.Hex())
+	}
+	for prefix := 0; prefix < 256; prefix++ {
+		if prefix == 0x04 {
+			continue
+		}
+		changed := bytes.Clone(encrypted)
+		changed[0] = byte(prefix)
+		if _, err := decryptAddressWithPubKey(changed, compressedPubKey); !errors.Is(err, ErrDecryptionFailed) {
+			t.Errorf("prefix 0x%02x: got %v, want ErrDecryptionFailed", prefix, err)
+		}
+	}
+	if _, err := decryptAddressWithPubKey(nil, compressedPubKey); !errors.Is(err, ErrDecryptionFailed) {
+		t.Errorf("empty ciphertext: got %v, want ErrDecryptionFailed", err)
 	}
 }

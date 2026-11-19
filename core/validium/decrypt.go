@@ -5,13 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/log"
 
 	ecies "github.com/scroll-tech/ecies-go/v2"
+)
+
+var (
+	// ErrMissingPrivateKey indicates the operator has not configured the required private key.
+	// This is an operator error that requires fixing the sequencer configuration.
+	ErrMissingPrivateKey = errors.New("missing private key for encryption key")
+
+	// ErrDecryptionFailed indicates the encrypted data could not be decrypted.
+	// This is typically a user error (invalid encrypted data, wrong key used, or garbage data).
+	ErrDecryptionFailed = errors.New("decryption failed")
 )
 
 const (
@@ -23,17 +32,7 @@ const (
 
 var (
 	BridgeABI abi.ABI
-
-	SequencerKey *ecies.PrivateKey
-	lock         sync.RWMutex
 )
-
-func SetSequencerKey(key *ecies.PrivateKey) {
-	lock.Lock()
-	defer lock.Unlock()
-	SequencerKey = key
-	log.Warn("Sequencer key set", "publicKey", key.PublicKey.Hex(true))
-}
 
 func init() {
 	abiJSON := `[{
@@ -157,42 +156,13 @@ func (v *finalizeDepositERC20EncryptedArgs) packFunctionCall() ([]byte, error) {
 	return packFunctionCall(finalizeDepositERC20Encrypted, v.Token, v.L2Token, v.From, v.To, v.Amount, v.L2Data)
 }
 
-// decrypt converts a finalizeDepositERC20EncryptedArgs to finalizeDepositERC20Args by decrypting the To field.
-func (v *finalizeDepositERC20EncryptedArgs) decrypt() (*finalizeDepositERC20Args, error) {
-	decrypted, err := decryptAddress(v.To)
-	if err != nil {
-		return nil, err
+// decryptAddressWithKey decrypts the given encrypted address using the specified private key.
+func decryptAddressWithKey(data []byte, privateKey *ecies.PrivateKey) (common.Address, error) {
+	if privateKey == nil {
+		return common.Address{}, errors.New("no decryption key provided")
 	}
 
-	return &finalizeDepositERC20Args{
-		Token:   v.Token,
-		L2Token: v.L2Token,
-		From:    v.From,
-		To:      decrypted,
-		Amount:  v.Amount,
-		L2Data:  v.L2Data,
-	}, nil
-}
-
-// decrypt converts a relayMessageEncryptedArgs to relayMessageArgs by decrypting the Target field.
-func (v relayMessageEncryptedArgs) decrypt() (relayMessageArgs, error) {
-	decrypted, err := decryptAddress(v.Target)
-	if err != nil {
-		return relayMessageArgs{}, err
-	}
-
-	return relayMessageArgs{
-		Sender:       v.Sender,
-		Target:       decrypted,
-		Value:        v.Value,
-		MessageNonce: v.MessageNonce,
-		Message:      v.Message,
-	}, nil
-}
-
-// decryptAddress decrypts the given encrypted address using the configured sequencer key.
-func decryptAddress(data []byte) (common.Address, error) {
-	raw, err := ecies.Decrypt(SequencerKey, data)
+	raw, err := ecies.Decrypt(privateKey, data)
 	if err != nil {
 		log.Warn("failed to decrypt address", "data", common.Bytes2Hex(data), "error", err)
 		return common.Address{}, errors.New("decryption failed")
@@ -208,8 +178,80 @@ func decryptAddress(data []byte) (common.Address, error) {
 	return address, nil
 }
 
-// decryptInnerCall decrypts the inner call of a relayMessageArgs if it is encrypted.
-func (v *relayMessageArgs) decryptInnerCall() error {
+// decryptAddressWithPubKey decrypts the given encrypted address using the private key
+// corresponding to the given compressed public key.
+// Returns ErrMissingPrivateKey if the private key is not configured (operator error).
+// Returns ErrDecryptionFailed if decryption fails or data is invalid (user error).
+func decryptAddressWithPubKey(data []byte, compressedPubKey []byte) (common.Address, error) {
+	privateKey, err := GetKeyByPubKey(compressedPubKey)
+	if err != nil {
+		// Operator error: private key not configured
+		pubKeyHex := common.Bytes2Hex(compressedPubKey)
+		return common.Address{}, fmt.Errorf("%w for public key %s", ErrMissingPrivateKey, pubKeyHex[:16]+"...")
+	}
+
+	// The ephemeral public key must be in the uncompressed form, 0x04 || X || Y. ecies.Decrypt
+	// ignores this byte, but the prover rejects any other prefix: both must reject the same data.
+	if len(data) == 0 || data[0] != 0x04 {
+		return common.Address{}, fmt.Errorf("%w: ephemeral public key is not uncompressed", ErrDecryptionFailed)
+	}
+
+	raw, err := ecies.Decrypt(privateKey, data)
+	if err != nil {
+		// User error: decryption failed (bad data or wrong key)
+		pubKeyHex := common.Bytes2Hex(compressedPubKey)
+		log.Warn("failed to decrypt address", "pubKeyHex", pubKeyHex[:16]+"...", "data", common.Bytes2Hex(data), "error", err)
+		return common.Address{}, fmt.Errorf("%w: %s", ErrDecryptionFailed, err.Error())
+	}
+
+	if len(raw) != common.AddressLength {
+		// User error: decrypted data is not a valid address
+		pubKeyHex := common.Bytes2Hex(compressedPubKey)
+		log.Warn("decrypted data is not address", "pubKeyHex", pubKeyHex[:16]+"...", "data", common.Bytes2Hex(data), "plaintext", common.Bytes2Hex(raw))
+		return common.Address{}, fmt.Errorf("%w: invalid address length %d", ErrDecryptionFailed, len(raw))
+	}
+
+	address := common.BytesToAddress(raw)
+	pubKeyHex := common.Bytes2Hex(compressedPubKey)
+	log.Info("Successfully decrypted address", "pubKeyHex", pubKeyHex[:16]+"...", "address", address)
+	return address, nil
+}
+
+// decryptWithPubKey converts a finalizeDepositERC20EncryptedArgs to finalizeDepositERC20Args by decrypting the To field using the specified public key.
+func (v *finalizeDepositERC20EncryptedArgs) decryptWithPubKey(compressedPubKey []byte) (*finalizeDepositERC20Args, error) {
+	decrypted, err := decryptAddressWithPubKey(v.To, compressedPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &finalizeDepositERC20Args{
+		Token:   v.Token,
+		L2Token: v.L2Token,
+		From:    v.From,
+		To:      decrypted,
+		Amount:  v.Amount,
+		L2Data:  v.L2Data,
+	}, nil
+}
+
+// decryptWithPubKey converts a relayMessageEncryptedArgs to relayMessageArgs by decrypting the Target field using the specified public key.
+func (v relayMessageEncryptedArgs) decryptWithPubKey(compressedPubKey []byte) (relayMessageArgs, error) {
+	decrypted, err := decryptAddressWithPubKey(v.Target, compressedPubKey)
+	if err != nil {
+		return relayMessageArgs{}, err
+	}
+
+	return relayMessageArgs{
+		Sender:       v.Sender,
+		Target:       decrypted,
+		Value:        v.Value,
+		MessageNonce: v.MessageNonce,
+		Message:      v.Message,
+	}, nil
+}
+
+// decryptInnerCallWithPubKey decrypts the inner call of a relayMessageArgs if it is encrypted, using the specified public key.
+func (v *relayMessageArgs) decryptInnerCallWithPubKey(compressedPubKey []byte) error {
 	if len(v.Message) < 4 {
 		return nil
 	}
@@ -223,7 +265,7 @@ func (v *relayMessageArgs) decryptInnerCall() error {
 		var encrypted finalizeDepositERC20EncryptedArgs
 		if err := unpackArguments(finalizeDepositERC20Encrypted, &encrypted, payload); err != nil {
 			return err
-		} else if decrypted, err := encrypted.decrypt(); err != nil {
+		} else if decrypted, err := encrypted.decryptWithPubKey(compressedPubKey); err != nil {
 			return err
 		} else if v.Message, err = decrypted.packFunctionCall(); err != nil { // overwrite the message with the decrypted call
 			return err
@@ -237,10 +279,16 @@ func (v *relayMessageArgs) decryptInnerCall() error {
 	}
 }
 
-// DecryptTxData decrypts the transaction data, handling both encrypted and unencrypted calls.
-func DecryptTxData(data []byte) ([]byte, error) {
+// DecryptTxDataWithPubKey decrypts the transaction data using the specified compressed public key.
+// This function supports key rotation by allowing the caller to specify which public key to use.
+// compressedPubKey must be provided (33 bytes) - it identifies which private key to use for decryption.
+func DecryptTxDataWithPubKey(data []byte, compressedPubKey []byte) ([]byte, error) {
 	if len(data) < 4 {
 		return data, nil
+	}
+
+	if compressedPubKey == nil {
+		return nil, fmt.Errorf("compressedPubKey must be provided")
 	}
 
 	// decrypt outer call
@@ -260,7 +308,7 @@ func DecryptTxData(data []byte) ([]byte, error) {
 		var encrypted relayMessageEncryptedArgs
 		if err := unpackArguments(relayMessageEncrypted, &encrypted, payload); err != nil {
 			return nil, err
-		} else if args, err = encrypted.decrypt(); err != nil {
+		} else if args, err = encrypted.decryptWithPubKey(compressedPubKey); err != nil {
 			return nil, err
 		}
 
@@ -270,7 +318,7 @@ func DecryptTxData(data []byte) ([]byte, error) {
 	}
 
 	// decrypt inner call
-	if err := args.decryptInnerCall(); err != nil {
+	if err := args.decryptInnerCallWithPubKey(compressedPubKey); err != nil {
 		return nil, err
 	} else if data, err = args.packFunctionCall(); err != nil { // overwrite the message with the decrypted call
 		return nil, err

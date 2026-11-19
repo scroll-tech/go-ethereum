@@ -112,6 +112,10 @@ var (
 	l1MessageV2StartIndexKey          = []byte("MessageQueueV2StartIndex")
 	l1MessageV2FirstL1BlockNumberKey  = []byte("MessageQueueV2FirstL1BlockNumber")
 
+	// Encryption key store
+	encryptionKeyPrefix           = []byte("ek") // encryptionKeyPrefix + keyId (uint64 big endian) -> EncryptionKey
+	highestSyncedEncryptionKeyId  = []byte("HighestSyncedEncryptionKeyId")
+
 	// Scroll rollup event store
 	rollupEventSyncedL1BlockNumberKey = []byte("R-LastRollupEventSyncedL1BlockNumber")
 	batchMetaPrefix                   = []byte("R-bm")
@@ -315,6 +319,11 @@ func batchMetaKey(batchIndex uint64) []byte {
 // committedBatchMetaKey = committedBatchMetaPrefix + batch index (uint64 big endian)
 func committedBatchMetaKey(batchIndex uint64) []byte {
 	return append(committedBatchMetaPrefix, encodeBigEndian(batchIndex)...)
+}
+
+// encryptionKeyKey = encryptionKeyPrefix + keyId (uint64 big endian)
+func encryptionKeyKey(keyId uint64) []byte {
+	return append(encryptionKeyPrefix, encodeBigEndian(keyId)...)
 }
 
 func diskStateRootKey(headerRoot common.Hash) []byte {

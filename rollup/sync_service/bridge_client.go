@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/accounts/abi/bind"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rollup/l1"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 // BridgeClient is a wrapper around EthClient that adds
-// methods for conveniently collecting L1 messages.
+// methods for conveniently collecting L1 messages and encryption keys.
 type BridgeClient struct {
 	client        EthClient
 	confirmations rpc.BlockNumber
@@ -25,9 +27,11 @@ type BridgeClient struct {
 	enableMessageQueueV2    bool
 	l1MessageQueueV2Address common.Address
 	filtererV2              *L1MessageQueueFilterer
+
+	scrollChainAddress common.Address
 }
 
-func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueV1Address common.Address, enableMessageQueueV2 bool, l1MessageQueueV2Address common.Address) (*BridgeClient, error) {
+func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, confirmations rpc.BlockNumber, l1MessageQueueV1Address common.Address, enableMessageQueueV2 bool, l1MessageQueueV2Address common.Address, scrollChainAddress common.Address) (*BridgeClient, error) {
 	if l1MessageQueueV1Address == (common.Address{}) {
 		return nil, errors.New("must pass non-zero l1MessageQueueV1Address to BridgeClient")
 	}
@@ -67,6 +71,8 @@ func newBridgeClient(ctx context.Context, l1Client EthClient, l1ChainId uint64, 
 		enableMessageQueueV2:    enableMessageQueueV2,
 		l1MessageQueueV2Address: l1MessageQueueV2Address,
 		filtererV2:              filtererV2,
+
+		scrollChainAddress: scrollChainAddress,
 	}
 
 	return &client, nil
@@ -152,6 +158,82 @@ func (c *BridgeClient) fetchMessagesInRange(ctx context.Context, from, to uint64
 	}
 
 	return msgsV1, msgsV2, nil
+}
+
+// fetchEncryptionKeysInRange retrieves and parses all NewEncryptionKey events between the
+// provided from and to L1 block numbers (inclusive).
+func (c *BridgeClient) fetchEncryptionKeysInRange(ctx context.Context, from, to uint64) ([]types.EncryptionKey, error) {
+	log.Trace("BridgeClient fetchEncryptionKeysInRange", "fromBlock", from, "toBlock", to)
+
+	var keys []types.EncryptionKey
+
+	opts := bind.FilterOpts{
+		Start:   from,
+		End:     &to,
+		Context: ctx,
+	}
+
+	// Get the NewEncryptionKey event ID from the ABI
+	eventID := l1.ScrollChainValidiumABI.Events["NewEncryptionKey"].ID
+
+	// Query NewEncryptionKey events from ScrollChainValidium
+	query := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(from)),
+		ToBlock:   big.NewInt(int64(to)),
+		Addresses: []common.Address{c.scrollChainAddress},
+		Topics:    [][]common.Hash{{eventID}},
+	}
+
+	logs, err := c.client.FilterLogs(opts.Context, query)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, vLog := range logs {
+		// Parse event
+		var event struct {
+			KeyId    *big.Int
+			MsgIndex *big.Int
+			Key      []byte
+		}
+
+		err := l1.ScrollChainValidiumABI.UnpackIntoInterface(&event, "NewEncryptionKey", vLog.Data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unpack NewEncryptionKey event: %w", err)
+		}
+
+		// Extract keyId from indexed parameter (first topic after event signature)
+		if len(vLog.Topics) < 2 {
+			return nil, fmt.Errorf("NewEncryptionKey event missing keyId topic")
+		}
+		event.KeyId = new(big.Int).SetBytes(vLog.Topics[1].Bytes())
+
+		if !event.KeyId.IsUint64() || !event.MsgIndex.IsUint64() {
+			return nil, fmt.Errorf("invalid NewEncryptionKey event: KeyId = %v, MsgIndex = %v", event.KeyId, event.MsgIndex)
+		}
+
+		// Validate key length: ECIES public keys are 33 bytes (compressed) or 65 bytes (uncompressed)
+		if len(event.Key) != 33 && len(event.Key) != 65 {
+			return nil, fmt.Errorf("invalid encryption key length %d for keyId %d (expected 33 or 65 bytes)", len(event.Key), event.KeyId.Uint64())
+		}
+
+		encKey := types.EncryptionKey{
+			KeyId:    event.KeyId.Uint64(),
+			MsgIndex: event.MsgIndex.Uint64(),
+			Key:      event.Key,
+		}
+
+		log.Info("Fetched new encryption key from ScrollChainValidium",
+			"keyId", encKey.KeyId,
+			"msgIndex", encKey.MsgIndex,
+			"keyLength", len(encKey.Key),
+			"blockNumber", vLog.BlockNumber,
+			"txHash", vLog.TxHash.Hex())
+
+		keys = append(keys, encKey)
+	}
+
+	return keys, nil
 }
 
 func (c *BridgeClient) getLatestConfirmedBlockNumber(ctx context.Context) (uint64, error) {

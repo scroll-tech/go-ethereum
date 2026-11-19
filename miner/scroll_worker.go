@@ -37,6 +37,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/core/validium"
 	"github.com/scroll-tech/go-ethereum/core/vm"
+	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/event"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
@@ -78,6 +79,107 @@ var (
 	missingRCOnRestartCounter = metrics.NewRegisteredCounter("miner/missing_rc_on_restart", nil)
 	missingAncestorRCCounter  = metrics.NewRegisteredCounter("miner/missing_ancestor_rc", nil)
 )
+
+// findNextKeyRotationBoundary finds the msgIndex at which the next key rotation occurs
+// after the given queue index. Returns math.MaxUint64 if there is no subsequent rotation.
+//
+// This is used to efficiently find key rotation boundaries when collecting L1 messages.
+//
+// IMPORTANT: Key selection is based on L1 message queueIndex vs encryption key msgIndex,
+// NOT on keyId. The keyId is only used as a database index to iterate through stored keys.
+// The actual rotation boundary is determined by comparing EncryptionKey.MsgIndex with queueIndex.
+//
+// Optimization: Loop backwards from highest key since we're usually processing recent messages
+// with the latest key, making the next rotation boundary likely to be near the end.
+func findNextKeyRotationBoundary(db ethdb.Reader, queueIndex uint64) (uint64, error) {
+	highestKeyId := rawdb.ReadHighestSyncedEncryptionKeyId(db)
+
+	// Bootstrap mode or single key: no keys synced yet
+	if highestKeyId == 0 {
+		key0 := rawdb.ReadEncryptionKey(db, 0)
+		if key0 == nil {
+			// No keys at all
+			return ^uint64(0), nil
+		}
+		// Only one key exists, no rotation
+		return ^uint64(0), nil
+	}
+
+	// Find the smallest msgIndex that is > queueIndex
+	// Loop backwards: most likely processing recent messages, so next rotation is near the end
+	var nextRotationIndex uint64 = ^uint64(0)
+
+	for keyId := highestKeyId; ; keyId-- {
+		encKey := rawdb.ReadEncryptionKey(db, keyId)
+		if encKey == nil {
+			return 0, fmt.Errorf("missing encryption key in database: keyId %d", keyId)
+		}
+
+		// Selection based on msgIndex vs queueIndex (keyId is just for DB access)
+		if encKey.MsgIndex > queueIndex {
+			// Keep updating - going backwards, we want the smallest one
+			nextRotationIndex = encKey.MsgIndex
+		}
+
+		// Break at keyId 0 (can't use keyId >= 0 in loop condition with unsigned)
+		if keyId == 0 {
+			break
+		}
+	}
+
+	return nextRotationIndex, nil
+}
+
+// selectEncryptionKeyFromDB queries the database to find the appropriate encryption key
+// for the given L1 message queue index. It finds the key with the highest msgIndex <= queueIndex.
+//
+// This matches the on-chain algorithm in ScrollChainValidium._getEncryptionKey (lines 432-445).
+//
+// IMPORTANT: Key selection is based on L1 message queueIndex vs encryption key msgIndex,
+// NOT on keyId. The keyId is only used as a database index to iterate through stored keys.
+// The actual key is selected by comparing EncryptionKey.MsgIndex with queueIndex.
+//
+// Optimization: Loop backwards from highest key since we're usually processing recent messages
+// with the latest key. In most cases, the latest key is the correct one.
+//
+// Returns the compressed public key (33 bytes) to use for decryption, or error if no key is available.
+func selectEncryptionKeyFromDB(db ethdb.Reader, queueIndex uint64) ([]byte, error) {
+	highestKeyId := rawdb.ReadHighestSyncedEncryptionKeyId(db)
+
+	// Bootstrap mode: no keys synced yet
+	if highestKeyId == 0 {
+		// Try to read key 0
+		key0 := rawdb.ReadEncryptionKey(db, 0)
+		if key0 == nil {
+			return nil, fmt.Errorf("no encryption keys synced in database")
+		}
+		// Key 0 should be valid for all messages in bootstrap mode
+		return key0.Key, nil
+	}
+
+	// Find the key with highest msgIndex <= queueIndex
+	// Loop backwards: most messages use the latest key, so we'll find it immediately
+	for keyId := highestKeyId; ; keyId-- {
+		encKey := rawdb.ReadEncryptionKey(db, keyId)
+		if encKey == nil {
+			return nil, fmt.Errorf("missing encryption key in database: keyId %d", keyId)
+		}
+
+		// Selection based on msgIndex vs queueIndex (keyId is just for DB access)
+		if encKey.MsgIndex <= queueIndex {
+			// Found it! This is the most recent key valid for this message
+			return encKey.Key, nil
+		}
+
+		// Break at keyId 0 (can't use keyId >= 0 in loop condition with unsigned)
+		if keyId == 0 {
+			break
+		}
+	}
+
+	// No key found - all keys start after this message
+	return nil, fmt.Errorf("no encryption key available for queue index %d (all keys start after this message)", queueIndex)
+}
 
 // prioritizedTransaction represents a single transaction that
 // should be processed as the first transaction in the next block.
@@ -472,15 +574,66 @@ func (w *worker) updateSnapshot() {
 // collectPendingL1Messages reads pending L1 messages from the database.
 // It returns a list of L1 messages that can be included in the block. Depending on the current
 // block time, it reads L1 messages from either L1MessageQueueV1 or L1MessageQueueV2.
+//
+// IMPORTANT: This function enforces key rotation boundaries. When a key rotation is detected
+// (i.e., the next message uses a different encryption key), it stops collecting messages and
+// returns only those encrypted with the same key. This ensures:
+//   1. Each block contains messages encrypted with a single key
+//   2. Key rotations define natural block boundaries
+//   3. Sequencer behavior aligns with rollup-relayer batch boundary enforcement
+//   4. No consensus divergence between sequencer and prover
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
 
-	// If we are on EuclidV2, we need to read L1 messages from L1MessageQueueV2.
+	// Fetch all available messages up to maxCount
+	var allMessages []types.L1MessageTx
 	if w.chainConfig.IsEuclidV2(w.current.header.Time) {
-		return rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
+		allMessages = rawdb.ReadL1MessagesV2From(w.eth.ChainDb(), startIndex, maxCount)
+	} else {
+		allMessages = rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
 	}
 
-	return rawdb.ReadL1MessagesV1From(w.eth.ChainDb(), startIndex, maxCount)
+	if len(allMessages) == 0 {
+		return allMessages
+	}
+
+	// Check for key rotation boundary: all messages in block must use same encryption key.
+	// The rollup-relayer cannot break up blocks, so the sequencer must stop collecting messages
+	// at key rotation boundaries to ensure each block contains messages with a single key.
+	//
+	// Optimization: Find the next key rotation boundary by scanning the DB encryption keys,
+	// then stop message collection before reaching that boundary. This is more efficient than
+	// querying the encryption key for every message.
+
+	db := w.eth.ChainDb()
+	nextRotationIndex, err := findNextKeyRotationBoundary(db, startIndex)
+	if err != nil {
+		log.Warn("Failed to find next key rotation boundary, skipping L1 messages for this block",
+			"startIndex", startIndex, "err", err)
+		return nil
+	}
+
+	// If no rotation boundary found (maxUint64), include all messages
+	if nextRotationIndex == ^uint64(0) {
+		return allMessages
+	}
+
+	// Scan messages and stop if we reach the rotation boundary
+	for i := 0; i < len(allMessages); i++ {
+		queueIndex := allMessages[i].QueueIndex
+
+		// If this message is at or after the rotation boundary, stop here
+		if queueIndex >= nextRotationIndex {
+			log.Info("Key rotation boundary detected, stopping L1 message collection",
+				"firstIndex", startIndex,
+				"rotationIndex", nextRotationIndex,
+				"messagesIncluded", i)
+			return allMessages[:i]
+		}
+	}
+
+	// No rotation boundary encountered in this batch, include all messages
+	return allMessages
 }
 
 // newWork
@@ -704,13 +857,41 @@ func (w *worker) processTxPool() (bool, error) {
 	}
 
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Messages) > 0 {
-		// Decrypt L1 message payloads.
+		// Decrypt L1 message payloads using queue-specific keys for rotation support.
+		//
+		// Error handling distinguishes operator errors from user errors:
+		// - ErrMissingPrivateKey (operator error): Stop including L1 messages entirely.
+		//   The sequencer cannot decrypt messages without the correct private key configured.
+		//   Already-processed messages are still included; the block continues with L2 txs.
+		// - ErrDecryptionFailed (user error): Include the message as-is and continue.
+		//   Users can submit invalid encrypted data on L2 which will revert on execution.
 		for i := range l1Messages {
-			if decrypted, err := validium.DecryptTxData(l1Messages[i].Data); err == nil {
+			queueIndex := l1Messages[i].QueueIndex
+
+			// Select which public key to use by querying the database
+			pubKey, err := selectEncryptionKeyFromDB(w.eth.ChainDb(), queueIndex)
+			if err != nil {
+				log.Error("Failed to select encryption key, stopping L1 message inclusion", "queueIndex", queueIndex, "err", err)
+				l1Messages = l1Messages[:i]
+				break
+			}
+
+			// Decrypt with the selected public key
+			decrypted, err := validium.DecryptTxDataWithPubKey(l1Messages[i].Data, pubKey)
+			if err == nil {
 				prevHash := types.NewTx(&l1Messages[i]).Hash().Hex()
 				l1Messages[i].Data = decrypted
 				newHash := types.NewTx(&l1Messages[i]).Hash().Hex()
-				log.Info("Decrypted L1 message", "queueIndex", l1Messages[i].QueueIndex, "prevHash", prevHash, "newHash", newHash)
+				log.Info("Decrypted L1 message", "queueIndex", queueIndex, "prevHash", prevHash, "newHash", newHash)
+			} else if errors.Is(err, validium.ErrMissingPrivateKey) {
+				// Operator error: private key not configured. Stop including L1 messages
+				// but continue building the block with what we have so far.
+				log.Error("Missing private key for L1 message decryption, stopping L1 message inclusion", "queueIndex", queueIndex, "error", err)
+				l1Messages = l1Messages[:i]
+				break
+			} else {
+				// User error (ErrDecryptionFailed or other): include message as-is, it will revert on execution.
+				log.Warn("Failed to decrypt L1 message, including as-is", "queueIndex", queueIndex, "error", err)
 			}
 		}
 

@@ -40,7 +40,9 @@ const (
 )
 
 var (
-	l1MessageTotalCounter = metrics.NewRegisteredCounter("rollup/l1/message", nil)
+	l1MessageTotalCounter        = metrics.NewRegisteredCounter("rollup/l1/message", nil)
+	encryptionKeysSyncedCounter  = metrics.NewRegisteredCounter("rollup/encryption_keys/synced", nil)
+	encryptionKeysActiveGauge    = metrics.NewRegisteredGauge("rollup/encryption_keys/active", nil)
 )
 
 // SyncService collects all L1 messages and stores them in a local database.
@@ -68,7 +70,7 @@ func NewSyncService(ctx context.Context, genesisConfig *params.ChainConfig, node
 		return nil, fmt.Errorf("missing L1 config in genesis")
 	}
 
-	client, err := newBridgeClient(ctx, l1Client, genesisConfig.Scroll.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.Scroll.L1Config.L1MessageQueueAddress, !nodeConfig.L1DisableMessageQueueV2, genesisConfig.Scroll.L1Config.L1MessageQueueV2Address)
+	client, err := newBridgeClient(ctx, l1Client, genesisConfig.Scroll.L1Config.L1ChainId, nodeConfig.L1Confirmations, genesisConfig.Scroll.L1Config.L1MessageQueueAddress, !nodeConfig.L1DisableMessageQueueV2, genesisConfig.Scroll.L1Config.L1MessageQueueV2Address, genesisConfig.Scroll.L1Config.ScrollChainAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bridge client: %w", err)
 	}
@@ -271,6 +273,41 @@ func (s *SyncService) fetchMessages() {
 			}
 			log.Warn("Failed to fetch L1 messages in range", "fromBlock", from, "toBlock", to, "err", err)
 			return
+		}
+
+		// Fetch encryption keys in the same block range (atomic with L1 messages)
+		encryptionKeys, err := s.client.fetchEncryptionKeysInRange(s.ctx, from, to)
+		if err != nil {
+			// flush pending writes to database
+			if from > 0 {
+				flush(from - 1)
+			}
+			log.Warn("Failed to fetch encryption keys in range", "fromBlock", from, "toBlock", to, "err", err)
+			return
+		}
+
+		if len(encryptionKeys) > 0 {
+			// Update metrics
+			encryptionKeysSyncedCounter.Inc(int64(len(encryptionKeys)))
+			if len(encryptionKeys) > 0 {
+				highestKeyId := encryptionKeys[len(encryptionKeys)-1].KeyId
+				encryptionKeysActiveGauge.Update(int64(highestKeyId + 1))
+			}
+
+			log.Info("Syncing new encryption keys to database",
+				"count", len(encryptionKeys),
+				"fromBlock", from,
+				"toBlock", to)
+
+			// Log each individual key for visibility
+			for _, key := range encryptionKeys {
+				log.Info("Storing encryption key",
+					"keyId", key.KeyId,
+					"msgIndex", key.MsgIndex,
+					"keyLength", len(key.Key))
+			}
+
+			rawdb.WriteEncryptionKeys(batchWriter, encryptionKeys)
 		}
 
 		// write start index of very first L1MessageV2 to database. This is true only once.

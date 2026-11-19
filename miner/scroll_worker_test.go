@@ -307,6 +307,24 @@ func TestGenerateBlockWithL1MsgClique(t *testing.T) {
 	testGenerateBlockWithL1Msg(t, true)
 }
 
+func TestCollectPendingL1MessagesWithMissingRotationRecord(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	defer db.Close()
+	config := params.AllCliqueProtocolChanges.Clone()
+	config.Scroll.L1Config = &params.L1Config{NumL1MessagesPerBlock: 1}
+	w := &worker{
+		eth:         &testWorkerBackend{db: db},
+		chainConfig: config,
+		current:     &work{header: &types.Header{}},
+	}
+
+	rawdb.WriteL1Messages(db, []types.L1MessageTx{{QueueIndex: 0, To: &common.Address{1}}})
+	require.Len(t, w.collectPendingL1Messages(0), 1)
+
+	rawdb.WriteEncryptionKey(db, types.EncryptionKey{KeyId: 1, MsgIndex: 0})
+	require.Empty(t, w.collectPendingL1Messages(0))
+}
+
 func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 	assert := assert.New(t)
 	var (

@@ -982,7 +982,7 @@ var (
 
 	ValidiumSequencerKeys = cli.StringFlag{
 		Name:  "validium.sequencerkeys",
-		Usage: "Validium sequencer decryption keys",
+		Usage: "Validium sequencer decryption keys (comma-separated hex, keyId 0,1,2,...)",
 	}
 )
 
@@ -1778,13 +1778,29 @@ func setValidium(ctx *cli.Context, cfg *ethconfig.Config) {
 		Fatalf("No sequencer decryption keys configured in validium mode")
 	}
 
-	// parse decryption key
-	hex := ctx.String(ValidiumSequencerKeys.Name)
-	key, err := ecies.NewPrivateKeyFromHex(hex)
-	if err != nil {
-		Fatalf("error while parsing sequencer key: %w", err)
+	// parse decryption keys (comma-separated for key rotation support)
+	keysStr := ctx.String(ValidiumSequencerKeys.Name)
+	keyStrings := strings.Split(keysStr, ",")
+
+	keys := make([]*ecies.PrivateKey, 0, len(keyStrings))
+	for i, hexKey := range keyStrings {
+		trimmed := strings.TrimSpace(hexKey)
+		if trimmed == "" {
+			continue // Skip empty entries
+		}
+		key, err := ecies.NewPrivateKeyFromHex(trimmed)
+		if err != nil {
+			Fatalf("error while parsing sequencer key %d: %v", i, err)
+		}
+		keys = append(keys, key)
 	}
-	validium.SetSequencerKey(key)
+
+	if len(keys) == 0 {
+		Fatalf("no valid sequencer keys provided")
+	}
+
+	validium.SetSequencerKeys(keys)
+	log.Info("Configured sequencer keys", "keyCount", len(keys))
 }
 
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -2180,6 +2196,7 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
 	}
+
 	if cfg.LightServ > 0 {
 		_, err := les.NewLesServer(stack, backend, cfg)
 		if err != nil {

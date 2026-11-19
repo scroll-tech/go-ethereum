@@ -608,9 +608,9 @@ func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx
 	db := w.eth.ChainDb()
 	nextRotationIndex, err := findNextKeyRotationBoundary(db, startIndex)
 	if err != nil {
-		log.Warn("Failed to find next key rotation boundary, including all messages",
+		log.Warn("Failed to find next key rotation boundary, skipping L1 messages for this block",
 			"startIndex", startIndex, "err", err)
-		return allMessages
+		return nil
 	}
 
 	// If no rotation boundary found (maxUint64), include all messages

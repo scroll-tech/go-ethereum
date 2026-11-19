@@ -289,6 +289,13 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// if caller doesn't have enough balance, it would be an error to allow
 	// over-charging itself. So the check here is necessary.
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
+		// EIP-7702: Ensure delegated code is loaded into witness even when balance check fails.
+		// revm always loads the code regardless of balance check result.
+		if code := evm.StateDB.GetCode(addr); len(code) > 0 {
+			if target, ok := types.ParseDelegation(code); ok {
+				evm.StateDB.GetCode(target)
+			}
+		}
 		return nil, gas, ErrInsufficientBalance
 	}
 	var snapshot = evm.StateDB.Snapshot()

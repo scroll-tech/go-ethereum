@@ -773,6 +773,10 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if !pool.eip1559 && tx.Type() == types.DynamicFeeTxType {
 		return ErrTxTypeNotSupported
 	}
+	// Reject blob transactions.
+	if tx.Type() == types.BlobTxType {
+		return ErrTxTypeNotSupported
+	}
 	// Reject set code transactions until EIP-7702 activates.
 	if !pool.eip7702 && tx.Type() == types.SetCodeTxType {
 		return ErrTxTypeNotSupported

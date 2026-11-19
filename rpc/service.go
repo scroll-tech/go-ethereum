@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
-	"strings"
 	"sync"
+	"sync/atomic"
 	"unicode"
 
 	"github.com/scroll-tech/go-ethereum/log"
@@ -39,6 +39,11 @@ var (
 type serviceRegistry struct {
 	mu       sync.Mutex
 	services map[string]service
+	// filter holds a *MethodFilter restricting which of the registered methods
+	// may be dispatched, or nothing at all to allow every one of them. It is
+	// written once during setup and read on every request, so it is kept out of
+	// the registration lock. See MethodFilter.
+	filter atomic.Value
 }
 
 // service represents a registered object.
@@ -94,13 +99,29 @@ func (r *serviceRegistry) registerName(name string, rcvr interface{}) error {
 
 // callback returns the callback corresponding to the given RPC method name.
 func (r *serviceRegistry) callback(method string) *callback {
-	elem := strings.SplitN(method, serviceMethodSeparator, 2)
-	if len(elem) != 2 {
+	namespace, name, ok := splitMethodName(method)
+	if !ok {
 		return nil
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.services[elem[0]].callbacks[elem[1]]
+	return r.services[namespace].callbacks[name]
+}
+
+// setFilter installs the method filter. It is called during server setup,
+// before any codec is served.
+func (r *serviceRegistry) setFilter(filter *MethodFilter) {
+	r.filter.Store(filter)
+}
+
+// allows reports whether the filter permits dispatching the given
+// fully-qualified method. Registries without a filter permit everything.
+//
+// This runs for every request, so it reads the filter without taking the
+// registration lock.
+func (r *serviceRegistry) allows(method string) bool {
+	filter, _ := r.filter.Load().(*MethodFilter)
+	return filter.Allows(method)
 }
 
 // subscription returns a subscription callback in the given service.

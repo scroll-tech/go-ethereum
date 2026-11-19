@@ -427,6 +427,11 @@ type jsTracer struct {
 // which must evaluate to an expression returning an object with 'step', 'fault'
 // and 'result' functions.
 func newJsTracer(code string, ctx *tracers2.Context) (tracers2.Tracer, error) {
+	// Checked again here, not only in tracers.New, so that no duktape VM is ever
+	// built while JavaScript tracers are disabled, whatever the call path.
+	if tracers2.JSTracersDisabled() {
+		return nil, tracers2.ErrJSTracersDisabled
+	}
 	if c, ok := assetTracers[code]; ok {
 		code = c
 	}

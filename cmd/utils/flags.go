@@ -609,7 +609,7 @@ var (
 	}
 	HTTPApiFlag = cli.StringFlag{
 		Name:  "http.api",
-		Usage: "API's offered over the HTTP-RPC interface",
+		Usage: "API's offered over the HTTP-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
 		Value: "",
 	}
 	HTTPPathPrefixFlag = cli.StringFlag{
@@ -647,7 +647,7 @@ var (
 	}
 	WSApiFlag = cli.StringFlag{
 		Name:  "ws.api",
-		Usage: "API's offered over the WS-RPC interface",
+		Usage: "API's offered over the WS-RPC interface. An entry is a namespace (\"debug\") or a single method (\"debug:executionWitness\"); naming any method of a namespace denies the rest of it",
 		Value: "",
 	}
 	WSAllowedOriginsFlag = cli.StringFlag{
@@ -671,6 +671,10 @@ var (
 	AllowUnprotectedTxs = cli.BoolFlag{
 		Name:  "rpc.allow-unprotected-txs",
 		Usage: "Allow for unprotected (non EIP155 signed) transactions to be submitted via RPC",
+	}
+	DisableJSTracersFlag = cli.BoolFlag{
+		Name:  "rpc.disable-js-tracers",
+		Usage: "Reject debug_trace* requests asking for any JavaScript tracer, leaving only the native Go tracers (callTracer, prestateTracer, 4byteTracer, flatCallTracer, noopTracerNative)",
 	}
 
 	// Network Settings
@@ -872,7 +876,7 @@ var (
 	// Circuit capacity check settings
 	CircuitCapacityCheckEnabledFlag = cli.BoolFlag{
 		Name:  "ccc",
-		Usage: "Enable circuit capacity check during block validation",
+		Usage: "Enable circuit capacity check during block validation (no longer supported, node fails to start)",
 	}
 
 	CircuitCapacityCheckWorkersFlag = cli.UintFlag{
@@ -1430,6 +1434,10 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 
 	if ctx.IsSet(DASyncEnabledFlag.Name) {
 		cfg.DaSyncingEnabled = ctx.Bool(DASyncEnabledFlag.Name)
+	}
+
+	if ctx.GlobalIsSet(DisableJSTracersFlag.Name) {
+		cfg.DisableJSTracers = ctx.GlobalBool(DisableJSTracersFlag.Name)
 	}
 
 	cfg.DAMissingHeaderFieldsBaseURL = ctx.GlobalString(DAMissingHeaderFieldsBaseURLFlag.Name)
@@ -2167,6 +2175,13 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 // The second return value is the full node instance, which may be nil if the
 // node is running as a light client.
 func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend, *eth.Ethereum) {
+	// Applied before the tracer APIs below are registered, so the interpreted
+	// engines are already off by the time any of them can be called.
+	if stack.Config().DisableJSTracers {
+		log.Info("JavaScript tracers disabled, only native tracers are reachable")
+		tracers.DisableJSTracers()
+	}
+
 	// initialize L1 client for sync service
 	// note: we need to do this here to avoid circular dependency
 	l1EndpointUrl := stack.Config().L1Endpoint

@@ -1,3 +1,6 @@
+// The tests below depend on rand.Seed, which is a no-op by default since Go 1.24.
+//go:debug randseednop=0
+
 package metrics
 
 import (

@@ -135,9 +135,6 @@ func TestGethClient(t *testing.T) {
 			"TestGetNodeInfo",
 			func(t *testing.T) { testGetNodeInfo(t, client) },
 		}, {
-			"TestSetHead",
-			func(t *testing.T) { testSetHead(t, client) },
-		}, {
 			"TestSubscribePendingTxs",
 			func(t *testing.T) { testSubscribePendingTransactions(t, client) },
 		}, {
@@ -146,6 +143,9 @@ func TestGethClient(t *testing.T) {
 		}, {
 			"TestCallContractNoGas",
 			func(t *testing.T) { testCallContractNoGas(t, client) },
+		}, {
+			"TestSetHead",
+			func(t *testing.T) { testSetHead(t, client) },
 		},
 	}
 	t.Parallel()

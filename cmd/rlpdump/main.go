@@ -130,7 +130,7 @@ func dump(s *rlp.Stream, depth int, out io.Writer) error {
 		s.List()
 		defer s.ListEnd()
 		if size == 0 {
-			fmt.Fprintf(out, ws(depth)+"[]")
+			fmt.Fprint(out, ws(depth)+"[]")
 		} else {
 			fmt.Fprintln(out, ws(depth)+"[")
 			for i := 0; ; i++ {

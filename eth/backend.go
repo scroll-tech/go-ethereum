@@ -61,7 +61,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/rollup/ccc"
 	"github.com/scroll-tech/go-ethereum/rollup/da_syncer"
 	"github.com/scroll-tech/go-ethereum/rollup/l1"
 	"github.com/scroll-tech/go-ethereum/rollup/missing_header_fields"
@@ -82,7 +81,6 @@ type Ethereum struct {
 	txPool            *core.TxPool
 	syncService       *sync_service.SyncService
 	rollupSyncService *rollup_sync_service.RollupSyncService
-	asyncChecker      *ccc.AsyncChecker
 	syncingPipeline   *da_syncer.SyncingPipeline
 
 	blockchain         *core.BlockChain
@@ -127,6 +125,9 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	}
 	if !config.SyncMode.IsValid() {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
+	}
+	if config.CheckCircuitCapacity {
+		return nil, errors.New("circuit capacity checker (--ccc) is no longer supported")
 	}
 	if config.Miner.GasPrice == nil || config.Miner.GasPrice.Cmp(common.Big0) <= 0 {
 		log.Warn("Sanitizing invalid miner gas price", "provided", config.Miner.GasPrice, "updated", ethconfig.Defaults.Miner.GasPrice)
@@ -213,14 +214,6 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client l1.Client) (*Ether
 	if err != nil {
 		return nil, err
 	}
-	if config.CheckCircuitCapacity {
-		eth.asyncChecker = ccc.NewAsyncChecker(eth.blockchain, config.CCCMaxWorkers, false)
-		eth.asyncChecker.WithOnFailingBlock(func(b *types.Block, err error) {
-			log.Warn("block failed CCC check, it will be reorged by the sequencer", "hash", b.Hash().Hex(), "err", err)
-		})
-		eth.blockchain.Validator().WithAsyncValidator(eth.asyncChecker.Check)
-	}
-
 	state, err := eth.blockchain.State()
 	if err != nil {
 		return nil, err
@@ -712,9 +705,6 @@ func (s *Ethereum) Stop() error {
 		s.syncingPipeline.Stop()
 	}
 	s.miner.Close()
-	if s.config.CheckCircuitCapacity {
-		s.asyncChecker.Wait()
-	}
 	s.blockchain.Stop()
 	s.engine.Close()
 	if s.sequencerRPCService != nil {

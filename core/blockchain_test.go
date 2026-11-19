@@ -1164,6 +1164,32 @@ func checkLogEvents(t *testing.T, logsCh <-chan []*types.Log, rmLogsCh <-chan Re
 	}
 }
 
+// Tests that SetHead emits a chain head event, so that subscribers like the
+// transaction pool and the miner move to the new head.
+func TestSetHeadEmitsChainHeadEvent(t *testing.T) {
+	_, blockchain, err := newCanonical(ethash.NewFaker(), 10, true)
+	if err != nil {
+		t.Fatalf("failed to create pristine chain: %v", err)
+	}
+	defer blockchain.Stop()
+
+	headCh := make(chan ChainHeadEvent, 1)
+	sub := blockchain.SubscribeChainHeadEvent(headCh)
+	defer sub.Unsubscribe()
+
+	if err := blockchain.SetHead(5); err != nil {
+		t.Fatalf("failed to set head: %v", err)
+	}
+	select {
+	case ev := <-headCh:
+		if got := ev.Block.NumberU64(); got != 5 {
+			t.Fatalf("chain head event block number mismatch: have %d, want 5", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for chain head event")
+	}
+}
+
 func TestReorgSideEvent(t *testing.T) {
 	var (
 		db      = rawdb.NewMemoryDatabase()

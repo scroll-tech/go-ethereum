@@ -317,6 +317,13 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 
 // handleCall processes method calls.
 func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
+	// Enforce the method allowlist before anything is dispatched. Both single
+	// and batch requests reach this point per message, so every element of a
+	// batch is checked on its own. A refused method reports the same error as
+	// one that was never registered, so the two cannot be told apart.
+	if !h.reg.allows(msg.Method) {
+		return msg.errorResponse(&methodNotFoundError{method: msg.Method})
+	}
 	if msg.isSubscribe() {
 		return h.handleSubscribe(cp, msg)
 	}
